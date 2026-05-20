@@ -87,7 +87,7 @@
         </div>
         <div class="form-group"><label>Final Date to Retire:</label><input type="date" id="p_retire"></div>
       </div>
-
+<thead><tr><th>Year</th><th>Your Age</th><th>Combined Outgoings</th><th>Tax-Free Pot Balance</th><th>Taxable Pot Balance</th><th>Other Income Streams</th><th>Required Drawdown</th><th>Total Gross Income</th></tr></thead>
       <div style="flex:1; min-width:300px;">
         <div class="form-group" style="margin-bottom: 25px;">
           <label>Reduction in Spending: <span id="v_spend" class="slider-val">100%</span></label>
@@ -300,10 +300,10 @@
         });
         globalDrawdownData = await mathRes.json();
 
-        // Populate Joint Retirement Table
-        document.querySelector("#rTable tbody").innerHTML = globalDrawdownData.length ? globalDrawdownData.map(r => {
-          return `<tr><td>${r.retirement_year}</td><td>${fmt(r.total_outgoings)}</td><td>${fmt(r.tax_free_pot)}</td><td>${fmt(r.taxable_pot)}</td><td>${fmt(r.other_pensions)}</td><td>${fmt(r.drawdown_amount)}</td><td style="font-weight:bold; color:#27ae60;">${fmt(r.total_income)}</td></tr>`;
-        }).join('') : '<tr><td colspan="7">No calculation rows computed.</td></tr>';
+    // Replace the globalDrawdownData.map line inside loadAllData() with this:
+document.querySelector("#rTable tbody").innerHTML = globalDrawdownData.length ? globalDrawdownData.map(r => {
+  return `<tr><td>${r.retirement_year}</td><td style="font-weight:bold; color:#3498db;">${r.current_age}</td><td>${fmt(r.total_outgoings)}</td><td>${fmt(r.tax_free_pot)}</td><td>${fmt(r.taxable_pot)}</td><td>${fmt(r.other_pensions)}</td><td>${fmt(r.drawdown_amount)}</td><td style="font-weight:bold; color:#27ae60;">${fmt(r.total_income)}</td></tr>`;
+}).join('') : '<tr><td colspan="8">No calculation rows computed.</td></tr>';
 
         // Populate tiles inside Modelling Tab
         if(globalDrawdownData.length > 0) {
