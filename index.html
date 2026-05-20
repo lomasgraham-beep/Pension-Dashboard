@@ -13,7 +13,6 @@
     .tab-buttons button { background: inherit; float: left; border: none; outline: none; cursor: pointer; padding: 14px 16px; font-size: 16px; font-weight: bold; color: #4a5568;}
     .tab-buttons button.active-btn { background: white; border-bottom: 3px solid #3498db; color: #2c3e50; }
     
-    /* Dashboard Cards */
     h2 { color: #2c3e50; margin-top: 0; padding-bottom: 5px; border-bottom: 2px solid #e2e8f0; }
     .section-title { margin-top: 30px; }
     .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
@@ -23,7 +22,6 @@
     .highlight-card { background: #eff6ff; border-color: #bfdbfe; }
     .highlight-card .value { color: #1e3a8a; }
 
-    /* Chart Containers */
     .chart-box { width: 100%; height: 400px; margin-bottom: 30px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
 
     table { width: 100%; border-collapse: collapse; margin-top: 15px; }
@@ -33,9 +31,14 @@
     .btn:hover { background: #2980b9; }
     .btn-sync { background: #27ae60; }
     .btn-sync:hover { background: #219150; }
+    
     .form-group { margin-bottom: 15px; }
     label { display: block; margin-bottom: 5px; font-weight: bold; }
-    input[type="date"], input[type="number"] { padding: 10px; width: 100%; max-width: 300px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;}
+    input[type="date"], input[type="number"], select { padding: 10px; width: 100%; max-width: 300px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;}
+    input[type="range"] { width: 100%; max-width: 300px; cursor: pointer; }
+    .slider-val { color: #3498db; font-size: 18px; font-weight: bold; margin-left: 10px;}
+    
+    #statusMsg, #paramMsg { margin-top: 15px; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -47,6 +50,7 @@
 
   <div class="tab-buttons">
     <button class="tab-link active-btn" onclick="showTab(event, 'Overview')">Overview & Analytics</button>
+    <button class="tab-link" onclick="showTab(event, 'Parameters')">Modelling</button>
     <button class="tab-link" onclick="showTab(event, 'NewEntry')">Log Entry</button>
     <button class="tab-link" onclick="showTab(event, 'History')">Recent Logs</button>
     <button class="tab-link" onclick="showTab(event, 'Forecast')">Forecast</button>
@@ -54,7 +58,6 @@
   </div>
 
   <div id="Overview" class="tabcontent active">
-    
     <h2>Pru Overview</h2>
     <div class="card-grid">
       <div class="card highlight-card"><h3>Current Month Growth</h3><div id="mPruGrowth" class="value">£0</div></div>
@@ -63,20 +66,58 @@
       <div class="card"><h3>Monthly Avg Growth</h3><div id="mPruAvg" class="value">£0</div></div>
       <div class="card highlight-card"><h3>Total Growth</h3><div id="mPruTotal" class="value">£0</div></div>
     </div>
-
     <h2 class="section-title">Aegon Overview</h2>
     <div class="card-grid">
       <div class="card highlight-card"><h3>Current Value</h3><div id="mAegonCur" class="value">£0</div></div>
       <div class="card"><h3>Expected Value</h3><div id="mAegonExp" class="value">£0</div></div>
       <div class="card"><h3>Overall Projection</h3><div id="mAegonProj" class="value">0%</div></div>
     </div>
-
     <h2 class="section-title">Interactive Growth Tracking</h2>
-    <p style="font-size: 13px; color: #7f8c8d;"><em>Tip: Click and drag over an area on the chart to zoom in. Right-click to reset.</em></p>
-    
     <div id="pruChart" class="chart-box"></div>
     <div id="aegonChart" class="chart-box"></div>
+  </div>
 
+  <div id="Parameters" class="tabcontent">
+    <h2>Retirement Modelling Parameters</h2>
+    <p style="color:#64748b; margin-bottom:20px;">Adjust your working days and contribution sliders below. Saving will update your live sheet forecasts.</p>
+    
+    <div style="display:flex; flex-wrap:wrap; gap:40px;">
+      
+      <div style="flex:1; min-width:300px;">
+        <div class="form-group"><label>Date to work shorter week 1:</label><input type="date" id="p_date1"></div>
+        <div class="form-group"><label>Number of days 1:</label>
+          <select id="p_days1">
+            <option value="5">5 Days</option>
+            <option value="4">4 Days</option>
+            <option value="3">3 Days</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Date to work shorter week 2:</label><input type="date" id="p_date2"></div>
+        <div class="form-group"><label>Number of days 2:</label>
+          <select id="p_days2">
+            <option value="5">5 Days</option>
+            <option value="4">4 Days</option>
+            <option value="3">3 Days</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Final Date to Retire:</label><input type="date" id="p_retire"></div>
+      </div>
+
+      <div style="flex:1; min-width:300px;">
+        <div class="form-group" style="margin-bottom: 25px;">
+          <label>Reduction in Spending: <span id="v_spend" class="slider-val">100%</span></label>
+          <input type="range" id="p_spend" min="25" max="100" value="100" oninput="document.getElementById('v_spend').innerText = this.value + '%'">
+        </div>
+        <div class="form-group">
+          <label>Graham Bills Contribution: <span id="v_bills" class="slider-val">100%</span></label>
+          <input type="range" id="p_bills" min="25" max="100" value="100" oninput="document.getElementById('v_bills').innerText = this.value + '%'">
+        </div>
+      </div>
+      
+    </div>
+    
+    <button type="button" class="btn" style="margin-top:15px;" onclick="submitParams()">Save Parameters</button>
+    <div id="paramMsg"></div>
   </div>
 
   <div id="NewEntry" class="tabcontent">
@@ -89,7 +130,7 @@
       <div class="form-group"><label>Aegon Contribution Applied?</label><input type="checkbox" id="aegonContrib"></div>
       <button type="button" class="btn" onclick="submitForm()">Submit Data</button>
     </form>
-    <div id="statusMsg" style="margin-top: 15px; font-weight: bold;"></div>
+    <div id="statusMsg"></div>
   </div>
 
   <div id="History" class="tabcontent">
@@ -108,78 +149,42 @@
   </div>
 
   <script>
-    // HARDCODED WEB APP URL
     const URL = "https://script.google.com/macros/s/AKfycbxfqYh1Iq-fT7bxhNyKRYeXThCQU3wQzPD49Co3keistSBXzqow_xYfPpUUwStOdPOW/exec";
 
     document.getElementById('entryDate').valueAsDate = new Date();
 
     const fmt = (n) => "£" + Math.round(n || 0).toLocaleString("en-GB");
-    const fmtPct = (n) => {
-      let val = Number(n);
-      if (val < 1 && val > -1) val = val * 100; 
-      return val.toFixed(2) + "%";
-    };
+    const fmtPct = (n) => { let val = Number(n); if (val < 1 && val > -1) val = val * 100; return val.toFixed(2) + "%"; };
+    const formatDate = (ds) => { if (!ds) return ""; const d = new Date(ds); return ("0" + d.getUTCDate()).slice(-2) + "/" + ("0" + (d.getUTCMonth() + 1)).slice(-2) + "/" + d.getUTCFullYear(); };
     
-    const formatDate = (ds) => {
-      if (!ds) return "";
-      const d = new Date(ds);
-      return ("0" + d.getUTCDate()).slice(-2) + "/" + ("0" + (d.getUTCMonth() + 1)).slice(-2) + "/" + d.getUTCFullYear();
-    };
+    // HTML Input Date Converter (YYYY-MM-DD format required by browsers)
+    const toInputDate = (ds) => { if (!ds) return ""; const d = new Date(ds); return d.getFullYear() + '-' + ("0" + (d.getMonth() + 1)).slice(-2) + '-' + ("0" + d.getDate()).slice(-2); };
 
-    // Google Charts Initialization
     let globalChartData = null;
     google.charts.load('current', {'packages':['corechart']});
     google.charts.setOnLoadCallback(() => { if(globalChartData) drawCharts(globalChartData); });
 
     function drawCharts(growthData) {
       if (!google.visualization) return; 
-      
-      var dataPru = new google.visualization.DataTable();
-      dataPru.addColumn('date', 'Date');
-      dataPru.addColumn('number', 'Pru Growth (£)');
-
-      var dataAegon = new google.visualization.DataTable();
-      dataAegon.addColumn('date', 'Date');
-      dataAegon.addColumn('number', 'Aegon Growth (£)');
+      var dataPru = new google.visualization.DataTable(); dataPru.addColumn('date', 'Date'); dataPru.addColumn('number', 'Pru Growth (£)');
+      var dataAegon = new google.visualization.DataTable(); dataAegon.addColumn('date', 'Date'); dataAegon.addColumn('number', 'Aegon Growth (£)');
 
       growthData.forEach(row => {
-        var dObj = new Date(row.date);
-        var pVal = Number(row.pruDiff || 0);
-        var aVal = Number(row.aegonDiff || 0);
-
-        // Filter out zero values to stop the chart crashing to the bottom
-        if (pVal !== 0) {
-          dataPru.addRow([dObj, pVal]);
-        }
-        if (aVal !== 0) {
-          dataAegon.addRow([dObj, aVal]);
-        }
+        var dObj = new Date(row.date); var pVal = Number(row.pruDiff || 0); var aVal = Number(row.aegonDiff || 0);
+        if (pVal !== 0) dataPru.addRow([dObj, pVal]);
+        if (aVal !== 0) dataAegon.addRow([dObj, aVal]);
       });
 
       var formatter = new google.visualization.NumberFormat({prefix: '£', fractionDigits: 0});
-      formatter.format(dataPru, 1);
-      formatter.format(dataAegon, 1);
+      formatter.format(dataPru, 1); formatter.format(dataAegon, 1);
 
-      var options = {
-        curveType: 'function', 
-        legend: { position: 'bottom' },
-        hAxis: { format: 'MMM yyyy', gridlines: { color: 'transparent' } },
-        vAxis: { title: 'Difference (£)' },
-        explorer: { actions: ['dragToZoom', 'rightClickToReset'], axis: 'horizontal', keepInBounds: true }, 
-        tooltip: { isHtml: false, trigger: 'focus' },
-        chartArea: { width: '85%', height: '70%' },
-        colors: ['#3498db']
-      };
-
-      // Apply linear trendlines (visibleInLegend is set to false to hide the math equations)
+      var options = { curveType: 'function', legend: { position: 'bottom' }, hAxis: { format: 'MMM yyyy' }, vAxis: { title: 'Difference (£)' }, explorer: { actions: ['dragToZoom', 'rightClickToReset'], axis: 'horizontal', keepInBounds: true }, tooltip: { isHtml: false, trigger: 'focus' }, chartArea: { width: '85%', height: '70%' }, colors: ['#3498db'] };
       var optsPru = { ...options, title: 'Pru Growth Tracking (£)', trendlines: { 0: { type: 'linear', color: '#e74c3c', lineWidth: 2, opacity: 0.5, visibleInLegend: false } }};
       var optsAegon = { ...options, title: 'Aegon Growth Tracking (£)', colors: ['#9b59b6'], trendlines: { 0: { type: 'linear', color: '#e74c3c', lineWidth: 2, opacity: 0.5, visibleInLegend: false } }};
 
-      // THESE ARE THE LINES THAT ACTUALLY DRAW THE CHARTS
       new google.visualization.LineChart(document.getElementById('pruChart')).draw(dataPru, optsPru);
       new google.visualization.LineChart(document.getElementById('aegonChart')).draw(dataAegon, optsAegon);
     }
-
     window.addEventListener('resize', () => { if(globalChartData) drawCharts(globalChartData); });
 
     function showTab(evt, id) {
@@ -189,26 +194,40 @@
       evt.currentTarget.className += " active-btn";
     }
 
-    function submitForm() {
-      const msg = document.getElementById('statusMsg');
-      msg.innerHTML = "Submitting..."; msg.style.color = "#3498db";
+    // Submit NEW PARAMETERS
+    function submitParams() {
+      const msg = document.getElementById('paramMsg');
+      msg.innerHTML = "Saving and calculating..."; msg.style.color = "#3498db";
       
       const payload = {
-        entryDate: document.getElementById('entryDate').value,
-        pruValue: document.getElementById('pruValue').value,
-        pruContrib: document.getElementById('pruContrib').checked,
-        aegonValue: document.getElementById('aegonValue').value,
-        aegonContrib: document.getElementById('aegonContrib').checked
+        action: 'updateParams',
+        date1: document.getElementById('p_date1').value,
+        days1: document.getElementById('p_days1').value,
+        date2: document.getElementById('p_date2').value,
+        days2: document.getElementById('p_days2').value,
+        retireDate: document.getElementById('p_retire').value,
+        spendRed: document.getElementById('p_spend').value,
+        billsPct: document.getElementById('p_bills').value
       };
 
       fetch(URL, { method: "POST", body: JSON.stringify(payload) })
         .then(res => res.text())
         .then(text => {
-          if(text === "Success") {
-            msg.innerHTML = "Successfully saved!"; msg.style.color = "#27ae60";
-            document.getElementById("trackingForm").reset();
-            document.getElementById('entryDate').valueAsDate = new Date();
-            loadData();
+          if(text === "ParamsSuccess") {
+            msg.innerHTML = "Parameters Updated! Forecast refreshed."; msg.style.color = "#27ae60";
+            loadData(); // Pull fresh data to show updated charts/tables based on new params
+            setTimeout(() => { msg.innerHTML = ""; }, 4000); // Clear message after 4s
+          } else { msg.innerHTML = text; msg.style.color = "#d9534f"; }
+        }).catch(err => { msg.innerHTML = "Connection error."; msg.style.color = "#d9534f"; });
+    }
+
+    // Submit TRACKING LOG
+    function submitForm() {
+      const msg = document.getElementById('statusMsg');
+      msg.innerHTML = "Submitting..."; msg.style.color = "#3498db";
+      const payload = { entryDate: document.getElementById('entryDate').value, pruValue: document.getElementById('pruValue').value, pruContrib: document.getElementById('pruContrib').checked, aegonValue: document.getElementById('aegonValue').value, aegonContrib: document.getElementById('aegonContrib').checked };
+      fetch(URL, { method: "POST", body: JSON.stringify(payload) }).then(res => res.text()).then(text => {
+          if(text === "Success") { msg.innerHTML = "Successfully saved!"; msg.style.color = "#27ae60"; document.getElementById("trackingForm").reset(); document.getElementById('entryDate').valueAsDate = new Date(); loadData();
           } else { msg.innerHTML = text; msg.style.color = "#d9534f"; }
         }).catch(err => { msg.innerHTML = "Connection error."; msg.style.color = "#d9534f"; });
     }
@@ -221,24 +240,32 @@
           
           let dm = data.dashMetrics;
           if (dm) {
-            document.getElementById("mPruGrowth").innerText = fmt(dm.pruMonthGrowth);
-            document.getElementById("mPruExp").innerText = fmt(dm.pruExpected);
-            document.getElementById("mPruProj").innerText = fmtPct(dm.pruProjPct);
-            document.getElementById("mPruAvg").innerText = fmt(dm.pruAvgGrowth);
-            document.getElementById("mPruTotal").innerText = fmt(dm.pruTotalGrowth);
-            document.getElementById("mAegonCur").innerText = fmt(dm.aegonCurrent);
-            document.getElementById("mAegonExp").innerText = fmt(dm.aegonExpected);
-            document.getElementById("mAegonProj").innerText = fmtPct(dm.aegonProjPct);
+            document.getElementById("mPruGrowth").innerText = fmt(dm.pruMonthGrowth); document.getElementById("mPruExp").innerText = fmt(dm.pruExpected); document.getElementById("mPruProj").innerText = fmtPct(dm.pruProjPct); document.getElementById("mPruAvg").innerText = fmt(dm.pruAvgGrowth); document.getElementById("mPruTotal").innerText = fmt(dm.pruTotalGrowth); document.getElementById("mAegonCur").innerText = fmt(dm.aegonCurrent); document.getElementById("mAegonExp").innerText = fmt(dm.aegonExpected); document.getElementById("mAegonProj").innerText = fmtPct(dm.aegonProjPct);
+          }
+
+          // Populate the PARAMETERS form with data from the Sheet
+          if (data.parameters) {
+            document.getElementById('p_date1').value = toInputDate(data.parameters.date1);
+            document.getElementById('p_days1').value = data.parameters.days1 || "5";
+            document.getElementById('p_date2').value = toInputDate(data.parameters.date2);
+            document.getElementById('p_days2').value = data.parameters.days2 || "5";
+            document.getElementById('p_retire').value = toInputDate(data.parameters.retireDate);
+            
+            // Set slider values (Sheet stores 50% as 0.5, so multiply by 100)
+            let spend = Math.round(data.parameters.spendRed * 100) || 100;
+            let bills = Math.round(data.parameters.billsPct * 100) || 100;
+            
+            document.getElementById('p_spend').value = spend;
+            document.getElementById('v_spend').innerText = spend + "%";
+            document.getElementById('p_bills').value = bills;
+            document.getElementById('v_bills').innerText = bills + "%";
           }
 
           globalChartData = data.growthData;
           if(google.visualization) drawCharts(globalChartData);
 
-          // History is sliced and reversed so newest is at the top
           document.querySelector("#hTable tbody").innerHTML = data.history.length ? data.history.slice().reverse().map(r => `<tr><td>${formatDate(r.d)}</td><td>${fmt(r.p)}</td><td>${fmt(r.a)}</td><td style="font-weight:bold;">${fmt(r.t)}</td></tr>`).join('') : '<tr><td colspan="4">No data</td></tr>';
-          
           document.querySelector("#fTable tbody").innerHTML = data.forecast.length ? data.forecast.map(r => `<tr><td>${formatDate(r[0])}</td><td>${fmt(r[1])}</td><td>${fmt(r[2])}</td><td style="font-weight:bold;">${fmt(r[3])}</td></tr>`).join('') : '<tr><td colspan="4">No data</td></tr>';
-          
           document.querySelector("#rTable tbody").innerHTML = data.drawdown.length ? data.drawdown.map(r => `<tr><td>${r[0]}</td><td>${fmt(r[1])}</td><td>${fmt(r[2])}</td><td>${fmt(r[3])}</td><td>${fmt(r[4])}</td><td>${fmt(r[5])}</td><td style="font-weight:bold; color:#27ae60;">${fmt(r[6])}</td></tr>`).join('') : '<tr><td colspan="7">No data</td></tr>';
         })
         .catch(err => console.error(err));
