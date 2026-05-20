@@ -197,7 +197,7 @@
     // Submit NEW PARAMETERS
     function submitParams() {
       const msg = document.getElementById('paramMsg');
-      msg.innerHTML = "Saving and calculating..."; msg.style.color = "#3498db";
+      msg.innerHTML = "Saving parameters to sheet..."; msg.style.color = "#3498db";
       
       const payload = {
         action: 'updateParams',
@@ -214,11 +214,20 @@
         .then(res => res.text())
         .then(text => {
           if(text === "ParamsSuccess") {
-            msg.innerHTML = "Parameters Updated! Forecast refreshed."; msg.style.color = "#27ae60";
-            loadData(); // Pull fresh data to show updated charts/tables based on new params
-            setTimeout(() => { msg.innerHTML = ""; }, 4000); // Clear message after 4s
+            msg.innerHTML = "Parameters saved! Waiting for sheet recalculation..."; msg.style.color = "#f39c12"; // Orange waiting text
+            
+            // Wait exactly 1.5 seconds to ensure formulas are done, then load data
+            setTimeout(() => {
+              msg.innerHTML = "Forecast successfully refreshed!"; msg.style.color = "#27ae60";
+              loadData(); 
+              
+              // Clear message after another 3 seconds
+              setTimeout(() => { msg.innerHTML = ""; }, 3000); 
+            }, 1500);
+            
           } else { msg.innerHTML = text; msg.style.color = "#d9534f"; }
         }).catch(err => { msg.innerHTML = "Connection error."; msg.style.color = "#d9534f"; });
+    }});
     }
 
     // Submit TRACKING LOG
