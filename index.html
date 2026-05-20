@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <title>Pension Dashboard</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; color: #333; }
+    .header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .tabcontent { display: none; padding: 20px; background: white; border: 1px solid #ccc; border-top: none; border-radius: 0 0 8px 8px;}
+    .active { display: block; }
+    .tab-buttons { overflow: hidden; border: 1px solid #ccc; background-color: #e2e8f0; border-radius: 8px 8px 0 0; }
+    .tab-buttons button { background: inherit; float: left; border: none; outline: none; cursor: pointer; padding: 14px 16px; font-size: 16px; font-weight: bold; color: #4a5568;}
+    .tab-buttons button.active-btn { background: white; border-bottom: 3px solid #3498db; color: #2c3e50; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: left; }
+    th { background-color: #f8fafc; color: #2c3e50; }
+    .btn { background: #3498db; color: white; padding: 10px 20px; border: none; cursor: pointer; font-size: 14px; border-radius: 4px; font-weight: bold;}
+    .btn:hover { background: #2980b9; }
+    .btn-sync { background: #27ae60; }
+    .btn-sync:hover { background: #219150; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    input[type="date"], input[type="number"] { padding: 10px; width: 100%; max-width: 300px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;}
+    #statusMsg { margin-top: 15px; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <div class="header-container">
+    <h1>Pension Tracking Dashboard</h1>
+    <button class="btn btn-sync" onclick="loadData()">Sync / Refresh Data</button>
+  </div>
+
+  <div class="tab-buttons">
+    <button class="tab-link active-btn" onclick="showTab(event, 'NewEntry')">New Entry</button>
+    <button class="tab-link" onclick="showTab(event, 'History')">Recent Activity</button>
+    <button class="tab-link" onclick="showTab(event, 'Forecast')">Pension Forecast</button>
+    <button class="tab-link" onclick="showTab(event, 'Retirement')">Retirement Phase</button>
+  </div>
+
+  <div id="NewEntry" class="tabcontent active">
+    <h2>Log New Balances</h2>
+    <form id="trackingForm">
+      <div class="form-group"><label>Date:</label><input type="date" id="entryDate" required></div>
+      <div class="form-group"><label>Pru Value (£):</label><input type="number" id="pruValue" step="0.01" required></div>
+      <div class="form-group"><label>Pru Contribution Applied?</label><input type="checkbox" id="pruContrib"></div>
+      <div class="form-group"><label>Aegon Value (£):</label><input type="number" id="aegonValue" step="0.01" required></div>
+      <div class="form-group"><label>Aegon Contribution Applied?</label><input type="checkbox" id="aegonContrib"></div>
+      <button type="button" class="btn" onclick="submitForm()">Submit Data</button>
+    </form>
+    <div id="statusMsg"></div>
+  </div>
+
+  <div id="History" class="tabcontent">
+    <h2>Recent Activity</h2>
+    <table id="hTable"><thead><tr><th>Date</th><th>Pru Value</th><th>Aegon Value</th><th>Total Value</th></tr></thead><tbody><tr><td colspan="4">Loading...</td></tr></tbody></table>
+  </div>
+
+  <div id="Forecast" class="tabcontent">
+    <h2>Pension Forecast</h2>
+    <table id="fTable"><thead><tr><th>Date</th><th>Pru Forecast</th><th>Aegon Forecast</th><th>Total Forecast</th></tr></thead><tbody><tr><td colspan="4">Loading...</td></tr></tbody></table>
+  </div>
+
+  <div id="Retirement" class="tabcontent">
+    <h2>Retirement Drawdown</h2>
+    <table id="rTable"><thead><tr><th>Year</th><th>Outgoings</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Other Pensions</th><th>Drawdown</th><th>Total Income</th></tr></thead><tbody><tr><td colspan="7">Loading...</td></tr></tbody></table>
+  </div>
+
+  <script>
+    // HARDCODED WEB APP URL
+    const URL = "https://script.google.com/macros/s/AKfycbxfqYh1Iq-fT7bxhNyKRYeXThCQU3wQzPD49Co3keistSBXzqow_xYfPpUUwStOdPOW/exec";
+
+    document.getElementById('entryDate').valueAsDate = new Date();
+
+    const fmt = (n) => "£" + Math.round(n || 0).toLocaleString("en-GB");
+    const formatDate = (ds) => {
+      if (!ds) return "";
+      const d = new Date(ds);
+      return ("0" + d.getUTCDate()).slice(-2) + "/" + ("0" + (d.getUTCMonth() + 1)).slice(-2) + "/" + d.getUTCFullYear();
+    };
+
+    function showTab(evt, id) {
+      document.querySelectorAll('.tabcontent').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.tab-link').forEach(el => el.className = el.className.replace(" active-btn", ""));
+      document.getElementById(id).style.display = 'block';
+      evt.currentTarget.className += " active-btn";
+    }
+
+    function submitForm() {
+      const msg = document.getElementById('statusMsg');
+      msg.innerHTML = "Submitting..."; msg.style.color = "#3498db";
+      
+      const payload = {
+        entryDate: document.getElementById('entryDate').value,
+        pruValue: document.getElementById('pruValue').value,
+        pruContrib: document.getElementById('pruContrib').checked,
+        aegonValue: document.getElementById('aegonValue').value,
+        aegonContrib: document.getElementById('aegonContrib').checked
+      };
+
+      fetch(URL, { method: "POST", body: JSON.stringify(payload) })
+        .then(res => res.text())
+        .then(text => {
+          if(text === "Success") {
+            msg.innerHTML = "Successfully saved!"; msg.style.color = "#27ae60";
+            document.getElementById("trackingForm").reset();
+            document.getElementById('entryDate').valueAsDate = new Date();
+            loadData();
+          } else {
+            msg.innerHTML = text; msg.style.color = "#d9534f";
+          }
+        }).catch(err => {
+          msg.innerHTML = "Connection error."; msg.style.color = "#d9534f";
+        });
+    }
+
+    function loadData() {
+      // Add ?api=data to tell the script we want the JSON data, not the HTML page!
+      fetch(URL + "?api=data&nocache=" + new Date().getTime())
+        .then(res => res.json())
+        .then(data => {
+          if (!data.success) {
+            alert("SPREADSHEET ERROR: " + data.error);
+            return;
+          }
+          
+          document.querySelector("#hTable tbody").innerHTML = data.history.length ? data.history.map(r => `<tr><td>${formatDate(r.d)}</td><td>${fmt(r.p)}</td><td>${fmt(r.a)}</td><td style="font-weight:bold;">${fmt(r.t)}</td></tr>`).join('') : '<tr><td colspan="4">No data</td></tr>';
+          document.querySelector("#fTable tbody").innerHTML = data.forecast.length ? data.forecast.map(r => `<tr><td>${formatDate(r[0])}</td><td>${fmt(r[1])}</td><td>${fmt(r[2])}</td><td style="font-weight:bold;">${fmt(r[3])}</td></tr>`).join('') : '<tr><td colspan="4">No data</td></tr>';
+          document.querySelector("#rTable tbody").innerHTML = data.drawdown.length ? data.drawdown.map(r => `<tr><td>${r[0]}</td><td>${fmt(r[1])}</td><td>${fmt(r[2])}</td><td>${fmt(r[3])}</td><td>${fmt(r[4])}</td><td>${fmt(r[5])}</td><td style="font-weight:bold; color:#27ae60;">${fmt(r[6])}</td></tr>`).join('') : '<tr><td colspan="7">No data</td></tr>';
+        })
+        .catch(err => {
+          alert("NETWORK ERROR: Check console. You may need to Redeploy as a 'New Version'.");
+        });
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
