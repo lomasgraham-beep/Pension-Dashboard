@@ -114,7 +114,6 @@
     document.getElementById('entryDate').valueAsDate = new Date();
 
     const fmt = (n) => "£" + Math.round(n || 0).toLocaleString("en-GB");
-    // Formats percentages properly assuming sheet returns decimals (e.g. 0.05 -> 5%)
     const fmtPct = (n) => {
       let val = Number(n);
       if (val < 1 && val > -1) val = val * 100; 
@@ -133,7 +132,7 @@
     google.charts.setOnLoadCallback(() => { if(globalChartData) drawCharts(globalChartData); });
 
     function drawCharts(growthData) {
-      if (!google.visualization) return; // Wait if not loaded yet
+      if (!google.visualization) return; 
       
       var dataPru = new google.visualization.DataTable();
       dataPru.addColumn('date', 'Date');
@@ -143,42 +142,44 @@
       dataAegon.addColumn('date', 'Date');
       dataAegon.addColumn('number', 'Aegon Growth (£)');
 
-        growthData.forEach(row => {
-     var dObj = new Date(row.date);
-     var pVal = Number(row.pruDiff || 0);
-     var aVal = Number(row.aegonDiff || 0);
+      growthData.forEach(row => {
+        var dObj = new Date(row.date);
+        var pVal = Number(row.pruDiff || 0);
+        var aVal = Number(row.aegonDiff || 0);
 
-     // Only plot the dot on the chart if the value is NOT zero
-     if (pVal !== 0) {
-       dataPru.addRow([dObj, pVal]);
-     }
-     if (aVal !== 0) {
-       dataAegon.addRow([dObj, aVal]);
-     }
-   });
+        // Filter out zero values to stop the chart crashing to the bottom
+        if (pVal !== 0) {
+          dataPru.addRow([dObj, pVal]);
+        }
+        if (aVal !== 0) {
+          dataAegon.addRow([dObj, aVal]);
+        }
+      });
 
-      // Force £ format on tooltips
       var formatter = new google.visualization.NumberFormat({prefix: '£', fractionDigits: 0});
       formatter.format(dataPru, 1);
       formatter.format(dataAegon, 1);
 
       var options = {
-        curveType: 'function', // Smoothed rounded lines
+        curveType: 'function', 
         legend: { position: 'bottom' },
         hAxis: { format: 'MMM yyyy', gridlines: { color: 'transparent' } },
         vAxis: { title: 'Difference (£)' },
-        explorer: { actions: ['dragToZoom', 'rightClickToReset'], axis: 'horizontal', keepInBounds: true }, // Zoom Feature
+        explorer: { actions: ['dragToZoom', 'rightClickToReset'], axis: 'horizontal', keepInBounds: true }, 
         tooltip: { isHtml: false, trigger: 'focus' },
         chartArea: { width: '85%', height: '70%' },
         colors: ['#3498db']
       };
 
-           // Apply linear trendlines
+      // Apply linear trendlines (visibleInLegend is set to false to hide the math equations)
       var optsPru = { ...options, title: 'Pru Growth Tracking (£)', trendlines: { 0: { type: 'linear', color: '#e74c3c', lineWidth: 2, opacity: 0.5, visibleInLegend: false } }};
       var optsAegon = { ...options, title: 'Aegon Growth Tracking (£)', colors: ['#9b59b6'], trendlines: { 0: { type: 'linear', color: '#e74c3c', lineWidth: 2, opacity: 0.5, visibleInLegend: false } }};
+
+      // THESE ARE THE LINES THAT ACTUALLY DRAW THE CHARTS
+      new google.visualization.LineChart(document.getElementById('pruChart')).draw(dataPru, optsPru);
+      new google.visualization.LineChart(document.getElementById('aegonChart')).draw(dataAegon, optsAegon);
     }
 
-    // Redraw charts if device is rotated or window resized
     window.addEventListener('resize', () => { if(globalChartData) drawCharts(globalChartData); });
 
     function showTab(evt, id) {
@@ -218,7 +219,6 @@
         .then(data => {
           if (!data.success) { alert("SPREADSHEET ERROR: " + data.error); return; }
           
-          // Populate Dashboard Cards
           let dm = data.dashMetrics;
           if (dm) {
             document.getElementById("mPruGrowth").innerText = fmt(dm.pruMonthGrowth);
@@ -231,13 +231,14 @@
             document.getElementById("mAegonProj").innerText = fmtPct(dm.aegonProjPct);
           }
 
-          // Trigger Interactive Charts
           globalChartData = data.growthData;
           if(google.visualization) drawCharts(globalChartData);
 
-          // Populate Tables
+          // History is sliced and reversed so newest is at the top
           document.querySelector("#hTable tbody").innerHTML = data.history.length ? data.history.slice().reverse().map(r => `<tr><td>${formatDate(r.d)}</td><td>${fmt(r.p)}</td><td>${fmt(r.a)}</td><td style="font-weight:bold;">${fmt(r.t)}</td></tr>`).join('') : '<tr><td colspan="4">No data</td></tr>';
+          
           document.querySelector("#fTable tbody").innerHTML = data.forecast.length ? data.forecast.map(r => `<tr><td>${formatDate(r[0])}</td><td>${fmt(r[1])}</td><td>${fmt(r[2])}</td><td style="font-weight:bold;">${fmt(r[3])}</td></tr>`).join('') : '<tr><td colspan="4">No data</td></tr>';
+          
           document.querySelector("#rTable tbody").innerHTML = data.drawdown.length ? data.drawdown.map(r => `<tr><td>${r[0]}</td><td>${fmt(r[1])}</td><td>${fmt(r[2])}</td><td>${fmt(r[3])}</td><td>${fmt(r[4])}</td><td>${fmt(r[5])}</td><td style="font-weight:bold; color:#27ae60;">${fmt(r[6])}</td></tr>`).join('') : '<tr><td colspan="7">No data</td></tr>';
         })
         .catch(err => console.error(err));
