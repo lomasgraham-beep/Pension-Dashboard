@@ -78,26 +78,28 @@
   </div>
 
   <div id="Parameters" class="tabcontent">
-    <h2>Retirement Modelling Parameters</h2>
-    <p style="color:#64748b; margin-bottom:20px;">Adjust your working days and contribution sliders below. Saving will update your live sheet forecasts.</p>
+    <h2>Pension Pots at Retirement</h2>
+    <div class="card-grid">
+      <div class="card highlight-card"><h3>Total Starting Pot</h3><div id="mRetTotal" class="value">£0</div></div>
+      <div class="card"><h3>Tax-Free Starting Pot</h3><div id="mRetTaxFree" class="value">£0</div></div>
+      <div class="card"><h3>Taxable Starting Pot</h3><div id="mRetTaxable" class="value">£0</div></div>
+    </div>
+
+    <h2 class="section-title">Retirement Modelling Parameters</h2>
+    <p style="color:#64748b; margin-bottom:20px;">Adjust your working days and contribution sliders below. Saving will update your live charts and tables.</p>
     
     <div style="display:flex; flex-wrap:wrap; gap:40px;">
-      
       <div style="flex:1; min-width:300px;">
         <div class="form-group"><label>Date to work shorter week 1:</label><input type="date" id="p_date1"></div>
         <div class="form-group"><label>Number of days 1:</label>
           <select id="p_days1">
-            <option value="5">5 Days</option>
-            <option value="4">4 Days</option>
-            <option value="3">3 Days</option>
+            <option value="5">5 Days</option><option value="4">4 Days</option><option value="3">3 Days</option>
           </select>
         </div>
         <div class="form-group"><label>Date to work shorter week 2:</label><input type="date" id="p_date2"></div>
         <div class="form-group"><label>Number of days 2:</label>
           <select id="p_days2">
-            <option value="5">5 Days</option>
-            <option value="4">4 Days</option>
-            <option value="3">3 Days</option>
+            <option value="5">5 Days</option><option value="4">4 Days</option><option value="3">3 Days</option>
           </select>
         </div>
         <div class="form-group"><label>Final Date to Retire:</label><input type="date" id="p_retire"></div>
@@ -113,11 +115,14 @@
           <input type="range" id="p_bills" min="25" max="100" value="100" oninput="document.getElementById('v_bills').innerText = this.value + '%'">
         </div>
       </div>
-      
     </div>
     
-    <button type="button" class="btn" style="margin-top:15px;" onclick="submitParams()">Save Parameters</button>
+    <button type="button" class="btn" style="margin-top:15px;" onclick="submitParams()">Save Parameters & Recalculate</button>
     <div id="paramMsg"></div>
+
+    <h2 class="section-title">Live Retirement Projections</h2>
+    <div id="potChart" class="chart-box"></div>
+    <div id="incomeChart" class="chart-box"></div>
   </div>
 
   <div id="NewEntry" class="tabcontent">
@@ -156,42 +161,108 @@
     const fmt = (n) => "£" + Math.round(n || 0).toLocaleString("en-GB");
     const fmtPct = (n) => { let val = Number(n); if (val < 1 && val > -1) val = val * 100; return val.toFixed(2) + "%"; };
     const formatDate = (ds) => { if (!ds) return ""; const d = new Date(ds); return ("0" + d.getUTCDate()).slice(-2) + "/" + ("0" + (d.getUTCMonth() + 1)).slice(-2) + "/" + d.getUTCFullYear(); };
-    
-    // HTML Input Date Converter (YYYY-MM-DD format required by browsers)
     const toInputDate = (ds) => { if (!ds) return ""; const d = new Date(ds); return d.getFullYear() + '-' + ("0" + (d.getMonth() + 1)).slice(-2) + '-' + ("0" + d.getDate()).slice(-2); };
 
     let globalChartData = null;
+    let globalDrawdownData = null;
     google.charts.load('current', {'packages':['corechart']});
-    google.charts.setOnLoadCallback(() => { if(globalChartData) drawCharts(globalChartData); });
+    google.charts.setOnLoadCallback(() => { if(globalChartData) drawCharts(globalChartData, globalDrawdownData); });
 
-    function drawCharts(growthData) {
+    function drawCharts(growthData, drawdownData) {
       if (!google.visualization) return; 
-      var dataPru = new google.visualization.DataTable(); dataPru.addColumn('date', 'Date'); dataPru.addColumn('number', 'Pru Growth (£)');
-      var dataAegon = new google.visualization.DataTable(); dataAegon.addColumn('date', 'Date'); dataAegon.addColumn('number', 'Aegon Growth (£)');
+      
+      // --- TRACKING CHARTS (Overview Tab) ---
+      if (growthData && growthData.length > 0) {
+        var dataPru = new google.visualization.DataTable(); dataPru.addColumn('date', 'Date'); dataPru.addColumn('number', 'Pru Growth (£)');
+        var dataAegon = new google.visualization.DataTable(); dataAegon.addColumn('date', 'Date'); dataAegon.addColumn('number', 'Aegon Growth (£)');
 
-      growthData.forEach(row => {
-        var dObj = new Date(row.date); var pVal = Number(row.pruDiff || 0); var aVal = Number(row.aegonDiff || 0);
-        if (pVal !== 0) dataPru.addRow([dObj, pVal]);
-        if (aVal !== 0) dataAegon.addRow([dObj, aVal]);
-      });
+        growthData.forEach(row => {
+          var dObj = new Date(row.date); var pVal = Number(row.pruDiff || 0); var aVal = Number(row.aegonDiff || 0);
+          if (pVal !== 0) dataPru.addRow([dObj, pVal]);
+          if (aVal !== 0) dataAegon.addRow([dObj, aVal]);
+        });
 
-      var formatter = new google.visualization.NumberFormat({prefix: '£', fractionDigits: 0});
-      formatter.format(dataPru, 1); formatter.format(dataAegon, 1);
+        var formatter = new google.visualization.NumberFormat({prefix: '£', fractionDigits: 0});
+        formatter.format(dataPru, 1); formatter.format(dataAegon, 1);
 
-      var options = { curveType: 'function', legend: { position: 'bottom' }, hAxis: { format: 'MMM yyyy' }, vAxis: { title: 'Difference (£)' }, explorer: { actions: ['dragToZoom', 'rightClickToReset'], axis: 'horizontal', keepInBounds: true }, tooltip: { isHtml: false, trigger: 'focus' }, chartArea: { width: '85%', height: '70%' }, colors: ['#3498db'] };
-      var optsPru = { ...options, title: 'Pru Growth Tracking (£)', trendlines: { 0: { type: 'linear', color: '#e74c3c', lineWidth: 2, opacity: 0.5, visibleInLegend: false } }};
-      var optsAegon = { ...options, title: 'Aegon Growth Tracking (£)', colors: ['#9b59b6'], trendlines: { 0: { type: 'linear', color: '#e74c3c', lineWidth: 2, opacity: 0.5, visibleInLegend: false } }};
+        var options = { curveType: 'function', legend: { position: 'bottom' }, hAxis: { format: 'MMM yyyy' }, vAxis: { title: 'Difference (£)' }, explorer: { actions: ['dragToZoom', 'rightClickToReset'], axis: 'horizontal', keepInBounds: true }, tooltip: { isHtml: false, trigger: 'focus' }, chartArea: { width: '85%', height: '70%' }, colors: ['#3498db'] };
+        var optsPru = { ...options, title: 'Pru Growth Tracking (£)', trendlines: { 0: { type: 'linear', color: '#e74c3c', lineWidth: 2, opacity: 0.5, visibleInLegend: false } }};
+        var optsAegon = { ...options, title: 'Aegon Growth Tracking (£)', colors: ['#9b59b6'], trendlines: { 0: { type: 'linear', color: '#e74c3c', lineWidth: 2, opacity: 0.5, visibleInLegend: false } }};
 
-      new google.visualization.LineChart(document.getElementById('pruChart')).draw(dataPru, optsPru);
-      new google.visualization.LineChart(document.getElementById('aegonChart')).draw(dataAegon, optsAegon);
+        new google.visualization.LineChart(document.getElementById('pruChart')).draw(dataPru, optsPru);
+        new google.visualization.LineChart(document.getElementById('aegonChart')).draw(dataAegon, optsAegon);
+      }
+
+      // --- RETIREMENT CHARTS (Modelling Tab) ---
+      if (drawdownData && drawdownData.length > 0) {
+        var dataPots = new google.visualization.DataTable();
+        dataPots.addColumn('string', 'Year');
+        dataPots.addColumn('number', 'Tax-Free Pot');
+        dataPots.addColumn('number', 'Taxable Pot');
+
+        var dataIncome = new google.visualization.DataTable();
+        dataIncome.addColumn('string', 'Year');
+        dataIncome.addColumn('number', 'Drawdown (Bar)');
+        dataIncome.addColumn('number', 'Other Pensions (Bar)');
+        dataIncome.addColumn('number', 'Drawdown Target (Line)');
+
+        drawdownData.forEach(r => {
+          let yr = String(r[0]);
+          let tf = Number(r[2] || 0);
+          let tx = Number(r[3] || 0);
+          let other = Number(r[4] || 0);
+          let draw = Number(r[5] || 0);
+          
+          dataPots.addRow([yr, tf, tx]);
+          dataIncome.addRow([yr, draw, other, draw]);
+        });
+
+        var numFmt = new google.visualization.NumberFormat({prefix: '£', fractionDigits: 0});
+        numFmt.format(dataPots, 1); numFmt.format(dataPots, 2);
+        numFmt.format(dataIncome, 1); numFmt.format(dataIncome, 2); numFmt.format(dataIncome, 3);
+
+        var optsPots = {
+          title: 'Pension Pots Over Time (£)',
+          isStacked: true,
+          legend: { position: 'bottom' },
+          chartArea: { width: '85%', height: '70%' },
+          colors: ['#2ecc71', '#e74c3c'],
+          vAxis: { title: 'Pot Value (£)', minValue: 0 }
+        };
+        
+        var optsIncome = {
+          title: 'Income Sources & Drawdown Target Overlay',
+          isStacked: true,
+          seriesType: 'bars',
+          series: { 
+            0: { targetAxisIndex: 0 }, // Drawdown Bar
+            1: { targetAxisIndex: 0 }, // Other Pensions Bar
+            2: { type: 'line', targetAxisIndex: 1, color: '#f39c12', lineWidth: 4 } // Drawdown Line (Orange)
+          },
+          vAxes: {
+            0: { title: 'Income (£)', minValue: 0 },
+            1: { title: 'Drawdown Trend (£)', viewWindow: { min: 0, max: 150000 } } // Right Y-Axis locked to 150k max
+          },
+          legend: { position: 'bottom' },
+          chartArea: { width: '80%', height: '70%' },
+          colors: ['#3498db', '#9b59b6']
+        };
+
+        new google.visualization.ColumnChart(document.getElementById('potChart')).draw(dataPots, optsPots);
+        new google.visualization.ComboChart(document.getElementById('incomeChart')).draw(dataIncome, optsIncome);
+      }
     }
-    window.addEventListener('resize', () => { if(globalChartData) drawCharts(globalChartData); });
+    
+    window.addEventListener('resize', () => { if(globalChartData) drawCharts(globalChartData, globalDrawdownData); });
 
     function showTab(evt, id) {
       document.querySelectorAll('.tabcontent').forEach(el => el.style.display = 'none');
       document.querySelectorAll('.tab-link').forEach(el => el.className = el.className.replace(" active-btn", ""));
       document.getElementById(id).style.display = 'block';
       evt.currentTarget.className += " active-btn";
+      
+      // Redraw charts when tab is opened to prevent layout bugs
+      if (globalChartData) { drawCharts(globalChartData, globalDrawdownData); }
     }
 
     // Submit NEW PARAMETERS
@@ -214,20 +285,14 @@
         .then(res => res.text())
         .then(text => {
           if(text === "ParamsSuccess") {
-            msg.innerHTML = "Parameters saved! Waiting for sheet recalculation..."; msg.style.color = "#f39c12"; // Orange waiting text
-            
-            // Wait exactly 1.5 seconds to ensure formulas are done, then load data
+            msg.innerHTML = "Parameters saved! Waiting for sheet recalculation..."; msg.style.color = "#f39c12"; 
             setTimeout(() => {
-              msg.innerHTML = "Forecast successfully refreshed!"; msg.style.color = "#27ae60";
+              msg.innerHTML = "Projections successfully refreshed!"; msg.style.color = "#27ae60";
               loadData(); 
-              
-              // Clear message after another 3 seconds
               setTimeout(() => { msg.innerHTML = ""; }, 3000); 
             }, 1500);
-            
           } else { msg.innerHTML = text; msg.style.color = "#d9534f"; }
         }).catch(err => { msg.innerHTML = "Connection error."; msg.style.color = "#d9534f"; });
-    }});
     }
 
     // Submit TRACKING LOG
@@ -260,18 +325,26 @@
             document.getElementById('p_days2').value = data.parameters.days2 || "5";
             document.getElementById('p_retire').value = toInputDate(data.parameters.retireDate);
             
-            // Set slider values (Sheet stores 50% as 0.5, so multiply by 100)
             let spend = Math.round(data.parameters.spendRed * 100) || 100;
             let bills = Math.round(data.parameters.billsPct * 100) || 100;
-            
             document.getElementById('p_spend').value = spend;
             document.getElementById('v_spend').innerText = spend + "%";
             document.getElementById('p_bills').value = bills;
             document.getElementById('v_bills').innerText = bills + "%";
           }
 
+          // Populate Retirement Pot Tiles (from the very first year of the drawdown array)
+          if (data.drawdown && data.drawdown.length > 0) {
+            let tf = Number(data.drawdown[0][2] || 0);
+            let tx = Number(data.drawdown[0][3] || 0);
+            document.getElementById("mRetTaxFree").innerText = fmt(tf);
+            document.getElementById("mRetTaxable").innerText = fmt(tx);
+            document.getElementById("mRetTotal").innerText = fmt(tf + tx);
+          }
+
           globalChartData = data.growthData;
-          if(google.visualization) drawCharts(globalChartData);
+          globalDrawdownData = data.drawdown;
+          if(google.visualization) drawCharts(globalChartData, globalDrawdownData);
 
           document.querySelector("#hTable tbody").innerHTML = data.history.length ? data.history.slice().reverse().map(r => `<tr><td>${formatDate(r.d)}</td><td>${fmt(r.p)}</td><td>${fmt(r.a)}</td><td style="font-weight:bold;">${fmt(r.t)}</td></tr>`).join('') : '<tr><td colspan="4">No data</td></tr>';
           document.querySelector("#fTable tbody").innerHTML = data.forecast.length ? data.forecast.map(r => `<tr><td>${formatDate(r[0])}</td><td>${fmt(r[1])}</td><td>${fmt(r[2])}</td><td style="font-weight:bold;">${fmt(r[3])}</td></tr>`).join('') : '<tr><td colspan="4">No data</td></tr>';
