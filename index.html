@@ -143,11 +143,19 @@
       dataAegon.addColumn('date', 'Date');
       dataAegon.addColumn('number', 'Aegon Growth (£)');
 
-      growthData.forEach(row => {
-        var dObj = new Date(row.date);
-        dataPru.addRow([dObj, Number(row.pruDiff || 0)]);
-        dataAegon.addRow([dObj, Number(row.aegonDiff || 0)]);
-      });
+        growthData.forEach(row => {
+     var dObj = new Date(row.date);
+     var pVal = Number(row.pruDiff || 0);
+     var aVal = Number(row.aegonDiff || 0);
+
+     // Only plot the dot on the chart if the value is NOT zero
+     if (pVal !== 0) {
+       dataPru.addRow([dObj, pVal]);
+     }
+     if (aVal !== 0) {
+       dataAegon.addRow([dObj, aVal]);
+     }
+   });
 
       // Force £ format on tooltips
       var formatter = new google.visualization.NumberFormat({prefix: '£', fractionDigits: 0});
