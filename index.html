@@ -173,12 +173,9 @@
         colors: ['#3498db']
       };
 
-      // Apply linear trendlines
-      var optsPru = { ...options, title: 'Pru Growth Tracking (£)', trendlines: { 0: { type: 'linear', color: '#e74c3c', lineWidth: 2, opacity: 0.5, visibleInLegend: true } }};
-      var optsAegon = { ...options, title: 'Aegon Growth Tracking (£)', colors: ['#9b59b6'], trendlines: { 0: { type: 'linear', color: '#e74c3c', lineWidth: 2, opacity: 0.5, visibleInLegend: true } }};
-
-      new google.visualization.LineChart(document.getElementById('pruChart')).draw(dataPru, optsPru);
-      new google.visualization.LineChart(document.getElementById('aegonChart')).draw(dataAegon, optsAegon);
+           // Apply linear trendlines
+      var optsPru = { ...options, title: 'Pru Growth Tracking (£)', trendlines: { 0: { type: 'linear', color: '#e74c3c', lineWidth: 2, opacity: 0.5, visibleInLegend: false } }};
+      var optsAegon = { ...options, title: 'Aegon Growth Tracking (£)', colors: ['#9b59b6'], trendlines: { 0: { type: 'linear', color: '#e74c3c', lineWidth: 2, opacity: 0.5, visibleInLegend: false } }};
     }
 
     // Redraw charts if device is rotated or window resized
