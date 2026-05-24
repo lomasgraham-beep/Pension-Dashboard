@@ -204,15 +204,17 @@
         const container = document.getElementById('dynamicInputsContainer');
         container.innerHTML = ''; 
 
-        // Filter pensions for the selected person
-const memberPensions = userPensions.filter(p => p.member_name === member && p.pension_type === 'Defined Contribution');
+        // Filter by member AND the exact plural string "Defined Contributions"
+        const memberPensions = userPensions.filter(p => 
+            p.member_name === member && 
+            p.pension_type === 'Defined Contributions'
+        );
         
         if(memberPensions.length === 0) {
-            container.innerHTML = '<p style="color:#d9534f; font-weight:bold;">No pensions found for this member in the database setup.</p>';
+            container.innerHTML = '<p style="color:#d9534f; font-weight:bold;">No active Defined Contribution pots found for this member.</p>';
             return;
         }
 
-        // Build the inputs
         memberPensions.forEach(p => {
             container.innerHTML += `
                 <div class="form-group">
@@ -222,24 +224,6 @@ const memberPensions = userPensions.filter(p => p.member_name === member && p.pe
             `;
         });
     }
-
-    async function submitDynamicLogEntry() {
-        const msg = document.getElementById('statusMsg');
-        msg.innerHTML = "Writing to secure tables..."; msg.style.color = "#3498db";
-        
-        const member = document.getElementById('logMember').value;
-        const logDate = document.getElementById('entryDate').value;
-        const inputs = document.querySelectorAll('.dynamic-pot-input');
-        
-        let payloads = [];
-        inputs.forEach(input => {
-            payloads.push({
-                member_name: member,
-                pension_name: input.getAttribute('data-pension'),
-                pot_value: parseFloat(input.value) || 0,
-                log_date: logDate
-            });
-        });
 
         try {
             let res = await fetch(`${SUPABASE_URL}/rest/v1/op_pension_logs`, {
