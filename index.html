@@ -132,17 +132,18 @@
     <form id="trackingForm">
       <div class="form-group">
         <label>Whose accounts are you updating?</label>
-        <select id="logMember" required>
+        <select id="logMember" required onchange="renderDynamicInputs()">
           <option value="Graham">Graham</option>
           <option value="Julie">Julie</option>
         </select>
       </div>
       <div class="form-group"><label>Date:</label><input type="date" id="entryDate" required></div>
-      <div class="form-group"><label>Pru Value (£):</label><input type="number" id="pruValue" step="0.01" value="0.00" required></div>
-      <div class="form-group"><label>Pru Contribution Applied?</label><input type="checkbox" id="pruContrib"></div>
-      <div class="form-group"><label>Aegon Value (£):</label><input type="number" id="aegonValue" step="0.01" value="0.00" required></div>
-      <div class="form-group"><label>Aegon Contribution Applied?</label><input type="checkbox" id="aegonContrib"></div>
-      <button type="button" class="btn" onclick="submitLogEntry()">Submit to Cloud Database</button>
+      
+      <div id="dynamicInputsContainer">
+          <p style="color: #64748b;">Loading pension accounts...</p>
+      </div>
+      
+      <button type="button" class="btn" onclick="submitDynamicLogEntry()">Submit to Cloud Database</button>
     </form>
     <div id="statusMsg"></div>
   </div>
