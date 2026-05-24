@@ -113,8 +113,8 @@
           <input type="range" id="p_spend" min="25" max="100" value="100" oninput="document.getElementById('v_spend').innerText = this.value + '%'">
         </div>
         <div class="form-group">
-          <label>Graham Bills Contribution: <span id="v_bills" class="slider-val">100%</span></label>
-          <input type="range" id="p_bills" min="25" max="100" value="100" oninput="document.getElementById('v_bills').innerText = this.value + '%'">
+          <label>Graham Drawdown Ratio: <span id="v_bills" class="slider-val">50%</span></label>
+          <input type="range" id="p_bills" min="0" max="100" value="50" oninput="document.getElementById('v_bills').innerText = this.value + '%'">
         </div>
       </div>
     </div>
@@ -150,7 +150,7 @@
 
   <div id="History" class="tabcontent">
     <h2>Unified Database Audit Log</h2>
-    <table id="hTable"><thead><tr><th>Date</th><th>Member</th><th>Pru Value</th><th>Aegon Value</th><th>Total Logged</th></tr></thead><tbody><tr><td colspan="5">Syncing database records...</td></tr></tbody></table>
+    <table id="hTable"><thead><tr><th>Date</th><th>Member</th><th>Pension Name</th><th>Logged Value</th></tr></thead><tbody><tr><td colspan="4">Syncing database records...</td></tr></tbody></table>
   </div>
 
   <div id="Retirement" class="tabcontent">
@@ -192,7 +192,120 @@
     });
 
     let globalDrawdownData = null;
+    let userPensions = []; // Stores the pensions fetched from the database
+    
     google.charts.load('current', {'packages':['corechart']});
+
+    // ==========================================
+    // DYNAMIC LOG ENTRY ENGINE
+    // ==========================================
+    function renderDynamicInputs() {
+        const member = document.getElementById('logMember').value;
+        const container = document.getElementById('dynamicInputsContainer');
+        container.innerHTML = ''; 
+
+        // Filter pensions for the selected person
+        const memberPensions = userPensions.filter(p => p.member_name === member);
+        
+        if(memberPensions.length === 0) {
+            container.innerHTML = '<p style="color:#d9534f; font-weight:bold;">No pensions found for this member in the database setup.</p>';
+            return;
+        }
+
+        // Build the inputs
+        memberPensions.forEach(p => {
+            container.innerHTML += `
+                <div class="form-group">
+                    <label>${p.pension_name} Value (£):</label>
+                    <input type="number" class="dynamic-pot-input" data-pension="${p.pension_name}" step="0.01" value="0.00" required>
+                </div>
+            `;
+        });
+    }
+
+    async function submitDynamicLogEntry() {
+        const msg = document.getElementById('statusMsg');
+        msg.innerHTML = "Writing to secure tables..."; msg.style.color = "#3498db";
+        
+        const member = document.getElementById('logMember').value;
+        const logDate = document.getElementById('entryDate').value;
+        const inputs = document.querySelectorAll('.dynamic-pot-input');
+        
+        let payloads = [];
+        inputs.forEach(input => {
+            payloads.push({
+                member_name: member,
+                pension_name: input.getAttribute('data-pension'),
+                pot_value: parseFloat(input.value) || 0,
+                log_date: logDate
+            });
+        });
+
+        try {
+            let res = await fetch(`${SUPABASE_URL}/rest/v1/op_pension_logs`, {
+                method: "POST",
+                headers: getHeaders(),
+                body: JSON.stringify(payloads)
+            });
+
+            if (res.ok) {
+                msg.innerHTML = "Balances successfully saved to the cloud!"; msg.style.color = "#27ae60";
+                document.getElementById('entryDate').valueAsDate = new Date();
+                inputs.forEach(i => i.value = "0.00");
+                loadAllData(); 
+            } else {
+                let err = await res.text(); 
+                msg.innerHTML = "Database write error: " + err; msg.style.color = "#d9534f";
+            }
+        } catch (err) {
+            msg.innerHTML = "Network connection failed."; msg.style.color = "#d9534f";
+        }
+    }
+
+    // ==========================================
+    // UPDATED PARAMETERS SUBMISSION
+    // ==========================================
+    async function submitParams() {
+      const msg = document.getElementById('paramMsg');
+      msg.innerHTML = "Updating parameters across cloud instances..."; msg.style.color = "#3498db";
+      
+      try {
+        const memberName = 'Graham';
+        
+        let checkRes = await fetch(`${SUPABASE_URL}/rest/v1/op_modelling_parameters?member_name=eq.${memberName}`, { headers: getHeaders() });
+        let checkData = await checkRes.json();
+        
+        const payload = {
+          member_name: memberName,
+          shorter_week_date_1: document.getElementById('p_date1').value || null,
+          working_days_1: parseInt(document.getElementById('p_days1').value),
+          shorter_week_date_2: document.getElementById('p_date2').value || null,
+          working_days_2: parseInt(document.getElementById('p_days2').value),
+          retirement_date: document.getElementById('p_retire').value || null,
+          spending_reduction_pct: parseFloat(document.getElementById('p_spend').value) / 100,
+          drawdown_ratio_graham: parseFloat(document.getElementById('p_bills').value) / 100
+        };
+
+        let method = "POST";
+        let url = `${SUPABASE_URL}/rest/v1/op_modelling_parameters`;
+        
+        if(checkData.length > 0) {
+          method = "PATCH";
+          url = `${SUPABASE_URL}/rest/v1/op_modelling_parameters?member_name=eq.${memberName}`;
+        }
+
+        let res = await fetch(url, { method: method, headers: getHeaders(), body: JSON.stringify(payload) });
+
+        if(res.ok) {
+          msg.innerHTML = "Calculations synced instantly!"; msg.style.color = "#27ae60";
+          loadAllData();
+          setTimeout(() => { msg.innerHTML = ""; }, 3000);
+        } else { 
+            let err = await res.text();
+            msg.innerHTML = "Failed saving parameters: " + err; msg.style.color = "#d9534f"; 
+        }
+      } catch (err) { msg.innerHTML = "Error hitting database servers."; msg.style.color = "#d9534f"; }
+    }
 
     // ==========================================
     // OPTIMIZED FORECAST ENGINE
@@ -218,7 +331,6 @@
           return;
         }
 
-        // Use a string builder to prevent browser freeze!
         let htmlBuilder = "";
         
         data.forEach(row => {
@@ -235,7 +347,6 @@
           `;
         });
         
-        // Inject exactly once
         tbody.innerHTML = htmlBuilder;
 
       } catch (err) {
@@ -249,6 +360,13 @@
     // ==========================================
     async function loadAllData() {
       try {
+        // 0. Fetch the Basic Data Pensions List to build the form
+        let bdRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_pensions`, { headers: getHeaders() });
+        if (bdRes.ok) {
+            userPensions = await bdRes.json();
+            renderDynamicInputs(); 
+        }
+
         // 1. Load Parameters
         let pRes = await fetch(`${SUPABASE_URL}/rest/v1/op_modelling_parameters?member_name=eq.Graham&order=updated_at.desc&limit=1`, { headers: getHeaders() });
         if (pRes.ok) {
@@ -260,8 +378,12 @@
                 document.getElementById('p_date2').value = toInputDate(p.shorter_week_date_2);
                 document.getElementById('p_days2').value = p.working_days_2 || "5";
                 document.getElementById('p_retire').value = toInputDate(p.retirement_date);
+                
                 let spend = Math.round((p.spending_reduction_pct || 1.0) * 100);
                 document.getElementById('p_spend').value = spend; document.getElementById('v_spend').innerText = spend + "%";
+                
+                let ratio = Math.round((p.drawdown_ratio_graham || 0.5) * 100);
+                document.getElementById('p_bills').value = ratio; document.getElementById('v_bills').innerText = ratio + "%";
             }
         }
 
@@ -320,7 +442,6 @@
         }
 
       } catch (err) { 
-        alert("CRITICAL SCRIPT ERROR: " + err.message);
         console.error("Master Load Error:", err); 
       }
     }
@@ -373,3 +494,5 @@
     window.addEventListener('resize', drawRetirementCharts);
     loadAllData(); 
   </script>
+</body>
+</html>
