@@ -39,6 +39,11 @@
     .slider-val { color: #3498db; font-size: 18px; font-weight: bold; margin-left: 10px;}
     
     #statusMsg, #paramMsg { margin-top: 15px; font-weight: bold; }
+
+    /* New CSS for the filter bar */
+    .filter-bar { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px; align-items: flex-end; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;}
+    .filter-bar .form-group { margin-bottom: 0; }
+    .filter-bar select, .filter-bar input { max-width: 200px; }
   </style>
 </head>
 <body>
@@ -150,7 +155,35 @@
 
   <div id="History" class="tabcontent">
     <h2>Unified Database Audit Log</h2>
-    <table id="hTable"><thead><tr><th>Date</th><th>Member</th><th>Pension Name</th><th>Logged Value</th></tr></thead><tbody><tr><td colspan="4">Syncing database records...</td></tr></tbody></table>
+    
+    <div class="filter-bar">
+      <div class="form-group">
+        <label>Filter by Member</label>
+        <select id="filterMember" onchange="renderHistoryTable()">
+          <option value="All">All Members</option>
+          <option value="Graham">Graham</option>
+          <option value="Julie">Julie</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Filter by Pension</label>
+        <select id="filterPension" onchange="renderHistoryTable()">
+          <option value="All">All Pensions</option>
+          </select>
+      </div>
+      <div class="form-group">
+        <label>Specific Date</label>
+        <input type="date" id="filterDate" onchange="renderHistoryTable()">
+      </div>
+      <div class="form-group">
+        <button class="btn" style="background-color: #64748b;" onclick="clearHistoryFilters()">Clear Filters</button>
+      </div>
+    </div>
+
+    <table id="hTable">
+        <thead><tr><th>Date</th><th>Member</th><th>Pension Name</th><th>Logged Value</th></tr></thead>
+        <tbody><tr><td colspan="4">Syncing database records...</td></tr></tbody>
+    </table>
   </div>
 
   <div id="Retirement" class="tabcontent">
@@ -193,11 +226,59 @@
 
     let globalDrawdownData = null;
     let userPensions = []; 
+    let allLogs = []; // Stores our entire log history for instant filtering
     
     google.charts.load('current', {'packages':['corechart']});
 
     // ==========================================
-    // DYNAMIC LOG ENTRY ENGINE (FILTERED FOR DC ONLY)
+    // HISTORY TAB: FILTERING AND RENDERING
+    // ==========================================
+    function renderHistoryTable() {
+        const tbody = document.querySelector("#hTable tbody");
+        const mFilter = document.getElementById('filterMember').value;
+        const pFilter = document.getElementById('filterPension').value;
+        const dFilter = document.getElementById('filterDate').value;
+
+        // 1. Filter the data based on dropdowns
+        let filteredData = allLogs;
+        if (mFilter !== "All") filteredData = filteredData.filter(l => l.member_name === mFilter);
+        if (pFilter !== "All") filteredData = filteredData.filter(l => l.pension_name === pFilter);
+        if (dFilter) filteredData = filteredData.filter(l => l.log_date === dFilter);
+
+        // 2. Force sort: Date descending (Newest first)
+        filteredData.sort((a, b) => new Date(b.log_date) - new Date(a.log_date));
+
+        if (filteredData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #64748b;">No logs match your filter criteria.</td></tr>';
+            return;
+        }
+
+        // 3. Render it to the screen with dd/mm/yyyy formatting
+        let html = "";
+        filteredData.forEach(l => {
+            // Convert 'yyyy-mm-dd' to 'dd/mm/yyyy'
+            const dObj = new Date(l.log_date);
+            const ukDate = ("0" + dObj.getDate()).slice(-2) + '/' + ("0" + (dObj.getMonth() + 1)).slice(-2) + '/' + dObj.getFullYear();
+            
+            html += `<tr>
+                <td>${ukDate}</td>
+                <td>${l.member_name}</td>
+                <td>${l.pension_name}</td>
+                <td style="font-weight:bold;">${fmt(l.pot_value)}</td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+    }
+
+    function clearHistoryFilters() {
+        document.getElementById('filterMember').value = "All";
+        document.getElementById('filterPension').value = "All";
+        document.getElementById('filterDate').value = "";
+        renderHistoryTable();
+    }
+
+    // ==========================================
+    // DYNAMIC LOG ENTRY ENGINE 
     // ==========================================
     function renderDynamicInputs() {
         const memberElem = document.getElementById('logMember');
@@ -207,7 +288,6 @@
         if (!container) return;
         container.innerHTML = ''; 
 
-        // Strictly filter for Defined Contributions
         const memberPensions = userPensions.filter(p => 
             p.member_name === member && 
             p.pension_type === 'Defined Contributions'
@@ -218,7 +298,6 @@
             return;
         }
 
-        // Build HTML as a single string to avoid browser stuttering
         let htmlBuilder = "";
         memberPensions.forEach(p => {
             htmlBuilder += `
@@ -365,7 +444,7 @@
     // ==========================================
     async function loadAllData() {
       try {
-        // 0. Fetch the Basic Data Pensions List to build the form
+        // 0. Fetch the Basic Data Pensions List
         let bdRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_pensions`, { headers: getHeaders() });
         if (bdRes.ok) {
             userPensions = await bdRes.json();
@@ -395,11 +474,13 @@
         // 2. Load Logs
         let logRes = await fetch(`${SUPABASE_URL}/rest/v1/op_pension_logs?order=log_date.desc`, { headers: getHeaders() });
         if (logRes.ok) {
-            let logs = await logRes.json();
+            allLogs = await logRes.json(); // Store locally for filtering!
+
+            // Update the Overview Tab Totals
             let gTot = 0, jTot = 0;
             let seen = new Set();
             
-            logs.forEach(l => {
+            allLogs.forEach(l => {
                 let key = l.member_name + '_' + l.pension_name;
                 if(!seen.has(key)) {
                     seen.add(key);
@@ -412,10 +493,15 @@
             document.getElementById('mWifeTotal').innerText = fmt(jTot);
             document.getElementById('mCombinedTotal').innerText = fmt(gTot + jTot);
 
-            document.querySelector("#hTable thead").innerHTML = `<tr><th>Date</th><th>Member</th><th>Pension Name</th><th>Logged Value</th></tr>`;
-            document.querySelector("#hTable tbody").innerHTML = logs.length ? logs.map(l => {
-                return `<tr><td>${l.log_date}</td><td>${l.member_name}</td><td>${l.pension_name}</td><td style="font-weight:bold;">${fmt(l.pot_value)}</td></tr>`;
-            }).join('') : '<tr><td colspan="4">No cloud entries logged yet.</td></tr>';
+            // Populate the Pension Filter Dropdown based on what's in the DB
+            const pSelect = document.getElementById('filterPension');
+            const uniquePensions = [...new Set(allLogs.map(l => l.pension_name))];
+            let pOptions = '<option value="All">All Pensions</option>';
+            uniquePensions.forEach(p => pOptions += `<option value="${p}">${p}</option>`);
+            pSelect.innerHTML = pOptions;
+
+            // Trigger the History Table Renderer
+            renderHistoryTable();
         }
 
         // 3. Trigger the Forecast Engine
