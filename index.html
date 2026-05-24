@@ -205,7 +205,7 @@
         container.innerHTML = ''; 
 
         // Filter pensions for the selected person
-        const memberPensions = userPensions.filter(p => p.member_name === member);
+const memberPensions = userPensions.filter(p => p.member_name === member && p.pension_type === 'Defined Contribution');
         
         if(memberPensions.length === 0) {
             container.innerHTML = '<p style="color:#d9534f; font-weight:bold;">No pensions found for this member in the database setup.</p>';
