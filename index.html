@@ -192,19 +192,22 @@
     });
 
     let globalDrawdownData = null;
-    let userPensions = []; // Stores the pensions fetched from the database
+    let userPensions = []; 
     
     google.charts.load('current', {'packages':['corechart']});
 
     // ==========================================
-    // DYNAMIC LOG ENTRY ENGINE
+    // DYNAMIC LOG ENTRY ENGINE (FILTERED FOR DC ONLY)
     // ==========================================
     function renderDynamicInputs() {
-        const member = document.getElementById('logMember').value;
+        const memberElem = document.getElementById('logMember');
+        if (!memberElem) return;
+        const member = memberElem.value;
         const container = document.getElementById('dynamicInputsContainer');
+        if (!container) return;
         container.innerHTML = ''; 
 
-        // Filter by member AND the exact plural string "Defined Contributions"
+        // Strictly filter for Defined Contributions
         const memberPensions = userPensions.filter(p => 
             p.member_name === member && 
             p.pension_type === 'Defined Contributions'
@@ -215,15 +218,36 @@
             return;
         }
 
+        // Build HTML as a single string to avoid browser stuttering
+        let htmlBuilder = "";
         memberPensions.forEach(p => {
-            container.innerHTML += `
+            htmlBuilder += `
                 <div class="form-group">
                     <label>${p.pension_name} Value (£):</label>
                     <input type="number" class="dynamic-pot-input" data-pension="${p.pension_name}" step="0.01" value="0.00" required>
                 </div>
             `;
         });
+        container.innerHTML = htmlBuilder;
     }
+
+    async function submitDynamicLogEntry() {
+        const msg = document.getElementById('statusMsg');
+        msg.innerHTML = "Writing to secure tables..."; msg.style.color = "#3498db";
+        
+        const member = document.getElementById('logMember').value;
+        const logDate = document.getElementById('entryDate').value;
+        const inputs = document.querySelectorAll('.dynamic-pot-input');
+        
+        let payloads = [];
+        inputs.forEach(input => {
+            payloads.push({
+                member_name: member,
+                pension_name: input.getAttribute('data-pension'),
+                pot_value: parseFloat(input.value) || 0,
+                log_date: logDate
+            });
+        });
 
         try {
             let res = await fetch(`${SUPABASE_URL}/rest/v1/op_pension_logs`, {
@@ -316,7 +340,6 @@
         }
 
         let htmlBuilder = "";
-        
         data.forEach(row => {
           const dateObj = new Date(row.forecast_month);
           const dateStr = dateObj.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
@@ -330,12 +353,10 @@
             </tr>
           `;
         });
-        
         tbody.innerHTML = htmlBuilder;
 
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="4" style="color:#d9534f; font-weight:bold;">Network/JS Error: ${err.message}</td></tr>`;
-        console.error(err);
       }
     }
 
@@ -398,7 +419,7 @@
         }
 
         // 3. Trigger the Forecast Engine
-        // await loadMonthlyForecast();
+        await loadMonthlyForecast();
 
         // 4. Load Joint Retirement Math Engine
         let mathRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/calculate_joint_retirement`, {
@@ -424,7 +445,6 @@
                 drawRetirementCharts();
             }
         }
-
       } catch (err) { 
         console.error("Master Load Error:", err); 
       }
@@ -476,7 +496,7 @@
     }
 
     window.addEventListener('resize', drawRetirementCharts);
-  //  loadAllData(); 
+    loadAllData(); 
   </script>
 </body>
 </html>
