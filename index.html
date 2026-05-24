@@ -191,12 +191,11 @@
     });
 
     let globalDrawdownData = null;
-    google.charts.load('current', {'packages':['corechart']});
-
-    // ==========================================
-    // MONTHLY FORECAST ENGINE
+    google.charts.load('current', {'packages':['    // ==========================================
+    // MONTHLY FORECAST ENGINE (WITH ERROR CATCHING)
     // ==========================================
     async function loadMonthlyForecast() {
+      const tbody = document.getElementById('forecast-table-body');
       try {
         let res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/generate_monthly_pension_forecast`, {
           method: "POST",
@@ -205,7 +204,6 @@
 
         if (res.ok) {
           let data = await res.json();
-          let tbody = document.getElementById('forecast-table-body');
           tbody.innerHTML = ''; 
           
           if(data.length === 0) {
@@ -230,9 +228,15 @@
               </tr>
             `;
           });
+        } else {
+          // If Supabase rejects the request, print the exact error to the screen
+          let errText = await res.text();
+          console.error("Supabase Error:", errText);
+          tbody.innerHTML = `<tr><td colspan="4" style="color: #d9534f; font-weight: bold;">Database Error: ${errText}</td></tr>`;
         }
       } catch (err) {
-        console.error("Error loading monthly forecast:", err);
+        // If the network completely fails
+        tbody.innerHTML = `<tr><td colspan="4" style="color: #d9534f; font-weight: bold;">Network Error: ${err.message}</td></tr>`;
       }
     }
 
