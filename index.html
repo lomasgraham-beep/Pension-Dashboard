@@ -171,7 +171,7 @@
     </table>
   </div>
 
-    <script>
+  <script>
     // ==========================================
     // CRITICAL CONNECTION CONFIGURATION
     // ==========================================
@@ -191,8 +191,10 @@
     });
 
     let globalDrawdownData = null;
-    google.charts.load('current', {'packages':['    // ==========================================
-    // MONTHLY FORECAST ENGINE (WITH ERROR CATCHING)
+    google.charts.load('current', {'packages':['corechart']});
+
+    // ==========================================
+    // OPTIMIZED FORECAST ENGINE
     // ==========================================
     async function loadMonthlyForecast() {
       const tbody = document.getElementById('forecast-table-body');
@@ -202,41 +204,42 @@
           headers: getHeaders()
         });
 
-        if (res.ok) {
-          let data = await res.json();
-          tbody.innerHTML = ''; 
-          
-          if(data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4">No forecast data generated. Check dates.</td></tr>';
-            return;
-          }
-
-          data.forEach(row => {
-            const dateObj = new Date(row.forecast_month);
-            const dateStr = dateObj.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
-            
-            const gTot = fmt(row.graham_total);
-            const jTot = fmt(row.julie_total);
-            const jointTot = fmt(row.graham_total + row.julie_total);
-
-            tbody.innerHTML += `
-              <tr>
-                <td>${dateStr}</td>
-                <td>${gTot}</td>
-                <td>${jTot}</td>
-                <td style="font-weight: bold; color: #2c3e50;">${jointTot}</td>
-              </tr>
-            `;
-          });
-        } else {
-          // If Supabase rejects the request, print the exact error to the screen
+        if (!res.ok) {
           let errText = await res.text();
-          console.error("Supabase Error:", errText);
-          tbody.innerHTML = `<tr><td colspan="4" style="color: #d9534f; font-weight: bold;">Database Error: ${errText}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="4" style="color:#d9534f; font-weight:bold;">DB Error: ${errText}</td></tr>`;
+          return;
         }
+
+        let data = await res.json();
+        
+        if (!Array.isArray(data) || data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4">No forecast data generated. Check dates.</td></tr>';
+          return;
+        }
+
+        // Use a string builder to prevent browser freeze!
+        let htmlBuilder = "";
+        
+        data.forEach(row => {
+          const dateObj = new Date(row.forecast_month);
+          const dateStr = dateObj.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+          
+          htmlBuilder += `
+            <tr>
+              <td>${dateStr}</td>
+              <td>${fmt(row.graham_total)}</td>
+              <td>${fmt(row.julie_total)}</td>
+              <td style="font-weight: bold; color: #2c3e50;">${fmt(row.graham_total + row.julie_total)}</td>
+            </tr>
+          `;
+        });
+        
+        // Inject exactly once
+        tbody.innerHTML = htmlBuilder;
+
       } catch (err) {
-        // If the network completely fails
-        tbody.innerHTML = `<tr><td colspan="4" style="color: #d9534f; font-weight: bold;">Network Error: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" style="color:#d9534f; font-weight:bold;">Network/JS Error: ${err.message}</td></tr>`;
+        console.error(err);
       }
     }
 
@@ -245,28 +248,26 @@
     // ==========================================
     async function loadAllData() {
       try {
-        // 1. Load Parameters (Updated for op_modelling_parameters and member_name)
+        // 1. Load Parameters
         let pRes = await fetch(`${SUPABASE_URL}/rest/v1/op_modelling_parameters?member_name=eq.Graham&order=updated_at.desc&limit=1`, { headers: getHeaders() });
         if (pRes.ok) {
             let pData = await pRes.json();
-            if(pData.length > 0) {
-            let p = pData[0];
-            document.getElementById('p_date1').value = toInputDate(p.shorter_week_date_1);
-            document.getElementById('p_days1').value = p.working_days_1 || "5";
-            document.getElementById('p_date2').value = toInputDate(p.shorter_week_date_2);
-            document.getElementById('p_days2').value = p.working_days_2 || "5";
-            document.getElementById('p_retire').value = toInputDate(p.retirement_date);
-            let spend = Math.round(p.spending_reduction_pct * 100) || 100;
-            document.getElementById('p_spend').value = spend; document.getElementById('v_spend').innerText = spend + "%";
+            if(pData && pData.length > 0) {
+                let p = pData[0];
+                document.getElementById('p_date1').value = toInputDate(p.shorter_week_date_1);
+                document.getElementById('p_days1').value = p.working_days_1 || "5";
+                document.getElementById('p_date2').value = toInputDate(p.shorter_week_date_2);
+                document.getElementById('p_days2').value = p.working_days_2 || "5";
+                document.getElementById('p_retire').value = toInputDate(p.retirement_date);
+                let spend = Math.round((p.spending_reduction_pct || 1.0) * 100);
+                document.getElementById('p_spend').value = spend; document.getElementById('v_spend').innerText = spend + "%";
             }
         }
 
-        // 2. Load Logs (Updated for op_pension_logs)
+        // 2. Load Logs
         let logRes = await fetch(`${SUPABASE_URL}/rest/v1/op_pension_logs?order=log_date.desc`, { headers: getHeaders() });
         if (logRes.ok) {
             let logs = await logRes.json();
-            
-            // Calculate latest totals by grabbing the first time we see each pension account
             let gTot = 0, jTot = 0;
             let seen = new Set();
             
@@ -283,10 +284,9 @@
             document.getElementById('mWifeTotal').innerText = fmt(jTot);
             document.getElementById('mCombinedTotal').innerText = fmt(gTot + jTot);
 
-            // Update History Table Layout for dynamic names
             document.querySelector("#hTable thead").innerHTML = `<tr><th>Date</th><th>Member</th><th>Pension Name</th><th>Logged Value</th></tr>`;
             document.querySelector("#hTable tbody").innerHTML = logs.length ? logs.map(l => {
-            return `<tr><td>${l.log_date}</td><td>${l.member_name}</td><td>${l.pension_name}</td><td style="font-weight:bold;">${fmt(l.pot_value)}</td></tr>`;
+                return `<tr><td>${l.log_date}</td><td>${l.member_name}</td><td>${l.pension_name}</td><td style="font-weight:bold;">${fmt(l.pot_value)}</td></tr>`;
             }).join('') : '<tr><td colspan="4">No cloud entries logged yet.</td></tr>';
         }
 
@@ -298,25 +298,30 @@
           method: "POST",
           headers: getHeaders()
         });
+        
         if (mathRes.ok) {
-            globalDrawdownData = await mathRes.json();
+            let parsedMath = await mathRes.json();
+            if (Array.isArray(parsedMath)) {
+                globalDrawdownData = parsedMath;
+                document.querySelector("#rTable tbody").innerHTML = globalDrawdownData.length ? globalDrawdownData.map(r => {
+                    return `<tr><td>${r.retirement_year}</td><td style="font-weight:bold; color:#3498db;">${r.current_age}</td><td>${fmt(r.total_outgoings)}</td><td>${fmt(r.tax_free_pot)}</td><td>${fmt(r.taxable_pot)}</td><td>${fmt(r.other_pensions)}</td><td>${fmt(r.drawdown_amount)}</td><td style="font-weight:bold; color:#27ae60;">${fmt(r.total_income)}</td></tr>`;
+                }).join('') : '<tr><td colspan="8">No calculation rows computed.</td></tr>';
 
-            document.querySelector("#rTable tbody").innerHTML = globalDrawdownData.length ? globalDrawdownData.map(r => {
-            return `<tr><td>${r.retirement_year}</td><td style="font-weight:bold; color:#3498db;">${r.current_age}</td><td>${fmt(r.total_outgoings)}</td><td>${fmt(r.tax_free_pot)}</td><td>${fmt(r.taxable_pot)}</td><td>${fmt(r.other_pensions)}</td><td>${fmt(r.drawdown_amount)}</td><td style="font-weight:bold; color:#27ae60;">${fmt(r.total_income)}</td></tr>`;
-            }).join('') : '<tr><td colspan="8">No calculation rows computed.</td></tr>';
-
-            if(globalDrawdownData.length > 0) {
-            let tf = Number(globalDrawdownData[0].tax_free_pot);
-            let tx = Number(globalDrawdownData[0].taxable_pot);
-            document.getElementById('mRetTaxFree').innerText = fmt(tf);
-            document.getElementById('mRetTaxable').innerText = fmt(tx);
-            document.getElementById('mRetTotal').innerText = fmt(tf + tx);
+                if(globalDrawdownData.length > 0) {
+                    let tf = Number(globalDrawdownData[0].tax_free_pot);
+                    let tx = Number(globalDrawdownData[0].taxable_pot);
+                    document.getElementById('mRetTaxFree').innerText = fmt(tf);
+                    document.getElementById('mRetTaxable').innerText = fmt(tx);
+                    document.getElementById('mRetTotal').innerText = fmt(tf + tx);
+                }
+                drawRetirementCharts();
             }
-
-            drawRetirementCharts();
         }
 
-      } catch (err) { console.error("Error connecting to data structures:", err); }
+      } catch (err) { 
+        alert("CRITICAL SCRIPT ERROR: " + err.message);
+        console.error("Master Load Error:", err); 
+      }
     }
 
     function drawRetirementCharts() {
