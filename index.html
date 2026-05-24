@@ -50,6 +50,7 @@
 
   <div class="tab-buttons">
     <button class="tab-link active-btn" onclick="showTab(event, 'Overview')">Overview & Analytics</button>
+    <button class="tab-link" onclick="showTab(event, 'Forecast')">Monthly Forecast</button>
     <button class="tab-link" onclick="showTab(event, 'Parameters')">Modelling</button>
     <button class="tab-link" onclick="showTab(event, 'NewEntry')">Log Entry</button>
     <button class="tab-link" onclick="showTab(event, 'History')">Recent Logs</button>
@@ -64,6 +65,24 @@
       <div class="card"><h3>Julie's Total</h3><div id="mWifeTotal" class="value">£0</div></div>
     </div>
     <p style="color:#64748b; font-size:13px;"><em>Note: Historical performance tracking charts will populate as logs are submitted to your new database.</em></p>
+  </div>
+
+  <div id="Forecast" class="tabcontent">
+    <h2>Pre-Retirement Monthly Forecast</h2>
+    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>Calculated via cloud database engine factoring in phased working days and compounded growth.</em></p>
+    <table id="forecastTable">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th>Graham's Tracked Total</th>
+          <th>Julie's Tracked Total</th>
+          <th>Joint Trajectory</th>
+        </tr>
+      </thead>
+      <tbody id="forecast-table-body">
+        <tr><td colspan="4">Fetching engine forecast...</td></tr>
+      </tbody>
+    </table>
   </div>
 
   <div id="Parameters" class="tabcontent">
@@ -155,10 +174,9 @@
   <script>
     // ==========================================
     // CRITICAL CONNECTION CONFIGURATION
-    // PLACE YOUR SUPABASE DETAILS HERE
     // ==========================================
-const SUPABASE_URL = "https://yavfcitgyyftpubqwddp.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
+    const SUPABASE_URL = "https://yavfcitgyyftpubqwddp.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
 
     document.getElementById('entryDate').valueAsDate = new Date();
 
@@ -259,10 +277,54 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
       } catch (err) { msg.innerHTML = "Error hitting database servers."; msg.style.color = "#d9534f"; }
     }
 
+    // ==========================================
+    // NEW: FETCH MONTHLY FORECAST ENGINE
+    // ==========================================
+    async function loadMonthlyForecast() {
+      try {
+        let res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/generate_monthly_pension_forecast`, {
+          method: "POST",
+          headers: getHeaders()
+        });
+
+        if (res.ok) {
+          let data = await res.json();
+          let tbody = document.getElementById('forecast-table-body');
+          tbody.innerHTML = ''; // Clear loading text
+          
+          if(data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4">No forecast data generated. Check dates.</td></tr>';
+            return;
+          }
+
+          data.forEach(row => {
+            const dateObj = new Date(row.forecast_month);
+            const dateStr = dateObj.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+            
+            const gTot = fmt(row.graham_total);
+            const jTot = fmt(row.julie_total);
+            const jointTot = fmt(row.graham_total + row.julie_total);
+
+            tbody.innerHTML += `
+              <tr>
+                <td>${dateStr}</td>
+                <td>${gTot}</td>
+                <td>${jTot}</td>
+                <td style="font-weight: bold; color: #2c3e50;">${jointTot}</td>
+              </tr>
+            `;
+          });
+        }
+      } catch (err) {
+        console.error("Error loading monthly forecast:", err);
+      }
+    }
+
     async function loadAllData() {
       try {
         const members = await getMemberMap();
         
+        // 1. Load Parameters
         let pRes = await fetch(`${SUPABASE_URL}/rest/v1/modelling_parameters?member_id=eq.${members['Graham']}&order=updated_at.desc&limit=1`, { headers: getHeaders() });
         let pData = await pRes.json();
         if(pData.length > 0) {
@@ -278,6 +340,7 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
           document.getElementById('p_bills').value = bills; document.getElementById('v_bills').innerText = bills + "%";
         }
 
+        // 2. Load Logs
         let logRes = await fetch(`${SUPABASE_URL}/rest/v1/pension_logs?order=log_date.desc`, { headers: getHeaders() });
         let logs = await logRes.json();
         
@@ -301,6 +364,7 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
           return `<tr><td>${l.log_date}</td><td>${memberNames[l.member_id] || 'Unknown'}</td><td>${fmt(l.pru_value)}</td><td>${fmt(l.aegon_value)}</td><td style="font-weight:bold;">${fmt(tot)}</td></tr>`;
         }).join('') : '<tr><td colspan="5">No cloud entries logged yet.</td></tr>';
 
+        // 3. Load Joint Retirement Math Engine
         let mathRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/calculate_joint_retirement`, {
           method: "POST",
           headers: getHeaders()
@@ -318,6 +382,9 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
           document.getElementById('mRetTaxable').innerText = fmt(tx);
           document.getElementById('mRetTotal').innerText = fmt(tf + tx);
         }
+
+        // 4. Trigger the Forecast Engine
+        await loadMonthlyForecast();
 
         drawRetirementCharts();
 
@@ -366,7 +433,7 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
       document.querySelectorAll('.tab-link').forEach(el => el.className = el.className.replace(" active-btn", ""));
       document.getElementById(id).style.display = 'block';
       evt.currentTarget.className += " active-btn";
-      if(id === 'Parameters') { drawRetirementCharts(); }
+      if(id === 'Parameters' || id === 'Forecast') { drawRetirementCharts(); }
     }
 
     window.addEventListener('resize', drawRetirementCharts);
