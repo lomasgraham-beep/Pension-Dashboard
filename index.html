@@ -69,7 +69,7 @@
     <button class="tab-link active-btn" onclick="showTab(event, 'Overview')">Overview</button>
     <button class="tab-link" onclick="showTab(event, 'Forecast')">Monthly Forecast</button>
     <button class="tab-link" onclick="showTab(event, 'Bills')">Household Bills</button>
-    <button class="tab-link" onclick="showTab(event, 'Dining')">Dining Data</button>
+    <button class="tab-link" onclick="showTab(event, 'Dining')">Dining</button>
     <button class="tab-link" onclick="showTab(event, 'Parameters')">Modelling</button>
     <button class="tab-link" onclick="showTab(event, 'NewEntry')">Log Entry</button>
     <button class="tab-link" onclick="showTab(event, 'History')">Recent Logs</button>
@@ -95,7 +95,7 @@
 
   <div id="Bills" class="tabcontent">
     <h2>Household Bills & Future Inflation</h2>
-    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>Visualizing your category costs. The age columns automatically apply 2.5% compounding inflation based on the oldest member's current age.</em></p>
+    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>Visualizing your category costs. The columns automatically apply 2.5% compounding inflation based on the oldest member's current age.</em></p>
     
     <div class="filter-bar">
       <div class="form-group">
@@ -127,13 +127,13 @@
   </div>
 
   <div id="Dining" class="tabcontent">
-    <h2>Dining Habits & Future Inflation</h2>
+    <h2>Dining & Future Inflation</h2>
     <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>Visualizing your dining budgets with 2.5% compounding inflation and database tapers applied.</em></p>
     
     <table id="dTable">
       <thead>
         <tr>
-          <th>Dining Habit</th>
+          <th>Dining Type</th>
           <th>Subject to Slider?</th>
           <th>Baseline (Today)</th>
           <th>Est. Cost at Age 70</th>
@@ -208,7 +208,7 @@
     let userPensions = []; 
     let allLogs = []; 
     let allBills = []; 
-    let allDining = []; // NEW
+    let allDining = []; 
     let allMembers = []; 
     let currentView = 'Joint'; 
 
@@ -292,11 +292,11 @@
         let html = ""; let totBase = 0, tot70 = 0, tot80 = 0, tot90 = 0;
 
         allDining.forEach(d => {
-            let name = d.habit_name || d.name || d.restaurant || d.description || 'Unnamed Dining Habit';
+            // Updated directly to routine_name based on DB structure
+            let name = d.routine_name || d.habit_name || d.name || 'Unnamed Dining Type';
             let reducible = d.spend_reduction ? "Yes" : "No";
             let base = Number(d.annual_total) || 0;
             
-            // New columns with fallback to 1.0 (100% retained)
             let t70 = d.taper_at_70 !== null && d.taper_at_70 !== undefined ? Number(d.taper_at_70) : 1.0;
             let t80 = d.taper_at_80 !== null && d.taper_at_80 !== undefined ? Number(d.taper_at_80) : 1.0;
             let t90 = d.taper_at_90 !== null && d.taper_at_90 !== undefined ? Number(d.taper_at_90) : 1.0;
@@ -318,18 +318,36 @@
 
     function clearBillsFilter() { document.getElementById('filterCategory').value = "All"; renderBillsTable(); }
 
+    // UPDATED: Replaced Ages with Dining Target
     function renderRetirementTable() {
         const tbody = document.querySelector("#rTable tbody"); const thead = document.querySelector("#rTable thead");
         if (!globalDrawdownData || globalDrawdownData.length === 0) { tbody.innerHTML = '<tr><td colspan="8">No calculation rows computed.</td></tr>'; return; }
         const targetHeader = currentView === 'Joint' ? 'Combined Outgoings' : 'Target Net Income';
-        thead.innerHTML = `<tr><th>Year</th><th>Ages</th><th>${targetHeader}</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Guaranteed Incomes</th><th>Drawdown required</th><th>Total Gross Income</th></tr>`;
+        
+        thead.innerHTML = `<tr><th>Year</th><th>Dining Target</th><th>${targetHeader}</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Guaranteed Incomes</th><th>Drawdown required</th><th>Total Gross Income</th></tr>`;
+        
         let html = "";
         globalDrawdownData.forEach(r => {
-            let tf, tx, other, draw, inc, target;
-            if (currentView === 'Joint') { tf = r.tax_free_pot; tx = r.taxable_pot; other = r.other_pensions; draw = r.drawdown_amount; inc = r.total_income; target = r.total_outgoings; } 
-            else if (currentView === 'Graham') { tf = r.g_tax_free; tx = r.g_taxable; other = r.g_other; draw = r.g_draw; inc = r.g_income; target = r.g_income; } 
-            else { tf = r.j_tax_free; tx = r.j_taxable; other = r.j_other; draw = r.j_draw; inc = r.j_income; target = r.j_income; }
-            html += `<tr><td>${r.retirement_year}</td><td style="font-weight:bold; color:#3498db;">${r.current_age}</td><td>${fmt(target)}</td><td>${fmt(tf)}</td><td>${fmt(tx)}</td><td>${fmt(other)}</td><td>${fmt(draw)}</td><td style="font-weight:bold; color:#27ae60;">${fmt(inc)}</td></tr>`;
+            let tf, tx, other, draw, inc, target, dining;
+            if (currentView === 'Joint') { 
+                tf = r.tax_free_pot; tx = r.taxable_pot; other = r.other_pensions; draw = r.drawdown_amount; inc = r.total_income; target = r.total_outgoings; dining = r.total_dining;
+            } 
+            else if (currentView === 'Graham') { 
+                tf = r.g_tax_free; tx = r.g_taxable; other = r.g_other; draw = r.g_draw; inc = r.g_income; target = r.g_income; dining = r.g_dining;
+            } 
+            else { 
+                tf = r.j_tax_free; tx = r.j_taxable; other = r.j_other; draw = r.j_draw; inc = r.j_income; target = r.j_income; dining = r.j_dining;
+            }
+            html += `<tr>
+                <td>${r.retirement_year}</td>
+                <td style="font-weight:bold; color:#e67e22;">${fmt(dining)}</td>
+                <td>${fmt(target)}</td>
+                <td>${fmt(tf)}</td>
+                <td>${fmt(tx)}</td>
+                <td>${fmt(other)}</td>
+                <td>${fmt(draw)}</td>
+                <td style="font-weight:bold; color:#27ae60;">${fmt(inc)}</td>
+            </tr>`;
         });
         tbody.innerHTML = html;
     }
@@ -403,7 +421,6 @@
           renderBillsTable(); 
       }
 
-      // NEW: Fetch Dining
       let diningRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_dining_habits`, { headers: getHeaders() });
       if (diningRes.ok) { 
           allDining = await diningRes.json(); 
