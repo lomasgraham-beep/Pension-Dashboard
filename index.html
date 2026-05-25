@@ -93,14 +93,15 @@
   </div>
 
   <div id="Bills" class="tabcontent">
-    <h2>Household Bills & Age Tapers</h2>
+    <h2>Household Bills & Future Inflation</h2>
+    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>Visualizing your category costs. The age columns automatically apply 2.5% compounding inflation based on the oldest member's current age.</em></p>
     
     <div class="filter-bar">
       <div class="form-group">
         <label>Filter by Category</label>
         <select id="filterCategory" onchange="renderBillsTable()">
           <option value="All">All Categories</option>
-          </select>
+        </select>
       </div>
       <div class="form-group">
         <button class="btn" style="background-color: #64748b;" onclick="clearBillsFilter()">Clear Filter</button>
@@ -113,10 +114,10 @@
           <th>Category</th>
           <th>Bill Name</th>
           <th>Subject to Slider?</th>
-          <th>Baseline Cost</th>
-          <th>Cost at Age 70</th>
-          <th>Cost at Age 80</th>
-          <th>Cost at Age 90</th>
+          <th>Baseline (Today)</th>
+          <th>Est. Cost at Age 70</th>
+          <th>Est. Cost at Age 80</th>
+          <th>Est. Cost at Age 90</th>
         </tr>
       </thead>
       <tbody><tr><td colspan="7">Loading database bills...</td></tr></tbody>
@@ -187,6 +188,7 @@
     let userPensions = []; 
     let allLogs = []; 
     let allBills = []; 
+    let allMembers = []; // NEW: Array to hold DOBs
     let currentView = 'Joint'; 
 
     google.charts.load('current', {'packages':['corechart']});
@@ -201,14 +203,31 @@
     }
 
     // ==========================================
-    // UPDATED BILLS RENDERER (WITH CATEGORY FILTER)
+    // INFLATION-AWARE BILLS RENDERER
     // ==========================================
     function renderBillsTable() {
         const tbody = document.querySelector("#bTable tbody");
         const tfoot = document.querySelector("#bTable tfoot");
         const catFilter = document.getElementById('filterCategory').value;
 
-        // Apply dropdown filter
+        // 1. Calculate Oldest Member's Current Age
+        let currentYear = new Date().getFullYear();
+        let oldestAge = 55; // Default fallback just in case
+        if (allMembers && allMembers.length > 0) {
+            let ages = allMembers.map(m => {
+                if(!m.dob) return 0;
+                return currentYear - new Date(m.dob).getFullYear();
+            });
+            oldestAge = Math.max(...ages);
+        }
+
+        // 2. Calculate Compounding Inflation Multipliers (2.5%)
+        const inflRate = 0.025;
+        const inf70 = Math.pow(1 + inflRate, Math.max(0, 70 - oldestAge));
+        const inf80 = Math.pow(1 + inflRate, Math.max(0, 80 - oldestAge));
+        const inf90 = Math.pow(1 + inflRate, Math.max(0, 90 - oldestAge));
+
+        // 3. Filter the Data
         let filteredBills = allBills;
         if (catFilter !== "All") {
             filteredBills = filteredBills.filter(b => (b.category_code || 'Uncategorized') === catFilter);
@@ -233,9 +252,10 @@
             let t80 = b.taper_at_80 !== null ? Number(b.taper_at_80) : 1.0;
             let t90 = b.taper_at_90 !== null ? Number(b.taper_at_90) : 1.0;
 
-            let val70 = base * t70;
-            let val80 = base * t80;
-            let val90 = base * t90;
+            // Apply BOTH the retention multiplier AND the future inflation multiplier
+            let val70 = base * t70 * inf70;
+            let val80 = base * t80 * inf80;
+            let val90 = base * t90 * inf90;
 
             totBase += base; tot70 += val70; tot80 += val80; tot90 += val90;
 
@@ -243,7 +263,7 @@
                 <td>${cat}</td>
                 <td>${name}</td>
                 <td>${reducible}</td>
-                <td>${fmt(base)}</td>
+                <td style="font-weight:bold;">${fmt(base)}</td>
                 <td>${fmt(val70)}</td>
                 <td>${fmt(val80)}</td>
                 <td>${fmt(val90)}</td>
@@ -339,17 +359,19 @@
     }
 
     async function loadAllData() {
+      // 0. NEW: Fetch Members to calculate precise ages for inflation
+      let mRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_members`, { headers: getHeaders() });
+      if (mRes.ok) { allMembers = await mRes.json(); }
+
       // 1. Fetch Household Bills for the new tab
       let billsRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_household_bills`, { headers: getHeaders() });
       if (billsRes.ok) { 
           allBills = await billsRes.json(); 
           
-          // Populate Category Dropdown
           const cSelect = document.getElementById('filterCategory');
           let cOptions = '<option value="All">All Categories</option>';
           let uniqueCats = [...new Set(allBills.map(b => b.category_code || 'Uncategorized'))].filter(c => c !== 'Uncategorized');
           uniqueCats.sort().forEach(c => cOptions += `<option value="${c}">${c}</option>`);
-          // Add 'Uncategorized' at the end if it exists
           if (allBills.some(b => !b.category_code)) cOptions += `<option value="Uncategorized">Uncategorized</option>`;
           cSelect.innerHTML = cOptions;
 
