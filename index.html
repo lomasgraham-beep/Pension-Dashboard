@@ -292,7 +292,6 @@
         let html = ""; let totBase = 0, tot70 = 0, tot80 = 0, tot90 = 0;
 
         allDining.forEach(d => {
-            // Updated directly to routine_name based on DB structure
             let name = d.routine_name || d.habit_name || d.name || 'Unnamed Dining Type';
             let reducible = d.spend_reduction ? "Yes" : "No";
             let base = Number(d.annual_total) || 0;
@@ -318,30 +317,50 @@
 
     function clearBillsFilter() { document.getElementById('filterCategory').value = "All"; renderBillsTable(); }
 
-    // UPDATED: Replaced Ages with Dining Target
     function renderRetirementTable() {
-        const tbody = document.querySelector("#rTable tbody"); const thead = document.querySelector("#rTable thead");
-        if (!globalDrawdownData || globalDrawdownData.length === 0) { tbody.innerHTML = '<tr><td colspan="8">No calculation rows computed.</td></tr>'; return; }
-        const targetHeader = currentView === 'Joint' ? 'Combined Outgoings' : 'Target Net Income';
+        const tbody = document.querySelector("#rTable tbody"); 
+        const thead = document.querySelector("#rTable thead");
         
-        thead.innerHTML = `<tr><th>Year</th><th>Dining Target</th><th>${targetHeader}</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Guaranteed Incomes</th><th>Drawdown required</th><th>Total Gross Income</th></tr>`;
+        if (!globalDrawdownData || globalDrawdownData.length === 0) { 
+            tbody.innerHTML = '<tr><td colspan="8">No calculation rows computed.</td></tr>'; 
+            return; 
+        }
+        
+        thead.innerHTML = `<tr>
+            <th>Year</th>
+            <th>Dining Target</th>
+            <th>Bills Target</th>
+            <th>Tax-Free Pot</th>
+            <th>Taxable Pot</th>
+            <th>Guaranteed Incomes</th>
+            <th>Drawdown required</th>
+            <th>Total Gross Income</th>
+        </tr>`;
         
         let html = "";
         globalDrawdownData.forEach(r => {
-            let tf, tx, other, draw, inc, target, dining;
+            let tf, tx, other, draw, inc, bills, dining;
+            
             if (currentView === 'Joint') { 
-                tf = r.tax_free_pot; tx = r.taxable_pot; other = r.other_pensions; draw = r.drawdown_amount; inc = r.total_income; target = r.total_outgoings; dining = r.total_dining;
+                tf = r.tax_free_pot; tx = r.taxable_pot; other = r.other_pensions; 
+                draw = r.drawdown_amount; inc = r.total_income; 
+                bills = r.total_bills; dining = r.total_dining;
             } 
             else if (currentView === 'Graham') { 
-                tf = r.g_tax_free; tx = r.g_taxable; other = r.g_other; draw = r.g_draw; inc = r.g_income; target = r.g_income; dining = r.g_dining;
+                tf = r.g_tax_free; tx = r.g_taxable; other = r.g_other; 
+                draw = r.g_draw; inc = r.g_income; 
+                bills = r.g_bills; dining = r.g_dining;
             } 
             else { 
-                tf = r.j_tax_free; tx = r.j_taxable; other = r.j_other; draw = r.j_draw; inc = r.j_income; target = r.j_income; dining = r.j_dining;
+                tf = r.j_tax_free; tx = r.j_taxable; other = r.j_other; 
+                draw = r.j_draw; inc = r.j_income; 
+                bills = r.j_bills; dining = r.j_dining;
             }
+            
             html += `<tr>
                 <td>${r.retirement_year}</td>
                 <td style="font-weight:bold; color:#e67e22;">${fmt(dining)}</td>
-                <td>${fmt(target)}</td>
+                <td style="font-weight:bold; color:#c0392b;">${fmt(bills)}</td>
                 <td>${fmt(tf)}</td>
                 <td>${fmt(tx)}</td>
                 <td>${fmt(other)}</td>
