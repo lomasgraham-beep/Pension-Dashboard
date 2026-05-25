@@ -188,7 +188,7 @@
     let userPensions = []; 
     let allLogs = []; 
     let allBills = []; 
-    let allMembers = []; // NEW: Array to hold DOBs
+    let allMembers = []; 
     let currentView = 'Joint'; 
 
     google.charts.load('current', {'packages':['corechart']});
@@ -203,16 +203,16 @@
     }
 
     // ==========================================
-    // INFLATION-AWARE BILLS RENDERER
+    // UPDATED BILLS RENDERER (SHOWS PERCENTAGE TAPER)
     // ==========================================
     function renderBillsTable() {
         const tbody = document.querySelector("#bTable tbody");
         const tfoot = document.querySelector("#bTable tfoot");
         const catFilter = document.getElementById('filterCategory').value;
 
-        // 1. Calculate Oldest Member's Current Age
+        // Calculate Oldest Member's Current Age for Inflation Math
         let currentYear = new Date().getFullYear();
-        let oldestAge = 55; // Default fallback just in case
+        let oldestAge = 55; 
         if (allMembers && allMembers.length > 0) {
             let ages = allMembers.map(m => {
                 if(!m.dob) return 0;
@@ -221,13 +221,11 @@
             oldestAge = Math.max(...ages);
         }
 
-        // 2. Calculate Compounding Inflation Multipliers (2.5%)
         const inflRate = 0.025;
         const inf70 = Math.pow(1 + inflRate, Math.max(0, 70 - oldestAge));
         const inf80 = Math.pow(1 + inflRate, Math.max(0, 80 - oldestAge));
         const inf90 = Math.pow(1 + inflRate, Math.max(0, 90 - oldestAge));
 
-        // 3. Filter the Data
         let filteredBills = allBills;
         if (catFilter !== "All") {
             filteredBills = filteredBills.filter(b => (b.category_code || 'Uncategorized') === catFilter);
@@ -252,7 +250,6 @@
             let t80 = b.taper_at_80 !== null ? Number(b.taper_at_80) : 1.0;
             let t90 = b.taper_at_90 !== null ? Number(b.taper_at_90) : 1.0;
 
-            // Apply BOTH the retention multiplier AND the future inflation multiplier
             let val70 = base * t70 * inf70;
             let val80 = base * t80 * inf80;
             let val90 = base * t90 * inf90;
@@ -264,9 +261,9 @@
                 <td>${name}</td>
                 <td>${reducible}</td>
                 <td style="font-weight:bold;">${fmt(base)}</td>
-                <td>${fmt(val70)}</td>
-                <td>${fmt(val80)}</td>
-                <td>${fmt(val90)}</td>
+                <td>${fmt(val70)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t70 * 100)}% Retained)</span></td>
+                <td>${fmt(val80)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t80 * 100)}% Retained)</span></td>
+                <td>${fmt(val90)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t90 * 100)}% Retained)</span></td>
             </tr>`;
         });
 
@@ -280,14 +277,8 @@
         </tr>`;
     }
 
-    function clearBillsFilter() {
-        document.getElementById('filterCategory').value = "All";
-        renderBillsTable();
-    }
+    function clearBillsFilter() { document.getElementById('filterCategory').value = "All"; renderBillsTable(); }
 
-    // ==========================================
-    // EXISTING LOGIC
-    // ==========================================
     function renderRetirementTable() {
         const tbody = document.querySelector("#rTable tbody");
         const thead = document.querySelector("#rTable thead");
@@ -359,11 +350,9 @@
     }
 
     async function loadAllData() {
-      // 0. NEW: Fetch Members to calculate precise ages for inflation
       let mRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_members`, { headers: getHeaders() });
       if (mRes.ok) { allMembers = await mRes.json(); }
 
-      // 1. Fetch Household Bills for the new tab
       let billsRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_household_bills`, { headers: getHeaders() });
       if (billsRes.ok) { 
           allBills = await billsRes.json(); 
@@ -378,11 +367,9 @@
           renderBillsTable(); 
       }
 
-      // 2. Fetch User Pensions
       let bdRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_pensions`, { headers: getHeaders() });
       if (bdRes.ok) { userPensions = await bdRes.json(); renderDynamicInputs(); }
 
-      // 3. Fetch Parameters
       let pRes = await fetch(`${SUPABASE_URL}/rest/v1/op_modelling_parameters?member_name=eq.Graham&order=updated_at.desc&limit=1`, { headers: getHeaders() });
       if (pRes.ok) {
           let pData = await pRes.json();
@@ -396,7 +383,6 @@
           }
       }
 
-      // 4. Fetch Logs
       let logRes = await fetch(`${SUPABASE_URL}/rest/v1/op_pension_logs?order=log_date.desc`, { headers: getHeaders() });
       if (logRes.ok) {
           allLogs = await logRes.json(); 
@@ -411,7 +397,6 @@
           renderHistoryTable();
       }
 
-      // 5. Fetch Forecast
       let forecastRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/generate_monthly_pension_forecast`, { method: "POST", headers: getHeaders() });
       if (forecastRes.ok) {
           let data = await forecastRes.json(); let html = "";
@@ -419,7 +404,6 @@
           document.getElementById('forecast-table-body').innerHTML = html;
       }
 
-      // 6. Fetch Retirement Math
       let mathRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/calculate_joint_retirement`, { method: "POST", headers: getHeaders() });
       if (mathRes.ok) {
           globalDrawdownData = await mathRes.json();
