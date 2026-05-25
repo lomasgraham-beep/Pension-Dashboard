@@ -16,8 +16,8 @@
 
     .tabcontent { display: none; padding: 20px; background: white; border: 1px solid #ccc; border-top: none; border-radius: 0 0 8px 8px;}
     .active { display: block; }
-    .tab-buttons { overflow: hidden; border: 1px solid #ccc; background-color: #e2e8f0; border-radius: 8px 8px 0 0; }
-    .tab-buttons button { background: inherit; float: left; border: none; outline: none; cursor: pointer; padding: 14px 16px; font-size: 16px; font-weight: bold; color: #4a5568;}
+    .tab-buttons { overflow: hidden; border: 1px solid #ccc; background-color: #e2e8f0; border-radius: 8px 8px 0 0; display: flex; flex-wrap: wrap;}
+    .tab-buttons button { background: inherit; border: none; outline: none; cursor: pointer; padding: 14px 16px; font-size: 16px; font-weight: bold; color: #4a5568;}
     .tab-buttons button.active-btn { background: white; border-bottom: 3px solid #3498db; color: #2c3e50; }
     
     h2 { color: #2c3e50; margin-top: 0; padding-bottom: 5px; border-bottom: 2px solid #e2e8f0; }
@@ -69,6 +69,7 @@
     <button class="tab-link active-btn" onclick="showTab(event, 'Overview')">Overview</button>
     <button class="tab-link" onclick="showTab(event, 'Forecast')">Monthly Forecast</button>
     <button class="tab-link" onclick="showTab(event, 'Bills')">Household Bills</button>
+    <button class="tab-link" onclick="showTab(event, 'Dining')">Dining Data</button>
     <button class="tab-link" onclick="showTab(event, 'Parameters')">Modelling</button>
     <button class="tab-link" onclick="showTab(event, 'NewEntry')">Log Entry</button>
     <button class="tab-link" onclick="showTab(event, 'History')">Recent Logs</button>
@@ -121,8 +122,27 @@
         </tr>
       </thead>
       <tbody><tr><td colspan="7">Loading database bills...</td></tr></tbody>
-      <tfoot style="background-color: #f8fafc; font-weight: bold;">
-        </tfoot>
+      <tfoot style="background-color: #f8fafc; font-weight: bold;"></tfoot>
+    </table>
+  </div>
+
+  <div id="Dining" class="tabcontent">
+    <h2>Dining Habits & Future Inflation</h2>
+    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>Visualizing your dining budgets with 2.5% compounding inflation and database tapers applied.</em></p>
+    
+    <table id="dTable">
+      <thead>
+        <tr>
+          <th>Dining Habit</th>
+          <th>Subject to Slider?</th>
+          <th>Baseline (Today)</th>
+          <th>Est. Cost at Age 70</th>
+          <th>Est. Cost at Age 80</th>
+          <th>Est. Cost at Age 90</th>
+        </tr>
+      </thead>
+      <tbody><tr><td colspan="6">Loading database dining habits...</td></tr></tbody>
+      <tfoot style="background-color: #f8fafc; font-weight: bold;"></tfoot>
     </table>
   </div>
 
@@ -188,6 +208,7 @@
     let userPensions = []; 
     let allLogs = []; 
     let allBills = []; 
+    let allDining = []; // NEW
     let allMembers = []; 
     let currentView = 'Joint'; 
 
@@ -203,14 +224,9 @@
     }
 
     // ==========================================
-    // UPDATED BILLS RENDERER (SHOWS PERCENTAGE TAPER)
+    // DATA RENDERERS
     // ==========================================
-    function renderBillsTable() {
-        const tbody = document.querySelector("#bTable tbody");
-        const tfoot = document.querySelector("#bTable tfoot");
-        const catFilter = document.getElementById('filterCategory').value;
-
-        // Calculate Oldest Member's Current Age for Inflation Math
+    function calculateInflationMultipliers() {
         let currentYear = new Date().getFullYear();
         let oldestAge = 55; 
         if (allMembers && allMembers.length > 0) {
@@ -222,45 +238,40 @@
         }
 
         const inflRate = 0.025;
-        const inf70 = Math.pow(1 + inflRate, Math.max(0, 70 - oldestAge));
-        const inf80 = Math.pow(1 + inflRate, Math.max(0, 80 - oldestAge));
-        const inf90 = Math.pow(1 + inflRate, Math.max(0, 90 - oldestAge));
+        return {
+            inf70: Math.pow(1 + inflRate, Math.max(0, 70 - oldestAge)),
+            inf80: Math.pow(1 + inflRate, Math.max(0, 80 - oldestAge)),
+            inf90: Math.pow(1 + inflRate, Math.max(0, 90 - oldestAge))
+        };
+    }
+
+    function renderBillsTable() {
+        const tbody = document.querySelector("#bTable tbody");
+        const tfoot = document.querySelector("#bTable tfoot");
+        const catFilter = document.getElementById('filterCategory').value;
+        const { inf70, inf80, inf90 } = calculateInflationMultipliers();
 
         let filteredBills = allBills;
-        if (catFilter !== "All") {
-            filteredBills = filteredBills.filter(b => (b.category_code || 'Uncategorized') === catFilter);
-        }
+        if (catFilter !== "All") filteredBills = filteredBills.filter(b => (b.category_code || 'Uncategorized') === catFilter);
 
-        if (!filteredBills || filteredBills.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7">No bills match your criteria.</td></tr>';
-            tfoot.innerHTML = '';
-            return;
-        }
+        if (!filteredBills || filteredBills.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No bills match your criteria.</td></tr>'; tfoot.innerHTML = ''; return; }
 
-        let html = "";
-        let totBase = 0, tot70 = 0, tot80 = 0, tot90 = 0;
+        let html = ""; let totBase = 0, tot70 = 0, tot80 = 0, tot90 = 0;
 
         filteredBills.forEach(b => {
             let cat = b.category_code || 'Uncategorized';
             let name = b.bill_name || b.name || b.item || 'Unnamed Bill';
             let reducible = b.spend_reduction ? "Yes" : "No";
-            
             let base = Number(b.total_annual) || 0;
             let t70 = b.taper_at_70 !== null ? Number(b.taper_at_70) : 1.0;
             let t80 = b.taper_at_80 !== null ? Number(b.taper_at_80) : 1.0;
             let t90 = b.taper_at_90 !== null ? Number(b.taper_at_90) : 1.0;
 
-            let val70 = base * t70 * inf70;
-            let val80 = base * t80 * inf80;
-            let val90 = base * t90 * inf90;
-
+            let val70 = base * t70 * inf70; let val80 = base * t80 * inf80; let val90 = base * t90 * inf90;
             totBase += base; tot70 += val70; tot80 += val80; tot90 += val90;
 
             html += `<tr>
-                <td>${cat}</td>
-                <td>${name}</td>
-                <td>${reducible}</td>
-                <td style="font-weight:bold;">${fmt(base)}</td>
+                <td>${cat}</td><td>${name}</td><td>${reducible}</td><td style="font-weight:bold;">${fmt(base)}</td>
                 <td>${fmt(val70)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t70 * 100)}% Retained)</span></td>
                 <td>${fmt(val80)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t80 * 100)}% Retained)</span></td>
                 <td>${fmt(val90)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t90 * 100)}% Retained)</span></td>
@@ -268,20 +279,47 @@
         });
 
         tbody.innerHTML = html;
-        tfoot.innerHTML = `<tr>
-            <td colspan="3" style="text-align: right;"><strong>TOTAL FOR SELECTION:</strong></td>
-            <td style="color: #2c3e50;">${fmt(totBase)}</td>
-            <td style="color: #3498db;">${fmt(tot70)}</td>
-            <td style="color: #9b59b6;">${fmt(tot80)}</td>
-            <td style="color: #27ae60;">${fmt(tot90)}</td>
-        </tr>`;
+        tfoot.innerHTML = `<tr><td colspan="3" style="text-align: right;"><strong>TOTAL FOR SELECTION:</strong></td><td style="color: #2c3e50;">${fmt(totBase)}</td><td style="color: #3498db;">${fmt(tot70)}</td><td style="color: #9b59b6;">${fmt(tot80)}</td><td style="color: #27ae60;">${fmt(tot90)}</td></tr>`;
+    }
+
+    function renderDiningTable() {
+        const tbody = document.querySelector("#dTable tbody");
+        const tfoot = document.querySelector("#dTable tfoot");
+        const { inf70, inf80, inf90 } = calculateInflationMultipliers();
+
+        if (!allDining || allDining.length === 0) { tbody.innerHTML = '<tr><td colspan="6">No dining habits found.</td></tr>'; tfoot.innerHTML = ''; return; }
+
+        let html = ""; let totBase = 0, tot70 = 0, tot80 = 0, tot90 = 0;
+
+        allDining.forEach(d => {
+            let name = d.habit_name || d.name || d.restaurant || d.description || 'Unnamed Dining Habit';
+            let reducible = d.spend_reduction ? "Yes" : "No";
+            let base = Number(d.annual_total) || 0;
+            
+            // New columns with fallback to 1.0 (100% retained)
+            let t70 = d.taper_at_70 !== null && d.taper_at_70 !== undefined ? Number(d.taper_at_70) : 1.0;
+            let t80 = d.taper_at_80 !== null && d.taper_at_80 !== undefined ? Number(d.taper_at_80) : 1.0;
+            let t90 = d.taper_at_90 !== null && d.taper_at_90 !== undefined ? Number(d.taper_at_90) : 1.0;
+
+            let val70 = base * t70 * inf70; let val80 = base * t80 * inf80; let val90 = base * t90 * inf90;
+            totBase += base; tot70 += val70; tot80 += val80; tot90 += val90;
+
+            html += `<tr>
+                <td>${name}</td><td>${reducible}</td><td style="font-weight:bold;">${fmt(base)}</td>
+                <td>${fmt(val70)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t70 * 100)}% Retained)</span></td>
+                <td>${fmt(val80)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t80 * 100)}% Retained)</span></td>
+                <td>${fmt(val90)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t90 * 100)}% Retained)</span></td>
+            </tr>`;
+        });
+
+        tbody.innerHTML = html;
+        tfoot.innerHTML = `<tr><td colspan="2" style="text-align: right;"><strong>TOTAL ANNUAL DINING:</strong></td><td style="color: #2c3e50;">${fmt(totBase)}</td><td style="color: #3498db;">${fmt(tot70)}</td><td style="color: #9b59b6;">${fmt(tot80)}</td><td style="color: #27ae60;">${fmt(tot90)}</td></tr>`;
     }
 
     function clearBillsFilter() { document.getElementById('filterCategory').value = "All"; renderBillsTable(); }
 
     function renderRetirementTable() {
-        const tbody = document.querySelector("#rTable tbody");
-        const thead = document.querySelector("#rTable thead");
+        const tbody = document.querySelector("#rTable tbody"); const thead = document.querySelector("#rTable thead");
         if (!globalDrawdownData || globalDrawdownData.length === 0) { tbody.innerHTML = '<tr><td colspan="8">No calculation rows computed.</td></tr>'; return; }
         const targetHeader = currentView === 'Joint' ? 'Combined Outgoings' : 'Target Net Income';
         thead.innerHTML = `<tr><th>Year</th><th>Ages</th><th>${targetHeader}</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Guaranteed Incomes</th><th>Drawdown required</th><th>Total Gross Income</th></tr>`;
@@ -356,15 +394,20 @@
       let billsRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_household_bills`, { headers: getHeaders() });
       if (billsRes.ok) { 
           allBills = await billsRes.json(); 
-          
           const cSelect = document.getElementById('filterCategory');
           let cOptions = '<option value="All">All Categories</option>';
           let uniqueCats = [...new Set(allBills.map(b => b.category_code || 'Uncategorized'))].filter(c => c !== 'Uncategorized');
           uniqueCats.sort().forEach(c => cOptions += `<option value="${c}">${c}</option>`);
           if (allBills.some(b => !b.category_code)) cOptions += `<option value="Uncategorized">Uncategorized</option>`;
           cSelect.innerHTML = cOptions;
-
           renderBillsTable(); 
+      }
+
+      // NEW: Fetch Dining
+      let diningRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_dining_habits`, { headers: getHeaders() });
+      if (diningRes.ok) { 
+          allDining = await diningRes.json(); 
+          renderDiningTable(); 
       }
 
       let bdRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_pensions`, { headers: getHeaders() });
