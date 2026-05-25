@@ -7,6 +7,14 @@
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; color: #333; }
     .header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    
+    /* Master View Toggle CSS */
+    .header-controls { display: flex; gap: 15px; align-items: center; }
+    .view-toggle { background: #e2e8f0; border-radius: 6px; overflow: hidden; display: flex; border: 1px solid #cbd5e1; }
+    .btn-toggle { background: transparent; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; color: #64748b; font-size: 14px; transition: 0.2s;}
+    .btn-toggle:hover { background: #cbd5e1; }
+    .btn-toggle.active-toggle { background: #3498db; color: white; }
+
     .tabcontent { display: none; padding: 20px; background: white; border: 1px solid #ccc; border-top: none; border-radius: 0 0 8px 8px;}
     .active { display: block; }
     .tab-buttons { overflow: hidden; border: 1px solid #ccc; background-color: #e2e8f0; border-radius: 8px 8px 0 0; }
@@ -40,7 +48,6 @@
     
     #statusMsg, #paramMsg { margin-top: 15px; font-weight: bold; }
 
-    /* New CSS for the filter bar */
     .filter-bar { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px; align-items: flex-end; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;}
     .filter-bar .form-group { margin-bottom: 0; }
     .filter-bar select, .filter-bar input { max-width: 200px; }
@@ -50,7 +57,14 @@
 
   <div class="header-container">
     <h1>Joint Pension Analytics (Supabase Cloud)</h1>
-    <button class="btn btn-sync" onclick="loadAllData()">Sync / Refresh Database</button>
+    <div class="header-controls">
+        <div class="view-toggle">
+            <button id="view-Joint" class="btn-toggle active-toggle" onclick="setView('Joint')">Joint View</button>
+            <button id="view-Graham" class="btn-toggle" onclick="setView('Graham')">Graham's View</button>
+            <button id="view-Julie" class="btn-toggle" onclick="setView('Julie')">Julie's View</button>
+        </div>
+        <button class="btn btn-sync" onclick="loadAllData()">Sync / Refresh</button>
+    </div>
   </div>
 
   <div class="tab-buttons">
@@ -59,7 +73,7 @@
     <button class="tab-link" onclick="showTab(event, 'Parameters')">Modelling</button>
     <button class="tab-link" onclick="showTab(event, 'NewEntry')">Log Entry</button>
     <button class="tab-link" onclick="showTab(event, 'History')">Recent Logs</button>
-    <button class="tab-link" onclick="showTab(event, 'Retirement')">Joint Retirement</button>
+    <button class="tab-link" onclick="showTab(event, 'Retirement')">Retirement Simulation</button>
   </div>
 
   <div id="Overview" class="tabcontent active">
@@ -69,20 +83,13 @@
       <div class="card"><h3>Graham's Total</h3><div id="mGrahamTotal" class="value">£0</div></div>
       <div class="card"><h3>Julie's Total</h3><div id="mWifeTotal" class="value">£0</div></div>
     </div>
-    <p style="color:#64748b; font-size:13px;"><em>Note: Historical performance tracking charts will populate as logs are submitted to your new database.</em></p>
   </div>
 
   <div id="Forecast" class="tabcontent">
     <h2>Pre-Retirement Monthly Forecast</h2>
-    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>Calculated via cloud database engine factoring in phased working days and compounded growth.</em></p>
     <table id="forecastTable">
       <thead>
-        <tr>
-          <th>Month</th>
-          <th>Graham's Tracked Total</th>
-          <th>Julie's Tracked Total</th>
-          <th>Joint Trajectory</th>
-        </tr>
+        <tr><th>Month</th><th>Graham's Tracked Total</th><th>Julie's Tracked Total</th><th>Joint Trajectory</th></tr>
       </thead>
       <tbody id="forecast-table-body">
         <tr><td colspan="4">Fetching engine forecast...</td></tr>
@@ -91,13 +98,6 @@
   </div>
 
   <div id="Parameters" class="tabcontent">
-    <h2>Pension Pots at Shared Retirement</h2>
-    <div class="card-grid">
-      <div class="card highlight-card"><h3>Combined Starting Pot</h3><div id="mRetTotal" class="value">£0</div></div>
-      <div class="card"><h3>Tax-Free Starting Pot</h3><div id="mRetTaxFree" class="value">£0</div></div>
-      <div class="card"><h3>Taxable Starting Pot</h3><div id="mRetTaxable" class="value">£0</div></div>
-    </div>
-
     <h2 class="section-title">Retirement Modelling Parameters (Graham)</h2>
     <div style="display:flex; flex-wrap:wrap; gap:40px;">
       <div style="flex:1; min-width:300px;">
@@ -127,7 +127,7 @@
     <button type="button" class="btn" style="margin-top:15px;" onclick="submitParams()">Save Parameters & Recalculate</button>
     <div id="paramMsg"></div>
 
-    <h2 class="section-title">Live Joint Projections</h2>
+    <h2 class="section-title"><span id="chartViewTitle">Joint</span> Projections</h2>
     <div id="potChart" class="chart-box"></div>
     <div id="incomeChart" class="chart-box"></div>
   </div>
@@ -143,11 +143,7 @@
         </select>
       </div>
       <div class="form-group"><label>Date:</label><input type="date" id="entryDate" required></div>
-      
-      <div id="dynamicInputsContainer">
-          <p style="color: #64748b;">Loading pension accounts...</p>
-      </div>
-      
+      <div id="dynamicInputsContainer"></div>
       <button type="button" class="btn" onclick="submitDynamicLogEntry()">Submit to Cloud Database</button>
     </form>
     <div id="statusMsg"></div>
@@ -155,31 +151,12 @@
 
   <div id="History" class="tabcontent">
     <h2>Unified Database Audit Log</h2>
-    
     <div class="filter-bar">
-      <div class="form-group">
-        <label>Filter by Member</label>
-        <select id="filterMember" onchange="renderHistoryTable()">
-          <option value="All">All Members</option>
-          <option value="Graham">Graham</option>
-          <option value="Julie">Julie</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Filter by Pension</label>
-        <select id="filterPension" onchange="renderHistoryTable()">
-          <option value="All">All Pensions</option>
-          </select>
-      </div>
-      <div class="form-group">
-        <label>Specific Date</label>
-        <input type="date" id="filterDate" onchange="renderHistoryTable()">
-      </div>
-      <div class="form-group">
-        <button class="btn" style="background-color: #64748b;" onclick="clearHistoryFilters()">Clear Filters</button>
-      </div>
+      <div class="form-group"><label>Member</label><select id="filterMember" onchange="renderHistoryTable()"><option value="All">All Members</option><option value="Graham">Graham</option><option value="Julie">Julie</option></select></div>
+      <div class="form-group"><label>Pension</label><select id="filterPension" onchange="renderHistoryTable()"><option value="All">All Pensions</option></select></div>
+      <div class="form-group"><label>Specific Date</label><input type="date" id="filterDate" onchange="renderHistoryTable()"></div>
+      <div class="form-group"><button class="btn" style="background-color: #64748b;" onclick="clearHistoryFilters()">Clear Filters</button></div>
     </div>
-
     <table id="hTable">
         <thead><tr><th>Date</th><th>Member</th><th>Pension Name</th><th>Logged Value</th></tr></thead>
         <tbody><tr><td colspan="4">Syncing database records...</td></tr></tbody>
@@ -187,20 +164,10 @@
   </div>
 
   <div id="Retirement" class="tabcontent">
-    <h2>Joint Retirement Drawdown (Combined Calculations)</h2>
+    <h2><span id="tableViewTitle">Joint</span> Retirement Drawdown Engine</h2>
     <table id="rTable">
       <thead>
-        <tr>
-          <th>Year</th>
-          <th>Your Age</th>
-          <th>Combined Outgoings</th>
-          <th>Tax-Free Pot Balance</th>
-          <th>Taxable Pot Balance</th>
-          <th>Other Income Streams</th>
-          <th>Required Drawdown</th>
-          <th>Total Gross Income</th>
-        </tr>
-      </thead>
+        </thead>
       <tbody><tr><td colspan="8">Recalculating math views...</td></tr></tbody>
     </table>
   </div>
@@ -213,364 +180,254 @@
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
 
     document.getElementById('entryDate').valueAsDate = new Date();
-
     const fmt = (n) => "£" + Math.round(n || 0).toLocaleString("en-GB");
     const toInputDate = (ds) => { if (!ds) return ""; const d = new Date(ds); return d.getFullYear() + '-' + ("0" + (d.getMonth() + 1)).slice(-2) + '-' + ("0" + d.getDate()).slice(-2); };
-
-    const getHeaders = () => ({
-      "apikey": SUPABASE_KEY,
-      "Authorization": `Bearer ${SUPABASE_KEY}`,
-      "Content-Type": "application/json",
-      "Prefer": "return=representation"
-    });
+    const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" });
 
     let globalDrawdownData = null;
     let userPensions = []; 
-    let allLogs = []; // Stores our entire log history for instant filtering
+    let allLogs = []; 
     
+    // MASTER TOGGLE VARIABLE
+    let currentView = 'Joint'; 
+
     google.charts.load('current', {'packages':['corechart']});
 
     // ==========================================
-    // HISTORY TAB: FILTERING AND RENDERING
+    // VIEW TOGGLE LOGIC
+    // ==========================================
+    function setView(viewName) {
+        currentView = viewName;
+        // Update button styles
+        document.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active-toggle'));
+        document.getElementById('view-' + viewName).classList.add('active-toggle');
+        
+        // Update Title text
+        document.getElementById('tableViewTitle').innerText = viewName;
+        document.getElementById('chartViewTitle').innerText = viewName;
+
+        // Instantly Re-render Tables and Charts with new lens
+        renderRetirementTable();
+        drawRetirementCharts();
+    }
+
+    // ==========================================
+    // RETIREMENT ENGINE (DYNAMIC RENDERER)
+    // ==========================================
+    function renderRetirementTable() {
+        const tbody = document.querySelector("#rTable tbody");
+        const thead = document.querySelector("#rTable thead");
+
+        if (!globalDrawdownData || globalDrawdownData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8">No calculation rows computed.</td></tr>';
+            return;
+        }
+
+        // Dynamically change the "Outgoings" header if we are in an individual view
+        const targetHeader = currentView === 'Joint' ? 'Combined Outgoings' : 'Target Net Income';
+        thead.innerHTML = `
+            <tr>
+              <th>Year</th>
+              <th>Ages</th>
+              <th>${targetHeader}</th>
+              <th>Tax-Free Pot</th>
+              <th>Taxable Pot</th>
+              <th>Guaranteed Incomes</th>
+              <th>Drawdown required</th>
+              <th>Total Gross Income</th>
+            </tr>
+        `;
+
+        let html = "";
+        globalDrawdownData.forEach(r => {
+            let tf, tx, other, draw, inc, target;
+
+            // Route the correct SQL variables based on the toggle switch
+            if (currentView === 'Joint') {
+                tf = r.tax_free_pot; tx = r.taxable_pot; other = r.other_pensions; 
+                draw = r.drawdown_amount; inc = r.total_income; target = r.total_outgoings;
+            } else if (currentView === 'Graham') {
+                tf = r.g_tax_free; tx = r.g_taxable; other = r.g_other; 
+                draw = r.g_draw; inc = r.g_income; target = r.g_income; // Rough target match
+            } else {
+                tf = r.j_tax_free; tx = r.j_taxable; other = r.j_other; 
+                draw = r.j_draw; inc = r.j_income; target = r.j_income;
+            }
+
+            html += `<tr>
+                <td>${r.retirement_year}</td>
+                <td style="font-weight:bold; color:#3498db;">${r.current_age}</td>
+                <td>${fmt(target)}</td>
+                <td>${fmt(tf)}</td>
+                <td>${fmt(tx)}</td>
+                <td>${fmt(other)}</td>
+                <td>${fmt(draw)}</td>
+                <td style="font-weight:bold; color:#27ae60;">${fmt(inc)}</td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+    }
+
+    function drawRetirementCharts() {
+        if (!google.visualization || !globalDrawdownData || globalDrawdownData.length === 0) return;
+
+        var dataPots = new google.visualization.DataTable();
+        dataPots.addColumn('string', 'Year');
+        dataPots.addColumn('number', 'Tax-Free Pot');
+        dataPots.addColumn('number', 'Taxable Pot');
+
+        var dataIncome = new google.visualization.DataTable();
+        dataIncome.addColumn('string', 'Year');
+        dataIncome.addColumn('number', 'Drawdown (Bar)');
+        dataIncome.addColumn('number', 'Other Pensions (Bar)');
+        dataIncome.addColumn('number', 'Drawdown Target (Line)');
+
+        globalDrawdownData.forEach(r => {
+            let yr = String(r.retirement_year);
+            let tf, tx, other, draw;
+
+            // Route the correct chart variables based on toggle switch
+            if (currentView === 'Joint') {
+                tf = r.tax_free_pot; tx = r.taxable_pot; other = r.other_pensions; draw = r.drawdown_amount;
+            } else if (currentView === 'Graham') {
+                tf = r.g_tax_free; tx = r.g_taxable; other = r.g_other; draw = r.g_draw;
+            } else {
+                tf = r.j_tax_free; tx = r.j_taxable; other = r.j_other; draw = r.j_draw;
+            }
+
+            dataPots.addRow([yr, Number(tf), Number(tx)]);
+            dataIncome.addRow([yr, Number(draw), Number(other), Number(draw)]);
+        });
+
+        var numFmt = new google.visualization.NumberFormat({prefix: '£', fractionDigits: 0});
+        numFmt.format(dataPots, 1); numFmt.format(dataPots, 2);
+        numFmt.format(dataIncome, 1); numFmt.format(dataIncome, 2); numFmt.format(dataIncome, 3);
+
+        new google.visualization.ColumnChart(document.getElementById('potChart')).draw(dataPots, {
+            title: `${currentView} Pension Pots Runout Plan (£)`, isStacked: true, legend: { position: 'bottom' },
+            chartArea: { width: '85%', height: '70%' }, colors: ['#2ecc71', '#e74c3c'], vAxis: { minValue: 0 }
+        });
+
+        new google.visualization.ComboChart(document.getElementById('incomeChart')).draw(dataIncome, {
+            title: `${currentView} Retirement Income Stream Composition`, isStacked: true, seriesType: 'bars',
+            series: { 0: { targetAxisIndex: 0 }, 1: { targetAxisIndex: 0 }, 2: { type: 'line', targetAxisIndex: 1, color: '#f39c12', lineWidth: 4 } },
+            vAxes: { 0: { title: 'Income (£)' }, 1: { title: 'Drawdown Trend Line (£)', viewWindow: { min: 0 } } },
+            legend: { position: 'bottom' }, chartArea: { width: '80%', height: '70%' }, colors: ['#3498db', '#9b59b6']
+        });
+    }
+
+    // ==========================================
+    // OTHER UTILITIES (UNCHANGED)
     // ==========================================
     function renderHistoryTable() {
         const tbody = document.querySelector("#hTable tbody");
         const mFilter = document.getElementById('filterMember').value;
         const pFilter = document.getElementById('filterPension').value;
         const dFilter = document.getElementById('filterDate').value;
-
-        // 1. Filter the data based on dropdowns
         let filteredData = allLogs;
         if (mFilter !== "All") filteredData = filteredData.filter(l => l.member_name === mFilter);
         if (pFilter !== "All") filteredData = filteredData.filter(l => l.pension_name === pFilter);
         if (dFilter) filteredData = filteredData.filter(l => l.log_date === dFilter);
-
-        // 2. Force sort: Date descending (Newest first)
         filteredData.sort((a, b) => new Date(b.log_date) - new Date(a.log_date));
-
-        if (filteredData.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #64748b;">No logs match your filter criteria.</td></tr>';
-            return;
-        }
-
-        // 3. Render it to the screen with dd/mm/yyyy formatting
+        if (filteredData.length === 0) { tbody.innerHTML = '<tr><td colspan="4">No logs match criteria.</td></tr>'; return; }
         let html = "";
         filteredData.forEach(l => {
-            // Convert 'yyyy-mm-dd' to 'dd/mm/yyyy'
             const dObj = new Date(l.log_date);
             const ukDate = ("0" + dObj.getDate()).slice(-2) + '/' + ("0" + (dObj.getMonth() + 1)).slice(-2) + '/' + dObj.getFullYear();
-            
-            html += `<tr>
-                <td>${ukDate}</td>
-                <td>${l.member_name}</td>
-                <td>${l.pension_name}</td>
-                <td style="font-weight:bold;">${fmt(l.pot_value)}</td>
-            </tr>`;
+            html += `<tr><td>${ukDate}</td><td>${l.member_name}</td><td>${l.pension_name}</td><td style="font-weight:bold;">${fmt(l.pot_value)}</td></tr>`;
         });
         tbody.innerHTML = html;
     }
-
-    function clearHistoryFilters() {
-        document.getElementById('filterMember').value = "All";
-        document.getElementById('filterPension').value = "All";
-        document.getElementById('filterDate').value = "";
-        renderHistoryTable();
-    }
-
-    // ==========================================
-    // DYNAMIC LOG ENTRY ENGINE 
-    // ==========================================
+    function clearHistoryFilters() { document.getElementById('filterMember').value = "All"; document.getElementById('filterPension').value = "All"; document.getElementById('filterDate').value = ""; renderHistoryTable(); }
+    
     function renderDynamicInputs() {
-        const memberElem = document.getElementById('logMember');
-        if (!memberElem) return;
-        const member = memberElem.value;
+        const member = document.getElementById('logMember').value;
         const container = document.getElementById('dynamicInputsContainer');
-        if (!container) return;
         container.innerHTML = ''; 
-
-        const memberPensions = userPensions.filter(p => 
-            p.member_name === member && 
-            p.pension_type === 'Defined Contributions'
-        );
-        
-        if(memberPensions.length === 0) {
-            container.innerHTML = '<p style="color:#d9534f; font-weight:bold;">No active Defined Contribution pots found for this member.</p>';
-            return;
-        }
-
-        let htmlBuilder = "";
-        memberPensions.forEach(p => {
-            htmlBuilder += `
-                <div class="form-group">
-                    <label>${p.pension_name} Value (£):</label>
-                    <input type="number" class="dynamic-pot-input" data-pension="${p.pension_name}" step="0.01" value="0.00" required>
-                </div>
-            `;
-        });
-        container.innerHTML = htmlBuilder;
+        const memberPensions = userPensions.filter(p => p.member_name === member && p.pension_type === 'Defined Contributions');
+        if(memberPensions.length === 0) { container.innerHTML = '<p>No DC pots found.</p>'; return; }
+        memberPensions.forEach(p => { container.innerHTML += `<div class="form-group"><label>${p.pension_name} Value (£):</label><input type="number" class="dynamic-pot-input" data-pension="${p.pension_name}" step="0.01" value="0.00" required></div>`;});
     }
 
     async function submitDynamicLogEntry() {
-        const msg = document.getElementById('statusMsg');
-        msg.innerHTML = "Writing to secure tables..."; msg.style.color = "#3498db";
-        
-        const member = document.getElementById('logMember').value;
-        const logDate = document.getElementById('entryDate').value;
-        const inputs = document.querySelectorAll('.dynamic-pot-input');
-        
+        document.getElementById('statusMsg').innerHTML = "Saving...";
         let payloads = [];
-        inputs.forEach(input => {
-            payloads.push({
-                member_name: member,
-                pension_name: input.getAttribute('data-pension'),
-                pot_value: parseFloat(input.value) || 0,
-                log_date: logDate
-            });
+        document.querySelectorAll('.dynamic-pot-input').forEach(input => {
+            payloads.push({ member_name: document.getElementById('logMember').value, pension_name: input.getAttribute('data-pension'), pot_value: parseFloat(input.value) || 0, log_date: document.getElementById('entryDate').value });
         });
-
-        try {
-            let res = await fetch(`${SUPABASE_URL}/rest/v1/op_pension_logs`, {
-                method: "POST",
-                headers: getHeaders(),
-                body: JSON.stringify(payloads)
-            });
-
-            if (res.ok) {
-                msg.innerHTML = "Balances successfully saved to the cloud!"; msg.style.color = "#27ae60";
-                document.getElementById('entryDate').valueAsDate = new Date();
-                inputs.forEach(i => i.value = "0.00");
-                loadAllData(); 
-            } else {
-                let err = await res.text(); 
-                msg.innerHTML = "Database write error: " + err; msg.style.color = "#d9534f";
-            }
-        } catch (err) {
-            msg.innerHTML = "Network connection failed."; msg.style.color = "#d9534f";
-        }
+        let res = await fetch(`${SUPABASE_URL}/rest/v1/op_pension_logs`, { method: "POST", headers: getHeaders(), body: JSON.stringify(payloads) });
+        if (res.ok) { document.getElementById('statusMsg').innerHTML = "Saved!"; loadAllData(); }
     }
 
-    // ==========================================
-    // UPDATED PARAMETERS SUBMISSION
-    // ==========================================
     async function submitParams() {
-      const msg = document.getElementById('paramMsg');
-      msg.innerHTML = "Updating parameters across cloud instances..."; msg.style.color = "#3498db";
-      
-      try {
-        const memberName = 'Graham';
-        
-        let checkRes = await fetch(`${SUPABASE_URL}/rest/v1/op_modelling_parameters?member_name=eq.${memberName}`, { headers: getHeaders() });
-        let checkData = await checkRes.json();
-        
-        const payload = {
-          member_name: memberName,
-          shorter_week_date_1: document.getElementById('p_date1').value || null,
-          working_days_1: parseInt(document.getElementById('p_days1').value),
-          shorter_week_date_2: document.getElementById('p_date2').value || null,
-          working_days_2: parseInt(document.getElementById('p_days2').value),
-          retirement_date: document.getElementById('p_retire').value || null,
-          spending_reduction_pct: parseFloat(document.getElementById('p_spend').value) / 100,
-          drawdown_ratio_graham: parseFloat(document.getElementById('p_bills').value) / 100
-        };
-
-        let method = "POST";
-        let url = `${SUPABASE_URL}/rest/v1/op_modelling_parameters`;
-        
-        if(checkData.length > 0) {
-          method = "PATCH";
-          url = `${SUPABASE_URL}/rest/v1/op_modelling_parameters?member_name=eq.${memberName}`;
-        }
-
-        let res = await fetch(url, { method: method, headers: getHeaders(), body: JSON.stringify(payload) });
-
-        if(res.ok) {
-          msg.innerHTML = "Calculations synced instantly!"; msg.style.color = "#27ae60";
-          loadAllData();
-          setTimeout(() => { msg.innerHTML = ""; }, 3000);
-        } else { 
-            let err = await res.text();
-            msg.innerHTML = "Failed saving parameters: " + err; msg.style.color = "#d9534f"; 
-        }
-      } catch (err) { msg.innerHTML = "Error hitting database servers."; msg.style.color = "#d9534f"; }
+      let payload = {
+        member_name: 'Graham', shorter_week_date_1: document.getElementById('p_date1').value || null, working_days_1: parseInt(document.getElementById('p_days1').value),
+        shorter_week_date_2: document.getElementById('p_date2').value || null, working_days_2: parseInt(document.getElementById('p_days2').value),
+        retirement_date: document.getElementById('p_retire').value || null, spending_reduction_pct: parseFloat(document.getElementById('p_spend').value) / 100,
+        drawdown_ratio_graham: parseFloat(document.getElementById('p_bills').value) / 100
+      };
+      let check = await fetch(`${SUPABASE_URL}/rest/v1/op_modelling_parameters?member_name=eq.Graham`, { headers: getHeaders() });
+      let data = await check.json();
+      let method = data.length > 0 ? "PATCH" : "POST";
+      let url = data.length > 0 ? `${SUPABASE_URL}/rest/v1/op_modelling_parameters?member_name=eq.Graham` : `${SUPABASE_URL}/rest/v1/op_modelling_parameters`;
+      await fetch(url, { method: method, headers: getHeaders(), body: JSON.stringify(payload) });
+      loadAllData();
     }
 
-    // ==========================================
-    // OPTIMIZED FORECAST ENGINE
-    // ==========================================
     async function loadMonthlyForecast() {
-      const tbody = document.getElementById('forecast-table-body');
-      try {
-        let res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/generate_monthly_pension_forecast`, {
-          method: "POST",
-          headers: getHeaders()
-        });
-
-        if (!res.ok) {
-          let errText = await res.text();
-          tbody.innerHTML = `<tr><td colspan="4" style="color:#d9534f; font-weight:bold;">DB Error: ${errText}</td></tr>`;
-          return;
-        }
-
-        let data = await res.json();
-        
-        if (!Array.isArray(data) || data.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4">No forecast data generated. Check dates.</td></tr>';
-          return;
-        }
-
-        let htmlBuilder = "";
-        data.forEach(row => {
-          const dateObj = new Date(row.forecast_month);
-          const dateStr = dateObj.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
-          
-          htmlBuilder += `
-            <tr>
-              <td>${dateStr}</td>
-              <td>${fmt(row.graham_total)}</td>
-              <td>${fmt(row.julie_total)}</td>
-              <td style="font-weight: bold; color: #2c3e50;">${fmt(row.graham_total + row.julie_total)}</td>
-            </tr>
-          `;
-        });
-        tbody.innerHTML = htmlBuilder;
-
-      } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="4" style="color:#d9534f; font-weight:bold;">Network/JS Error: ${err.message}</td></tr>`;
+      let res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/generate_monthly_pension_forecast`, { method: "POST", headers: getHeaders() });
+      if (res.ok) {
+          let data = await res.json();
+          let html = "";
+          data.forEach(row => {
+              const d = new Date(row.forecast_month);
+              html += `<tr><td>${d.toLocaleDateString('en-GB', {month:'short', year:'numeric'})}</td><td>${fmt(row.graham_total)}</td><td>${fmt(row.julie_total)}</td><td style="font-weight:bold;">${fmt(row.graham_total + row.julie_total)}</td></tr>`;
+          });
+          document.getElementById('forecast-table-body').innerHTML = html;
       }
     }
 
-    // ==========================================
-    // MASTER DATA LOADER
-    // ==========================================
     async function loadAllData() {
-      try {
-        // 0. Fetch the Basic Data Pensions List
-        let bdRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_pensions`, { headers: getHeaders() });
-        if (bdRes.ok) {
-            userPensions = await bdRes.json();
-            renderDynamicInputs(); 
-        }
+      let bdRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_pensions`, { headers: getHeaders() });
+      if (bdRes.ok) { userPensions = await bdRes.json(); renderDynamicInputs(); }
 
-        // 1. Load Parameters
-        let pRes = await fetch(`${SUPABASE_URL}/rest/v1/op_modelling_parameters?member_name=eq.Graham&order=updated_at.desc&limit=1`, { headers: getHeaders() });
-        if (pRes.ok) {
-            let pData = await pRes.json();
-            if(pData && pData.length > 0) {
-                let p = pData[0];
-                document.getElementById('p_date1').value = toInputDate(p.shorter_week_date_1);
-                document.getElementById('p_days1').value = p.working_days_1 || "5";
-                document.getElementById('p_date2').value = toInputDate(p.shorter_week_date_2);
-                document.getElementById('p_days2').value = p.working_days_2 || "5";
-                document.getElementById('p_retire').value = toInputDate(p.retirement_date);
-                
-                let spend = Math.round((p.spending_reduction_pct || 1.0) * 100);
-                document.getElementById('p_spend').value = spend; document.getElementById('v_spend').innerText = spend + "%";
-                
-                let ratio = Math.round((p.drawdown_ratio_graham || 0.5) * 100);
-                document.getElementById('p_bills').value = ratio; document.getElementById('v_bills').innerText = ratio + "%";
-            }
-        }
-
-        // 2. Load Logs
-        let logRes = await fetch(`${SUPABASE_URL}/rest/v1/op_pension_logs?order=log_date.desc`, { headers: getHeaders() });
-        if (logRes.ok) {
-            allLogs = await logRes.json(); // Store locally for filtering!
-
-            // Update the Overview Tab Totals
-            let gTot = 0, jTot = 0;
-            let seen = new Set();
-            
-            allLogs.forEach(l => {
-                let key = l.member_name + '_' + l.pension_name;
-                if(!seen.has(key)) {
-                    seen.add(key);
-                    if(l.member_name === 'Graham') gTot += Number(l.pot_value);
-                    if(l.member_name === 'Julie') jTot += Number(l.pot_value);
-                }
-            });
-
-            document.getElementById('mGrahamTotal').innerText = fmt(gTot);
-            document.getElementById('mWifeTotal').innerText = fmt(jTot);
-            document.getElementById('mCombinedTotal').innerText = fmt(gTot + jTot);
-
-            // Populate the Pension Filter Dropdown based on what's in the DB
-            const pSelect = document.getElementById('filterPension');
-            const uniquePensions = [...new Set(allLogs.map(l => l.pension_name))];
-            let pOptions = '<option value="All">All Pensions</option>';
-            uniquePensions.forEach(p => pOptions += `<option value="${p}">${p}</option>`);
-            pSelect.innerHTML = pOptions;
-
-            // Trigger the History Table Renderer
-            renderHistoryTable();
-        }
-
-        // 3. Trigger the Forecast Engine
-        await loadMonthlyForecast();
-
-        // 4. Load Joint Retirement Math Engine
-        let mathRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/calculate_joint_retirement`, {
-          method: "POST",
-          headers: getHeaders()
-        });
-        
-        if (mathRes.ok) {
-            let parsedMath = await mathRes.json();
-            if (Array.isArray(parsedMath)) {
-                globalDrawdownData = parsedMath;
-                document.querySelector("#rTable tbody").innerHTML = globalDrawdownData.length ? globalDrawdownData.map(r => {
-                    return `<tr><td>${r.retirement_year}</td><td style="font-weight:bold; color:#3498db;">${r.current_age}</td><td>${fmt(r.total_outgoings)}</td><td>${fmt(r.tax_free_pot)}</td><td>${fmt(r.taxable_pot)}</td><td>${fmt(r.other_pensions)}</td><td>${fmt(r.drawdown_amount)}</td><td style="font-weight:bold; color:#27ae60;">${fmt(r.total_income)}</td></tr>`;
-                }).join('') : '<tr><td colspan="8">No calculation rows computed.</td></tr>';
-
-                if(globalDrawdownData.length > 0) {
-                    let tf = Number(globalDrawdownData[0].tax_free_pot);
-                    let tx = Number(globalDrawdownData[0].taxable_pot);
-                    document.getElementById('mRetTaxFree').innerText = fmt(tf);
-                    document.getElementById('mRetTaxable').innerText = fmt(tx);
-                    document.getElementById('mRetTotal').innerText = fmt(tf + tx);
-                }
-                drawRetirementCharts();
-            }
-        }
-      } catch (err) { 
-        console.error("Master Load Error:", err); 
+      let pRes = await fetch(`${SUPABASE_URL}/rest/v1/op_modelling_parameters?member_name=eq.Graham&order=updated_at.desc&limit=1`, { headers: getHeaders() });
+      if (pRes.ok) {
+          let pData = await pRes.json();
+          if(pData && pData.length > 0) {
+              let p = pData[0];
+              document.getElementById('p_date1').value = toInputDate(p.shorter_week_date_1); document.getElementById('p_days1').value = p.working_days_1 || "5";
+              document.getElementById('p_date2').value = toInputDate(p.shorter_week_date_2); document.getElementById('p_days2').value = p.working_days_2 || "5";
+              document.getElementById('p_retire').value = toInputDate(p.retirement_date);
+              document.getElementById('p_spend').value = Math.round((p.spending_reduction_pct || 1.0) * 100); document.getElementById('v_spend').innerText = document.getElementById('p_spend').value + "%";
+              document.getElementById('p_bills').value = Math.round((p.drawdown_ratio_graham || 0.5) * 100); document.getElementById('v_bills').innerText = document.getElementById('p_bills').value + "%";
+          }
       }
-    }
 
-    function drawRetirementCharts() {
-      if (!google.visualization || !globalDrawdownData || globalDrawdownData.length === 0) return;
+      let logRes = await fetch(`${SUPABASE_URL}/rest/v1/op_pension_logs?order=log_date.desc`, { headers: getHeaders() });
+      if (logRes.ok) {
+          allLogs = await logRes.json(); 
+          let gTot = 0, jTot = 0; let seen = new Set();
+          allLogs.forEach(l => {
+              let key = l.member_name + '_' + l.pension_name;
+              if(!seen.has(key)) { seen.add(key); if(l.member_name === 'Graham') gTot += Number(l.pot_value); if(l.member_name === 'Julie') jTot += Number(l.pot_value); }
+          });
+          document.getElementById('mGrahamTotal').innerText = fmt(gTot); document.getElementById('mWifeTotal').innerText = fmt(jTot); document.getElementById('mCombinedTotal').innerText = fmt(gTot + jTot);
+          const pSelect = document.getElementById('filterPension');
+          let pOptions = '<option value="All">All Pensions</option>';
+          [...new Set(allLogs.map(l => l.pension_name))].forEach(p => pOptions += `<option value="${p}">${p}</option>`);
+          pSelect.innerHTML = pOptions;
+          renderHistoryTable();
+      }
 
-      var dataPots = new google.visualization.DataTable();
-      dataPots.addColumn('string', 'Year');
-      dataPots.addColumn('number', 'Tax-Free Pot');
-      dataPots.addColumn('number', 'Taxable Pot');
+      await loadMonthlyForecast();
 
-      var dataIncome = new google.visualization.DataTable();
-      dataIncome.addColumn('string', 'Year');
-      dataIncome.addColumn('number', 'Drawdown (Bar)');
-      dataIncome.addColumn('number', 'Other Pensions (Bar)');
-      dataIncome.addColumn('number', 'Drawdown Target (Line)');
-
-      globalDrawdownData.forEach(r => {
-        let yr = String(r.retirement_year);
-        dataPots.addRow([yr, Number(r.tax_free_pot), Number(r.taxable_pot)]);
-        dataIncome.addRow([yr, Number(r.drawdown_amount), Number(r.other_pensions), Number(r.drawdown_amount)]);
-      });
-
-      var numFmt = new google.visualization.NumberFormat({prefix: '£', fractionDigits: 0});
-      numFmt.format(dataPots, 1); numFmt.format(dataPots, 2);
-      numFmt.format(dataIncome, 1); numFmt.format(dataIncome, 2); numFmt.format(dataIncome, 3);
-
-      new google.visualization.ColumnChart(document.getElementById('potChart')).draw(dataPots, {
-        title: 'Combined Pension Pots Runout Plan (£)', isStacked: true, legend: { position: 'bottom' },
-        chartArea: { width: '85%', height: '70%' }, colors: ['#2ecc71', '#e74c3c'], vAxis: { minValue: 0 }
-      });
-
-      new google.visualization.ComboChart(document.getElementById('incomeChart')).draw(dataIncome, {
-        title: 'Joint Retirement Income Stream Composition', isStacked: true, seriesType: 'bars',
-        series: { 0: { targetAxisIndex: 0 }, 1: { targetAxisIndex: 0 }, 2: { type: 'line', targetAxisIndex: 1, color: '#f39c12', lineWidth: 4 } },
-        vAxes: { 0: { title: 'Income (£)' }, 1: { title: 'Drawdown Trend Line (£)', viewWindow: { min: 0, max: 80000 } } },
-        legend: { position: 'bottom' }, chartArea: { width: '80%', height: '70%' }, colors: ['#3498db', '#9b59b6']
-      });
+      let mathRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/calculate_joint_retirement`, { method: "POST", headers: getHeaders() });
+      if (mathRes.ok) {
+          globalDrawdownData = await mathRes.json();
+          renderRetirementTable();
+          drawRetirementCharts();
+      }
     }
 
     function showTab(evt, id) {
@@ -578,7 +435,7 @@
       document.querySelectorAll('.tab-link').forEach(el => el.className = el.className.replace(" active-btn", ""));
       document.getElementById(id).style.display = 'block';
       evt.currentTarget.className += " active-btn";
-      if(id === 'Parameters' || id === 'Forecast') { drawRetirementCharts(); }
+      if(id === 'Parameters' || id === 'Retirement') drawRetirementCharts();
     }
 
     window.addEventListener('resize', drawRetirementCharts);
