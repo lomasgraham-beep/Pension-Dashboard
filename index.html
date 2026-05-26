@@ -54,6 +54,7 @@
     .pos-growth { color: #27ae60; font-weight: bold; }
     .neg-growth { color: #c0392b; font-weight: bold; }
     .kpi-badge { font-size: 11px; padding: 3px 6px; border-radius: 12px; background: #e2e8f0; color: #4a5568; margin-left: 5px; }
+    .contrib-badge { background:#d1fae5; color:#065f46; font-size:11px; padding:2px 8px; border-radius:12px; margin-left:8px; vertical-align:middle; font-weight:bold; }
   </style>
 </head>
 <body>
@@ -93,7 +94,7 @@
 
   <div id="KPIs" class="tabcontent">
     <h2>Pension Performance Metrics</h2>
-    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>"Expected Organic Growth" calculates average performance by automatically excluding logged contributions and stripping out anomalous market spikes/crashes.</em></p>
+    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>"Current Monthly Growth" intelligently maps the log date to your working-days timeline to subtract the exact correct contribution amount.</em></p>
     
     <div class="card-grid" style="margin-bottom: 30px;">
         <div class="card highlight-card"><h3>Overall Portfolio Expected Monthly Growth</h3><div id="kpiExpectedTotal" class="value">£0</div></div>
@@ -107,7 +108,7 @@
           <th>Member</th>
           <th>Pension Name</th>
           <th>Current Value</th>
-          <th>Latest Monthly Growth (£)</th>
+          <th>Current Monthly Growth (£)</th>
           <th>Expected Organic Growth (£)</th>
           <th>Total Lifetime Growth (£)</th>
           <th>Total Lifetime Growth (%)</th>
@@ -209,6 +210,8 @@
     let allBills = []; 
     let allDining = []; 
     let allMembers = []; 
+    let allContributions = []; 
+    let grahamParams = null; // NEW: Storing Graham's timeline parameters globally
     let currentView = 'Joint'; 
 
     google.charts.load('current', {'packages':['corechart']});
@@ -223,13 +226,52 @@
     }
 
     // ==========================================
+    // TIME-MACHINE CONTRIBUTION LOOKUP
+    // ==========================================
+    function getExpectedContribution(log) {
+        if (!log.contribution_applied) return 0;
+        
+        let expectedDays = 5; // Default for Graham
+        
+        // 1. Time-Machine logic for Graham
+        if (log.member_name === 'Graham' && grahamParams) {
+            let logDate = new Date(log.log_date);
+            let d1 = grahamParams.shorter_week_date_1 ? new Date(grahamParams.shorter_week_date_1) : null;
+            let d2 = grahamParams.shorter_week_date_2 ? new Date(grahamParams.shorter_week_date_2) : null;
+            let wd1 = grahamParams.working_days_1 || 5;
+            let wd2 = grahamParams.working_days_2 || 5;
+            
+            // Check chronological phases (latest to earliest)
+            if (d2 && logDate >= d2) {
+                expectedDays = wd2;
+            } else if (d1 && logDate >= d1) {
+                expectedDays = wd1;
+            }
+        }
+
+        // 2. Fetch the matched amount from bd_pension_contributions
+        let match = allContributions.find(c => {
+            if (c.member_name !== log.member_name || c.pension_name !== log.pension_name) return false;
+            
+            // If Graham, strictly match the working_days parameter
+            if (log.member_name === 'Graham') {
+                return Number(c.working_days) === Number(expectedDays);
+            }
+            
+            // If Julie, just grab her single matching pension row
+            return true;
+        });
+        
+        return match ? (Number(match.monthly_contribution) || 0) : 0;
+    }
+
+    // ==========================================
     // KPI RENDERER ENGINE
     // ==========================================
     function renderKPIs() {
         const tbody = document.querySelector("#kpiTable tbody");
         if (!allLogs || allLogs.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No log data found for KPIs.</td></tr>'; return; }
 
-        // 1. Group all logs by Pension (and sort chronologically for math)
         let dict = {};
         allLogs.forEach(l => {
             let key = l.member_name + '|' + l.pension_name;
@@ -241,64 +283,89 @@
         let expectedTotal = 0, expectedGraham = 0, expectedJulie = 0;
 
         Object.keys(dict).forEach(key => {
-            // Sort oldest to newest for chronological math
             let logs = dict[key].sort((a,b) => new Date(a.log_date) - new Date(b.log_date));
-            if(logs.length < 2) return; // Need at least 2 logs to show growth
+            if(logs.length < 2) return; 
             
             let member = logs[0].member_name;
             let name = logs[0].pension_name;
+
+            // Group strictly by YYYY-MM
+            let monthlyData = {};
+            logs.forEach(l => {
+                let d = new Date(l.log_date);
+                let mKey = d.getFullYear() + '-' + ("0" + (d.getMonth()+1)).slice(-2);
+                if(!monthlyData[mKey]) monthlyData[mKey] = { logs: [], sumContrib: 0 };
+                monthlyData[mKey].logs.push(l);
+                
+                // Add the exact Time-Machine calculated contribution amount
+                monthlyData[mKey].sumContrib += getExpectedContribution(l);
+            });
+
+            let monthKeys = Object.keys(monthlyData).sort();
+            let organicDiffs = [];
+            let latestMonthlyGrowth = 0;
+
+            for (let i = 0; i < monthKeys.length; i++) {
+                let mKey = monthKeys[i];
+                let mLogs = monthlyData[mKey].logs;
+                let currentMonthEndVal = Number(mLogs[mLogs.length - 1].pot_value);
+                let sumContrib = monthlyData[mKey].sumContrib;
+
+                let prevMonthEndVal = null;
+                if (i > 0) {
+                    let pKey = monthKeys[i-1];
+                    let pLogs = monthlyData[pKey].logs;
+                    prevMonthEndVal = Number(pLogs[pLogs.length - 1].pot_value);
+                }
+
+                if (prevMonthEndVal !== null) {
+                    let organic = currentMonthEndVal - prevMonthEndVal - sumContrib;
+                    organicDiffs.push(organic);
+                    if (i === monthKeys.length - 1) {
+                        latestMonthlyGrowth = organic; 
+                    }
+                }
+            }
+
+            if (monthKeys.length === 1) {
+                let mLogs = monthlyData[monthKeys[0]].logs;
+                let firstVal = Number(mLogs[0].pot_value);
+                let currentVal = Number(mLogs[mLogs.length-1].pot_value);
+                let sumContrib = monthlyData[monthKeys[0]].sumContrib;
+                latestMonthlyGrowth = currentVal - firstVal - sumContrib;
+                organicDiffs.push(latestMonthlyGrowth);
+            }
+
             let firstLog = logs[0];
             let latestLog = logs[logs.length - 1];
-            let prevLog = logs[logs.length - 2];
-
-            // A. Current Value & Total Lifetime Growth
             let currentVal = Number(latestLog.pot_value);
             let firstVal = Number(firstLog.pot_value);
             let totalDiff = currentVal - firstVal;
             let totalPct = firstVal > 0 ? (totalDiff / firstVal) * 100 : 0;
 
-            // B. Latest Monthly Growth
-            let latestDiff = currentVal - Number(prevLog.pot_value);
-            let diffClass = latestDiff >= 0 ? 'pos-growth' : 'neg-growth';
-            // Flag if the latest diff includes a contribution
-            let contribFlag = latestLog.contribution_applied ? `<span class="kpi-badge">Contrib Tainted</span>` : '';
-
-            // C. Expected Monthly Organic Growth (The Analytics)
-            let organicDiffs = [];
-            for (let i = 1; i < logs.length; i++) {
-                // Ignore any month where a contribution was made
-                if (logs[i].contribution_applied !== true) {
-                    organicDiffs.push(Number(logs[i].pot_value) - Number(logs[i-1].pot_value));
-                }
-            }
-
             let expectedGrowth = 0;
             if (organicDiffs.length > 0) {
-                // Outlier Removal Math: Interquartile Range (IQR) Filter
                 if (organicDiffs.length >= 4) {
                     let sorted = [...organicDiffs].sort((a, b) => a - b);
                     let q1 = sorted[Math.floor(sorted.length / 4)];
                     let q3 = sorted[Math.ceil(sorted.length * (3 / 4)) - 1];
                     let iqr = q3 - q1;
-                    let minAllowed = q1 - (iqr * 1.5);
-                    let maxAllowed = q3 + (iqr * 1.5);
-                    let filtered = sorted.filter(x => x >= minAllowed && x <= maxAllowed);
+                    let filtered = sorted.filter(x => x >= (q1 - iqr * 1.5) && x <= (q3 + iqr * 1.5));
                     if(filtered.length > 0) {
                         expectedGrowth = filtered.reduce((a, b) => a + b, 0) / filtered.length;
                     } else {
                         expectedGrowth = organicDiffs.reduce((a, b) => a + b, 0) / organicDiffs.length;
                     }
                 } else {
-                    // Not enough data for IQR, just average the organic diffs
                     expectedGrowth = organicDiffs.reduce((a, b) => a + b, 0) / organicDiffs.length;
                 }
             }
 
-            // Add to master totals
             expectedTotal += expectedGrowth;
             if (member === 'Graham') expectedGraham += expectedGrowth;
             if (member === 'Julie') expectedJulie += expectedGrowth;
 
+            let latClass = latestMonthlyGrowth >= 0 ? 'pos-growth' : 'neg-growth';
             let expClass = expectedGrowth >= 0 ? 'pos-growth' : 'neg-growth';
             let totClass = totalDiff >= 0 ? 'pos-growth' : 'neg-growth';
 
@@ -306,7 +373,7 @@
                 <td>${member}</td>
                 <td>${name}</td>
                 <td style="font-weight:bold;">${fmt(currentVal)}</td>
-                <td class="${diffClass}">${fmtDiff(latestDiff)} ${contribFlag}</td>
+                <td class="${latClass}">${fmtDiff(latestMonthlyGrowth)}</td>
                 <td class="${expClass}">${fmtDiff(expectedGrowth)}</td>
                 <td class="${totClass}">${fmtDiff(totalDiff)}</td>
                 <td class="${totClass}">${totalPct >= 0 ? '+' : ''}${totalPct.toFixed(1)}%</td>
@@ -323,9 +390,6 @@
         document.getElementById('kpiExpectedJulie').className = 'value ' + (expectedJulie >= 0 ? 'pos-growth' : 'neg-growth');
     }
 
-    // ==========================================
-    // OTHER DATA RENDERERS
-    // ==========================================
     function calculateInflationMultipliers() {
         let currentYear = new Date().getFullYear();
         let oldestAge = 55; 
@@ -336,7 +400,6 @@
             });
             oldestAge = Math.max(...ages);
         }
-
         const inflRate = 0.025;
         return { inf70: Math.pow(1 + inflRate, Math.max(0, 70 - oldestAge)), inf80: Math.pow(1 + inflRate, Math.max(0, 80 - oldestAge)), inf90: Math.pow(1 + inflRate, Math.max(0, 90 - oldestAge)) };
     }
@@ -432,7 +495,11 @@
         let html = "";
         filteredData.forEach(l => { 
             const dObj = new Date(l.log_date); const ukDate = ("0" + dObj.getDate()).slice(-2) + '/' + ("0" + (dObj.getMonth() + 1)).slice(-2) + '/' + dObj.getFullYear(); 
-            const contribBadge = l.contribution_applied ? `<span style="background:#d1fae5; color:#065f46; font-size:11px; padding:2px 8px; border-radius:12px; margin-left:8px; vertical-align:middle;">+ Contrib</span>` : '';
+            
+            // Pass the log into the time-machine function
+            let cAmt = getExpectedContribution(l);
+            const contribBadge = cAmt > 0 ? `<span class="contrib-badge">+${fmt(cAmt)} DB Contrib</span>` : (l.contribution_applied ? `<span class="contrib-badge">+ Contrib</span>` : '');
+            
             html += `<tr><td>${ukDate}</td><td>${l.member_name}</td><td>${l.pension_name}</td><td style="font-weight:bold;">${fmt(l.pot_value)} ${contribBadge}</td></tr>`; 
         });
         tbody.innerHTML = html;
@@ -451,7 +518,7 @@
                 <input type="number" class="dynamic-pot-input" data-pension="${p.pension_name}" step="0.01" value="0.00" required style="margin-bottom:10px;">
                 <label style="display:inline-flex; align-items:center; font-weight:normal; color:#64748b; cursor:pointer;">
                     <input type="checkbox" class="dynamic-contrib-input" data-pension="${p.pension_name}" style="width:auto; margin-right:8px; cursor:pointer;">
-                    Includes new contribution?
+                    Includes standard monthly contribution?
                 </label>
             </div>`;
         });
@@ -462,7 +529,13 @@
         document.querySelectorAll('.dynamic-pot-input').forEach(input => { 
             let pName = input.getAttribute('data-pension');
             let checkbox = document.querySelector(`.dynamic-contrib-input[data-pension="${pName}"]`);
-            payloads.push({ member_name: document.getElementById('logMember').value, pension_name: pName, pot_value: parseFloat(input.value) || 0, log_date: document.getElementById('entryDate').value, contribution_applied: checkbox ? checkbox.checked : false }); 
+            payloads.push({ 
+                member_name: document.getElementById('logMember').value, 
+                pension_name: pName, 
+                pot_value: parseFloat(input.value) || 0, 
+                log_date: document.getElementById('entryDate').value, 
+                contribution_applied: checkbox ? checkbox.checked : false 
+            }); 
         });
         let res = await fetch(`${SUPABASE_URL}/rest/v1/op_pension_logs`, { method: "POST", headers: getHeaders(), body: JSON.stringify(payloads) });
         if (res.ok) { document.getElementById('statusMsg').innerHTML = "Saved!"; loadAllData(); }
@@ -476,6 +549,9 @@
     }
 
     async function loadAllData() {
+      let cRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_pension_contributions`, { headers: getHeaders() });
+      if (cRes.ok) { allContributions = await cRes.json(); }
+
       let mRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_members`, { headers: getHeaders() });
       if (mRes.ok) { allMembers = await mRes.json(); }
 
@@ -500,6 +576,7 @@
           let pData = await pRes.json();
           if(pData && pData.length > 0) {
               let p = pData[0];
+              grahamParams = p; // SAVE GLOBALLY for the Time-Machine logic
               document.getElementById('p_date1').value = toInputDate(p.shorter_week_date_1); document.getElementById('p_days1').value = p.working_days_1 || "5";
               document.getElementById('p_date2').value = toInputDate(p.shorter_week_date_2); document.getElementById('p_days2').value = p.working_days_2 || "5";
               document.getElementById('p_retire').value = toInputDate(p.retirement_date);
@@ -520,7 +597,7 @@
           const pSelect = document.getElementById('filterPension'); let pOptions = '<option value="All">All Pensions</option>';
           [...new Set(allLogs.map(l => l.pension_name))].forEach(p => pOptions += `<option value="${p}">${p}</option>`); pSelect.innerHTML = pOptions;
           renderHistoryTable();
-          renderKPIs(); // NEW: Fire the KPI Engine
+          renderKPIs();
       }
 
       let forecastRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/generate_monthly_pension_forecast`, { method: "POST", headers: getHeaders() });
