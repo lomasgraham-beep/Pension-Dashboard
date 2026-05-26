@@ -110,8 +110,8 @@
           <th>Current Value</th>
           <th>Current Monthly Growth (£)</th>
           <th>Expected Organic Growth (£)</th>
-          <th>Total Lifetime Growth (£)</th>
-          <th>Total Lifetime Growth (%)</th>
+          <th>Avg. Monthly Growth (£)</th>
+          <th>Avg. Monthly Growth (%)</th>
         </tr>
       </thead>
       <tbody><tr><td colspan="7">Crunching KPI data...</td></tr></tbody>
@@ -211,7 +211,7 @@
     let allDining = []; 
     let allMembers = []; 
     let allContributions = []; 
-    let grahamParams = null; // NEW: Storing Graham's timeline parameters globally
+    let grahamParams = null; 
     let currentView = 'Joint'; 
 
     google.charts.load('current', {'packages':['corechart']});
@@ -225,15 +225,10 @@
         renderRetirementTable(); drawRetirementCharts();
     }
 
-    // ==========================================
-    // TIME-MACHINE CONTRIBUTION LOOKUP
-    // ==========================================
     function getExpectedContribution(log) {
         if (!log.contribution_applied) return 0;
+        let expectedDays = 5; 
         
-        let expectedDays = 5; // Default for Graham
-        
-        // 1. Time-Machine logic for Graham
         if (log.member_name === 'Graham' && grahamParams) {
             let logDate = new Date(log.log_date);
             let d1 = grahamParams.shorter_week_date_1 ? new Date(grahamParams.shorter_week_date_1) : null;
@@ -241,7 +236,6 @@
             let wd1 = grahamParams.working_days_1 || 5;
             let wd2 = grahamParams.working_days_2 || 5;
             
-            // Check chronological phases (latest to earliest)
             if (d2 && logDate >= d2) {
                 expectedDays = wd2;
             } else if (d1 && logDate >= d1) {
@@ -249,16 +243,11 @@
             }
         }
 
-        // 2. Fetch the matched amount from bd_pension_contributions
         let match = allContributions.find(c => {
             if (c.member_name !== log.member_name || c.pension_name !== log.pension_name) return false;
-            
-            // If Graham, strictly match the working_days parameter
             if (log.member_name === 'Graham') {
                 return Number(c.working_days) === Number(expectedDays);
             }
-            
-            // If Julie, just grab her single matching pension row
             return true;
         });
         
@@ -266,7 +255,7 @@
     }
 
     // ==========================================
-    // KPI RENDERER ENGINE
+    // UPDATED KPI RENDERER ENGINE
     // ==========================================
     function renderKPIs() {
         const tbody = document.querySelector("#kpiTable tbody");
@@ -289,20 +278,18 @@
             let member = logs[0].member_name;
             let name = logs[0].pension_name;
 
-            // Group strictly by YYYY-MM
             let monthlyData = {};
             logs.forEach(l => {
                 let d = new Date(l.log_date);
                 let mKey = d.getFullYear() + '-' + ("0" + (d.getMonth()+1)).slice(-2);
                 if(!monthlyData[mKey]) monthlyData[mKey] = { logs: [], sumContrib: 0 };
                 monthlyData[mKey].logs.push(l);
-                
-                // Add the exact Time-Machine calculated contribution amount
                 monthlyData[mKey].sumContrib += getExpectedContribution(l);
             });
 
             let monthKeys = Object.keys(monthlyData).sort();
             let organicDiffs = [];
+            let organicPcts = [];
             let latestMonthlyGrowth = 0;
 
             for (let i = 0; i < monthKeys.length; i++) {
@@ -321,6 +308,11 @@
                 if (prevMonthEndVal !== null) {
                     let organic = currentMonthEndVal - prevMonthEndVal - sumContrib;
                     organicDiffs.push(organic);
+                    
+                    // Track exact percentage yield for this specific month
+                    let pct = prevMonthEndVal !== 0 ? (organic / prevMonthEndVal) * 100 : 0;
+                    organicPcts.push(pct);
+                    
                     if (i === monthKeys.length - 1) {
                         latestMonthlyGrowth = organic; 
                     }
@@ -334,14 +326,12 @@
                 let sumContrib = monthlyData[monthKeys[0]].sumContrib;
                 latestMonthlyGrowth = currentVal - firstVal - sumContrib;
                 organicDiffs.push(latestMonthlyGrowth);
+                organicPcts.push(firstVal !== 0 ? (latestMonthlyGrowth / firstVal) * 100 : 0);
             }
 
-            let firstLog = logs[0];
-            let latestLog = logs[logs.length - 1];
-            let currentVal = Number(latestLog.pot_value);
-            let firstVal = Number(firstLog.pot_value);
-            let totalDiff = currentVal - firstVal;
-            let totalPct = firstVal > 0 ? (totalDiff / firstVal) * 100 : 0;
+            // Calculate the pure averages
+            let avgGrowthAmt = organicDiffs.length > 0 ? organicDiffs.reduce((a, b) => a + b, 0) / organicDiffs.length : 0;
+            let avgGrowthPct = organicPcts.length > 0 ? organicPcts.reduce((a, b) => a + b, 0) / organicPcts.length : 0;
 
             let expectedGrowth = 0;
             if (organicDiffs.length > 0) {
@@ -354,10 +344,10 @@
                     if(filtered.length > 0) {
                         expectedGrowth = filtered.reduce((a, b) => a + b, 0) / filtered.length;
                     } else {
-                        expectedGrowth = organicDiffs.reduce((a, b) => a + b, 0) / organicDiffs.length;
+                        expectedGrowth = avgGrowthAmt;
                     }
                 } else {
-                    expectedGrowth = organicDiffs.reduce((a, b) => a + b, 0) / organicDiffs.length;
+                    expectedGrowth = avgGrowthAmt;
                 }
             }
 
@@ -367,16 +357,16 @@
 
             let latClass = latestMonthlyGrowth >= 0 ? 'pos-growth' : 'neg-growth';
             let expClass = expectedGrowth >= 0 ? 'pos-growth' : 'neg-growth';
-            let totClass = totalDiff >= 0 ? 'pos-growth' : 'neg-growth';
+            let avgClass = avgGrowthAmt >= 0 ? 'pos-growth' : 'neg-growth';
 
             html += `<tr>
                 <td>${member}</td>
                 <td>${name}</td>
-                <td style="font-weight:bold;">${fmt(currentVal)}</td>
+                <td style="font-weight:bold;">${fmt(Number(logs[logs.length - 1].pot_value))}</td>
                 <td class="${latClass}">${fmtDiff(latestMonthlyGrowth)}</td>
                 <td class="${expClass}">${fmtDiff(expectedGrowth)}</td>
-                <td class="${totClass}">${fmtDiff(totalDiff)}</td>
-                <td class="${totClass}">${totalPct >= 0 ? '+' : ''}${totalPct.toFixed(1)}%</td>
+                <td class="${avgClass}">${fmtDiff(avgGrowthAmt)}</td>
+                <td class="${avgClass}">${avgGrowthPct >= 0 ? '+' : ''}${avgGrowthPct.toFixed(2)}%</td>
             </tr>`;
         });
 
@@ -495,11 +485,8 @@
         let html = "";
         filteredData.forEach(l => { 
             const dObj = new Date(l.log_date); const ukDate = ("0" + dObj.getDate()).slice(-2) + '/' + ("0" + (dObj.getMonth() + 1)).slice(-2) + '/' + dObj.getFullYear(); 
-            
-            // Pass the log into the time-machine function
             let cAmt = getExpectedContribution(l);
             const contribBadge = cAmt > 0 ? `<span class="contrib-badge">+${fmt(cAmt)} DB Contrib</span>` : (l.contribution_applied ? `<span class="contrib-badge">+ Contrib</span>` : '');
-            
             html += `<tr><td>${ukDate}</td><td>${l.member_name}</td><td>${l.pension_name}</td><td style="font-weight:bold;">${fmt(l.pot_value)} ${contribBadge}</td></tr>`; 
         });
         tbody.innerHTML = html;
@@ -576,7 +563,7 @@
           let pData = await pRes.json();
           if(pData && pData.length > 0) {
               let p = pData[0];
-              grahamParams = p; // SAVE GLOBALLY for the Time-Machine logic
+              grahamParams = p; 
               document.getElementById('p_date1').value = toInputDate(p.shorter_week_date_1); document.getElementById('p_days1').value = p.working_days_1 || "5";
               document.getElementById('p_date2').value = toInputDate(p.shorter_week_date_2); document.getElementById('p_days2').value = p.working_days_2 || "5";
               document.getElementById('p_retire').value = toInputDate(p.retirement_date);
