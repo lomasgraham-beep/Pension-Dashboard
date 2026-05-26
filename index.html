@@ -49,6 +49,11 @@
     .filter-bar { display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px; align-items: flex-end; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;}
     .filter-bar .form-group { margin-bottom: 0; }
     .filter-bar select, .filter-bar input { max-width: 200px; }
+
+    /* KPI Specific Styling */
+    .pos-growth { color: #27ae60; font-weight: bold; }
+    .neg-growth { color: #c0392b; font-weight: bold; }
+    .kpi-badge { font-size: 11px; padding: 3px 6px; border-radius: 12px; background: #e2e8f0; color: #4a5568; margin-left: 5px; }
   </style>
 </head>
 <body>
@@ -67,6 +72,7 @@
 
   <div class="tab-buttons">
     <button class="tab-link active-btn" onclick="showTab(event, 'Overview')">Overview</button>
+    <button class="tab-link" onclick="showTab(event, 'KPIs')">Performance KPIs</button>
     <button class="tab-link" onclick="showTab(event, 'Forecast')">Monthly Forecast</button>
     <button class="tab-link" onclick="showTab(event, 'Bills')">Household Bills</button>
     <button class="tab-link" onclick="showTab(event, 'Dining')">Dining</button>
@@ -85,6 +91,32 @@
     </div>
   </div>
 
+  <div id="KPIs" class="tabcontent">
+    <h2>Pension Performance Metrics</h2>
+    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>"Expected Organic Growth" calculates average performance by automatically excluding logged contributions and stripping out anomalous market spikes/crashes.</em></p>
+    
+    <div class="card-grid" style="margin-bottom: 30px;">
+        <div class="card highlight-card"><h3>Overall Portfolio Expected Monthly Growth</h3><div id="kpiExpectedTotal" class="value">£0</div></div>
+        <div class="card"><h3>Graham's Expected Monthly Growth</h3><div id="kpiExpectedGraham" class="value">£0</div></div>
+        <div class="card"><h3>Julie's Expected Monthly Growth</h3><div id="kpiExpectedJulie" class="value">£0</div></div>
+    </div>
+
+    <table id="kpiTable">
+      <thead>
+        <tr>
+          <th>Member</th>
+          <th>Pension Name</th>
+          <th>Current Value</th>
+          <th>Latest Monthly Growth (£)</th>
+          <th>Expected Organic Growth (£)</th>
+          <th>Total Lifetime Growth (£)</th>
+          <th>Total Lifetime Growth (%)</th>
+        </tr>
+      </thead>
+      <tbody><tr><td colspan="7">Crunching KPI data...</td></tr></tbody>
+    </table>
+  </div>
+
   <div id="Forecast" class="tabcontent">
     <h2>Pre-Retirement Monthly Forecast</h2>
     <table id="forecastTable">
@@ -95,11 +127,7 @@
 
   <div id="Bills" class="tabcontent">
     <h2>Household Bills & Future Inflation</h2>
-    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>Visualizing your category costs. The columns automatically apply 2.5% compounding inflation based on the oldest member's current age.</em></p>
-    <div class="filter-bar">
-      <div class="form-group"><label>Filter by Category</label><select id="filterCategory" onchange="renderBillsTable()"><option value="All">All Categories</option></select></div>
-      <div class="form-group"><button class="btn" style="background-color: #64748b;" onclick="clearBillsFilter()">Clear Filter</button></div>
-    </div>
+    <div class="filter-bar"><div class="form-group"><label>Filter by Category</label><select id="filterCategory" onchange="renderBillsTable()"><option value="All">All Categories</option></select></div><div class="form-group"><button class="btn" style="background-color: #64748b;" onclick="clearBillsFilter()">Clear Filter</button></div></div>
     <table id="bTable">
       <thead><tr><th>Category</th><th>Bill Name</th><th>Subject to Slider?</th><th>Baseline (Today)</th><th>Est. Cost at Age 70</th><th>Est. Cost at Age 80</th><th>Est. Cost at Age 90</th></tr></thead>
       <tbody><tr><td colspan="7">Loading database bills...</td></tr></tbody>
@@ -109,7 +137,6 @@
 
   <div id="Dining" class="tabcontent">
     <h2>Dining & Future Inflation</h2>
-    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>Visualizing your dining budgets with 2.5% compounding inflation and database tapers applied.</em></p>
     <table id="dTable">
       <thead><tr><th>Dining Type</th><th>Subject to Slider?</th><th>Baseline (Today)</th><th>Est. Cost at Age 70</th><th>Est. Cost at Age 80</th><th>Est. Cost at Age 90</th></tr></thead>
       <tbody><tr><td colspan="6">Loading database dining habits...</td></tr></tbody>
@@ -172,6 +199,7 @@
 
     document.getElementById('entryDate').valueAsDate = new Date();
     const fmt = (n) => "£" + Math.round(n || 0).toLocaleString("en-GB");
+    const fmtDiff = (n) => { let s = n >= 0 ? "+" : "-"; return `${s}£${Math.abs(Math.round(n)).toLocaleString("en-GB")}`; };
     const toInputDate = (ds) => { if (!ds) return ""; const d = new Date(ds); return d.getFullYear() + '-' + ("0" + (d.getMonth() + 1)).slice(-2) + '-' + ("0" + d.getDate()).slice(-2); };
     const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" });
 
@@ -194,6 +222,110 @@
         renderRetirementTable(); drawRetirementCharts();
     }
 
+    // ==========================================
+    // KPI RENDERER ENGINE
+    // ==========================================
+    function renderKPIs() {
+        const tbody = document.querySelector("#kpiTable tbody");
+        if (!allLogs || allLogs.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No log data found for KPIs.</td></tr>'; return; }
+
+        // 1. Group all logs by Pension (and sort chronologically for math)
+        let dict = {};
+        allLogs.forEach(l => {
+            let key = l.member_name + '|' + l.pension_name;
+            if(!dict[key]) dict[key] = [];
+            dict[key].push(l);
+        });
+
+        let html = "";
+        let expectedTotal = 0, expectedGraham = 0, expectedJulie = 0;
+
+        Object.keys(dict).forEach(key => {
+            // Sort oldest to newest for chronological math
+            let logs = dict[key].sort((a,b) => new Date(a.log_date) - new Date(b.log_date));
+            if(logs.length < 2) return; // Need at least 2 logs to show growth
+            
+            let member = logs[0].member_name;
+            let name = logs[0].pension_name;
+            let firstLog = logs[0];
+            let latestLog = logs[logs.length - 1];
+            let prevLog = logs[logs.length - 2];
+
+            // A. Current Value & Total Lifetime Growth
+            let currentVal = Number(latestLog.pot_value);
+            let firstVal = Number(firstLog.pot_value);
+            let totalDiff = currentVal - firstVal;
+            let totalPct = firstVal > 0 ? (totalDiff / firstVal) * 100 : 0;
+
+            // B. Latest Monthly Growth
+            let latestDiff = currentVal - Number(prevLog.pot_value);
+            let diffClass = latestDiff >= 0 ? 'pos-growth' : 'neg-growth';
+            // Flag if the latest diff includes a contribution
+            let contribFlag = latestLog.contribution_applied ? `<span class="kpi-badge">Contrib Tainted</span>` : '';
+
+            // C. Expected Monthly Organic Growth (The Analytics)
+            let organicDiffs = [];
+            for (let i = 1; i < logs.length; i++) {
+                // Ignore any month where a contribution was made
+                if (logs[i].contribution_applied !== true) {
+                    organicDiffs.push(Number(logs[i].pot_value) - Number(logs[i-1].pot_value));
+                }
+            }
+
+            let expectedGrowth = 0;
+            if (organicDiffs.length > 0) {
+                // Outlier Removal Math: Interquartile Range (IQR) Filter
+                if (organicDiffs.length >= 4) {
+                    let sorted = [...organicDiffs].sort((a, b) => a - b);
+                    let q1 = sorted[Math.floor(sorted.length / 4)];
+                    let q3 = sorted[Math.ceil(sorted.length * (3 / 4)) - 1];
+                    let iqr = q3 - q1;
+                    let minAllowed = q1 - (iqr * 1.5);
+                    let maxAllowed = q3 + (iqr * 1.5);
+                    let filtered = sorted.filter(x => x >= minAllowed && x <= maxAllowed);
+                    if(filtered.length > 0) {
+                        expectedGrowth = filtered.reduce((a, b) => a + b, 0) / filtered.length;
+                    } else {
+                        expectedGrowth = organicDiffs.reduce((a, b) => a + b, 0) / organicDiffs.length;
+                    }
+                } else {
+                    // Not enough data for IQR, just average the organic diffs
+                    expectedGrowth = organicDiffs.reduce((a, b) => a + b, 0) / organicDiffs.length;
+                }
+            }
+
+            // Add to master totals
+            expectedTotal += expectedGrowth;
+            if (member === 'Graham') expectedGraham += expectedGrowth;
+            if (member === 'Julie') expectedJulie += expectedGrowth;
+
+            let expClass = expectedGrowth >= 0 ? 'pos-growth' : 'neg-growth';
+            let totClass = totalDiff >= 0 ? 'pos-growth' : 'neg-growth';
+
+            html += `<tr>
+                <td>${member}</td>
+                <td>${name}</td>
+                <td style="font-weight:bold;">${fmt(currentVal)}</td>
+                <td class="${diffClass}">${fmtDiff(latestDiff)} ${contribFlag}</td>
+                <td class="${expClass}">${fmtDiff(expectedGrowth)}</td>
+                <td class="${totClass}">${fmtDiff(totalDiff)}</td>
+                <td class="${totClass}">${totalPct >= 0 ? '+' : ''}${totalPct.toFixed(1)}%</td>
+            </tr>`;
+        });
+
+        tbody.innerHTML = html;
+        document.getElementById('kpiExpectedTotal').innerText = fmtDiff(expectedTotal);
+        document.getElementById('kpiExpectedGraham').innerText = fmtDiff(expectedGraham);
+        document.getElementById('kpiExpectedJulie').innerText = fmtDiff(expectedJulie);
+        
+        document.getElementById('kpiExpectedTotal').className = 'value ' + (expectedTotal >= 0 ? 'pos-growth' : 'neg-growth');
+        document.getElementById('kpiExpectedGraham').className = 'value ' + (expectedGraham >= 0 ? 'pos-growth' : 'neg-growth');
+        document.getElementById('kpiExpectedJulie').className = 'value ' + (expectedJulie >= 0 ? 'pos-growth' : 'neg-growth');
+    }
+
+    // ==========================================
+    // OTHER DATA RENDERERS
+    // ==========================================
     function calculateInflationMultipliers() {
         let currentYear = new Date().getFullYear();
         let oldestAge = 55; 
@@ -204,20 +336,14 @@
             });
             oldestAge = Math.max(...ages);
         }
+
         const inflRate = 0.025;
-        return {
-            inf70: Math.pow(1 + inflRate, Math.max(0, 70 - oldestAge)),
-            inf80: Math.pow(1 + inflRate, Math.max(0, 80 - oldestAge)),
-            inf90: Math.pow(1 + inflRate, Math.max(0, 90 - oldestAge))
-        };
+        return { inf70: Math.pow(1 + inflRate, Math.max(0, 70 - oldestAge)), inf80: Math.pow(1 + inflRate, Math.max(0, 80 - oldestAge)), inf90: Math.pow(1 + inflRate, Math.max(0, 90 - oldestAge)) };
     }
 
     function renderBillsTable() {
-        const tbody = document.querySelector("#bTable tbody");
-        const tfoot = document.querySelector("#bTable tfoot");
-        const catFilter = document.getElementById('filterCategory').value;
-        const { inf70, inf80, inf90 } = calculateInflationMultipliers();
-
+        const tbody = document.querySelector("#bTable tbody"); const tfoot = document.querySelector("#bTable tfoot");
+        const catFilter = document.getElementById('filterCategory').value; const { inf70, inf80, inf90 } = calculateInflationMultipliers();
         let filteredBills = allBills;
         if (catFilter !== "All") filteredBills = filteredBills.filter(b => (b.category_code || 'Uncategorized') === catFilter);
         if (!filteredBills || filteredBills.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No bills match your criteria.</td></tr>'; tfoot.innerHTML = ''; return; }
@@ -293,9 +419,6 @@
         new google.visualization.ComboChart(document.getElementById('incomeChart')).draw(dataIncome, { title: `${currentView} Retirement Income Stream Composition`, isStacked: true, seriesType: 'bars', series: { 0: { targetAxisIndex: 0 }, 1: { targetAxisIndex: 0 }, 2: { type: 'line', targetAxisIndex: 1, color: '#f39c12', lineWidth: 4 } }, vAxes: { 0: { title: 'Income (£)' }, 1: { title: 'Drawdown Trend Line (£)', viewWindow: { min: 0 } } }, legend: { position: 'bottom' }, chartArea: { width: '80%', height: '70%' }, colors: ['#3498db', '#9b59b6'] });
     }
 
-    // ==========================================
-    // UPDATED: HISTORY TABLE (Shows Contrib Badge)
-    // ==========================================
     function renderHistoryTable() {
         const tbody = document.querySelector("#hTable tbody");
         const mFilter = document.getElementById('filterMember').value; const pFilter = document.getElementById('filterPension').value; const dFilter = document.getElementById('filterDate').value;
@@ -308,31 +431,17 @@
         
         let html = "";
         filteredData.forEach(l => { 
-            const dObj = new Date(l.log_date); 
-            const ukDate = ("0" + dObj.getDate()).slice(-2) + '/' + ("0" + (dObj.getMonth() + 1)).slice(-2) + '/' + dObj.getFullYear(); 
-            // Add a visual badge if it includes a contribution
+            const dObj = new Date(l.log_date); const ukDate = ("0" + dObj.getDate()).slice(-2) + '/' + ("0" + (dObj.getMonth() + 1)).slice(-2) + '/' + dObj.getFullYear(); 
             const contribBadge = l.contribution_applied ? `<span style="background:#d1fae5; color:#065f46; font-size:11px; padding:2px 8px; border-radius:12px; margin-left:8px; vertical-align:middle;">+ Contrib</span>` : '';
-            
-            html += `<tr>
-                <td>${ukDate}</td>
-                <td>${l.member_name}</td>
-                <td>${l.pension_name}</td>
-                <td style="font-weight:bold;">${fmt(l.pot_value)} ${contribBadge}</td>
-            </tr>`; 
+            html += `<tr><td>${ukDate}</td><td>${l.member_name}</td><td>${l.pension_name}</td><td style="font-weight:bold;">${fmt(l.pot_value)} ${contribBadge}</td></tr>`; 
         });
         tbody.innerHTML = html;
     }
     function clearHistoryFilters() { document.getElementById('filterMember').value = "All"; document.getElementById('filterPension').value = "All"; document.getElementById('filterDate').value = ""; renderHistoryTable(); }
     
-    // ==========================================
-    // UPDATED: DYNAMIC INPUTS (Adds Checkbox)
-    // ==========================================
     function renderDynamicInputs() {
-        const member = document.getElementById('logMember').value; 
-        const container = document.getElementById('dynamicInputsContainer'); 
-        container.innerHTML = ''; 
+        const member = document.getElementById('logMember').value; const container = document.getElementById('dynamicInputsContainer'); container.innerHTML = ''; 
         const memberPensions = userPensions.filter(p => p.member_name === member && p.pension_type === 'Defined Contributions');
-        
         if(memberPensions.length === 0) { container.innerHTML = '<p>No DC pots found.</p>'; return; }
         
         memberPensions.forEach(p => { 
@@ -348,25 +457,13 @@
         });
     }
 
-    // ==========================================
-    // UPDATED: SUBMIT LOG ENTRY (Sends boolean)
-    // ==========================================
     async function submitDynamicLogEntry() {
-        document.getElementById('statusMsg').innerHTML = "Saving..."; 
-        let payloads = [];
-        
+        document.getElementById('statusMsg').innerHTML = "Saving..."; let payloads = [];
         document.querySelectorAll('.dynamic-pot-input').forEach(input => { 
             let pName = input.getAttribute('data-pension');
             let checkbox = document.querySelector(`.dynamic-contrib-input[data-pension="${pName}"]`);
-            payloads.push({ 
-                member_name: document.getElementById('logMember').value, 
-                pension_name: pName, 
-                pot_value: parseFloat(input.value) || 0, 
-                log_date: document.getElementById('entryDate').value,
-                contribution_applied: checkbox ? checkbox.checked : false // Captures the exact checkbox state
-            }); 
+            payloads.push({ member_name: document.getElementById('logMember').value, pension_name: pName, pot_value: parseFloat(input.value) || 0, log_date: document.getElementById('entryDate').value, contribution_applied: checkbox ? checkbox.checked : false }); 
         });
-        
         let res = await fetch(`${SUPABASE_URL}/rest/v1/op_pension_logs`, { method: "POST", headers: getHeaders(), body: JSON.stringify(payloads) });
         if (res.ok) { document.getElementById('statusMsg').innerHTML = "Saved!"; loadAllData(); }
     }
@@ -385,20 +482,15 @@
       let billsRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_household_bills`, { headers: getHeaders() });
       if (billsRes.ok) { 
           allBills = await billsRes.json(); 
-          const cSelect = document.getElementById('filterCategory');
-          let cOptions = '<option value="All">All Categories</option>';
+          const cSelect = document.getElementById('filterCategory'); let cOptions = '<option value="All">All Categories</option>';
           let uniqueCats = [...new Set(allBills.map(b => b.category_code || 'Uncategorized'))].filter(c => c !== 'Uncategorized');
           uniqueCats.sort().forEach(c => cOptions += `<option value="${c}">${c}</option>`);
           if (allBills.some(b => !b.category_code)) cOptions += `<option value="Uncategorized">Uncategorized</option>`;
-          cSelect.innerHTML = cOptions;
-          renderBillsTable(); 
+          cSelect.innerHTML = cOptions; renderBillsTable(); 
       }
 
       let diningRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_dining_habits`, { headers: getHeaders() });
-      if (diningRes.ok) { 
-          allDining = await diningRes.json(); 
-          renderDiningTable(); 
-      }
+      if (diningRes.ok) { allDining = await diningRes.json(); renderDiningTable(); }
 
       let bdRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_pensions`, { headers: getHeaders() });
       if (bdRes.ok) { userPensions = await bdRes.json(); renderDynamicInputs(); }
@@ -428,6 +520,7 @@
           const pSelect = document.getElementById('filterPension'); let pOptions = '<option value="All">All Pensions</option>';
           [...new Set(allLogs.map(l => l.pension_name))].forEach(p => pOptions += `<option value="${p}">${p}</option>`); pSelect.innerHTML = pOptions;
           renderHistoryTable();
+          renderKPIs(); // NEW: Fire the KPI Engine
       }
 
       let forecastRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/generate_monthly_pension_forecast`, { method: "POST", headers: getHeaders() });
