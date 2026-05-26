@@ -50,7 +50,6 @@
     .filter-bar .form-group { margin-bottom: 0; }
     .filter-bar select, .filter-bar input { max-width: 200px; }
 
-    /* KPI Specific Styling */
     .pos-growth { color: #27ae60; font-weight: bold; }
     .neg-growth { color: #c0392b; font-weight: bold; }
     .kpi-badge { font-size: 11px; padding: 3px 6px; border-radius: 12px; background: #e2e8f0; color: #4a5568; margin-left: 5px; }
@@ -94,7 +93,7 @@
 
   <div id="KPIs" class="tabcontent">
     <h2>Pension Performance Metrics</h2>
-    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>"Current Monthly Growth" intelligently maps the log date to your working-days timeline to subtract the exact correct contribution amount.</em></p>
+    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>"Expected Growth" uses the Median of historical monthly organic growth, successfully filtering out anomalous spikes and dips.</em></p>
     
     <div class="card-grid" style="margin-bottom: 30px;">
         <div class="card highlight-card"><h3>Overall Portfolio Expected Monthly Growth</h3><div id="kpiExpectedTotal" class="value">£0</div></div>
@@ -109,7 +108,7 @@
           <th>Pension Name</th>
           <th>Current Value</th>
           <th>Current Monthly Growth (£)</th>
-          <th>Expected Organic Growth (£)</th>
+          <th>Expected Monthly Growth (£)</th>
           <th>Avg. Monthly Growth (£)</th>
           <th>Avg. Monthly Growth (%)</th>
         </tr>
@@ -228,35 +227,23 @@
     function getExpectedContribution(log) {
         if (!log.contribution_applied) return 0;
         let expectedDays = 5; 
-        
         if (log.member_name === 'Graham' && grahamParams) {
             let logDate = new Date(log.log_date);
             let d1 = grahamParams.shorter_week_date_1 ? new Date(grahamParams.shorter_week_date_1) : null;
             let d2 = grahamParams.shorter_week_date_2 ? new Date(grahamParams.shorter_week_date_2) : null;
             let wd1 = grahamParams.working_days_1 || 5;
             let wd2 = grahamParams.working_days_2 || 5;
-            
-            if (d2 && logDate >= d2) {
-                expectedDays = wd2;
-            } else if (d1 && logDate >= d1) {
-                expectedDays = wd1;
-            }
+            if (d2 && logDate >= d2) expectedDays = wd2;
+            else if (d1 && logDate >= d1) expectedDays = wd1;
         }
-
         let match = allContributions.find(c => {
             if (c.member_name !== log.member_name || c.pension_name !== log.pension_name) return false;
-            if (log.member_name === 'Graham') {
-                return Number(c.working_days) === Number(expectedDays);
-            }
+            if (log.member_name === 'Graham') return Number(c.working_days) === Number(expectedDays);
             return true;
         });
-        
         return match ? (Number(match.monthly_contribution) || 0) : 0;
     }
 
-    // ==========================================
-    // UPDATED KPI RENDERER ENGINE
-    // ==========================================
     function renderKPIs() {
         const tbody = document.querySelector("#kpiTable tbody");
         if (!allLogs || allLogs.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No log data found for KPIs.</td></tr>'; return; }
@@ -274,9 +261,7 @@
         Object.keys(dict).forEach(key => {
             let logs = dict[key].sort((a,b) => new Date(a.log_date) - new Date(b.log_date));
             if(logs.length < 2) return; 
-            
-            let member = logs[0].member_name;
-            let name = logs[0].pension_name;
+            let member = logs[0].member_name; let name = logs[0].pension_name;
 
             let monthlyData = {};
             logs.forEach(l => {
@@ -288,106 +273,67 @@
             });
 
             let monthKeys = Object.keys(monthlyData).sort();
-            let organicDiffs = [];
-            let organicPcts = [];
-            let latestMonthlyGrowth = 0;
+            let organicDiffs = []; let organicPcts = []; let latestMonthlyGrowth = 0;
 
             for (let i = 0; i < monthKeys.length; i++) {
-                let mKey = monthKeys[i];
-                let mLogs = monthlyData[mKey].logs;
+                let mKey = monthKeys[i]; let mLogs = monthlyData[mKey].logs;
                 let currentMonthEndVal = Number(mLogs[mLogs.length - 1].pot_value);
                 let sumContrib = monthlyData[mKey].sumContrib;
-
-                let prevMonthEndVal = null;
-                if (i > 0) {
-                    let pKey = monthKeys[i-1];
-                    let pLogs = monthlyData[pKey].logs;
-                    prevMonthEndVal = Number(pLogs[pLogs.length - 1].pot_value);
-                }
+                let prevMonthEndVal = (i > 0) ? Number(monthlyData[monthKeys[i-1]].logs[monthlyData[monthKeys[i-1]].logs.length - 1].pot_value) : null;
 
                 if (prevMonthEndVal !== null) {
                     let organic = currentMonthEndVal - prevMonthEndVal - sumContrib;
                     organicDiffs.push(organic);
-                    
-                    // Track exact percentage yield for this specific month
-                    let pct = prevMonthEndVal !== 0 ? (organic / prevMonthEndVal) * 100 : 0;
-                    organicPcts.push(pct);
-                    
-                    if (i === monthKeys.length - 1) {
-                        latestMonthlyGrowth = organic; 
-                    }
+                    organicPcts.push(prevMonthEndVal !== 0 ? (organic / prevMonthEndVal) * 100 : 0);
+                    if (i === monthKeys.length - 1) latestMonthlyGrowth = organic; 
                 }
             }
 
             if (monthKeys.length === 1) {
-                let mLogs = monthlyData[monthKeys[0]].logs;
-                let firstVal = Number(mLogs[0].pot_value);
-                let currentVal = Number(mLogs[mLogs.length-1].pot_value);
-                let sumContrib = monthlyData[monthKeys[0]].sumContrib;
-                latestMonthlyGrowth = currentVal - firstVal - sumContrib;
+                let firstVal = Number(monthlyData[monthKeys[0]].logs[0].pot_value);
+                let currentVal = Number(monthlyData[monthKeys[0]].logs[monthlyData[monthKeys[0]].logs.length-1].pot_value);
+                latestMonthlyGrowth = currentVal - firstVal - monthlyData[monthKeys[0]].sumContrib;
                 organicDiffs.push(latestMonthlyGrowth);
                 organicPcts.push(firstVal !== 0 ? (latestMonthlyGrowth / firstVal) * 100 : 0);
             }
 
-            // Calculate the pure averages
+            let getMedian = (arr) => {
+                let sorted = [...arr].sort((a,b) => a - b);
+                let mid = Math.floor(sorted.length / 2);
+                return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+            };
+
+            let medianGrowthAmt = organicDiffs.length > 0 ? getMedian(organicDiffs) : 0;
+            let medianGrowthPct = organicPcts.length > 0 ? getMedian(organicPcts) : 0;
             let avgGrowthAmt = organicDiffs.length > 0 ? organicDiffs.reduce((a, b) => a + b, 0) / organicDiffs.length : 0;
             let avgGrowthPct = organicPcts.length > 0 ? organicPcts.reduce((a, b) => a + b, 0) / organicPcts.length : 0;
 
-            let expectedGrowth = 0;
-            if (organicDiffs.length > 0) {
-                if (organicDiffs.length >= 4) {
-                    let sorted = [...organicDiffs].sort((a, b) => a - b);
-                    let q1 = sorted[Math.floor(sorted.length / 4)];
-                    let q3 = sorted[Math.ceil(sorted.length * (3 / 4)) - 1];
-                    let iqr = q3 - q1;
-                    let filtered = sorted.filter(x => x >= (q1 - iqr * 1.5) && x <= (q3 + iqr * 1.5));
-                    if(filtered.length > 0) {
-                        expectedGrowth = filtered.reduce((a, b) => a + b, 0) / filtered.length;
-                    } else {
-                        expectedGrowth = avgGrowthAmt;
-                    }
-                } else {
-                    expectedGrowth = avgGrowthAmt;
-                }
-            }
+            expectedTotal += medianGrowthAmt;
+            if (member === 'Graham') expectedGraham += medianGrowthAmt;
+            if (member === 'Julie') expectedJulie += medianGrowthAmt;
 
-            expectedTotal += expectedGrowth;
-            if (member === 'Graham') expectedGraham += expectedGrowth;
-            if (member === 'Julie') expectedJulie += expectedGrowth;
-
-            let latClass = latestMonthlyGrowth >= 0 ? 'pos-growth' : 'neg-growth';
-            let expClass = expectedGrowth >= 0 ? 'pos-growth' : 'neg-growth';
-            let avgClass = avgGrowthAmt >= 0 ? 'pos-growth' : 'neg-growth';
-
-            html += `<tr>
-                <td>${member}</td>
-                <td>${name}</td>
-                <td style="font-weight:bold;">${fmt(Number(logs[logs.length - 1].pot_value))}</td>
-                <td class="${latClass}">${fmtDiff(latestMonthlyGrowth)}</td>
-                <td class="${expClass}">${fmtDiff(expectedGrowth)}</td>
-                <td class="${avgClass}">${fmtDiff(avgGrowthAmt)}</td>
-                <td class="${avgClass}">${avgGrowthPct >= 0 ? '+' : ''}${avgGrowthPct.toFixed(2)}%</td>
-            </tr>`;
+            html += `<tr><td>${member}</td><td>${name}</td><td style="font-weight:bold;">${fmt(Number(logs[logs.length - 1].pot_value))}</td>
+                <td class="${latestMonthlyGrowth >= 0 ? 'pos-growth' : 'neg-growth'}">${fmtDiff(latestMonthlyGrowth)}</td>
+                <td class="${medianGrowthAmt >= 0 ? 'pos-growth' : 'neg-growth'}">${fmtDiff(medianGrowthAmt)}</td>
+                <td class="${avgGrowthAmt >= 0 ? 'pos-growth' : 'neg-growth'}">${fmtDiff(avgGrowthAmt)}</td>
+                <td class="${avgGrowthPct >= 0 ? 'pos-growth' : 'neg-growth'}">${avgGrowthPct >= 0 ? '+' : ''}${avgGrowthPct.toFixed(2)}%</td></tr>`;
         });
 
         tbody.innerHTML = html;
         document.getElementById('kpiExpectedTotal').innerText = fmtDiff(expectedTotal);
         document.getElementById('kpiExpectedGraham').innerText = fmtDiff(expectedGraham);
         document.getElementById('kpiExpectedJulie').innerText = fmtDiff(expectedJulie);
-        
         document.getElementById('kpiExpectedTotal').className = 'value ' + (expectedTotal >= 0 ? 'pos-growth' : 'neg-growth');
         document.getElementById('kpiExpectedGraham').className = 'value ' + (expectedGraham >= 0 ? 'pos-growth' : 'neg-growth');
         document.getElementById('kpiExpectedJulie').className = 'value ' + (expectedJulie >= 0 ? 'pos-growth' : 'neg-growth');
     }
 
+    // Existing renderers for Bills/Dining/Retirement
     function calculateInflationMultipliers() {
         let currentYear = new Date().getFullYear();
         let oldestAge = 55; 
         if (allMembers && allMembers.length > 0) {
-            let ages = allMembers.map(m => {
-                if(!m.dob) return 0;
-                return currentYear - new Date(m.dob).getFullYear();
-            });
+            let ages = allMembers.map(m => { if(!m.dob) return 0; return currentYear - new Date(m.dob).getFullYear(); });
             oldestAge = Math.max(...ages);
         }
         const inflRate = 0.025;
@@ -441,9 +387,7 @@
     function renderRetirementTable() {
         const tbody = document.querySelector("#rTable tbody"); const thead = document.querySelector("#rTable thead");
         if (!globalDrawdownData || globalDrawdownData.length === 0) { tbody.innerHTML = '<tr><td colspan="8">No calculation rows computed.</td></tr>'; return; }
-        
         thead.innerHTML = `<tr><th>Year</th><th>Dining Target</th><th>Bills Target</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Guaranteed Incomes</th><th>Drawdown required</th><th>Total Gross Income</th></tr>`;
-        
         let html = "";
         globalDrawdownData.forEach(r => {
             let tf, tx, other, draw, inc, bills, dining;
@@ -486,7 +430,7 @@
         filteredData.forEach(l => { 
             const dObj = new Date(l.log_date); const ukDate = ("0" + dObj.getDate()).slice(-2) + '/' + ("0" + (dObj.getMonth() + 1)).slice(-2) + '/' + dObj.getFullYear(); 
             let cAmt = getExpectedContribution(l);
-            const contribBadge = cAmt > 0 ? `<span class="contrib-badge">+${fmt(cAmt)} DB Contrib</span>` : (l.contribution_applied ? `<span class="contrib-badge">+ Contrib</span>` : '');
+            const contribBadge = cAmt > 0 ? `<span class="contrib-badge">+${fmt(cAmt)} Contrib</span>` : (l.contribution_applied ? `<span class="contrib-badge">+ Contrib</span>` : '');
             html += `<tr><td>${ukDate}</td><td>${l.member_name}</td><td>${l.pension_name}</td><td style="font-weight:bold;">${fmt(l.pot_value)} ${contribBadge}</td></tr>`; 
         });
         tbody.innerHTML = html;
@@ -497,7 +441,6 @@
         const member = document.getElementById('logMember').value; const container = document.getElementById('dynamicInputsContainer'); container.innerHTML = ''; 
         const memberPensions = userPensions.filter(p => p.member_name === member && p.pension_type === 'Defined Contributions');
         if(memberPensions.length === 0) { container.innerHTML = '<p>No DC pots found.</p>'; return; }
-        
         memberPensions.forEach(p => { 
             container.innerHTML += `
             <div class="form-group" style="background:#f8fafc; padding:15px; border-radius:6px; border:1px solid #e2e8f0; margin-bottom:15px;">
@@ -538,40 +481,31 @@
     async function loadAllData() {
       let cRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_pension_contributions`, { headers: getHeaders() });
       if (cRes.ok) { allContributions = await cRes.json(); }
-
       let mRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_members`, { headers: getHeaders() });
       if (mRes.ok) { allMembers = await mRes.json(); }
-
       let billsRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_household_bills`, { headers: getHeaders() });
       if (billsRes.ok) { 
           allBills = await billsRes.json(); 
           const cSelect = document.getElementById('filterCategory'); let cOptions = '<option value="All">All Categories</option>';
-          let uniqueCats = [...new Set(allBills.map(b => b.category_code || 'Uncategorized'))].filter(c => c !== 'Uncategorized');
-          uniqueCats.sort().forEach(c => cOptions += `<option value="${c}">${c}</option>`);
-          if (allBills.some(b => !b.category_code)) cOptions += `<option value="Uncategorized">Uncategorized</option>`;
+          [...new Set(allBills.map(b => b.category_code || 'Uncategorized'))].sort().forEach(c => cOptions += `<option value="${c}">${c}</option>`);
           cSelect.innerHTML = cOptions; renderBillsTable(); 
       }
-
       let diningRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_dining_habits`, { headers: getHeaders() });
       if (diningRes.ok) { allDining = await diningRes.json(); renderDiningTable(); }
-
       let bdRes = await fetch(`${SUPABASE_URL}/rest/v1/bd_pensions`, { headers: getHeaders() });
       if (bdRes.ok) { userPensions = await bdRes.json(); renderDynamicInputs(); }
-
       let pRes = await fetch(`${SUPABASE_URL}/rest/v1/op_modelling_parameters?member_name=eq.Graham&order=updated_at.desc&limit=1`, { headers: getHeaders() });
       if (pRes.ok) {
           let pData = await pRes.json();
           if(pData && pData.length > 0) {
-              let p = pData[0];
-              grahamParams = p; 
-              document.getElementById('p_date1').value = toInputDate(p.shorter_week_date_1); document.getElementById('p_days1').value = p.working_days_1 || "5";
-              document.getElementById('p_date2').value = toInputDate(p.shorter_week_date_2); document.getElementById('p_days2').value = p.working_days_2 || "5";
-              document.getElementById('p_retire').value = toInputDate(p.retirement_date);
-              document.getElementById('p_spend').value = Math.round((p.spending_reduction_pct || 1.0) * 100); document.getElementById('v_spend').innerText = document.getElementById('p_spend').value + "%";
-              document.getElementById('p_bills').value = Math.round((p.drawdown_ratio_graham || 0.5) * 100); document.getElementById('v_bills').innerText = document.getElementById('p_bills').value + "%";
+              grahamParams = pData[0];
+              document.getElementById('p_date1').value = toInputDate(grahamParams.shorter_week_date_1); document.getElementById('p_days1').value = grahamParams.working_days_1 || "5";
+              document.getElementById('p_date2').value = toInputDate(grahamParams.shorter_week_date_2); document.getElementById('p_days2').value = grahamParams.working_days_2 || "5";
+              document.getElementById('p_retire').value = toInputDate(grahamParams.retirement_date);
+              document.getElementById('p_spend').value = Math.round((grahamParams.spending_reduction_pct || 1.0) * 100); document.getElementById('v_spend').innerText = document.getElementById('p_spend').value + "%";
+              document.getElementById('p_bills').value = Math.round((grahamParams.drawdown_ratio_graham || 0.5) * 100); document.getElementById('v_bills').innerText = document.getElementById('p_bills').value + "%";
           }
       }
-
       let logRes = await fetch(`${SUPABASE_URL}/rest/v1/op_pension_logs?order=log_date.desc`, { headers: getHeaders() });
       if (logRes.ok) {
           allLogs = await logRes.json(); 
@@ -583,17 +517,14 @@
           document.getElementById('mGrahamTotal').innerText = fmt(gTot); document.getElementById('mWifeTotal').innerText = fmt(jTot); document.getElementById('mCombinedTotal').innerText = fmt(gTot + jTot);
           const pSelect = document.getElementById('filterPension'); let pOptions = '<option value="All">All Pensions</option>';
           [...new Set(allLogs.map(l => l.pension_name))].forEach(p => pOptions += `<option value="${p}">${p}</option>`); pSelect.innerHTML = pOptions;
-          renderHistoryTable();
-          renderKPIs();
+          renderHistoryTable(); renderKPIs();
       }
-
       let forecastRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/generate_monthly_pension_forecast`, { method: "POST", headers: getHeaders() });
       if (forecastRes.ok) {
           let data = await forecastRes.json(); let html = "";
           data.forEach(row => { const d = new Date(row.forecast_month); html += `<tr><td>${d.toLocaleDateString('en-GB', {month:'short', year:'numeric'})}</td><td>${fmt(row.graham_total)}</td><td>${fmt(row.julie_total)}</td><td style="font-weight:bold;">${fmt(row.graham_total + row.julie_total)}</td></tr>`; });
           document.getElementById('forecast-table-body').innerHTML = html;
       }
-
       let mathRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/calculate_joint_retirement`, { method: "POST", headers: getHeaders() });
       if (mathRes.ok) {
           globalDrawdownData = await mathRes.json();
