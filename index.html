@@ -96,31 +96,12 @@
   <div id="Bills" class="tabcontent">
     <h2>Household Bills & Future Inflation</h2>
     <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>Visualizing your category costs. The columns automatically apply 2.5% compounding inflation based on the oldest member's current age.</em></p>
-    
     <div class="filter-bar">
-      <div class="form-group">
-        <label>Filter by Category</label>
-        <select id="filterCategory" onchange="renderBillsTable()">
-          <option value="All">All Categories</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <button class="btn" style="background-color: #64748b;" onclick="clearBillsFilter()">Clear Filter</button>
-      </div>
+      <div class="form-group"><label>Filter by Category</label><select id="filterCategory" onchange="renderBillsTable()"><option value="All">All Categories</option></select></div>
+      <div class="form-group"><button class="btn" style="background-color: #64748b;" onclick="clearBillsFilter()">Clear Filter</button></div>
     </div>
-
     <table id="bTable">
-      <thead>
-        <tr>
-          <th>Category</th>
-          <th>Bill Name</th>
-          <th>Subject to Slider?</th>
-          <th>Baseline (Today)</th>
-          <th>Est. Cost at Age 70</th>
-          <th>Est. Cost at Age 80</th>
-          <th>Est. Cost at Age 90</th>
-        </tr>
-      </thead>
+      <thead><tr><th>Category</th><th>Bill Name</th><th>Subject to Slider?</th><th>Baseline (Today)</th><th>Est. Cost at Age 70</th><th>Est. Cost at Age 80</th><th>Est. Cost at Age 90</th></tr></thead>
       <tbody><tr><td colspan="7">Loading database bills...</td></tr></tbody>
       <tfoot style="background-color: #f8fafc; font-weight: bold;"></tfoot>
     </table>
@@ -129,18 +110,8 @@
   <div id="Dining" class="tabcontent">
     <h2>Dining & Future Inflation</h2>
     <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>Visualizing your dining budgets with 2.5% compounding inflation and database tapers applied.</em></p>
-    
     <table id="dTable">
-      <thead>
-        <tr>
-          <th>Dining Type</th>
-          <th>Subject to Slider?</th>
-          <th>Baseline (Today)</th>
-          <th>Est. Cost at Age 70</th>
-          <th>Est. Cost at Age 80</th>
-          <th>Est. Cost at Age 90</th>
-        </tr>
-      </thead>
+      <thead><tr><th>Dining Type</th><th>Subject to Slider?</th><th>Baseline (Today)</th><th>Est. Cost at Age 70</th><th>Est. Cost at Age 80</th><th>Est. Cost at Age 90</th></tr></thead>
       <tbody><tr><td colspan="6">Loading database dining habits...</td></tr></tbody>
       <tfoot style="background-color: #f8fafc; font-weight: bold;"></tfoot>
     </table>
@@ -223,9 +194,6 @@
         renderRetirementTable(); drawRetirementCharts();
     }
 
-    // ==========================================
-    // DATA RENDERERS
-    // ==========================================
     function calculateInflationMultipliers() {
         let currentYear = new Date().getFullYear();
         let oldestAge = 55; 
@@ -236,7 +204,6 @@
             });
             oldestAge = Math.max(...ages);
         }
-
         const inflRate = 0.025;
         return {
             inf70: Math.pow(1 + inflRate, Math.max(0, 70 - oldestAge)),
@@ -253,64 +220,39 @@
 
         let filteredBills = allBills;
         if (catFilter !== "All") filteredBills = filteredBills.filter(b => (b.category_code || 'Uncategorized') === catFilter);
-
         if (!filteredBills || filteredBills.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No bills match your criteria.</td></tr>'; tfoot.innerHTML = ''; return; }
 
         let html = ""; let totBase = 0, tot70 = 0, tot80 = 0, tot90 = 0;
-
         filteredBills.forEach(b => {
-            let cat = b.category_code || 'Uncategorized';
-            let name = b.bill_name || b.name || b.item || 'Unnamed Bill';
-            let reducible = b.spend_reduction ? "Yes" : "No";
-            let base = Number(b.total_annual) || 0;
-            let t70 = b.taper_at_70 !== null ? Number(b.taper_at_70) : 1.0;
-            let t80 = b.taper_at_80 !== null ? Number(b.taper_at_80) : 1.0;
-            let t90 = b.taper_at_90 !== null ? Number(b.taper_at_90) : 1.0;
-
+            let cat = b.category_code || 'Uncategorized'; let name = b.bill_name || b.name || b.item || 'Unnamed Bill'; let reducible = b.spend_reduction ? "Yes" : "No"; let base = Number(b.total_annual) || 0;
+            let t70 = b.taper_at_70 !== null ? Number(b.taper_at_70) : 1.0; let t80 = b.taper_at_80 !== null ? Number(b.taper_at_80) : 1.0; let t90 = b.taper_at_90 !== null ? Number(b.taper_at_90) : 1.0;
             let val70 = base * t70 * inf70; let val80 = base * t80 * inf80; let val90 = base * t90 * inf90;
             totBase += base; tot70 += val70; tot80 += val80; tot90 += val90;
-
-            html += `<tr>
-                <td>${cat}</td><td>${name}</td><td>${reducible}</td><td style="font-weight:bold;">${fmt(base)}</td>
+            html += `<tr><td>${cat}</td><td>${name}</td><td>${reducible}</td><td style="font-weight:bold;">${fmt(base)}</td>
                 <td>${fmt(val70)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t70 * 100)}% Retained)</span></td>
                 <td>${fmt(val80)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t80 * 100)}% Retained)</span></td>
-                <td>${fmt(val90)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t90 * 100)}% Retained)</span></td>
-            </tr>`;
+                <td>${fmt(val90)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t90 * 100)}% Retained)</span></td></tr>`;
         });
-
         tbody.innerHTML = html;
         tfoot.innerHTML = `<tr><td colspan="3" style="text-align: right;"><strong>TOTAL FOR SELECTION:</strong></td><td style="color: #2c3e50;">${fmt(totBase)}</td><td style="color: #3498db;">${fmt(tot70)}</td><td style="color: #9b59b6;">${fmt(tot80)}</td><td style="color: #27ae60;">${fmt(tot90)}</td></tr>`;
     }
 
     function renderDiningTable() {
-        const tbody = document.querySelector("#dTable tbody");
-        const tfoot = document.querySelector("#dTable tfoot");
+        const tbody = document.querySelector("#dTable tbody"); const tfoot = document.querySelector("#dTable tfoot");
         const { inf70, inf80, inf90 } = calculateInflationMultipliers();
-
         if (!allDining || allDining.length === 0) { tbody.innerHTML = '<tr><td colspan="6">No dining habits found.</td></tr>'; tfoot.innerHTML = ''; return; }
 
         let html = ""; let totBase = 0, tot70 = 0, tot80 = 0, tot90 = 0;
-
         allDining.forEach(d => {
-            let name = d.routine_name || d.habit_name || d.name || 'Unnamed Dining Type';
-            let reducible = d.spend_reduction ? "Yes" : "No";
-            let base = Number(d.annual_total) || 0;
-            
-            let t70 = d.taper_at_70 !== null && d.taper_at_70 !== undefined ? Number(d.taper_at_70) : 1.0;
-            let t80 = d.taper_at_80 !== null && d.taper_at_80 !== undefined ? Number(d.taper_at_80) : 1.0;
-            let t90 = d.taper_at_90 !== null && d.taper_at_90 !== undefined ? Number(d.taper_at_90) : 1.0;
-
+            let name = d.routine_name || d.habit_name || d.name || 'Unnamed Dining Type'; let reducible = d.spend_reduction ? "Yes" : "No"; let base = Number(d.annual_total) || 0;
+            let t70 = d.taper_at_70 !== null && d.taper_at_70 !== undefined ? Number(d.taper_at_70) : 1.0; let t80 = d.taper_at_80 !== null && d.taper_at_80 !== undefined ? Number(d.taper_at_80) : 1.0; let t90 = d.taper_at_90 !== null && d.taper_at_90 !== undefined ? Number(d.taper_at_90) : 1.0;
             let val70 = base * t70 * inf70; let val80 = base * t80 * inf80; let val90 = base * t90 * inf90;
             totBase += base; tot70 += val70; tot80 += val80; tot90 += val90;
-
-            html += `<tr>
-                <td>${name}</td><td>${reducible}</td><td style="font-weight:bold;">${fmt(base)}</td>
+            html += `<tr><td>${name}</td><td>${reducible}</td><td style="font-weight:bold;">${fmt(base)}</td>
                 <td>${fmt(val70)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t70 * 100)}% Retained)</span></td>
                 <td>${fmt(val80)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t80 * 100)}% Retained)</span></td>
-                <td>${fmt(val90)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t90 * 100)}% Retained)</span></td>
-            </tr>`;
+                <td>${fmt(val90)}<br><span style="font-size: 11px; color: #64748b;">(${Math.round(t90 * 100)}% Retained)</span></td></tr>`;
         });
-
         tbody.innerHTML = html;
         tfoot.innerHTML = `<tr><td colspan="2" style="text-align: right;"><strong>TOTAL ANNUAL DINING:</strong></td><td style="color: #2c3e50;">${fmt(totBase)}</td><td style="color: #3498db;">${fmt(tot70)}</td><td style="color: #9b59b6;">${fmt(tot80)}</td><td style="color: #27ae60;">${fmt(tot90)}</td></tr>`;
     }
@@ -318,55 +260,18 @@
     function clearBillsFilter() { document.getElementById('filterCategory').value = "All"; renderBillsTable(); }
 
     function renderRetirementTable() {
-        const tbody = document.querySelector("#rTable tbody"); 
-        const thead = document.querySelector("#rTable thead");
+        const tbody = document.querySelector("#rTable tbody"); const thead = document.querySelector("#rTable thead");
+        if (!globalDrawdownData || globalDrawdownData.length === 0) { tbody.innerHTML = '<tr><td colspan="8">No calculation rows computed.</td></tr>'; return; }
         
-        if (!globalDrawdownData || globalDrawdownData.length === 0) { 
-            tbody.innerHTML = '<tr><td colspan="8">No calculation rows computed.</td></tr>'; 
-            return; 
-        }
-        
-        thead.innerHTML = `<tr>
-            <th>Year</th>
-            <th>Dining Target</th>
-            <th>Bills Target</th>
-            <th>Tax-Free Pot</th>
-            <th>Taxable Pot</th>
-            <th>Guaranteed Incomes</th>
-            <th>Drawdown required</th>
-            <th>Total Gross Income</th>
-        </tr>`;
+        thead.innerHTML = `<tr><th>Year</th><th>Dining Target</th><th>Bills Target</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Guaranteed Incomes</th><th>Drawdown required</th><th>Total Gross Income</th></tr>`;
         
         let html = "";
         globalDrawdownData.forEach(r => {
             let tf, tx, other, draw, inc, bills, dining;
-            
-            if (currentView === 'Joint') { 
-                tf = r.tax_free_pot; tx = r.taxable_pot; other = r.other_pensions; 
-                draw = r.drawdown_amount; inc = r.total_income; 
-                bills = r.total_bills; dining = r.total_dining;
-            } 
-            else if (currentView === 'Graham') { 
-                tf = r.g_tax_free; tx = r.g_taxable; other = r.g_other; 
-                draw = r.g_draw; inc = r.g_income; 
-                bills = r.g_bills; dining = r.g_dining;
-            } 
-            else { 
-                tf = r.j_tax_free; tx = r.j_taxable; other = r.j_other; 
-                draw = r.j_draw; inc = r.j_income; 
-                bills = r.j_bills; dining = r.j_dining;
-            }
-            
-            html += `<tr>
-                <td>${r.retirement_year}</td>
-                <td style="font-weight:bold; color:#e67e22;">${fmt(dining)}</td>
-                <td style="font-weight:bold; color:#c0392b;">${fmt(bills)}</td>
-                <td>${fmt(tf)}</td>
-                <td>${fmt(tx)}</td>
-                <td>${fmt(other)}</td>
-                <td>${fmt(draw)}</td>
-                <td style="font-weight:bold; color:#27ae60;">${fmt(inc)}</td>
-            </tr>`;
+            if (currentView === 'Joint') { tf = r.tax_free_pot; tx = r.taxable_pot; other = r.other_pensions; draw = r.drawdown_amount; inc = r.total_income; bills = r.total_bills; dining = r.total_dining; } 
+            else if (currentView === 'Graham') { tf = r.g_tax_free; tx = r.g_taxable; other = r.g_other; draw = r.g_draw; inc = r.g_income; bills = r.g_bills; dining = r.g_dining; } 
+            else { tf = r.j_tax_free; tx = r.j_taxable; other = r.j_other; draw = r.j_draw; inc = r.j_income; bills = r.j_bills; dining = r.j_dining; }
+            html += `<tr><td>${r.retirement_year}</td><td style="font-weight:bold; color:#e67e22;">${fmt(dining)}</td><td style="font-weight:bold; color:#c0392b;">${fmt(bills)}</td><td>${fmt(tf)}</td><td>${fmt(tx)}</td><td>${fmt(other)}</td><td>${fmt(draw)}</td><td style="font-weight:bold; color:#27ae60;">${fmt(inc)}</td></tr>`;
         });
         tbody.innerHTML = html;
     }
@@ -388,6 +293,9 @@
         new google.visualization.ComboChart(document.getElementById('incomeChart')).draw(dataIncome, { title: `${currentView} Retirement Income Stream Composition`, isStacked: true, seriesType: 'bars', series: { 0: { targetAxisIndex: 0 }, 1: { targetAxisIndex: 0 }, 2: { type: 'line', targetAxisIndex: 1, color: '#f39c12', lineWidth: 4 } }, vAxes: { 0: { title: 'Income (£)' }, 1: { title: 'Drawdown Trend Line (£)', viewWindow: { min: 0 } } }, legend: { position: 'bottom' }, chartArea: { width: '80%', height: '70%' }, colors: ['#3498db', '#9b59b6'] });
     }
 
+    // ==========================================
+    // UPDATED: HISTORY TABLE (Shows Contrib Badge)
+    // ==========================================
     function renderHistoryTable() {
         const tbody = document.querySelector("#hTable tbody");
         const mFilter = document.getElementById('filterMember').value; const pFilter = document.getElementById('filterPension').value; const dFilter = document.getElementById('filterDate').value;
@@ -397,22 +305,68 @@
         if (dFilter) filteredData = filteredData.filter(l => l.log_date === dFilter);
         filteredData.sort((a, b) => new Date(b.log_date) - new Date(a.log_date));
         if (filteredData.length === 0) { tbody.innerHTML = '<tr><td colspan="4">No logs match criteria.</td></tr>'; return; }
+        
         let html = "";
-        filteredData.forEach(l => { const dObj = new Date(l.log_date); const ukDate = ("0" + dObj.getDate()).slice(-2) + '/' + ("0" + (dObj.getMonth() + 1)).slice(-2) + '/' + dObj.getFullYear(); html += `<tr><td>${ukDate}</td><td>${l.member_name}</td><td>${l.pension_name}</td><td style="font-weight:bold;">${fmt(l.pot_value)}</td></tr>`; });
+        filteredData.forEach(l => { 
+            const dObj = new Date(l.log_date); 
+            const ukDate = ("0" + dObj.getDate()).slice(-2) + '/' + ("0" + (dObj.getMonth() + 1)).slice(-2) + '/' + dObj.getFullYear(); 
+            // Add a visual badge if it includes a contribution
+            const contribBadge = l.contribution_applied ? `<span style="background:#d1fae5; color:#065f46; font-size:11px; padding:2px 8px; border-radius:12px; margin-left:8px; vertical-align:middle;">+ Contrib</span>` : '';
+            
+            html += `<tr>
+                <td>${ukDate}</td>
+                <td>${l.member_name}</td>
+                <td>${l.pension_name}</td>
+                <td style="font-weight:bold;">${fmt(l.pot_value)} ${contribBadge}</td>
+            </tr>`; 
+        });
         tbody.innerHTML = html;
     }
     function clearHistoryFilters() { document.getElementById('filterMember').value = "All"; document.getElementById('filterPension').value = "All"; document.getElementById('filterDate').value = ""; renderHistoryTable(); }
     
+    // ==========================================
+    // UPDATED: DYNAMIC INPUTS (Adds Checkbox)
+    // ==========================================
     function renderDynamicInputs() {
-        const member = document.getElementById('logMember').value; const container = document.getElementById('dynamicInputsContainer'); container.innerHTML = ''; 
+        const member = document.getElementById('logMember').value; 
+        const container = document.getElementById('dynamicInputsContainer'); 
+        container.innerHTML = ''; 
         const memberPensions = userPensions.filter(p => p.member_name === member && p.pension_type === 'Defined Contributions');
+        
         if(memberPensions.length === 0) { container.innerHTML = '<p>No DC pots found.</p>'; return; }
-        memberPensions.forEach(p => { container.innerHTML += `<div class="form-group"><label>${p.pension_name} Value (£):</label><input type="number" class="dynamic-pot-input" data-pension="${p.pension_name}" step="0.01" value="0.00" required></div>`;});
+        
+        memberPensions.forEach(p => { 
+            container.innerHTML += `
+            <div class="form-group" style="background:#f8fafc; padding:15px; border-radius:6px; border:1px solid #e2e8f0; margin-bottom:15px;">
+                <label>${p.pension_name} Value (£):</label>
+                <input type="number" class="dynamic-pot-input" data-pension="${p.pension_name}" step="0.01" value="0.00" required style="margin-bottom:10px;">
+                <label style="display:inline-flex; align-items:center; font-weight:normal; color:#64748b; cursor:pointer;">
+                    <input type="checkbox" class="dynamic-contrib-input" data-pension="${p.pension_name}" style="width:auto; margin-right:8px; cursor:pointer;">
+                    Includes new contribution?
+                </label>
+            </div>`;
+        });
     }
 
+    // ==========================================
+    // UPDATED: SUBMIT LOG ENTRY (Sends boolean)
+    // ==========================================
     async function submitDynamicLogEntry() {
-        document.getElementById('statusMsg').innerHTML = "Saving..."; let payloads = [];
-        document.querySelectorAll('.dynamic-pot-input').forEach(input => { payloads.push({ member_name: document.getElementById('logMember').value, pension_name: input.getAttribute('data-pension'), pot_value: parseFloat(input.value) || 0, log_date: document.getElementById('entryDate').value }); });
+        document.getElementById('statusMsg').innerHTML = "Saving..."; 
+        let payloads = [];
+        
+        document.querySelectorAll('.dynamic-pot-input').forEach(input => { 
+            let pName = input.getAttribute('data-pension');
+            let checkbox = document.querySelector(`.dynamic-contrib-input[data-pension="${pName}"]`);
+            payloads.push({ 
+                member_name: document.getElementById('logMember').value, 
+                pension_name: pName, 
+                pot_value: parseFloat(input.value) || 0, 
+                log_date: document.getElementById('entryDate').value,
+                contribution_applied: checkbox ? checkbox.checked : false // Captures the exact checkbox state
+            }); 
+        });
+        
         let res = await fetch(`${SUPABASE_URL}/rest/v1/op_pension_logs`, { method: "POST", headers: getHeaders(), body: JSON.stringify(payloads) });
         if (res.ok) { document.getElementById('statusMsg').innerHTML = "Saved!"; loadAllData(); }
     }
