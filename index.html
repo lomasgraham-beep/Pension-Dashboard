@@ -94,13 +94,15 @@
 
   <div id="KPIs" class="tabcontent">
     <h2>Pension Performance Metrics</h2>
-    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>"Expected Growth" uses the Median of historical monthly organic growth, successfully filtering out anomalous spikes and normalizing gaps in logging dates.</em></p>
+    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>Tracking the health, compounding trajectory, and rolling 12-month organic momentum of your investments.</em></p>
     
-    <div class="card-grid" style="margin-bottom: 30px;">
+    <div class="card-grid" style="margin-bottom: 25px;">
         <div class="card highlight-card"><h3>Overall Portfolio Expected Monthly Growth</h3><div id="kpiExpectedTotal" class="value">£0</div></div>
         <div class="card"><h3>Graham's Expected Monthly Growth</h3><div id="kpiExpectedGraham" class="value">£0</div></div>
         <div class="card"><h3>Julie's Expected Monthly Growth</h3><div id="kpiExpectedJulie" class="value">£0</div></div>
     </div>
+
+    <div id="kpiGrowthChart" class="chart-box" style="height: 350px;"></div>
 
     <table id="kpiTable">
       <thead>
@@ -214,7 +216,7 @@
     let grahamParams = null; 
     let currentView = 'Joint'; 
 
-    google.charts.load('current', {'packages':['corechart']});
+    google.charts.load('current', {'packages':['corechart', 'line']});
 
     function setView(viewName) {
         currentView = viewName;
@@ -254,7 +256,78 @@
     }
 
     // ==========================================
-    // KPI RENDERER ENGINE (WITH TIME-GAP FIX)
+    // NEW: ROLLING 12-MONTH LINE CHART ENGINE
+    // ==========================================
+    function drawKPIGrowthChart() {
+        if (!google.visualization || !allLogs || allLogs.length === 0) return;
+        
+        let pensions = [...new Set(allLogs.map(l => l.member_name + ' - ' + l.pension_name))];
+        let allMonthsMap = {};
+        
+        // Sort chronologically
+        let sortedLogs = [...allLogs].sort((a,b) => new Date(a.log_date) - new Date(b.log_date));
+        
+        sortedLogs.forEach(l => {
+            let d = new Date(l.log_date);
+            let mKey = d.toLocaleString('default', { month: 'short', year: 'numeric' }); // e.g. "Oct 2023"
+            let sortKey = l.log_date.substring(0,7); // e.g. "2023-10"
+            let pKey = l.member_name + ' - ' + l.pension_name;
+            
+            if (!allMonthsMap[sortKey]) allMonthsMap[sortKey] = { label: mKey, values: {} };
+            
+            // We take the latest log for the month if there are multiple
+            allMonthsMap[sortKey].values[pKey] = Number(l.pot_value);
+        });
+        
+        let sortedMonthKeys = Object.keys(allMonthsMap).sort();
+        let displayKeys = sortedMonthKeys.slice(-12); // Isolate the last rolling 12 months
+        
+        var data = new google.visualization.DataTable();
+        data.addColumn('string', 'Month');
+        pensions.forEach(p => data.addColumn('number', p));
+        
+        let lastKnown = {};
+        pensions.forEach(p => lastKnown[p] = null);
+        
+        // Loop through everything to build up accurate "last known" balances, 
+        // ensuring the chart line doesn't drop to £0 if a month was skipped
+        sortedMonthKeys.forEach(key => {
+            pensions.forEach(p => {
+                if (allMonthsMap[key].values[p] !== undefined) {
+                    lastKnown[p] = allMonthsMap[key].values[p];
+                }
+            });
+            
+            // Only output the data row if it falls inside our 12-month rolling window
+            if (displayKeys.includes(key)) {
+                let row = [allMonthsMap[key].label];
+                pensions.forEach(p => row.push(lastKnown[p]));
+                data.addRow(row);
+            }
+        });
+        
+        // Format the tooltip numbers nicely
+        var format£ = new google.visualization.NumberFormat({prefix: '£', fractionDigits: 0});
+        for (let i = 1; i <= pensions.length; i++) {
+            format£.format(data, i);
+        }
+        
+        var options = {
+            title: 'Rolling 12-Month Pension Value Trajectory (£)',
+            curveType: 'function',
+            legend: { position: 'right' },
+            chartArea: { width: '75%', height: '70%' },
+            vAxis: { format: '£#,###' },
+            interpolateNulls: true, // Smooths over any gaps
+            colors: ['#3498db', '#9b59b6', '#2ecc71', '#e67e22', '#f1c40f', '#e74c3c', '#34495e']
+        };
+        
+        var chart = new google.visualization.LineChart(document.getElementById('kpiGrowthChart'));
+        chart.draw(data, options);
+    }
+
+    // ==========================================
+    // KPI RENDERER ENGINE
     // ==========================================
     function renderKPIs() {
         const tbody = document.querySelector("#kpiTable tbody");
@@ -305,19 +378,16 @@
                     let pLogs = monthlyData[pKey].logs;
                     let prevMonthEndVal = Number(pLogs[pLogs.length - 1].pot_value);
                     
-                    // NORMALIZATION LOGIC: Count exact months between logs
                     let pParts = pKey.split('-');
                     let mParts = mKey.split('-');
                     let monthDiff = (parseInt(mParts[0]) - parseInt(pParts[0])) * 12 + (parseInt(mParts[1]) - parseInt(pParts[1]));
-                    if (monthDiff < 1) monthDiff = 1; // Saftey net
+                    if (monthDiff < 1) monthDiff = 1; 
                     
-                    // Multiply the base contribution by the number of months in the gap
                     let baseContrib = monthlyData[mKey].hasContrib ? monthlyData[mKey].expectedAmt : 0;
                     let totalContribsInGap = baseContrib * monthDiff;
 
                     let totalOrganicOverGap = currentMonthEndVal - prevMonthEndVal - totalContribsInGap;
                     
-                    // Divide the organic growth by the month gap to get true monthly average
                     let normalizedMonthlyOrganic = totalOrganicOverGap / monthDiff;
                     organicDiffs.push(normalizedMonthlyOrganic);
                     
@@ -345,7 +415,6 @@
             };
 
             let medianGrowthAmt = organicDiffs.length > 0 ? getMedian(organicDiffs) : 0;
-            let medianGrowthPct = organicPcts.length > 0 ? getMedian(organicPcts) : 0;
             let avgGrowthAmt = organicDiffs.length > 0 ? organicDiffs.reduce((a, b) => a + b, 0) / organicDiffs.length : 0;
             let avgGrowthPct = organicPcts.length > 0 ? organicPcts.reduce((a, b) => a + b, 0) / organicPcts.length : 0;
 
@@ -376,11 +445,11 @@
         document.getElementById('kpiExpectedTotal').className = 'value ' + (expectedTotal >= 0 ? 'pos-growth' : 'neg-growth');
         document.getElementById('kpiExpectedGraham').className = 'value ' + (expectedGraham >= 0 ? 'pos-growth' : 'neg-growth');
         document.getElementById('kpiExpectedJulie').className = 'value ' + (expectedJulie >= 0 ? 'pos-growth' : 'neg-growth');
+
+        // Draw the new line chart once the table data is processed
+        drawKPIGrowthChart();
     }
 
-    // ==========================================
-    // OTHER RENDERERS
-    // ==========================================
     function calculateInflationMultipliers() {
         let currentYear = new Date().getFullYear();
         let oldestAge = 55; 
@@ -486,11 +555,8 @@
         let html = "";
         filteredData.forEach(l => { 
             const dObj = new Date(l.log_date); const ukDate = ("0" + dObj.getDate()).slice(-2) + '/' + ("0" + (dObj.getMonth() + 1)).slice(-2) + '/' + dObj.getFullYear(); 
-            
-            let cAmt = 0;
-            if (l.contribution_applied) cAmt = getExpectedContribution(l);
+            let cAmt = getExpectedContribution(l);
             const contribBadge = cAmt > 0 ? `<span class="contrib-badge">+${fmt(cAmt)} DB Contrib</span>` : (l.contribution_applied ? `<span class="contrib-badge">+ Contrib</span>` : '');
-            
             html += `<tr><td>${ukDate}</td><td>${l.member_name}</td><td>${l.pension_name}</td><td style="font-weight:bold;">${fmt(l.pot_value)} ${contribBadge}</td></tr>`; 
         });
         tbody.innerHTML = html;
@@ -610,10 +676,18 @@
       document.querySelectorAll('.tab-link').forEach(el => el.className = el.className.replace(" active-btn", ""));
       document.getElementById(id).style.display = 'block';
       evt.currentTarget.className += " active-btn";
+      
+      // Update charts on tab switch to ensure correct dimensions
       if(id === 'Parameters' || id === 'Retirement') drawRetirementCharts();
+      if(id === 'KPIs') drawKPIGrowthChart();
     }
 
-    window.addEventListener('resize', drawRetirementCharts);
+    // Redraw all charts if the window is resized
+    window.addEventListener('resize', () => {
+        drawRetirementCharts();
+        drawKPIGrowthChart();
+    });
+    
     loadAllData(); 
   </script>
 </body>
