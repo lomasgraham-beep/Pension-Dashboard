@@ -94,7 +94,7 @@
 
   <div id="KPIs" class="tabcontent">
     <h2>Pension Performance Metrics</h2>
-    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>"Expected Growth" uses the Median of historical monthly organic growth, successfully filtering out anomalous spikes and multiple intra-month logs.</em></p>
+    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>"Expected Growth" uses the Median of historical monthly organic growth, successfully filtering out anomalous spikes and normalizing gaps in logging dates.</em></p>
     
     <div class="card-grid" style="margin-bottom: 30px;">
         <div class="card highlight-card"><h3>Overall Portfolio Expected Monthly Growth</h3><div id="kpiExpectedTotal" class="value">£0</div></div>
@@ -253,6 +253,9 @@
         return match ? (Number(match.monthly_contribution) || 0) : 0;
     }
 
+    // ==========================================
+    // KPI RENDERER ENGINE (WITH TIME-GAP FIX)
+    // ==========================================
     function renderKPIs() {
         const tbody = document.querySelector("#kpiTable tbody");
         if (!allLogs || allLogs.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No log data found for KPIs.</td></tr>'; return; }
@@ -281,8 +284,6 @@
                 if(!monthlyData[mKey]) monthlyData[mKey] = { logs: [], hasContrib: false, expectedAmt: 0 };
                 monthlyData[mKey].logs.push(l);
                 
-                // BULLETPROOF FIX: If ANY log in this month has a contribution applied, flag the month.
-                // We only grab the amount once.
                 if (l.contribution_applied) {
                     monthlyData[mKey].hasContrib = true;
                     monthlyData[mKey].expectedAmt = getExpectedContribution(l);
@@ -298,25 +299,32 @@
                 let mKey = monthKeys[i];
                 let mLogs = monthlyData[mKey].logs;
                 let currentMonthEndVal = Number(mLogs[mLogs.length - 1].pot_value);
-                
-                // Deduct the standard monthly contribution a MAXIMUM of one time per calendar month
-                let sumContrib = monthlyData[mKey].hasContrib ? monthlyData[mKey].expectedAmt : 0;
 
-                let prevMonthEndVal = null;
                 if (i > 0) {
                     let pKey = monthKeys[i-1];
                     let pLogs = monthlyData[pKey].logs;
-                    prevMonthEndVal = Number(pLogs[pLogs.length - 1].pot_value);
-                }
-
-                if (prevMonthEndVal !== null) {
-                    let organic = currentMonthEndVal - prevMonthEndVal - sumContrib;
-                    organicDiffs.push(organic);
+                    let prevMonthEndVal = Number(pLogs[pLogs.length - 1].pot_value);
                     
-                    let pct = prevMonthEndVal !== 0 ? (organic / prevMonthEndVal) * 100 : 0;
+                    // NORMALIZATION LOGIC: Count exact months between logs
+                    let pParts = pKey.split('-');
+                    let mParts = mKey.split('-');
+                    let monthDiff = (parseInt(mParts[0]) - parseInt(pParts[0])) * 12 + (parseInt(mParts[1]) - parseInt(pParts[1]));
+                    if (monthDiff < 1) monthDiff = 1; // Saftey net
+                    
+                    // Multiply the base contribution by the number of months in the gap
+                    let baseContrib = monthlyData[mKey].hasContrib ? monthlyData[mKey].expectedAmt : 0;
+                    let totalContribsInGap = baseContrib * monthDiff;
+
+                    let totalOrganicOverGap = currentMonthEndVal - prevMonthEndVal - totalContribsInGap;
+                    
+                    // Divide the organic growth by the month gap to get true monthly average
+                    let normalizedMonthlyOrganic = totalOrganicOverGap / monthDiff;
+                    organicDiffs.push(normalizedMonthlyOrganic);
+                    
+                    let pct = prevMonthEndVal !== 0 ? (normalizedMonthlyOrganic / prevMonthEndVal) * 100 : 0;
                     organicPcts.push(pct);
                     
-                    if (i === monthKeys.length - 1) latestMonthlyGrowth = organic; 
+                    if (i === monthKeys.length - 1) latestMonthlyGrowth = normalizedMonthlyOrganic; 
                 }
             }
 
@@ -349,16 +357,10 @@
             let medClass = medianGrowthAmt >= 0 ? 'pos-growth' : 'neg-growth';
             let avgClass = avgGrowthAmt >= 0 ? 'pos-growth' : 'neg-growth';
 
-            let currentVal = Number(logs[logs.length - 1].pot_value);
-            let firstVal = Number(logs[0].pot_value);
-            let totalDiff = currentVal - firstVal;
-            let totalPct = firstVal > 0 ? (totalDiff / firstVal) * 100 : 0;
-            let totClass = totalDiff >= 0 ? 'pos-growth' : 'neg-growth';
-
             html += `<tr>
                 <td>${member}</td>
                 <td>${name}</td>
-                <td style="font-weight:bold;">${fmt(currentVal)}</td>
+                <td style="font-weight:bold;">${fmt(Number(logs[logs.length - 1].pot_value))}</td>
                 <td class="${latClass}">${fmtDiff(latestMonthlyGrowth)}</td>
                 <td class="${medClass}">${fmtDiff(medianGrowthAmt)}</td>
                 <td class="${avgClass}">${fmtDiff(avgGrowthAmt)}</td>
@@ -376,6 +378,9 @@
         document.getElementById('kpiExpectedJulie').className = 'value ' + (expectedJulie >= 0 ? 'pos-growth' : 'neg-growth');
     }
 
+    // ==========================================
+    // OTHER RENDERERS
+    // ==========================================
     function calculateInflationMultipliers() {
         let currentYear = new Date().getFullYear();
         let oldestAge = 55; 
@@ -482,13 +487,8 @@
         filteredData.forEach(l => { 
             const dObj = new Date(l.log_date); const ukDate = ("0" + dObj.getDate()).slice(-2) + '/' + ("0" + (dObj.getMonth() + 1)).slice(-2) + '/' + dObj.getFullYear(); 
             
-            // Check the time machine purely for display in the history table
             let cAmt = 0;
-            if (l.contribution_applied) {
-                l.contribution_applied = true; // explicitly boolean
-                cAmt = getExpectedContribution(l);
-            }
-            
+            if (l.contribution_applied) cAmt = getExpectedContribution(l);
             const contribBadge = cAmt > 0 ? `<span class="contrib-badge">+${fmt(cAmt)} DB Contrib</span>` : (l.contribution_applied ? `<span class="contrib-badge">+ Contrib</span>` : '');
             
             html += `<tr><td>${ukDate}</td><td>${l.member_name}</td><td>${l.pension_name}</td><td style="font-weight:bold;">${fmt(l.pot_value)} ${contribBadge}</td></tr>`; 
