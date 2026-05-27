@@ -215,15 +215,20 @@
     let allContributions = []; 
     let grahamParams = null; 
     let currentView = 'Joint'; 
+    let googleChartsLoaded = false; // Safety circuit breaker
 
     google.charts.load('current', {'packages':['corechart']});
+    google.charts.setOnLoadCallback(() => {
+        googleChartsLoaded = true;
+        drawAllActiveCharts();
+    });
 
     // ==========================================
     // CHART RENDERING SAFETY ENGINE
     // ==========================================
-    // This intelligently only draws charts if their specific tab is currently visible on screen.
-    // It entirely prevents the infamous "Width 0px / Infinite Resize Loop" crash.
     function drawAllActiveCharts() {
+        if (!googleChartsLoaded) return; // Prevent premature rendering crashes
+
         let kpiTab = document.getElementById('KPIs');
         let paramTab = document.getElementById('Parameters');
         let retTab = document.getElementById('Retirement');
@@ -275,6 +280,9 @@
         return match ? (Number(match.monthly_contribution) || 0) : 0;
     }
 
+    // ==========================================
+    // ROLLING 12-MONTH LINE CHART ENGINE
+    // ==========================================
     function drawKPIGrowthChart() {
         if (!google.visualization || !allLogs || allLogs.length === 0) return;
         
@@ -334,6 +342,9 @@
         chart.draw(data, options);
     }
 
+    // ==========================================
+    // KPI RENDERER ENGINE
+    // ==========================================
     function renderKPIs() {
         const tbody = document.querySelector("#kpiTable tbody");
         if (!allLogs || allLogs.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No log data found for KPIs.</td></tr>'; return; }
@@ -682,15 +693,6 @@
       // Only draw charts once the tab is actively visible on the screen
       drawAllActiveCharts();
     }
-
-    // NEW: Debounced Resize Listener to mathematically prevent the Infinite Resize Loop
-    let resizeTimer;
-    window.addEventListener('resize', () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => {
-            drawAllActiveCharts();
-        }, 250); // Circuit breaker
-    });
     
     loadAllData(); 
   </script>
