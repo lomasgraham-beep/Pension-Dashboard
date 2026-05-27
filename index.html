@@ -216,7 +216,26 @@
     let grahamParams = null; 
     let currentView = 'Joint'; 
 
-    google.charts.load('current', {'packages':['corechart', 'line']});
+    google.charts.load('current', {'packages':['corechart']});
+
+    // ==========================================
+    // CHART RENDERING SAFETY ENGINE
+    // ==========================================
+    // This intelligently only draws charts if their specific tab is currently visible on screen.
+    // It entirely prevents the infamous "Width 0px / Infinite Resize Loop" crash.
+    function drawAllActiveCharts() {
+        let kpiTab = document.getElementById('KPIs');
+        let paramTab = document.getElementById('Parameters');
+        let retTab = document.getElementById('Retirement');
+
+        if (kpiTab.style.display === 'block' || kpiTab.classList.contains('active')) {
+            drawKPIGrowthChart();
+        }
+        if (paramTab.style.display === 'block' || paramTab.classList.contains('active') ||
+            retTab.style.display === 'block' || retTab.classList.contains('active')) {
+            drawRetirementCharts();
+        }
+    }
 
     function setView(viewName) {
         currentView = viewName;
@@ -224,7 +243,8 @@
         document.getElementById('view-' + viewName).classList.add('active-toggle');
         document.getElementById('tableViewTitle').innerText = viewName;
         document.getElementById('chartViewTitle').innerText = viewName;
-        renderRetirementTable(); drawRetirementCharts();
+        renderRetirementTable(); 
+        drawAllActiveCharts();
     }
 
     function getExpectedContribution(log) {
@@ -255,32 +275,26 @@
         return match ? (Number(match.monthly_contribution) || 0) : 0;
     }
 
-    // ==========================================
-    // NEW: ROLLING 12-MONTH LINE CHART ENGINE
-    // ==========================================
     function drawKPIGrowthChart() {
         if (!google.visualization || !allLogs || allLogs.length === 0) return;
         
         let pensions = [...new Set(allLogs.map(l => l.member_name + ' - ' + l.pension_name))];
         let allMonthsMap = {};
         
-        // Sort chronologically
         let sortedLogs = [...allLogs].sort((a,b) => new Date(a.log_date) - new Date(b.log_date));
         
         sortedLogs.forEach(l => {
             let d = new Date(l.log_date);
-            let mKey = d.toLocaleString('default', { month: 'short', year: 'numeric' }); // e.g. "Oct 2023"
-            let sortKey = l.log_date.substring(0,7); // e.g. "2023-10"
+            let mKey = d.toLocaleString('default', { month: 'short', year: 'numeric' }); 
+            let sortKey = l.log_date.substring(0,7); 
             let pKey = l.member_name + ' - ' + l.pension_name;
             
             if (!allMonthsMap[sortKey]) allMonthsMap[sortKey] = { label: mKey, values: {} };
-            
-            // We take the latest log for the month if there are multiple
             allMonthsMap[sortKey].values[pKey] = Number(l.pot_value);
         });
         
         let sortedMonthKeys = Object.keys(allMonthsMap).sort();
-        let displayKeys = sortedMonthKeys.slice(-12); // Isolate the last rolling 12 months
+        let displayKeys = sortedMonthKeys.slice(-12); // Last 12 months
         
         var data = new google.visualization.DataTable();
         data.addColumn('string', 'Month');
@@ -289,8 +303,6 @@
         let lastKnown = {};
         pensions.forEach(p => lastKnown[p] = null);
         
-        // Loop through everything to build up accurate "last known" balances, 
-        // ensuring the chart line doesn't drop to £0 if a month was skipped
         sortedMonthKeys.forEach(key => {
             pensions.forEach(p => {
                 if (allMonthsMap[key].values[p] !== undefined) {
@@ -298,7 +310,6 @@
                 }
             });
             
-            // Only output the data row if it falls inside our 12-month rolling window
             if (displayKeys.includes(key)) {
                 let row = [allMonthsMap[key].label];
                 pensions.forEach(p => row.push(lastKnown[p]));
@@ -306,11 +317,8 @@
             }
         });
         
-        // Format the tooltip numbers nicely
         var format£ = new google.visualization.NumberFormat({prefix: '£', fractionDigits: 0});
-        for (let i = 1; i <= pensions.length; i++) {
-            format£.format(data, i);
-        }
+        for (let i = 1; i <= pensions.length; i++) { format£.format(data, i); }
         
         var options = {
             title: 'Rolling 12-Month Pension Value Trajectory (£)',
@@ -318,7 +326,7 @@
             legend: { position: 'right' },
             chartArea: { width: '75%', height: '70%' },
             vAxis: { format: '£#,###' },
-            interpolateNulls: true, // Smooths over any gaps
+            interpolateNulls: true,
             colors: ['#3498db', '#9b59b6', '#2ecc71', '#e67e22', '#f1c40f', '#e74c3c', '#34495e']
         };
         
@@ -326,9 +334,6 @@
         chart.draw(data, options);
     }
 
-    // ==========================================
-    // KPI RENDERER ENGINE
-    // ==========================================
     function renderKPIs() {
         const tbody = document.querySelector("#kpiTable tbody");
         if (!allLogs || allLogs.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No log data found for KPIs.</td></tr>'; return; }
@@ -445,9 +450,6 @@
         document.getElementById('kpiExpectedTotal').className = 'value ' + (expectedTotal >= 0 ? 'pos-growth' : 'neg-growth');
         document.getElementById('kpiExpectedGraham').className = 'value ' + (expectedGraham >= 0 ? 'pos-growth' : 'neg-growth');
         document.getElementById('kpiExpectedJulie').className = 'value ' + (expectedJulie >= 0 ? 'pos-growth' : 'neg-growth');
-
-        // Draw the new line chart once the table data is processed
-        drawKPIGrowthChart();
     }
 
     function calculateInflationMultipliers() {
@@ -667,7 +669,7 @@
       let mathRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/calculate_joint_retirement`, { method: "POST", headers: getHeaders() });
       if (mathRes.ok) {
           globalDrawdownData = await mathRes.json();
-          renderRetirementTable(); drawRetirementCharts();
+          renderRetirementTable(); drawAllActiveCharts();
       }
     }
 
@@ -677,15 +679,17 @@
       document.getElementById(id).style.display = 'block';
       evt.currentTarget.className += " active-btn";
       
-      // Update charts on tab switch to ensure correct dimensions
-      if(id === 'Parameters' || id === 'Retirement') drawRetirementCharts();
-      if(id === 'KPIs') drawKPIGrowthChart();
+      // Only draw charts once the tab is actively visible on the screen
+      drawAllActiveCharts();
     }
 
-    // Redraw all charts if the window is resized
+    // NEW: Debounced Resize Listener to mathematically prevent the Infinite Resize Loop
+    let resizeTimer;
     window.addEventListener('resize', () => {
-        drawRetirementCharts();
-        drawKPIGrowthChart();
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            drawAllActiveCharts();
+        }, 250); // Circuit breaker
     });
     
     loadAllData(); 
