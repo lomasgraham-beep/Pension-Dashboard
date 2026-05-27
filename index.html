@@ -94,7 +94,7 @@
 
   <div id="KPIs" class="tabcontent">
     <h2>Pension Performance Metrics</h2>
-    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>"Expected Growth" uses the Median of historical monthly organic growth, successfully filtering out anomalous spikes and dips.</em></p>
+    <p style="color:#64748b; font-size:13px; margin-top:-5px;"><em>"Expected Growth" uses the Median of historical monthly organic growth, successfully filtering out anomalous spikes and multiple intra-month logs.</em></p>
     
     <div class="card-grid" style="margin-bottom: 30px;">
         <div class="card highlight-card"><h3>Overall Portfolio Expected Monthly Growth</h3><div id="kpiExpectedTotal" class="value">£0</div></div>
@@ -226,7 +226,6 @@
     }
 
     function getExpectedContribution(log) {
-        if (!log.contribution_applied) return 0;
         let expectedDays = 5; 
         
         if (log.member_name === 'Graham' && grahamParams) {
@@ -279,9 +278,15 @@
             logs.forEach(l => {
                 let d = new Date(l.log_date);
                 let mKey = d.getFullYear() + '-' + ("0" + (d.getMonth()+1)).slice(-2);
-                if(!monthlyData[mKey]) monthlyData[mKey] = { logs: [], sumContrib: 0 };
+                if(!monthlyData[mKey]) monthlyData[mKey] = { logs: [], hasContrib: false, expectedAmt: 0 };
                 monthlyData[mKey].logs.push(l);
-                monthlyData[mKey].sumContrib += getExpectedContribution(l);
+                
+                // BULLETPROOF FIX: If ANY log in this month has a contribution applied, flag the month.
+                // We only grab the amount once.
+                if (l.contribution_applied) {
+                    monthlyData[mKey].hasContrib = true;
+                    monthlyData[mKey].expectedAmt = getExpectedContribution(l);
+                }
             });
 
             let monthKeys = Object.keys(monthlyData).sort();
@@ -293,7 +298,9 @@
                 let mKey = monthKeys[i];
                 let mLogs = monthlyData[mKey].logs;
                 let currentMonthEndVal = Number(mLogs[mLogs.length - 1].pot_value);
-                let sumContrib = monthlyData[mKey].sumContrib;
+                
+                // Deduct the standard monthly contribution a MAXIMUM of one time per calendar month
+                let sumContrib = monthlyData[mKey].hasContrib ? monthlyData[mKey].expectedAmt : 0;
 
                 let prevMonthEndVal = null;
                 if (i > 0) {
@@ -317,7 +324,7 @@
                 let mLogs = monthlyData[monthKeys[0]].logs;
                 let firstVal = Number(mLogs[0].pot_value);
                 let currentVal = Number(mLogs[mLogs.length-1].pot_value);
-                let sumContrib = monthlyData[monthKeys[0]].sumContrib;
+                let sumContrib = monthlyData[monthKeys[0]].hasContrib ? monthlyData[monthKeys[0]].expectedAmt : 0;
                 latestMonthlyGrowth = currentVal - firstVal - sumContrib;
                 organicDiffs.push(latestMonthlyGrowth);
                 organicPcts.push(firstVal !== 0 ? (latestMonthlyGrowth / firstVal) * 100 : 0);
@@ -474,8 +481,16 @@
         let html = "";
         filteredData.forEach(l => { 
             const dObj = new Date(l.log_date); const ukDate = ("0" + dObj.getDate()).slice(-2) + '/' + ("0" + (dObj.getMonth() + 1)).slice(-2) + '/' + dObj.getFullYear(); 
-            let cAmt = getExpectedContribution(l);
+            
+            // Check the time machine purely for display in the history table
+            let cAmt = 0;
+            if (l.contribution_applied) {
+                l.contribution_applied = true; // explicitly boolean
+                cAmt = getExpectedContribution(l);
+            }
+            
             const contribBadge = cAmt > 0 ? `<span class="contrib-badge">+${fmt(cAmt)} DB Contrib</span>` : (l.contribution_applied ? `<span class="contrib-badge">+ Contrib</span>` : '');
+            
             html += `<tr><td>${ukDate}</td><td>${l.member_name}</td><td>${l.pension_name}</td><td style="font-weight:bold;">${fmt(l.pot_value)} ${contribBadge}</td></tr>`; 
         });
         tbody.innerHTML = html;
