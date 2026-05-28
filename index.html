@@ -50,6 +50,7 @@
     .filter-bar .form-group { margin-bottom: 0; }
     .filter-bar select, .filter-bar input { max-width: 200px; }
 
+    /* KPI Specific Styling */
     .pos-growth { color: #27ae60; font-weight: bold; }
     .neg-growth { color: #c0392b; font-weight: bold; }
     .kpi-badge { font-size: 11px; padding: 3px 6px; border-radius: 12px; background: #e2e8f0; color: #4a5568; margin-left: 5px; }
@@ -217,18 +218,6 @@
 
     google.charts.load('current', {'packages':['corechart']});
 
-    // Handle tab switching safely
-    function showTab(evt, id) {
-      document.querySelectorAll('.tabcontent').forEach(el => el.style.display = 'none');
-      document.querySelectorAll('.tab-link').forEach(el => el.className = el.className.replace(" active-btn", ""));
-      document.getElementById(id).style.display = 'block';
-      evt.currentTarget.className += " active-btn";
-      
-      // Only draw charts when explicitly shown to prevent bugs
-      if(id === 'Parameters' || id === 'Retirement') drawRetirementCharts();
-      if(id === 'KPIs') drawKPIGrowthChart();
-    }
-
     function setView(viewName) {
         currentView = viewName;
         document.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active-toggle'));
@@ -241,6 +230,76 @@
         let retTab = document.getElementById('Retirement');
         if (paramTab.style.display === 'block' || retTab.style.display === 'block') {
             drawRetirementCharts();
+        }
+    }
+
+    // ==========================================
+    // THE BULLETPROOF CHART GENERATOR
+    // ==========================================
+    function drawKPIGrowthChart() {
+        try {
+            if (!google.visualization || !allLogs || allLogs.length === 0) return;
+            
+            // Build a unique array of pensions
+            let pensions = [];
+            allLogs.forEach(l => {
+                let pName = l.member_name + ' - ' + l.pension_name;
+                if (!pensions.includes(pName)) pensions.push(pName);
+            });
+            
+            // Extract the last 12 months exactly, assigning 0 to missing values to prevent SVG crashes
+            let monthsMap = {};
+            allLogs.forEach(l => {
+                let d = new Date(l.log_date);
+                if (isNaN(d.getTime())) return; 
+                let mStr = d.getFullYear() + '-' + ("0" + (d.getMonth() + 1)).slice(-2);
+                let displayStr = d.toLocaleString('default', { month: 'short', year: 'numeric' });
+                if (!monthsMap[mStr]) monthsMap[mStr] = { label: displayStr, values: {} };
+                monthsMap[mStr].values[l.member_name + ' - ' + l.pension_name] = Number(l.pot_value);
+            });
+            
+            let sortedMonths = Object.keys(monthsMap).sort();
+            let last12 = sortedMonths.slice(-12);
+            
+            var data = new google.visualization.DataTable();
+            data.addColumn('string', 'Month');
+            pensions.forEach(p => data.addColumn('number', p));
+            
+            let prevVals = {};
+            pensions.forEach(p => prevVals[p] = 0);
+            
+            sortedMonths.forEach(m => {
+                pensions.forEach(p => {
+                    if (monthsMap[m].values[p] !== undefined) prevVals[p] = monthsMap[m].values[p];
+                });
+                if (last12.includes(m)) {
+                    let row = [monthsMap[m].label];
+                    pensions.forEach(p => row.push(prevVals[p]));
+                    data.addRow(row);
+                }
+            });
+            
+            var numFmt = new google.visualization.NumberFormat({prefix: '£', fractionDigits: 0});
+            for (let i = 1; i <= pensions.length; i++) numFmt.format(data, i);
+            
+            var options = {
+                title: 'Rolling 12-Month Pension Value Trajectory (£)',
+                curveType: 'function',
+                legend: { position: 'right' },
+                chartArea: { width: '75%', height: '70%' },
+                vAxis: { format: '£#,###', minValue: 0 },
+                seriesType: 'line', // Forces the ComboChart engine to render perfectly stable lines
+                lineWidth: 3,
+                pointsVisible: true,
+                pointSize: 5,
+                colors: ['#3498db', '#9b59b6', '#2ecc71', '#e67e22', '#f1c40f', '#e74c3c']
+            };
+            
+            // Uses the same proven rendering engine that works in the Retirement tab
+            var chart = new google.visualization.ComboChart(document.getElementById('kpiGrowthChart'));
+            chart.draw(data, options);
+        } catch(err) {
+            console.warn("Chart safely aborted to prevent browser crash.");
         }
     }
 
@@ -270,72 +329,6 @@
         });
         
         return match ? (Number(match.monthly_contribution) || 0) : 0;
-    }
-
-    // ==========================================
-    // BUG-FIXED: LINE CHART (No Null Interpolation)
-    // ==========================================
-    function drawKPIGrowthChart() {
-        if (!google.visualization || !allLogs || allLogs.length === 0) return;
-        
-        let kpiTab = document.getElementById('KPIs');
-        if (kpiTab.style.display !== 'block') return; // Double protection
-        
-        let pensions = [...new Set(allLogs.map(l => l.member_name + ' - ' + l.pension_name))];
-        let allMonthsMap = {};
-        
-        let sortedLogs = [...allLogs].sort((a,b) => new Date(a.log_date) - new Date(b.log_date));
-        
-        sortedLogs.forEach(l => {
-            let d = new Date(l.log_date);
-            let mKey = d.toLocaleString('default', { month: 'short', year: 'numeric' }); 
-            let sortKey = l.log_date.substring(0,7); 
-            let pKey = l.member_name + ' - ' + l.pension_name;
-            
-            if (!allMonthsMap[sortKey]) allMonthsMap[sortKey] = { label: mKey, values: {} };
-            allMonthsMap[sortKey].values[pKey] = Number(l.pot_value);
-        });
-        
-        let sortedMonthKeys = Object.keys(allMonthsMap).sort();
-        let displayKeys = sortedMonthKeys.slice(-12); 
-        
-        var data = new google.visualization.DataTable();
-        data.addColumn('string', 'Month');
-        pensions.forEach(p => data.addColumn('number', p));
-        
-        let lastKnown = {};
-        // FATAL BUG FIX: Force 0 instead of Null. Nulls crash the SVG engine.
-        pensions.forEach(p => lastKnown[p] = 0); 
-        
-        sortedMonthKeys.forEach(key => {
-            pensions.forEach(p => {
-                if (allMonthsMap[key].values[p] !== undefined) {
-                    lastKnown[p] = allMonthsMap[key].values[p];
-                }
-            });
-            
-            if (displayKeys.includes(key)) {
-                let row = [allMonthsMap[key].label];
-                pensions.forEach(p => row.push(lastKnown[p]));
-                data.addRow(row);
-            }
-        });
-        
-        var format£ = new google.visualization.NumberFormat({prefix: '£', fractionDigits: 0});
-        for (let i = 1; i <= pensions.length; i++) { format£.format(data, i); }
-        
-        var options = {
-            title: 'Rolling 12-Month Pension Value Trajectory (£)',
-            curveType: 'function',
-            legend: { position: 'right' },
-            chartArea: { width: '75%', height: '70%' },
-            vAxis: { format: '£#,###' },
-            // Removed interpolateNulls to permanently prevent the infinite calculation loop
-            colors: ['#3498db', '#9b59b6', '#2ecc71', '#e67e22', '#f1c40f', '#e74c3c', '#34495e']
-        };
-        
-        var chart = new google.visualization.LineChart(document.getElementById('kpiGrowthChart'));
-        chart.draw(data, options);
     }
 
     function renderKPIs() {
@@ -533,11 +526,6 @@
 
     function drawRetirementCharts() {
         if (!google.visualization || !globalDrawdownData || globalDrawdownData.length === 0) return;
-        
-        let paramTab = document.getElementById('Parameters');
-        let retTab = document.getElementById('Retirement');
-        if (paramTab.style.display !== 'block' && retTab.style.display !== 'block') return;
-
         var dataPots = new google.visualization.DataTable(); dataPots.addColumn('string', 'Year'); dataPots.addColumn('number', 'Tax-Free Pot'); dataPots.addColumn('number', 'Taxable Pot');
         var dataIncome = new google.visualization.DataTable(); dataIncome.addColumn('string', 'Year'); dataIncome.addColumn('number', 'Drawdown (Bar)'); dataIncome.addColumn('number', 'Other Pensions (Bar)'); dataIncome.addColumn('number', 'Drawdown Target (Line)');
         globalDrawdownData.forEach(r => {
@@ -683,6 +671,24 @@
       }
     }
 
+    // THE DELAYED TAB SWITCH ENGINE
+    // We delay chart drawing by exactly 50 milliseconds to ensure the browser has fully expanded the tab
+    function showTab(evt, id) {
+      document.querySelectorAll('.tabcontent').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.tab-link').forEach(el => el.className = el.className.replace(" active-btn", ""));
+      document.getElementById(id).style.display = 'block';
+      evt.currentTarget.className += " active-btn";
+      
+      if(id === 'Parameters' || id === 'Retirement') setTimeout(drawRetirementCharts, 50);
+      if(id === 'KPIs') setTimeout(drawKPIGrowthChart, 50); 
+    }
+
+    // The safe resize listener
+    window.addEventListener('resize', () => {
+        if (document.getElementById('Parameters').style.display === 'block' || document.getElementById('Retirement').style.display === 'block') drawRetirementCharts();
+        if (document.getElementById('KPIs').style.display === 'block') drawKPIGrowthChart();
+    });
+    
     loadAllData(); 
   </script>
 </body>
