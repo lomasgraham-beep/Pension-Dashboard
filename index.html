@@ -291,11 +291,7 @@
         drawAllActiveCharts();
     }
 
-    // ==========================================
-    // THE BRAIN: EXPECTED CONTRIBUTION ENGINE
-    // ==========================================
     function getExpectedContribution(log) {
-        // --- HARDCODED OVERRIDE: Oct 2025 to Mar 2026 ---
         if (log.member_name === 'Graham' && log.pension_name === 'Pru') {
             let logDate = new Date(log.log_date);
             let yr = logDate.getFullYear();
@@ -305,11 +301,10 @@
             let isEarly2026 = (yr === 2026 && mo >= 1 && mo <= 3);
             
             if (isLate2025 || isEarly2026) {
-                return 2313; // Force the specific historical baseline
+                return 2313; 
             }
         }
 
-        // --- Standard Logic for all other dates/members ---
         let expectedDays = 5; 
         
         if (log.member_name === 'Graham' && grahamParams) {
@@ -337,6 +332,9 @@
         return match ? (Number(match.monthly_contribution) || 0) : 0;
     }
 
+    // ==========================================
+    // CHART 1: ROLLING 12-MONTH LINE CHART
+    // ==========================================
     function drawKPIGrowthChart() {
         try {
             if (!google.visualization || !allLogs || allLogs.length === 0) return;
@@ -394,7 +392,8 @@
                 title: 'Total Pension Value - Last 12 Months',
                 curveType: 'function',
                 legend: { position: 'bottom' },
-                chartArea: { width: '85%', height: '65%' },
+                // FIX: Added hard left-margin of 85 pixels to prevent Y-Axis wrapping
+                chartArea: { left: 85, right: 30, top: 40, bottom: 60 },
                 vAxis: { format: '£#,###', minValue: 0 },
                 seriesType: 'line', 
                 lineWidth: 3,
@@ -408,6 +407,9 @@
         } catch(err) { console.warn("Chart safely aborted.", err); }
     }
 
+    // ==========================================
+    // CHART 2: GROWTH CHART (WITH MEDIAN OUTLIER CAP)
+    // ==========================================
     function drawMonthlyGrowthChart() {
         try {
             if (!google.visualization || !allLogs || allLogs.length === 0) return;
@@ -472,23 +474,42 @@
             var data = new google.visualization.DataTable();
             data.addColumn('date', 'Month'); 
             data.addColumn('number', 'Organic Growth (£)');
+            data.addColumn({type: 'string', role: 'tooltip'}); // Custom Tooltip for our Capped values
 
             let sortedMonths = Object.keys(masterTimeline).sort();
             if(sortedMonths.length === 0) return;
             
+            // FIX: Calculate Median Outlier Caps to protect the chart scale
+            let vals = Object.values(masterTimeline).sort((a,b) => a - b);
+            let median = vals[Math.floor(vals.length / 2)] || 0;
+            let baseAbs = Math.max(Math.abs(median), 500); // Set a minimum £500 baseline scale
+            let upperCap = baseAbs * 3.5; // Cap the visual spike at 3.5x normal
+            let lowerCap = -baseAbs * 3.5;
+
             sortedMonths.forEach(m => {
                 let dParts = m.split('-');
                 let dObj = new Date(dParts[0], dParts[1]-1, 1);
-                data.addRow([dObj, masterTimeline[m]]);
-            });
+                
+                let rawVal = masterTimeline[m];
+                let plotVal = rawVal;
+                let tooltip = `${dObj.toLocaleString('en-GB', {month:'short', year:'numeric'})}\nOrganic Growth: £${Math.round(rawVal).toLocaleString('en-GB')}`;
 
-            var numFmt = new google.visualization.NumberFormat({prefix: '£', fractionDigits: 0});
-            numFmt.format(data, 1);
+                // Apply the cap to the visual chart so it doesn't wreck the Y-axis
+                if (rawVal > upperCap) {
+                    plotVal = upperCap;
+                    tooltip += `\n(Bar capped to preserve chart scale)`;
+                } else if (rawVal < lowerCap) {
+                    plotVal = lowerCap;
+                    tooltip += `\n(Bar capped to preserve chart scale)`;
+                }
+
+                data.addRow([dObj, plotVal, tooltip]);
+            });
 
             var options = {
                 title: 'Monthly Organic Growth & Trendline (£)',
                 legend: { position: 'none' },
-                chartArea: { width: '80%', height: '65%' },
+                chartArea: { left: 85, right: 30, top: 40, bottom: 60 },
                 hAxis: { format: 'MMM yyyy', gridlines: {color: 'transparent'} },
                 vAxis: { format: '£#,###' },
                 colors: ['#27ae60'], 
