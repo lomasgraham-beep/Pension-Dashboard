@@ -242,9 +242,6 @@
         drawAllActiveCharts();
     });
 
-    // ==========================================
-    // CHART RENDERING SAFETY ENGINE
-    // ==========================================
     function drawAllActiveCharts() {
         if (!googleChartsLoaded) return; 
 
@@ -262,7 +259,6 @@
         }
     }
 
-    // Handles the dynamic dropdown population for the KPI charts
     function updateKPIFilters() {
         let mFilter = document.getElementById('kpiFilterMember').value;
         let pSelect = document.getElementById('kpiFilterPension');
@@ -277,13 +273,11 @@
         });
         
         pSelect.innerHTML = pOptions;
-        
         if ([...pSelect.options].some(o => o.value === currentVal)) {
             pSelect.value = currentVal;
         } else {
             pSelect.value = "All";
         }
-        
         drawAllActiveCharts();
     }
 
@@ -297,7 +291,25 @@
         drawAllActiveCharts();
     }
 
+    // ==========================================
+    // THE BRAIN: EXPECTED CONTRIBUTION ENGINE
+    // ==========================================
     function getExpectedContribution(log) {
+        // --- HARDCODED OVERRIDE: Oct 2025 to Mar 2026 ---
+        if (log.member_name === 'Graham' && log.pension_name === 'Pru') {
+            let logDate = new Date(log.log_date);
+            let yr = logDate.getFullYear();
+            let mo = logDate.getMonth() + 1;
+            
+            let isLate2025 = (yr === 2025 && mo >= 10 && mo <= 12);
+            let isEarly2026 = (yr === 2026 && mo >= 1 && mo <= 3);
+            
+            if (isLate2025 || isEarly2026) {
+                return 2313; // Force the specific historical baseline
+            }
+        }
+
+        // --- Standard Logic for all other dates/members ---
         let expectedDays = 5; 
         
         if (log.member_name === 'Graham' && grahamParams) {
@@ -325,9 +337,6 @@
         return match ? (Number(match.monthly_contribution) || 0) : 0;
     }
 
-    // ==========================================
-    // CHART 1: ROLLING 12-MONTH LINE CHART
-    // ==========================================
     function drawKPIGrowthChart() {
         try {
             if (!google.visualization || !allLogs || allLogs.length === 0) return;
@@ -399,9 +408,6 @@
         } catch(err) { console.warn("Chart safely aborted.", err); }
     }
 
-    // ==========================================
-    // CHART 2: ORGANIC GROWTH WITH TRENDLINE
-    // ==========================================
     function drawMonthlyGrowthChart() {
         try {
             if (!google.visualization || !allLogs || allLogs.length === 0) return;
@@ -409,7 +415,6 @@
             let mFilter = document.getElementById('kpiFilterMember').value;
             let pFilter = document.getElementById('kpiFilterPension').value;
 
-            // Group filtered logs
             let dict = {};
             allLogs.forEach(l => {
                 if (mFilter !== "All" && l.member_name !== mFilter) return;
@@ -465,7 +470,7 @@
             });
 
             var data = new google.visualization.DataTable();
-            data.addColumn('date', 'Month'); // Must be a continuous date axis for trendlines to work
+            data.addColumn('date', 'Month'); 
             data.addColumn('number', 'Organic Growth (£)');
 
             let sortedMonths = Object.keys(masterTimeline).sort();
@@ -487,7 +492,7 @@
                 hAxis: { format: 'MMM yyyy', gridlines: {color: 'transparent'} },
                 vAxis: { format: '£#,###' },
                 colors: ['#27ae60'], 
-                trendlines: { 0: { type: 'linear', color: '#e74c3c', lineWidth: 4, opacity: 0.8 } }, // The Red Trendline
+                trendlines: { 0: { type: 'linear', color: '#e74c3c', lineWidth: 4, opacity: 0.8 } }, 
                 bar: { groupWidth: '60%' }
             };
             
@@ -822,13 +827,10 @@
               if(!seen.has(key)) { seen.add(key); if(l.member_name === 'Graham') gTot += Number(l.pot_value); if(l.member_name === 'Julie') jTot += Number(l.pot_value); }
           });
           document.getElementById('mGrahamTotal').innerText = fmt(gTot); document.getElementById('mWifeTotal').innerText = fmt(jTot); document.getElementById('mCombinedTotal').innerText = fmt(gTot + jTot);
-          const pSelect = document.getElementById('filterPension'); let pOptions = '<option value="All">All Pensions</option>';
-          [...new Set(allLogs.map(l => l.pension_name))].forEach(p => pOptions += `<option value="${p}">${p}</option>`); pSelect.innerHTML = pOptions;
+          
+          updateKPIFilters();
           renderHistoryTable();
           renderKPIs();
-          
-          // Trigger the initial dynamic filter population
-          updateKPIFilters();
       }
 
       let forecastRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/generate_monthly_pension_forecast`, { method: "POST", headers: getHeaders() });
@@ -845,7 +847,6 @@
       }
     }
 
-    // Delay drawing slightly to let DOM settle, effectively preventing the infinite loop.
     function showTab(evt, id) {
       document.querySelectorAll('.tabcontent').forEach(el => el.style.display = 'none');
       document.querySelectorAll('.tab-link').forEach(el => el.className = el.className.replace(" active-btn", ""));
@@ -862,7 +863,7 @@
         resizeTimer = setTimeout(() => {
             if (document.getElementById('Parameters').style.display === 'block' || document.getElementById('Retirement').style.display === 'block') drawRetirementCharts();
             if (document.getElementById('KPIs').style.display === 'block') drawAllActiveCharts();
-        }, 150); // Buffer resize calls to drastically reduce CPU load
+        }, 150); 
     });
     
     loadAllData(); 
