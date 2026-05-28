@@ -50,7 +50,6 @@
     .filter-bar .form-group { margin-bottom: 0; }
     .filter-bar select, .filter-bar input { max-width: 200px; }
 
-    /* KPI Specific Styling */
     .pos-growth { color: #27ae60; font-weight: bold; }
     .neg-growth { color: #c0392b; font-weight: bold; }
     .kpi-badge { font-size: 11px; padding: 3px 6px; border-radius: 12px; background: #e2e8f0; color: #4a5568; margin-left: 5px; }
@@ -218,13 +217,31 @@
 
     google.charts.load('current', {'packages':['corechart']});
 
+    // Handle tab switching safely
+    function showTab(evt, id) {
+      document.querySelectorAll('.tabcontent').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.tab-link').forEach(el => el.className = el.className.replace(" active-btn", ""));
+      document.getElementById(id).style.display = 'block';
+      evt.currentTarget.className += " active-btn";
+      
+      // Only draw charts when explicitly shown to prevent bugs
+      if(id === 'Parameters' || id === 'Retirement') drawRetirementCharts();
+      if(id === 'KPIs') drawKPIGrowthChart();
+    }
+
     function setView(viewName) {
         currentView = viewName;
         document.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active-toggle'));
         document.getElementById('view-' + viewName).classList.add('active-toggle');
         document.getElementById('tableViewTitle').innerText = viewName;
         document.getElementById('chartViewTitle').innerText = viewName;
-        renderRetirementTable(); drawRetirementCharts();
+        renderRetirementTable(); 
+        
+        let paramTab = document.getElementById('Parameters');
+        let retTab = document.getElementById('Retirement');
+        if (paramTab.style.display === 'block' || retTab.style.display === 'block') {
+            drawRetirementCharts();
+        }
     }
 
     function getExpectedContribution(log) {
@@ -256,13 +273,13 @@
     }
 
     // ==========================================
-    // SAFE LINE CHART ENGINE
+    // BUG-FIXED: LINE CHART (No Null Interpolation)
     // ==========================================
     function drawKPIGrowthChart() {
-        // SAFETY: If the library isn't loaded or the tab isn't visible, ABORT immediately.
         if (!google.visualization || !allLogs || allLogs.length === 0) return;
+        
         let kpiTab = document.getElementById('KPIs');
-        if (kpiTab.style.display !== 'block') return;
+        if (kpiTab.style.display !== 'block') return; // Double protection
         
         let pensions = [...new Set(allLogs.map(l => l.member_name + ' - ' + l.pension_name))];
         let allMonthsMap = {};
@@ -287,7 +304,8 @@
         pensions.forEach(p => data.addColumn('number', p));
         
         let lastKnown = {};
-        pensions.forEach(p => lastKnown[p] = null);
+        // FATAL BUG FIX: Force 0 instead of Null. Nulls crash the SVG engine.
+        pensions.forEach(p => lastKnown[p] = 0); 
         
         sortedMonthKeys.forEach(key => {
             pensions.forEach(p => {
@@ -312,7 +330,7 @@
             legend: { position: 'right' },
             chartArea: { width: '75%', height: '70%' },
             vAxis: { format: '£#,###' },
-            interpolateNulls: true,
+            // Removed interpolateNulls to permanently prevent the infinite calculation loop
             colors: ['#3498db', '#9b59b6', '#2ecc71', '#e67e22', '#f1c40f', '#e74c3c', '#34495e']
         };
         
@@ -406,7 +424,6 @@
             };
 
             let medianGrowthAmt = organicDiffs.length > 0 ? getMedian(organicDiffs) : 0;
-            let medianGrowthPct = organicPcts.length > 0 ? getMedian(organicPcts) : 0;
             let avgGrowthAmt = organicDiffs.length > 0 ? organicDiffs.reduce((a, b) => a + b, 0) / organicDiffs.length : 0;
             let avgGrowthPct = organicPcts.length > 0 ? organicPcts.reduce((a, b) => a + b, 0) / organicPcts.length : 0;
 
@@ -516,6 +533,11 @@
 
     function drawRetirementCharts() {
         if (!google.visualization || !globalDrawdownData || globalDrawdownData.length === 0) return;
+        
+        let paramTab = document.getElementById('Parameters');
+        let retTab = document.getElementById('Retirement');
+        if (paramTab.style.display !== 'block' && retTab.style.display !== 'block') return;
+
         var dataPots = new google.visualization.DataTable(); dataPots.addColumn('string', 'Year'); dataPots.addColumn('number', 'Tax-Free Pot'); dataPots.addColumn('number', 'Taxable Pot');
         var dataIncome = new google.visualization.DataTable(); dataIncome.addColumn('string', 'Year'); dataIncome.addColumn('number', 'Drawdown (Bar)'); dataIncome.addColumn('number', 'Other Pensions (Bar)'); dataIncome.addColumn('number', 'Drawdown Target (Line)');
         globalDrawdownData.forEach(r => {
@@ -544,14 +566,9 @@
         let html = "";
         filteredData.forEach(l => { 
             const dObj = new Date(l.log_date); const ukDate = ("0" + dObj.getDate()).slice(-2) + '/' + ("0" + (dObj.getMonth() + 1)).slice(-2) + '/' + dObj.getFullYear(); 
-            
             let cAmt = 0;
-            if (l.contribution_applied) {
-                cAmt = getExpectedContribution(l);
-            }
-            
+            if (l.contribution_applied) { cAmt = getExpectedContribution(l); }
             const contribBadge = cAmt > 0 ? `<span class="contrib-badge">+${fmt(cAmt)} DB Contrib</span>` : (l.contribution_applied ? `<span class="contrib-badge">+ Contrib</span>` : '');
-            
             html += `<tr><td>${ukDate}</td><td>${l.member_name}</td><td>${l.pension_name}</td><td style="font-weight:bold;">${fmt(l.pot_value)} ${contribBadge}</td></tr>`; 
         });
         tbody.innerHTML = html;
@@ -666,23 +683,6 @@
       }
     }
 
-    // THE SAFETY PROTOCOL:
-    // 1. Only trigger charts when explicitly clicking a tab
-    function showTab(evt, id) {
-      document.querySelectorAll('.tabcontent').forEach(el => el.style.display = 'none');
-      document.querySelectorAll('.tab-link').forEach(el => el.className = el.className.replace(" active-btn", ""));
-      document.getElementById(id).style.display = 'block';
-      evt.currentTarget.className += " active-btn";
-      
-      // Strict Draw-on-Demand
-      if (id === 'Parameters' || id === 'Retirement') drawRetirementCharts();
-      if (id === 'KPIs') drawKPIGrowthChart();
-    }
-
-    // 2. The unsafe window resize listener is intact ONLY for the safe Retirement charts,
-    //    and specifically avoids redrawing the KPI line chart to prevent the loop.
-    window.addEventListener('resize', drawRetirementCharts);
-    
     loadAllData(); 
   </script>
 </body>
