@@ -57,12 +57,26 @@
   .status-ok   { background:#d1fae5; color:#065f46; }
   .footnote { font-size:12px; color:#64748b; line-height:1.5; }
   .group-label { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#94a3b8; font-weight:bold; margin-bottom:10px; }
+  h2.collapser { cursor:pointer; user-select:none; -webkit-user-select:none; }
+  h2.collapser:hover { color:#3498db; }
+  .chev { font-size:13px; color:#94a3b8; display:inline-block; width:14px; }
+  .panel.collapsed h2 { margin-bottom:0; padding-bottom:0; border-bottom:none; }
+  .panel.collapsed .panel-body { display:none; }
+  .toolbar { display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap; }
+  .toolbar button { background:#3498db; color:#fff; border:none; padding:8px 14px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:13px; }
+  .toolbar button:hover { background:#2980b9; }
 </style>
 </head>
 <body>
 
 <h1>Pension Scenario Lab</h1>
 <div id="status" class="status-load">Connecting to your database…</div>
+
+<div class="toolbar">
+  <button onclick="setAllCollapsed(true)">▸ Collapse all</button>
+  <button onclick="setAllCollapsed(false)">▾ Expand all</button>
+  <span style="font-size:12px; color:#64748b; align-self:center;">Tip: collapse the control panels to keep the chart in view while you drag.</span>
+</div>
 
 <div class="panel">
   <p class="intro">
@@ -643,6 +657,39 @@
     }
   }
 
+  function initCollapsibles() {
+    document.querySelectorAll('.panel').forEach(panel => {
+      const h = panel.querySelector('h2');
+      if (!h) return; // panels without a header (intro, footnote) stay open
+      const body = document.createElement('div');
+      body.className = 'panel-body';
+      let node = h.nextSibling;
+      while (node) { const next = node.nextSibling; body.appendChild(node); node = next; }
+      panel.appendChild(body);
+      h.classList.add('collapser');
+      h.insertAdjacentHTML('afterbegin', '<span class="chev">▾</span> ');
+      h.addEventListener('click', () => {
+        const collapsed = panel.classList.toggle('collapsed');
+        const chev = h.querySelector('.chev');
+        if (chev) chev.textContent = collapsed ? '▸' : '▾';
+        // a chart drawn while hidden mis-sizes, so redraw when its panel reopens
+        if (!collapsed && panel.querySelector('#potChart') && chartsReady) setTimeout(recompute, 30);
+      });
+    });
+  }
+
+  function setAllCollapsed(state) {
+    document.querySelectorAll('.panel').forEach(panel => {
+      const h = panel.querySelector('h2.collapser');
+      if (!h) return;
+      panel.classList.toggle('collapsed', state);
+      const chev = h.querySelector('.chev');
+      if (chev) chev.textContent = state ? '▸' : '▾';
+    });
+    if (!state && chartsReady) setTimeout(recompute, 30);
+  }
+
+  initCollapsibles();
   loadData();
 </script>
 </body>
