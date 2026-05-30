@@ -675,6 +675,12 @@
         // a chart drawn while hidden mis-sizes, so redraw when its panel reopens
         if (!collapsed && panel.querySelector('#potChart') && chartsReady) setTimeout(recompute, 30);
       });
+      // start the State Pension Risk panel collapsed
+      if (h.textContent.includes('State Pension Risk')) {
+        panel.classList.add('collapsed');
+        const chev = h.querySelector('.chev');
+        if (chev) chev.textContent = '▸';
+      }
     });
   }
 
