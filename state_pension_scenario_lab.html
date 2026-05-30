@@ -3,30 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>State Pension Risk — Scenario Lab</title>
+<title>Pension Scenario Lab</title>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
   body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; color: #333; max-width: 1100px; margin: 0 auto; }
   h1 { color: #2c3e50; }
-  h2 { color: #2c3e50; margin-top: 0; padding-bottom: 5px; border-bottom: 2px solid #e2e8f0; }
+  h2 { color: #2c3e50; margin-top: 0; padding-bottom: 5px; border-bottom: 2px solid #e2e8f0; font-size:19px; }
   .panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
   .intro { font-size: 14px; color: #475569; line-height: 1.5; }
-  .intro code { background:#eef2f7; padding:1px 5px; border-radius:4px; }
+  .intro code, .footnote code { background:#eef2f7; padding:1px 5px; border-radius:4px; }
 
   .controls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; }
-  .ctrl { }
   .ctrl label { display: block; font-weight: bold; margin-bottom: 6px; color:#2c3e50; }
   .ctrl .hint { font-weight: normal; font-size: 12px; color: #64748b; display:block; margin-bottom:8px; }
   input[type="range"] { width: 100%; cursor: pointer; }
-  input[type="number"] { padding: 8px; width: 110px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
+  input[type="number"], input[type="date"], select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; box-sizing:border-box; }
+  input[type="number"] { width: 110px; }
+  input[type="date"] { width: 100%; max-width: 220px; }
+  select { width: auto; }
   .slider-val { color: #3498db; font-size: 18px; font-weight: bold; }
   .sp-list label { font-weight: normal; display:flex; align-items:center; margin-bottom:4px; cursor:pointer; }
   .sp-list input { width:auto; margin-right:8px; }
   .twocol { display:flex; gap:18px; }
+  .phase-row { display:flex; gap:10px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
   .toggle-row { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
   .toggle-row input { width:auto; }
+  .reset-btn { background:#64748b; color:#fff; border:none; padding:9px 16px; border-radius:4px; font-weight:bold; cursor:pointer; }
+  .reset-btn:hover { background:#475569; }
 
-  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 15px; }
   .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; }
   .card h3 { margin: 0 0 8px 0; font-size: 12px; color: #64748b; text-transform: uppercase; }
   .card .value { font-size: 22px; font-weight: bold; color: #2c3e50; }
@@ -51,53 +56,114 @@
   .status-err  { background:#fdecea; color:#c0392b; }
   .status-ok   { background:#d1fae5; color:#065f46; }
   .footnote { font-size:12px; color:#64748b; line-height:1.5; }
+  .group-label { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#94a3b8; font-weight:bold; margin-bottom:10px; }
 </style>
 </head>
 <body>
 
-<h1>State Pension Risk — Scenario Lab</h1>
+<h1>Pension Scenario Lab</h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
   <p class="intro">
     This runs entirely in your browser against your live data &mdash; <strong>it never writes anything back</strong>, so your real figures are safe.
-    The <strong>Baseline</strong> column re-creates your existing <em>Retirement</em> tab exactly. The <strong>Scenario</strong> column applies the controls below.
+    The whole model now runs here: your accumulation (contributions growing your pots to retirement) <em>and</em> your drawdown.
     <br><br>
-    <strong>First thing to check:</strong> with every control left at its default, the Baseline and Scenario numbers should be identical, and the Baseline should match your dashboard's Retirement tab (Joint view). If they match, the maths port is faithful and you can trust the scenario deltas.
+    The <strong>Baseline</strong> always reflects your <em>saved</em> plan exactly as the dashboard shows it. The <strong>Scenario</strong> applies the live controls below.
+    Move any control and everything recalculates instantly &mdash; with nothing saved until you choose to. Hit <strong>Reset</strong> to snap everything back to your saved plan.
   </p>
 </div>
 
 <div class="panel">
-  <h2>State Pension Controls</h2>
+  <h2>Your Plan <span style="font-weight:normal;font-size:13px;color:#64748b;">— live overrides (Scenario only)</span></h2>
   <div class="controls-grid">
 
     <div class="ctrl">
-      <label>Triple Lock / Uprating rate <span id="v_sp" class="slider-val">2.5%</span></label>
-      <span class="hint">Annual rise applied to State Pension. Your engine assumes 2.5%. Drag down to model the triple lock being weakened, capped, or frozen (0%).</span>
-      <input type="range" id="c_sp" min="0" max="3.5" step="0.1" value="2.5" oninput="onChange()">
+      <div class="group-label">Timing</div>
+      <label>Retirement date</label>
+      <span class="hint">Earlier means smaller pots but fewer drawdown years; later, the reverse.</span>
+      <input type="date" id="c_retire" oninput="onInput()">
     </div>
 
     <div class="ctrl">
-      <label>State Pension age delay (years)</label>
-      <span class="hint">Push the State Pension start date back, e.g. if the qualifying age rises to 68/70.</span>
-      <div class="twocol">
-        <div>Graham<br><input type="number" id="c_delayG" min="0" max="10" step="1" value="0" oninput="onChange()"></div>
-        <div>Julie<br><input type="number" id="c_delayJ" min="0" max="10" step="1" value="0" oninput="onChange()"></div>
+      <div class="group-label">Investment</div>
+      <label>Growth until retirement <span id="v_growth" class="slider-val">5.0%</span></label>
+      <span class="hint">Annual growth applied while pots are still building. (Drawdown phase stays at your engine's 5%.)</span>
+      <input type="range" id="c_growth" min="0" max="10" step="0.25" value="5" oninput="onInput()">
+    </div>
+
+    <div class="ctrl">
+      <div class="group-label">Working pattern (Graham)</div>
+      <label>Shorter-week phases</label>
+      <span class="hint">When Graham drops days &mdash; changes which contribution tier applies.</span>
+      <div class="phase-row">
+        <span>Phase 1:</span>
+        <input type="date" id="c_p1date" style="max-width:150px;" oninput="onInput()">
+        <select id="c_p1days" onchange="onInput()"><option value="5">5d</option><option value="4">4d</option><option value="3">3d</option></select>
+      </div>
+      <div class="phase-row">
+        <span>Phase 2:</span>
+        <input type="date" id="c_p2date" style="max-width:150px;" oninput="onInput()">
+        <select id="c_p2days" onchange="onInput()"><option value="5">5d</option><option value="4">4d</option><option value="3">3d</option></select>
       </div>
     </div>
 
     <div class="ctrl">
-      <label>Means testing <span style="font-weight:normal;font-size:12px;color:#64748b;">(simplified model)</span></label>
-      <span class="hint">If private drawdown income exceeds the threshold, State Pension is tapered away.</span>
-      <div class="toggle-row"><input type="checkbox" id="c_mtOn" onchange="onChange()"><span>Enable means testing</span></div>
-      <div>Threshold (£/yr): <input type="number" id="c_mtThresh" min="0" step="1000" value="20000" oninput="onChange()"></div>
+      <div class="group-label">Contributions</div>
+      <label>Contribution adjustment <span id="v_contrib" class="slider-val">100%</span></label>
+      <span class="hint">Scales all monthly contributions up or down (e.g. 120% = paying in 20% more).</span>
+      <input type="range" id="c_contrib" min="0" max="200" step="5" value="100" oninput="onInput()">
+    </div>
+
+    <div class="ctrl">
+      <div class="group-label">Retirement spending</div>
+      <label>Spending level <span id="v_spend" class="slider-val">100%</span></label>
+      <span class="hint">Applies to bills &amp; dining you've flagged as reducible.</span>
+      <input type="range" id="c_spend" min="25" max="100" step="1" value="100" oninput="onInput()">
+    </div>
+
+    <div class="ctrl">
+      <div class="group-label">Split</div>
+      <label>Graham drawdown ratio <span id="v_ratio" class="slider-val">50%</span></label>
+      <span class="hint">Share of joint outgoings funded from Graham's pots (Julie funds the rest).</span>
+      <input type="range" id="c_ratio" min="0" max="100" step="1" value="50" oninput="onInput()">
+    </div>
+
+  </div>
+  <div style="margin-top:18px;"><button class="reset-btn" onclick="resetControls()">↺ Reset to saved plan</button></div>
+</div>
+
+<div class="panel">
+  <h2>State Pension Risk</h2>
+  <div class="controls-grid">
+
+    <div class="ctrl">
+      <label>Triple Lock / Uprating rate <span id="v_sp" class="slider-val">2.5%</span></label>
+      <span class="hint">Annual rise on State Pension. Your engine assumes 2.5%. Drag down for the lock weakened, capped, or frozen (0%).</span>
+      <input type="range" id="c_sp" min="0" max="3.5" step="0.1" value="2.5" oninput="onInput()">
+    </div>
+
+    <div class="ctrl">
+      <label>State Pension age delay (years)</label>
+      <span class="hint">Push the start date back if the qualifying age rises.</span>
+      <div class="twocol">
+        <div>Graham<br><input type="number" id="c_delayG" min="0" max="10" step="1" value="0" oninput="onInput()"></div>
+        <div>Julie<br><input type="number" id="c_delayJ" min="0" max="10" step="1" value="0" oninput="onInput()"></div>
+      </div>
+    </div>
+
+    <div class="ctrl">
+      <label>Means testing <span style="font-weight:normal;font-size:12px;color:#64748b;">(simplified)</span></label>
+      <span class="hint">If private drawdown exceeds the threshold, State Pension tapers away.</span>
+      <div class="toggle-row"><input type="checkbox" id="c_mtOn" onchange="onInput()"><span>Enable means testing</span></div>
+      <div>Threshold (£/yr): <input type="number" id="c_mtThresh" min="0" step="1000" value="20000" oninput="onInput()"></div>
       <div style="margin-top:8px;">Taper <span id="v_mt" class="slider-val" style="font-size:15px;">50p</span> per £1 over</div>
-      <input type="range" id="c_mtTaper" min="0" max="100" step="5" value="50" oninput="onChange()">
+      <input type="range" id="c_mtTaper" min="0" max="100" step="5" value="50" oninput="onInput()">
     </div>
 
     <div class="ctrl">
       <label>Which incomes are "State Pension"?</label>
-      <span class="hint">Scenarios above apply only to the ticked incomes. Others keep your engine's 2.5% rise.</span>
+      <span class="hint">The controls above apply only to ticked incomes. Others keep the 2.5% rise.</span>
       <div id="spList" class="sp-list">Loading incomes…</div>
     </div>
 
@@ -107,7 +173,8 @@
 <div class="panel">
   <h2>Impact vs Baseline</h2>
   <div class="card-grid">
-    <div class="card"><h3>State Pension received (lifetime)</h3><div id="kStatePension" class="value">£0</div><div id="kStateSub" class="sub">&nbsp;</div></div>
+    <div class="card"><h3>Pot at retirement</h3><div id="kPot" class="value">£0</div><div id="kPotSub" class="sub">&nbsp;</div></div>
+    <div class="card"><h3>State Pension (lifetime)</h3><div id="kStatePension" class="value">£0</div><div id="kStateSub" class="sub">&nbsp;</div></div>
     <div class="card"><h3>Total drawdown required</h3><div id="kDraw" class="value">£0</div><div id="kDrawSub" class="sub">&nbsp;</div></div>
     <div class="card"><h3>Pots run short</h3><div id="kRunout" class="value">—</div><div id="kRunoutSub" class="sub">&nbsp;</div></div>
   </div>
@@ -148,43 +215,102 @@
 
 <div class="panel">
   <p class="footnote">
-    <strong>Assumptions inherited from your engine</strong> (so the baseline matches): 5% annual pot growth, 2.5% baseline inflation on outgoings and guaranteed income, £12,570 personal allowance (frozen), 20% basic-rate tax on income above it, 25% tax-free / 75% taxable pot split at retirement, tax-free pot drawn before taxable. Starting pots come from your <code>generate_monthly_pension_forecast</code> function.
+    <strong>Inherited from your engine</strong> so the baseline matches: 2.5% inflation on outgoings &amp; guaranteed income, 5% growth during drawdown, £12,570 personal allowance, 20% basic-rate tax above it, 25% tax-free / 75% taxable split at retirement, tax-free pot drawn first. The accumulation forecast is a faithful port of <code>generate_monthly_pension_forecast</code>, calibrated to the server result so saved settings reproduce it exactly.
     <br><br>
-    <strong>Means-testing note:</strong> this v1 reduces State Pension by the taper rate for every £1 of modelled annual private drawdown above the threshold, recalculated each year. It's a simplified illustration of a policy direction, not a model of any specific proposed scheme.
+    <strong>Means-testing</strong> is a simplified illustration: per person, State Pension is reduced by the taper rate for every £1 of that person's modelled private drawdown above the threshold. It shows the direction of such a policy, not any specific scheme.
   </p>
 </div>
 
 <script>
-  // ---- Same credentials as your dashboard (read-only use here) ----
   const SUPABASE_URL = "https://yavfcitgyyftpubqwddp.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
   const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" });
 
   const fmt = (n) => "£" + Math.round(n || 0).toLocaleString("en-GB");
   const fmtDiff = (n) => (n >= 0 ? "+" : "−") + "£" + Math.abs(Math.round(n)).toLocaleString("en-GB");
+  const parseLocalDate = (s) => { if (!s) return null; const p = String(s).split('T')[0].split('-'); return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2] || 1)); };
+  const toInputDate = (d) => { if (!d) return ""; return d.getFullYear() + '-' + ("0" + (d.getMonth() + 1)).slice(-2) + '-' + ("0" + d.getDate()).slice(-2); };
 
-  // ---- Engine constants (mirrors the SQL) ----
   const INFL = 0.025, GROWTH = 0.05, PA = 12570;
 
-  // ---- Data holders ----
-  let members = [], bills = [], dining = [], guaranteed = [], grahamParams = null;
-  let startingPots = { graham: 0, julie: 0 };
+  let members = [], bills = [], dining = [], guaranteed = [], pensions = [], logs = [], contributions = [];
+  let grahamParams = null, savedPlan = null;
+  let serverPots = { graham: 0, julie: 0 };
+  let calib = { g: 1, j: 1 };
   let chartsReady = false;
 
   google.charts.load('current', { packages: ['corechart'] });
-  google.charts.setOnLoadCallback(() => { chartsReady = true; recompute(); });
+  google.charts.setOnLoadCallback(() => { chartsReady = true; if (savedPlan) recompute(); });
 
-  // -------------------------------------------------------------
-  //  FAITHFUL PORT OF calculate_joint_retirement (+ scenario hooks)
-  // -------------------------------------------------------------
-  function runEngine(opts) {
-    const params = grahamParams || {};
-    let gRatio = (params.drawdown_ratio_graham != null) ? Number(params.drawdown_ratio_graham) : 0.5;
-    let spendRed = (params.spending_reduction_pct != null) ? Number(params.spending_reduction_pct) : 1.0;
-    let jRatio = 1.0 - gRatio;
-    let retDate = params.retirement_date ? new Date(params.retirement_date) : new Date();
-    let currentYr = retDate.getFullYear();
+  // ---------- ACCUMULATION: faithful port of generate_monthly_pension_forecast ----------
+  function latestPots() {
+    const map = {};
+    pensions.forEach(p => {
+      let best = null;
+      logs.forEach(l => {
+        if (l.member_name === p.member_name && l.pension_name === p.pension_name) {
+          const t = new Date(l.log_date).getTime();
+          if (best === null || t > best.t) best = { t, v: Number(l.pot_value) || 0 };
+        }
+      });
+      map[p.member_name + '|' + p.pension_name] = best ? best.v : 0;
+    });
+    return map;
+  }
 
+  function jsForecast(plan, contribMult) {
+    const pots = latestPots();
+    const now = new Date();
+    let cur = new Date(now.getFullYear(), now.getMonth() + 1, 1); // first of next month
+    const retire = plan.retirementDate
+      ? new Date(plan.retirementDate.getFullYear(), plan.retirementDate.getMonth(), 1)
+      : new Date(cur.getFullYear() + 5, cur.getMonth(), 1);
+    const monthlyGrowth = (plan.growthRate != null ? plan.growthRate : 0.05) / 12;
+    let augusts = 0;
+
+    const sumMember = (who) => {
+      let s = 0;
+      pensions.forEach(p => { if (p.member_name === who) s += pots[p.member_name + '|' + p.pension_name] || 0; });
+      return s;
+    };
+    let maxG = sumMember('Graham'), maxJ = sumMember('Julie');
+
+    let guard = 0;
+    while (cur < retire && guard < 1200) {
+      guard++;
+      cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+
+      let gDays = 5;
+      if (plan.phase2Date && cur >= plan.phase2Date) gDays = plan.phase2Days;
+      else if (plan.phase1Date && cur >= plan.phase1Date) gDays = plan.phase1Days;
+
+      if (cur.getMonth() === 7) augusts++; // August
+
+      contributions.forEach(c => {
+        if (c.member_name === 'Graham' && Number(c.working_days) === Number(gDays)) {
+          const k = 'Graham|' + c.pension_name;
+          if (k in pots) pots[k] += (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), augusts);
+        }
+      });
+      contributions.forEach(c => {
+        if (c.member_name === 'Julie') {
+          const k = 'Julie|' + c.pension_name;
+          if (k in pots) pots[k] += (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), augusts);
+        }
+      });
+
+      Object.keys(pots).forEach(k => pots[k] *= (1 + monthlyGrowth));
+
+      const g = sumMember('Graham'), j = sumMember('Julie');
+      if (g > maxG) maxG = g;
+      if (j > maxJ) maxJ = j;
+    }
+    return { graham: maxG, julie: maxJ };
+  }
+
+  // ---------- DRAWDOWN: faithful port of calculate_joint_retirement ----------
+  function runEngine(cfg) {
+    const gRatio = cfg.gRatio, spendRed = cfg.spendRed, jRatio = 1 - gRatio, sp = cfg.sp;
     const gM = members.find(m => m.name === 'Graham') || {};
     const jM = members.find(m => m.name === 'Julie') || {};
     const gDobYr = gM.dob ? new Date(gM.dob).getFullYear() : null;
@@ -194,12 +320,12 @@
       gM.end_of_life_date ? new Date(gM.end_of_life_date).getFullYear() : -Infinity,
       jM.end_of_life_date ? new Date(jM.end_of_life_date).getFullYear() : -Infinity
     );
-    if (!isFinite(endYr) || endYr < currentYr) endYr = currentYr + 30;
+    if (!isFinite(endYr) || endYr < cfg.startYear) endYr = cfg.startYear + 30;
 
-    let gTf = startingPots.graham * 0.25, gTx = startingPots.graham * 0.75;
-    let jTf = startingPots.julie * 0.25,  jTx = startingPots.julie * 0.75;
+    let gTf = cfg.pots.graham * 0.25, gTx = cfg.pots.graham * 0.75;
+    let jTf = cfg.pots.julie * 0.25,  jTx = cfg.pots.julie * 0.75;
 
-    let yrsPassed = 0;
+    let yrsPassed = 0, yr = 0;
     const rows = [];
 
     const taperFor = (row, oldest) => {
@@ -209,83 +335,67 @@
       return 1.0;
     };
 
-    // gross guaranteed income for one member, split state vs other, with scenario hooks
     function grossFor(who) {
       let stateGross = 0, otherGross = 0;
       guaranteed.filter(g => g.member_name === who).forEach(g => {
-        const isState = opts.stateNames.has(g.income_name);
-        if (!g.start_date) return; // SQL: null start_date never qualifies
-        const delay = isState ? (opts.spDelay[who] || 0) : 0;
+        if (!g.start_date) return;
+        const isState = sp.stateNames.has(g.income_name);
+        const delay = isState ? (sp.spDelay[who] || 0) : 0;
         const startYr = new Date(g.start_date).getFullYear() + delay;
         const endYrG = g.end_date ? new Date(g.end_date).getFullYear() : null;
-        const active = (currentYr_loop >= startYr) && (endYrG === null || currentYr_loop <= endYrG);
-        if (!active) return;
-        const rate = isState ? opts.spRate : INFL;
+        if (yr < startYr || (endYrG !== null && yr > endYrG)) return;
+        const rate = isState ? sp.spRate : INFL;
         const val = (Number(g.initial_annual_value) || 0) * Math.pow(1 + rate, yrsPassed);
         if (isState) stateGross += val; else otherGross += val;
       });
       return { stateGross, otherGross, total: stateGross + otherGross };
     }
 
-    // pure per-person drawdown calc for a given guaranteed-income object
     function drawFor(target, inc, tfPot, txPot) {
       const dbGross = inc.total;
       let dbNet, paRem;
       if (dbGross > PA) { dbNet = PA + (dbGross - PA) * 0.80; paRem = 0; }
       else { dbNet = dbGross; paRem = PA - dbGross; }
-
       let gap = Math.max(target - dbNet, 0);
       const drawTf = Math.min(gap, tfPot);
       const tfAfter = tfPot - drawTf;
       gap -= drawTf;
-
       let desiredGross = 0;
-      if (gap > 0) {
-        if (gap <= paRem) desiredGross = gap;
-        else desiredGross = paRem + (gap - paRem) / 0.80;
-      }
+      if (gap > 0) desiredGross = (gap <= paRem) ? gap : paRem + (gap - paRem) / 0.80;
       const drawGross = Math.min(desiredGross, txPot);
       const txAfter = txPot - drawGross;
-      const shortfall = desiredGross > txPot + 0.5; // couldn't draw enough
-
-      return { drawTf, drawGross, tfAfter, txAfter, dbGross, shortfall, privateDraw: drawTf + drawGross };
+      const shortfall = desiredGross > txPot + 0.5;
+      return { drawTf, drawGross, tfAfter, txAfter, shortfall, privateDraw: drawTf + drawGross };
     }
 
-    // pass 1 (no means test) -> determine reduction -> pass 2
     function personYear(target, incRaw, tfPot, txPot) {
       const p1 = drawFor(target, incRaw, tfPot, txPot);
       let inc = incRaw;
-      if (opts.meansTest.enabled && opts.meansTest.taper > 0 && incRaw.stateGross > 0) {
-        const over = Math.max(0, p1.privateDraw - opts.meansTest.threshold);
-        const reduction = Math.min(opts.meansTest.taper * over, incRaw.stateGross);
+      if (sp.meansTest.enabled && sp.meansTest.taper > 0 && incRaw.stateGross > 0) {
+        const over = Math.max(0, p1.privateDraw - sp.meansTest.threshold);
+        const reduction = Math.min(sp.meansTest.taper * over, incRaw.stateGross);
         if (reduction > 0) inc = { stateGross: incRaw.stateGross - reduction, otherGross: incRaw.otherGross, total: incRaw.total - reduction };
       }
       const p2 = drawFor(target, inc, tfPot, txPot);
       return { ...p2, inc };
     }
 
-    let currentYr_loop = currentYr; // referenced inside grossFor
-    for (currentYr_loop = currentYr; currentYr_loop <= endYr; currentYr_loop++) {
-      const gAge = gDobYr != null ? currentYr_loop - gDobYr : 0;
-      const jAge = jDobYr != null ? currentYr_loop - jDobYr : 0;
+    for (yr = cfg.startYear; yr <= endYr; yr++) {
+      const gAge = gDobYr != null ? yr - gDobYr : 0;
+      const jAge = jDobYr != null ? yr - jDobYr : 0;
       const oldest = Math.max(gAge, jAge);
 
       const gTfStart = gTf, gTxStart = gTx, jTfStart = jTf, jTxStart = jTx;
 
-      let baseBills = bills.reduce((s, b) =>
-        s + (Number(b.total_annual) || 0) * (b.spend_reduction ? spendRed : 1.0) * taperFor(b, oldest), 0);
-      let baseDining = dining.reduce((s, d) =>
-        s + (Number(d.annual_total) || 0) * (d.spend_reduction ? spendRed : 1.0) * taperFor(d, oldest), 0);
+      const baseBills = bills.reduce((s, b) => s + (Number(b.total_annual) || 0) * (b.spend_reduction ? spendRed : 1.0) * taperFor(b, oldest), 0);
+      const baseDining = dining.reduce((s, d) => s + (Number(d.annual_total) || 0) * (d.spend_reduction ? spendRed : 1.0) * taperFor(d, oldest), 0);
 
       const inflFactor = Math.pow(1 + INFL, yrsPassed);
       const yrOut = (baseBills + baseDining) * inflFactor;
       const gTarget = yrOut * gRatio, jTarget = yrOut * jRatio;
 
-      const gInc = grossFor('Graham');
-      const jInc = grossFor('Julie');
-
-      const gRes = personYear(gTarget, gInc, gTf, gTx);
-      const jRes = personYear(jTarget, jInc, jTf, jTx);
+      const gRes = personYear(gTarget, grossFor('Graham'), gTf, gTx);
+      const jRes = personYear(jTarget, grossFor('Julie'), jTf, jTx);
 
       gTf = gRes.tfAfter; gTx = gRes.txAfter;
       jTf = jRes.tfAfter; jTx = jRes.txAfter;
@@ -293,79 +403,102 @@
       const drawdown = gRes.drawTf + gRes.drawGross + jRes.drawTf + jRes.drawGross;
       const stateGross = gRes.inc.stateGross + jRes.inc.stateGross;
       const otherPensions = gRes.inc.total + jRes.inc.total;
-      const combinedOpening = gTfStart + gTxStart + jTfStart + jTxStart;
 
-      // growth on remainder (SQL applies after returning the row)
       gTf *= (1 + GROWTH); gTx *= (1 + GROWTH); jTf *= (1 + GROWTH); jTx *= (1 + GROWTH);
-      const combinedClosing = gTf + gTx + jTf + jTx;
 
       rows.push({
-        year: currentYr_loop, gAge, jAge,
-        outgoings: yrOut,
-        taxFree: gTfStart + jTfStart,
-        taxable: gTxStart + jTxStart,
-        stateGross,
-        otherPensions,
-        drawdown,
+        year: yr, gAge, jAge, outgoings: yrOut,
+        taxFree: gTfStart + jTfStart, taxable: gTxStart + jTxStart,
+        stateGross, otherPensions, drawdown,
         totalIncome: otherPensions + drawdown,
-        combinedOpening, combinedClosing,
+        combinedClosing: gTf + gTx + jTf + jTx,
         shortfall: gRes.shortfall || jRes.shortfall
       });
-
       yrsPassed++;
     }
     return rows;
   }
 
-  // -------------------------------------------------------------
-  function currentScenarioOpts() {
-    const stateNames = new Set();
-    document.querySelectorAll('.sp-check:checked').forEach(c => stateNames.add(c.value));
+  // ---------- Control reading ----------
+  function readStateNames() {
+    const s = new Set();
+    document.querySelectorAll('.sp-check:checked').forEach(c => s.add(c.value));
+    return s;
+  }
+  function spOptsScenario() {
     return {
       spRate: parseFloat(document.getElementById('c_sp').value) / 100,
-      spDelay: {
-        Graham: parseInt(document.getElementById('c_delayG').value) || 0,
-        Julie: parseInt(document.getElementById('c_delayJ').value) || 0
-      },
-      meansTest: {
-        enabled: document.getElementById('c_mtOn').checked,
-        threshold: parseFloat(document.getElementById('c_mtThresh').value) || 0,
-        taper: (parseFloat(document.getElementById('c_mtTaper').value) || 0) / 100
-      },
-      stateNames
+      spDelay: { Graham: parseInt(document.getElementById('c_delayG').value) || 0, Julie: parseInt(document.getElementById('c_delayJ').value) || 0 },
+      meansTest: { enabled: document.getElementById('c_mtOn').checked, threshold: parseFloat(document.getElementById('c_mtThresh').value) || 0, taper: (parseFloat(document.getElementById('c_mtTaper').value) || 0) / 100 },
+      stateNames: readStateNames()
     };
   }
-
-  function baselineOpts(stateNames) {
+  function spOptsBaseline(stateNames) {
     return { spRate: INFL, spDelay: { Graham: 0, Julie: 0 }, meansTest: { enabled: false, threshold: 0, taper: 0 }, stateNames };
   }
+  function readPlanControls() {
+    return {
+      plan: {
+        retirementDate: parseLocalDate(document.getElementById('c_retire').value),
+        growthRate: parseFloat(document.getElementById('c_growth').value) / 100,
+        phase1Date: parseLocalDate(document.getElementById('c_p1date').value),
+        phase1Days: parseInt(document.getElementById('c_p1days').value),
+        phase2Date: parseLocalDate(document.getElementById('c_p2date').value),
+        phase2Days: parseInt(document.getElementById('c_p2days').value)
+      },
+      contribMult: parseFloat(document.getElementById('c_contrib').value) / 100,
+      spendRed: parseFloat(document.getElementById('c_spend').value) / 100,
+      gRatio: parseFloat(document.getElementById('c_ratio').value) / 100
+    };
+  }
+  const yearOf = (d, fallback) => d ? d.getFullYear() : fallback;
 
-  function onChange() {
+  function onInput() {
+    document.getElementById('v_growth').innerText = parseFloat(document.getElementById('c_growth').value).toFixed(1) + '%';
+    document.getElementById('v_contrib').innerText = document.getElementById('c_contrib').value + '%';
+    document.getElementById('v_spend').innerText = document.getElementById('c_spend').value + '%';
+    document.getElementById('v_ratio').innerText = document.getElementById('c_ratio').value + '%';
     document.getElementById('v_sp').innerText = parseFloat(document.getElementById('c_sp').value).toFixed(1) + '%';
     document.getElementById('v_mt').innerText = document.getElementById('c_mtTaper').value + 'p';
     recompute();
   }
 
   function recompute() {
-    if (!grahamParams && members.length === 0) return;
-    const scn = currentScenarioOpts();
-    const base = runEngine(baselineOpts(scn.stateNames));
-    const scen = runEngine(scn);
-    renderCards(base, scen);
+    const stateNames = readStateNames();
+    const nowYr = new Date().getFullYear();
+    const savedStartYr = yearOf(savedPlan.retirementDate, nowYr);
+
+    const base = runEngine({
+      pots: serverPots, gRatio: savedPlan.gRatio, spendRed: savedPlan.spendRed,
+      startYear: savedStartYr, sp: spOptsBaseline(stateNames)
+    });
+
+    const pc = readPlanControls();
+    const js = jsForecast(pc.plan, pc.contribMult);
+    const scnPots = { graham: js.graham * calib.g, julie: js.julie * calib.j };
+    const scen = runEngine({
+      pots: scnPots, gRatio: pc.gRatio, spendRed: pc.spendRed,
+      startYear: yearOf(pc.plan.retirementDate, nowYr), sp: spOptsScenario()
+    });
+
+    renderCards(base, scen, serverPots.graham + serverPots.julie, scnPots.graham + scnPots.julie);
     renderMainTable(base, scen);
     renderBaseTable(base);
     if (chartsReady) drawChart(base, scen);
   }
 
-  function sum(rows, key) { return rows.reduce((s, r) => s + (r[key] || 0), 0); }
-  function firstShortfall(rows) { const r = rows.find(x => x.shortfall); return r ? r.year : null; }
+  const sum = (rows, key) => rows.reduce((s, r) => s + (r[key] || 0), 0);
+  const firstShortfall = (rows) => { const r = rows.find(x => x.shortfall); return r ? r.year : null; };
 
-  function renderCards(base, scen) {
+  function renderCards(base, scen, basePot, scnPot) {
+    document.getElementById('kPot').innerText = fmt(scnPot);
+    const potDelta = scnPot - basePot;
+    document.getElementById('kPotSub').innerHTML = Math.abs(potDelta) < 1 ? 'same as baseline' : `<span class="${potDelta >= 0 ? 'good' : 'bad'}">${fmtDiff(potDelta)} vs baseline</span>`;
+
     const spBase = sum(base, 'stateGross'), spScn = sum(scen, 'stateGross');
     document.getElementById('kStatePension').innerText = fmt(spScn);
     const spDelta = spScn - spBase;
-    const spSub = document.getElementById('kStateSub');
-    spSub.innerHTML = Math.abs(spDelta) < 1 ? 'same as baseline' : `<span class="${spDelta < 0 ? 'bad' : 'good'}">${fmtDiff(spDelta)} vs baseline</span>`;
+    document.getElementById('kStateSub').innerHTML = Math.abs(spDelta) < 1 ? 'same as baseline' : `<span class="${spDelta < 0 ? 'bad' : 'good'}">${fmtDiff(spDelta)} vs baseline</span>`;
 
     const dBase = sum(base, 'drawdown'), dScn = sum(scen, 'drawdown');
     document.getElementById('kDraw').innerText = fmt(dScn);
@@ -373,48 +506,40 @@
     document.getElementById('kDrawSub').innerHTML = Math.abs(dDelta) < 1 ? 'same as baseline' : `<span class="${dDelta > 0 ? 'bad' : 'good'}">${fmtDiff(dDelta)} vs baseline</span>`;
 
     const sBase = firstShortfall(base), sScn = firstShortfall(scen);
-    const runoutEl = document.getElementById('kRunout'), runoutSub = document.getElementById('kRunoutSub');
-    if (!sScn) { runoutEl.innerHTML = '<span class="good">Lasts</span>'; runoutSub.innerText = 'pots cover the full plan'; }
+    const el = document.getElementById('kRunout'), subEl = document.getElementById('kRunoutSub');
+    if (!sScn) { el.innerHTML = '<span class="good">Lasts</span>'; subEl.innerText = 'pots cover the full plan'; }
     else {
-      runoutEl.innerHTML = `<span class="bad">${sScn}</span>`;
-      if (sBase && sBase !== sScn) runoutSub.innerHTML = `<span class="bad">${sBase - sScn} yr earlier than baseline</span>`;
-      else if (!sBase) runoutSub.innerHTML = `<span class="bad">baseline lasts the distance</span>`;
-      else runoutSub.innerText = 'same as baseline';
+      el.innerHTML = `<span class="bad">${sScn}</span>`;
+      if (sBase && sBase !== sScn) subEl.innerHTML = `<span class="bad">${sBase - sScn} yr earlier than baseline</span>`;
+      else if (!sBase) subEl.innerHTML = `<span class="bad">baseline lasted the distance</span>`;
+      else subEl.innerText = 'same as baseline';
     }
   }
 
   function renderMainTable(base, scen) {
     const tbody = document.querySelector('#mainTable tbody');
     if (scen.length === 0) { tbody.innerHTML = '<tr><td colspan="9">No projection rows.</td></tr>'; return; }
+    const baseByYear = {}; base.forEach(b => baseByYear[b.year] = b);
     let html = '';
-    for (let i = 0; i < scen.length; i++) {
-      const s = scen[i], b = base[i];
+    scen.forEach(s => {
+      const b = baseByYear[s.year] || { drawdown: 0, combinedClosing: 0 };
       html += `<tr class="${s.shortfall ? 'shortfall' : ''}">
-        <td>${s.year}</td>
-        <td>G${s.gAge} / J${s.jAge}</td>
-        <td>${fmt(s.outgoings)}</td>
-        <td class="scn">${fmt(s.stateGross)}</td>
-        <td>${fmt(s.otherPensions)}</td>
-        <td>${fmt(b.drawdown)}</td>
-        <td class="scn">${fmt(s.drawdown)}</td>
-        <td>${fmt(b.combinedClosing)}</td>
-        <td class="scn">${fmt(s.combinedClosing)}</td>
+        <td>${s.year}</td><td>G${s.gAge} / J${s.jAge}</td><td>${fmt(s.outgoings)}</td>
+        <td class="scn">${fmt(s.stateGross)}</td><td>${fmt(s.otherPensions)}</td>
+        <td>${fmt(b.drawdown)}</td><td class="scn">${fmt(s.drawdown)}</td>
+        <td>${fmt(b.combinedClosing)}</td><td class="scn">${fmt(s.combinedClosing)}</td>
       </tr>`;
-    }
+    });
     tbody.innerHTML = html;
   }
 
   function renderBaseTable(base) {
     const tbody = document.querySelector('#baseTable tbody');
     if (base.length === 0) { tbody.innerHTML = '<tr><td colspan="6">No rows.</td></tr>'; return; }
-    let html = '';
-    base.forEach(r => {
-      html += `<tr>
-        <td>${r.year}</td><td>${fmt(r.taxFree)}</td><td>${fmt(r.taxable)}</td>
-        <td>${fmt(r.otherPensions)}</td><td>${fmt(r.drawdown)}</td><td>${fmt(r.totalIncome)}</td>
-      </tr>`;
-    });
-    tbody.innerHTML = html;
+    tbody.innerHTML = base.map(r => `<tr>
+      <td>${r.year}</td><td>${fmt(r.taxFree)}</td><td>${fmt(r.taxable)}</td>
+      <td>${fmt(r.otherPensions)}</td><td>${fmt(r.drawdown)}</td><td>${fmt(r.totalIncome)}</td>
+    </tr>`).join('');
   }
 
   function drawChart(base, scen) {
@@ -422,30 +547,48 @@
     data.addColumn('string', 'Year');
     data.addColumn('number', 'Baseline pot');
     data.addColumn('number', 'Scenario pot');
-    for (let i = 0; i < scen.length; i++) {
-      data.addRow([String(scen[i].year), Math.round(base[i].combinedClosing), Math.round(scen[i].combinedClosing)]);
-    }
+    const baseByYear = {}; base.forEach(b => baseByYear[b.year] = b);
+    scen.forEach(s => data.addRow([String(s.year), Math.round((baseByYear[s.year] || {}).combinedClosing || 0), Math.round(s.combinedClosing)]));
     const numFmt = new google.visualization.NumberFormat({ prefix: '£', fractionDigits: 0 });
     numFmt.format(data, 1); numFmt.format(data, 2);
     new google.visualization.LineChart(document.getElementById('potChart')).draw(data, {
       title: 'Combined remaining pension pot (end of year)',
-      legend: { position: 'bottom' },
-      curveType: 'function', lineWidth: 3, pointSize: 3, pointsVisible: true,
+      legend: { position: 'bottom' }, curveType: 'function', lineWidth: 3, pointSize: 3, pointsVisible: true,
       chartArea: { left: 90, right: 30, top: 40, bottom: 60 },
-      vAxis: { format: '£#,###', minValue: 0 },
-      colors: ['#94a3b8', '#3498db']
+      vAxis: { format: '£#,###', minValue: 0 }, colors: ['#94a3b8', '#3498db']
     });
   }
 
   function buildStateList() {
     const names = [...new Set(guaranteed.map(g => g.income_name).filter(Boolean))].sort();
     const el = document.getElementById('spList');
-    if (names.length === 0) { el.innerHTML = '<span class="hint">No guaranteed incomes found in the database.</span>'; return; }
+    if (names.length === 0) { el.innerHTML = '<span class="hint">No guaranteed incomes found.</span>'; return; }
     el.innerHTML = names.map(n => {
       const checked = n.toLowerCase().includes('state') ? 'checked' : '';
-      return `<label><input type="checkbox" class="sp-check" value="${n}" ${checked} onchange="onChange()"> ${n}</label>`;
+      return `<label><input type="checkbox" class="sp-check" value="${n}" ${checked} onchange="onInput()"> ${n}</label>`;
     }).join('');
   }
+
+  function applySavedToControls() {
+    document.getElementById('c_retire').value = toInputDate(savedPlan.retirementDate);
+    document.getElementById('c_growth').value = (savedPlan.growthRate * 100).toFixed(2);
+    document.getElementById('c_p1date').value = toInputDate(savedPlan.phase1Date);
+    document.getElementById('c_p1days').value = String(savedPlan.phase1Days);
+    document.getElementById('c_p2date').value = toInputDate(savedPlan.phase2Date);
+    document.getElementById('c_p2days').value = String(savedPlan.phase2Days);
+    document.getElementById('c_contrib').value = 100;
+    document.getElementById('c_spend').value = Math.round(savedPlan.spendRed * 100);
+    document.getElementById('c_ratio').value = Math.round(savedPlan.gRatio * 100);
+    document.getElementById('c_sp').value = 2.5;
+    document.getElementById('c_delayG').value = 0;
+    document.getElementById('c_delayJ').value = 0;
+    document.getElementById('c_mtOn').checked = false;
+    document.getElementById('c_mtThresh').value = 20000;
+    document.getElementById('c_mtTaper').value = 50;
+    document.querySelectorAll('.sp-check').forEach(c => { c.checked = c.value.toLowerCase().includes('state'); });
+  }
+
+  function resetControls() { applySavedToControls(); onInput(); }
 
   async function loadData() {
     const status = document.getElementById('status');
@@ -456,26 +599,44 @@
         return r.json();
       };
 
-      [members, bills, dining, guaranteed] = await Promise.all([
-        get('bd_members'),
-        get('bd_household_bills'),
-        get('bd_dining_habits'),
-        get('bd_guaranteed_incomes')
+      [members, bills, dining, guaranteed, pensions, contributions, logs] = await Promise.all([
+        get('bd_members'), get('bd_household_bills'), get('bd_dining_habits'),
+        get('bd_guaranteed_incomes'), get('bd_pensions'),
+        get('bd_pension_contributions'), get('op_pension_logs?order=log_date.desc')
       ]);
 
       const pData = await get('op_modelling_parameters?member_name=eq.Graham&order=updated_at.desc&limit=1');
-      grahamParams = (pData && pData.length) ? pData[0] : null;
+      grahamParams = (pData && pData.length) ? pData[0] : {};
 
+      savedPlan = {
+        retirementDate: parseLocalDate(grahamParams.retirement_date),
+        growthRate: grahamParams.pension_growth_rate != null ? Number(grahamParams.pension_growth_rate) : 0.05,
+        phase1Date: parseLocalDate(grahamParams.shorter_week_date_1),
+        phase1Days: grahamParams.working_days_1 ? Number(grahamParams.working_days_1) : 5,
+        phase2Date: parseLocalDate(grahamParams.shorter_week_date_2),
+        phase2Days: grahamParams.working_days_2 ? Number(grahamParams.working_days_2) : 5,
+        spendRed: grahamParams.spending_reduction_pct != null ? Number(grahamParams.spending_reduction_pct) : 1.0,
+        gRatio: grahamParams.drawdown_ratio_graham != null ? Number(grahamParams.drawdown_ratio_graham) : 0.5
+      };
+
+      // server forecast = source of truth for the baseline pots
       const fRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/generate_monthly_pension_forecast`, { method: 'POST', headers: getHeaders(), body: '{}' });
       if (!fRes.ok) throw new Error(`forecast → ${fRes.status}`);
       const fData = await fRes.json();
-      startingPots.graham = Math.max(0, ...fData.map(r => Number(r.graham_total) || 0));
-      startingPots.julie  = Math.max(0, ...fData.map(r => Number(r.julie_total)  || 0));
+      serverPots.graham = Math.max(0, ...fData.map(r => Number(r.graham_total) || 0));
+      serverPots.julie  = Math.max(0, ...fData.map(r => Number(r.julie_total)  || 0));
+
+      // calibrate the JS forecast so saved settings reproduce the server figure exactly
+      const js0 = jsForecast(savedPlan, 1);
+      calib.g = js0.graham > 0 ? serverPots.graham / js0.graham : 1;
+      calib.j = js0.julie  > 0 ? serverPots.julie  / js0.julie  : 1;
 
       buildStateList();
+      applySavedToControls();
+      onInput();
+
       status.className = 'status-ok';
-      status.innerText = `Loaded. Starting pots — Graham ${fmt(startingPots.graham)}, Julie ${fmt(startingPots.julie)}. Adjust the controls above.`;
-      recompute();
+      status.innerText = `Loaded. Saved-plan pots at retirement — Graham ${fmt(serverPots.graham)}, Julie ${fmt(serverPots.julie)}. Adjust any control above; Reset returns to your saved plan.`;
     } catch (e) {
       status.className = 'status-err';
       status.innerText = 'Could not load data: ' + e.message + '. Check your network settings allow access to Supabase.';
