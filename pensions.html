@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pensions</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; color: #333; max-width: 860px; margin: 0 auto; }
+  h1 { color: #2c3e50; }
+  .owner-head { color:#2c3e50; font-size:16px; font-weight:bold; margin:24px 0 10px; padding-bottom:6px; border-bottom:2px solid #cbd5e1; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin-bottom:20px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  .intro { font-size:14px; color:#475569; line-height:1.5; }
+  .card { border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-bottom:14px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+  .card-top { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .card-top .nm { font-weight:bold; color:#2c3e50; font-size:15px; }
+  .dirty-flag { display:none; font-size:11px; color:#b45309; background:#fef3c7; border:1px solid #fcd34d; padding:2px 8px; border-radius:12px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px; }
+  .field label { display:block; font-weight:bold; margin-bottom:6px; color:#2c3e50; font-size:13px; }
+  input[type="text"], select { padding:9px; border:1px solid #ccc; border-radius:4px; font-family:inherit; box-sizing:border-box; width:100%; max-width:260px; }
+  .meta { font-size:11px; color:#94a3b8; margin-top:12px; }
+  .btn { background:#3498db; color:#fff; border:none; padding:9px 18px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:14px; }
+  .btn-save { background:#27ae60; } .btn-save:hover { background:#219150; }
+  .btn-ghost { background:#64748b; } .btn-ghost:hover { background:#475569; }
+  .btn-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+  .row-msg { margin-top:10px; font-weight:bold; font-size:13px; }
+  #status { padding:10px; border-radius:6px; font-weight:bold; margin-bottom:15px; }
+  .status-load { background:#eff6ff; color:#1e3a8a; }
+  .status-err  { background:#fdecea; color:#c0392b; }
+  .status-ok   { background:#d1fae5; color:#065f46; }
+</style>
+</head>
+<body>
+
+<h1>Pensions</h1>
+<div id="status" class="status-load">Connecting to your database…</div>
+
+<div class="panel">
+  <p class="intro">
+    The pension pots the model tracks, grouped by owner. You can edit the <strong>name</strong>, <strong>type</strong> and <strong>owner</strong> of each.
+    Each pot is saved <strong>separately</strong> and nothing is stored until you tap its <strong>Save</strong>; <strong>Reload</strong> discards edits.
+    <br><br>
+    <strong>One important note on type:</strong> only pots set to <strong>Defined Contributions</strong> appear in the dashboard's Log Entry form (those are the ones you log balances for). The type is a dropdown to keep that value exact.
+  </p>
+</div>
+
+<div id="container"></div>
+
+<script>
+  const SUPABASE_URL = "https://yavfcitgyyftpubqwddp.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
+  const PENS_URL = `${SUPABASE_URL}/rest/v1/bd_pensions`;
+  const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" });
+
+  const STANDARD_TYPES = ['Defined Contributions', 'Defined Benefit'];
+  let pensions = [];
+  let memberNames = [];
+  let typeOptions = [];
+  const dirty = {};
+
+  function markDirty(id) { dirty[id] = true; const f = document.getElementById('dirty_' + id); if (f) f.style.display = 'inline-block'; }
+  function clearDirty(id) { dirty[id] = false; const f = document.getElementById('dirty_' + id); if (f) f.style.display = 'none'; }
+
+  function optionList(values, selected) {
+    return values.map(v => `<option value="${v.replace(/"/g, '&quot;')}" ${v === selected ? 'selected' : ''}>${v}</option>`).join('');
+  }
+
+  function render() {
+    const c = document.getElementById('container');
+    if (!pensions.length) { c.innerHTML = '<div class="panel">No pensions found in the database.</div>'; return; }
+
+    // group by owner; owners with no member_name go under "Unassigned"
+    const owners = [...new Set(pensions.map(p => p.member_name || 'Unassigned'))].sort();
+    let html = '';
+    owners.forEach(owner => {
+      html += `<div class="owner-head">${owner}</div>`;
+      pensions.filter(p => (p.member_name || 'Unassigned') === owner).forEach(p => {
+        const id = p.id;
+        html += `<div class="card">
+          <div class="card-top">
+            <span class="nm">${p.pension_name}</span>
+            <span id="dirty_${id}" class="dirty-flag">Unsaved</span>
+          </div>
+          <div class="grid">
+            <div class="field">
+              <label>Pension name</label>
+              <input type="text" id="name_${id}" value="${(p.pension_name || '').replace(/"/g, '&quot;')}" oninput="markDirty('${id}')">
+            </div>
+            <div class="field">
+              <label>Type</label>
+              <select id="type_${id}" onchange="markDirty('${id}')">${optionList(typeOptions, p.pension_type)}</select>
+            </div>
+            <div class="field">
+              <label>Owner</label>
+              <select id="owner_${id}" onchange="markDirty('${id}')">${optionList(memberNames, p.member_name)}</select>
+            </div>
+          </div>
+          <div class="meta">id: ${id}</div>
+          <div class="btn-row">
+            <button class="btn btn-save" onclick="savePension('${id}')">Save</button>
+            <button class="btn btn-ghost" onclick="reloadPension('${id}')">Reload</button>
+          </div>
+          <div class="row-msg" id="msg_${id}"></div>
+        </div>`;
+      });
+    });
+    c.innerHTML = html;
+  }
+
+  function reloadPension(id) {
+    if (dirty[id] && !confirm('Discard unsaved edits to this pension?')) return;
+    const p = pensions.find(x => x.id === id);
+    document.getElementById('name_' + id).value = p.pension_name || '';
+    document.getElementById('type_' + id).value = p.pension_type;
+    document.getElementById('owner_' + id).value = p.member_name;
+    clearDirty(id);
+    document.getElementById('msg_' + id).innerHTML = '';
+  }
+
+  async function savePension(id) {
+    const msg = document.getElementById('msg_' + id);
+    const name = document.getElementById('name_' + id).value.trim();
+    const type = document.getElementById('type_' + id).value;
+    const owner = document.getElementById('owner_' + id).value;
+
+    if (!name) { msg.style.color = '#c0392b'; msg.innerText = 'Pension name can\'t be empty. Nothing saved.'; return; }
+
+    const orig = pensions.find(x => x.id === id);
+    // Warn if renaming, because logs/contributions reference pensions by name
+    if (name !== orig.pension_name) {
+      if (!confirm(`You're renaming "${orig.pension_name}" to "${name}". Existing logs and contributions reference the old name and won't be renamed automatically. Continue?`)) {
+        msg.style.color = '#475569'; msg.innerText = 'Save cancelled.'; return;
+      }
+    }
+
+    const payload = { pension_name: name, pension_type: type, member_name: owner };
+    msg.style.color = '#1e3a8a'; msg.innerText = 'Saving…';
+    try {
+      const res = await fetch(`${PENS_URL}?id=eq.${id}`,
+        { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error('PATCH → ' + res.status);
+      const check = await fetch(`${PENS_URL}?id=eq.${id}`, { headers: getHeaders() });
+      const rows = check.ok ? await check.json() : [];
+      if (rows.length) { const i = pensions.findIndex(x => x.id === id); if (i >= 0) pensions[i] = rows[0]; }
+      clearDirty(id);
+      msg.style.color = '#065f46';
+      msg.innerText = '✓ Saved. Refresh the dashboard or Scenario Lab to pick up the change.';
+    } catch (e) {
+      msg.style.color = '#c0392b';
+      msg.innerText = 'Save failed: ' + e.message + '. Nothing was changed.';
+    }
+  }
+
+  async function loadAll() {
+    const status = document.getElementById('status');
+    try {
+      const get = async (path) => { const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: getHeaders() }); if (!r.ok) throw new Error(path + ' → ' + r.status); return r.json(); };
+      const [pens, members] = await Promise.all([ get('bd_pensions?order=member_name.asc,pension_name.asc'), get('bd_members?order=name.asc') ]);
+      pensions = pens;
+      memberNames = [...new Set(members.map(m => m.name).filter(Boolean))];
+      // build type dropdown from existing values + standards, no duplicates
+      typeOptions = [...new Set([...STANDARD_TYPES, ...pensions.map(p => p.pension_type).filter(Boolean)])];
+      render();
+      status.className = 'status-ok';
+      status.innerText = `Loaded ${pensions.length} pension${pensions.length === 1 ? '' : 's'} across ${memberNames.length} member${memberNames.length === 1 ? '' : 's'}.`;
+    } catch (e) {
+      status.className = 'status-err';
+      status.innerText = 'Could not load: ' + e.message + '. Check your network settings allow access to Supabase.';
+    }
+  }
+
+  window.addEventListener('beforeunload', (e) => { if (Object.values(dirty).some(Boolean)) { e.preventDefault(); e.returnValue = ''; } });
+
+  loadAll();
+</script>
+</body>
+</html>
