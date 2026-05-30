@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contributions</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; color: #333; max-width: 880px; margin: 0 auto; }
+  h1 { color: #2c3e50; }
+  .owner-head { color:#2c3e50; font-size:16px; font-weight:bold; margin:24px 0 6px; padding-bottom:6px; border-bottom:2px solid #cbd5e1; }
+  .pension-head { color:#475569; font-size:14px; font-weight:bold; margin:14px 0 8px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin-bottom:20px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  .intro { font-size:14px; color:#475569; line-height:1.5; }
+  .card { border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-bottom:12px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+  .card-top { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .tier-badge { font-size:12px; font-weight:bold; padding:3px 10px; border-radius:12px; background:#e0e7ff; color:#3730a3; }
+  .tier-badge.na { background:#e2e8f0; color:#64748b; }
+  .dirty-flag { display:none; font-size:11px; color:#b45309; background:#fef3c7; border:1px solid #fcd34d; padding:2px 8px; border-radius:12px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap:16px; }
+  .field label { display:block; font-weight:bold; margin-bottom:6px; color:#2c3e50; font-size:13px; }
+  .field .hint { font-weight:normal; font-size:11px; color:#64748b; display:block; margin-bottom:6px; }
+  input[type="number"], select { padding:9px; border:1px solid #ccc; border-radius:4px; font-family:inherit; box-sizing:border-box; width:100%; max-width:200px; }
+  .input-prefix { position:relative; display:inline-block; max-width:200px; width:100%; }
+  .meta { font-size:11px; color:#94a3b8; margin-top:12px; }
+  .btn { background:#3498db; color:#fff; border:none; padding:9px 18px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:14px; }
+  .btn-save { background:#27ae60; } .btn-save:hover { background:#219150; }
+  .btn-ghost { background:#64748b; } .btn-ghost:hover { background:#475569; }
+  .btn-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+  .row-msg { margin-top:10px; font-weight:bold; font-size:13px; }
+  #status { padding:10px; border-radius:6px; font-weight:bold; margin-bottom:15px; }
+  .status-load { background:#eff6ff; color:#1e3a8a; }
+  .status-err  { background:#fdecea; color:#c0392b; }
+  .status-ok   { background:#d1fae5; color:#065f46; }
+</style>
+</head>
+<body>
+
+<h1>Contributions</h1>
+<div id="status" class="status-load">Connecting to your database…</div>
+
+<div class="panel">
+  <p class="intro">
+    The monthly amounts paid into each pension. For Graham, contributions vary by <strong>working-days tier</strong> (5-, 4- or 3-day week) and the model picks the row matching his current phase &mdash; so each tier is shown clearly.
+    Each row is saved <strong>separately</strong>; nothing is stored until you tap its <strong>Save</strong>, and <strong>Reload</strong> discards edits.
+    <br><br>
+    <strong>August increase</strong> is entered as a friendly percentage (e.g. <code>3</code> for 3%) &mdash; the model applies it once each August to grow the contribution over time.
+  </p>
+</div>
+
+<div id="container"></div>
+
+<script>
+  const SUPABASE_URL = "https://yavfcitgyyftpubqwddp.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
+  const CONTRIB_URL = `${SUPABASE_URL}/rest/v1/bd_pension_contributions`;
+  const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" });
+
+  const fmt = (n) => "£" + Number(n || 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let rows = [];
+  const dirty = {};
+
+  function markDirty(id) { dirty[id] = true; const f = document.getElementById('dirty_' + id); if (f) f.style.display = 'inline-block'; }
+  function clearDirty(id) { dirty[id] = false; const f = document.getElementById('dirty_' + id); if (f) f.style.display = 'none'; }
+
+  // stored decimal (0.03) <-> friendly percent (3)
+  const toPct = (dec) => dec == null ? '' : +(Number(dec) * 100).toFixed(4);
+  const toDec = (pct) => pct === '' || pct == null ? null : Number(pct) / 100;
+
+  function tierLabel(wd) {
+    if (wd == null) return { txt: 'All / n/a', cls: 'na' };
+    return { txt: wd + '-day week', cls: '' };
+  }
+
+  function render() {
+    const c = document.getElementById('container');
+    if (!rows.length) { c.innerHTML = '<div class="panel">No contribution rows found in the database.</div>'; return; }
+
+    const owners = [...new Set(rows.map(r => r.member_name || 'Unassigned'))].sort();
+    let html = '';
+    owners.forEach(owner => {
+      html += `<div class="owner-head">${owner}</div>`;
+      const pensionsForOwner = [...new Set(rows.filter(r => (r.member_name || 'Unassigned') === owner).map(r => r.pension_name))].sort();
+      pensionsForOwner.forEach(pen => {
+        html += `<div class="pension-head">${pen}</div>`;
+        rows.filter(r => (r.member_name || 'Unassigned') === owner && r.pension_name === pen)
+            .sort((a, b) => (b.working_days || 0) - (a.working_days || 0))
+            .forEach(r => {
+          const id = r.id;
+          const tier = tierLabel(r.working_days);
+          html += `<div class="card">
+            <div class="card-top">
+              <span class="tier-badge ${tier.cls}">${tier.txt}</span>
+              <span id="dirty_${id}" class="dirty-flag">Unsaved</span>
+            </div>
+            <div class="grid">
+              <div class="field">
+                <label>Monthly contribution</label>
+                <span class="hint">Amount paid in each month (£).</span>
+                <input type="number" step="0.01" id="amt_${id}" value="${r.monthly_contribution != null ? r.monthly_contribution : ''}" oninput="markDirty('${id}')">
+              </div>
+              <div class="field">
+                <label>Working-days tier</label>
+                <span class="hint">Which week pattern this row applies to.</span>
+                <select id="wd_${id}" onchange="markDirty('${id}')">
+                  <option value="" ${r.working_days == null ? 'selected' : ''}>Not tier-specific</option>
+                  <option value="5" ${r.working_days === 5 ? 'selected' : ''}>5-day week</option>
+                  <option value="4" ${r.working_days === 4 ? 'selected' : ''}>4-day week</option>
+                  <option value="3" ${r.working_days === 3 ? 'selected' : ''}>3-day week</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>August increase (%)</label>
+                <span class="hint">Annual rise applied each August.</span>
+                <input type="number" step="0.01" id="aug_${id}" value="${toPct(r.august_increase_pct)}" oninput="markDirty('${id}')">
+              </div>
+            </div>
+            <div class="meta">id: ${id}</div>
+            <div class="btn-row">
+              <button class="btn btn-save" onclick="saveRow('${id}')">Save</button>
+              <button class="btn btn-ghost" onclick="reloadRow('${id}')">Reload</button>
+            </div>
+            <div class="row-msg" id="msg_${id}"></div>
+          </div>`;
+        });
+      });
+    });
+    c.innerHTML = html;
+  }
+
+  function reloadRow(id) {
+    if (dirty[id] && !confirm('Discard unsaved edits to this row?')) return;
+    const r = rows.find(x => x.id === id);
+    document.getElementById('amt_' + id).value = r.monthly_contribution != null ? r.monthly_contribution : '';
+    document.getElementById('wd_' + id).value = r.working_days == null ? '' : String(r.working_days);
+    document.getElementById('aug_' + id).value = toPct(r.august_increase_pct);
+    clearDirty(id);
+    document.getElementById('msg_' + id).innerHTML = '';
+  }
+
+  async function saveRow(id) {
+    const msg = document.getElementById('msg_' + id);
+    const amtRaw = document.getElementById('amt_' + id).value;
+    const wdRaw = document.getElementById('wd_' + id).value;
+    const augRaw = document.getElementById('aug_' + id).value;
+
+    const amt = amtRaw === '' ? null : Number(amtRaw);
+    if (amt != null && (isNaN(amt) || amt < 0)) { msg.style.color = '#c0392b'; msg.innerText = 'Monthly contribution must be a positive number. Nothing saved.'; return; }
+    const augPct = augRaw === '' ? null : Number(augRaw);
+    if (augPct != null && (isNaN(augPct) || augPct < 0 || augPct > 100)) { msg.style.color = '#c0392b'; msg.innerText = 'August increase looks wrong — enter a percentage like 3 (not 0.03). Nothing saved.'; return; }
+
+    const payload = {
+      monthly_contribution: amt,
+      working_days: wdRaw === '' ? null : parseInt(wdRaw),
+      august_increase_pct: toDec(augRaw)
+    };
+
+    msg.style.color = '#1e3a8a'; msg.innerText = 'Saving…';
+    try {
+      const res = await fetch(`${CONTRIB_URL}?id=eq.${id}`,
+        { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error('PATCH → ' + res.status);
+      const check = await fetch(`${CONTRIB_URL}?id=eq.${id}`, { headers: getHeaders() });
+      const fresh = check.ok ? await check.json() : [];
+      if (fresh.length) { const i = rows.findIndex(x => x.id === id); if (i >= 0) rows[i] = fresh[0]; }
+      clearDirty(id);
+      msg.style.color = '#065f46';
+      msg.innerText = '✓ Saved. Refresh the dashboard or Scenario Lab to pick up the change.';
+    } catch (e) {
+      msg.style.color = '#c0392b';
+      msg.innerText = 'Save failed: ' + e.message + '. Nothing was changed.';
+    }
+  }
+
+  async function loadAll() {
+    const status = document.getElementById('status');
+    try {
+      const r = await fetch(`${CONTRIB_URL}?order=member_name.asc,pension_name.asc`, { headers: getHeaders() });
+      if (!r.ok) throw new Error('load → ' + r.status);
+      rows = await r.json();
+      render();
+      status.className = 'status-ok';
+      status.innerText = `Loaded ${rows.length} contribution row${rows.length === 1 ? '' : 's'}.`;
+    } catch (e) {
+      status.className = 'status-err';
+      status.innerText = 'Could not load: ' + e.message + '. Check your network settings allow access to Supabase.';
+    }
+  }
+
+  window.addEventListener('beforeunload', (e) => { if (Object.values(dirty).some(Boolean)) { e.preventDefault(); e.returnValue = ''; } });
+
+  loadAll();
+</script>
+</body>
+</html>
