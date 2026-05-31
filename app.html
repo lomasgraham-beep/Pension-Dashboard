@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Joint Pension Analytics</title>
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="common.js"></script>
+  <script src="engine.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; color: #333; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+    .topbar h1 { margin:0; font-size:22px; color:#2c3e50; }
+    .right { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    .view-toggle { background:#e2e8f0; border-radius:6px; overflow:hidden; display:flex; border:1px solid #cbd5e1; }
+    .btn-toggle { background:transparent; border:none; padding:9px 16px; font-weight:bold; cursor:pointer; color:#64748b; font-size:13px; }
+    .btn-toggle:hover { background:#cbd5e1; }
+    .btn-toggle.active-toggle { background:#3498db; color:#fff; }
+    .who { font-size:13px; color:#64748b; }
+    .who a { color:#3498db; font-weight:bold; cursor:pointer; text-decoration:none; margin-left:10px; }
+    .who a:hover { text-decoration:underline; }
+
+    .tab-buttons { display:flex; flex-wrap:wrap; border:1px solid #ccc; background:#e2e8f0; border-radius:8px 8px 0 0; }
+    .tab-buttons button { background:inherit; border:none; cursor:pointer; padding:13px 16px; font-size:15px; font-weight:bold; color:#4a5568; }
+    .tab-buttons button.active-btn { background:#fff; border-bottom:3px solid #3498db; color:#2c3e50; }
+    .tabcontent { display:none; padding:20px; background:#fff; border:1px solid #ccc; border-top:none; border-radius:0 0 8px 8px; }
+    .tabcontent.active { display:block; }
+    h2 { color:#2c3e50; margin-top:0; padding-bottom:5px; border-bottom:2px solid #e2e8f0; }
+
+    .card-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:15px; margin-bottom:10px; }
+    .card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:15px; text-align:center; }
+    .card.hl { background:#eff6ff; border-color:#bfdbfe; }
+    .card h3 { margin:0 0 8px; font-size:12px; color:#64748b; text-transform:uppercase; }
+    .card .value { font-size:24px; font-weight:bold; color:#2c3e50; }
+    .card.hl .value { color:#1e3a8a; }
+
+    .chart-box { width:100%; height:400px; margin-bottom:20px; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
+    th, td { padding:9px 10px; border-bottom:1px solid #e2e8f0; text-align:right; white-space:nowrap; }
+    th:first-child, td:first-child { text-align:left; }
+    th { background:#f8fafc; color:#2c3e50; }
+    tr.shortfall td { background:#fdecea; }
+    .table-wrap { overflow-x:auto; }
+
+    .subtab-buttons { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:15px; border-bottom:2px solid #e2e8f0; padding-bottom:10px; }
+    .subtab-link { background:#eef2f7; border:1px solid #cbd5e1; color:#475569; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:14px; }
+    .subtab-link:hover { background:#e2e8f0; }
+    .subtab-link.active-sub { background:#3498db; color:#fff; border-color:#3498db; }
+    .subtabcontent { display:none; }
+    .app-frame { width:100%; border:none; min-height:500px; background:#fff; border-radius:8px; }
+    .note { font-size:12px; color:#64748b; margin-bottom:10px; }
+    #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
+    .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <h1>Joint Pension Analytics</h1>
+    <div class="right">
+      <div class="view-toggle">
+        <button id="vt-Joint" class="btn-toggle active-toggle" onclick="setView('Joint')">Joint</button>
+        <button id="vt-Graham" class="btn-toggle" onclick="setView('Graham')">Graham</button>
+        <button id="vt-Julie" class="btn-toggle" onclick="setView('Julie')">Julie</button>
+      </div>
+      <span class="who"><span id="whoami"></span><a onclick="App.doLogout()">Log out</a></span>
+    </div>
+  </div>
+
+  <div class="tab-buttons">
+    <button class="tab-link active-btn" onclick="showTab(event,'Overview')">Overview</button>
+    <button class="tab-link" onclick="showTab(event,'Modelling')">Modelling</button>
+    <button class="tab-link" onclick="showTab(event,'Retirement')">Retirement</button>
+    <button class="tab-link" onclick="showTab(event,'ScenarioLab')">Scenario Lab</button>
+    <button class="tab-link" onclick="showTab(event,'BasicData')">Basic Data</button>
+  </div>
+
+  <div id="Overview" class="tabcontent active">
+    <div id="status" class="s-load">Loading…</div>
+    <h2>Current Position</h2>
+    <div class="card-grid">
+      <div class="card hl"><h3>Combined pot now</h3><div id="ovCombined" class="value">£0</div></div>
+      <div class="card"><h3>Graham now</h3><div id="ovGraham" class="value">£0</div></div>
+      <div class="card"><h3>Julie now</h3><div id="ovJulie" class="value">£0</div></div>
+    </div>
+    <h2 style="margin-top:25px;">Projected at Retirement</h2>
+    <div class="card-grid">
+      <div class="card hl"><h3>Combined pot at retirement</h3><div id="ovProjCombined" class="value">£0</div></div>
+      <div class="card"><h3>Graham at retirement</h3><div id="ovProjGraham" class="value">£0</div></div>
+      <div class="card"><h3>Julie at retirement</h3><div id="ovProjJulie" class="value">£0</div></div>
+    </div>
+    <p class="note" id="ovNote" style="margin-top:14px;"></p>
+  </div>
+
+  <div id="Modelling" class="tabcontent">
+    <h2><span class="viewlabel">Joint</span> Projections</h2>
+    <p class="note">Computed live from your saved plan. Edit the plan under <strong>Basic Data → Defaults</strong>; try what-ifs in the <strong>Scenario Lab</strong>.</p>
+    <div id="potChart" class="chart-box"></div>
+    <div id="incomeChart" class="chart-box"></div>
+  </div>
+
+  <div id="Retirement" class="tabcontent">
+    <h2><span class="viewlabel">Joint</span> Retirement Drawdown</h2>
+    <div class="table-wrap">
+      <table id="rTable">
+        <thead><tr><th>Year</th><th>Ages</th><th>Outgoings</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Guaranteed Income</th><th>Drawdown</th><th>Total Income</th><th>End Pot</th></tr></thead>
+        <tbody><tr><td colspan="9">Calculating…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="ScenarioLab" class="tabcontent">
+    <p class="note">Live what-if modelling — nothing here is saved. Use the tabs above to return.</p>
+    <iframe id="frame-lab" class="app-frame" title="Scenario Lab"></iframe>
+  </div>
+
+  <div id="BasicData" class="tabcontent">
+    <div class="subtab-buttons">
+      <button id="subbtn-Members" class="subtab-link active-sub" onclick="showSub(event,'Members')">Members</button>
+      <button id="subbtn-Pensions" class="subtab-link" onclick="showSub(event,'Pensions')">Pensions</button>
+      <button id="subbtn-Contributions" class="subtab-link" onclick="showSub(event,'Contributions')">Contributions</button>
+      <button id="subbtn-Defaults" class="subtab-link" onclick="showSub(event,'Defaults')">Defaults</button>
+    </div>
+    <p class="note">Edit your reference data. Saving here updates the plan; reopen this dashboard to see new projections.</p>
+    <div id="sub-Members" class="subtabcontent"><iframe id="frame-Members" class="app-frame" title="Members"></iframe></div>
+    <div id="sub-Pensions" class="subtabcontent"><iframe id="frame-Pensions" class="app-frame" title="Pensions"></iframe></div>
+    <div id="sub-Contributions" class="subtabcontent"><iframe id="frame-Contributions" class="app-frame" title="Contributions"></iframe></div>
+    <div id="sub-Defaults" class="subtabcontent"><iframe id="frame-Defaults" class="app-frame" title="Defaults"></iframe></div>
+  </div>
+
+  <script>
+    const fmt = App.fmt;
+    let data = {};            // all loaded tables
+    let savedPlan = null;     // parsed modelling parameters
+    let serverPots = null;    // forecast pots calibrated to the server
+    let drawdownRows = [];    // engine.drawdown output for the saved plan
+    let currentView = 'Joint';
+    let chartsReady = false;
+
+    google.charts.load('current', { packages: ['corechart'] });
+    google.charts.setOnLoadCallback(() => { chartsReady = true; if (drawdownRows.length) drawCharts(); });
+
+    // ---------- view toggle ----------
+    function setView(v) {
+      currentView = v;
+      ['Joint','Graham','Julie'].forEach(n => document.getElementById('vt-' + n).classList.toggle('active-toggle', n === v));
+      document.querySelectorAll('.viewlabel').forEach(el => el.textContent = v);
+      renderRetirementTable();
+      if (chartsReady) drawCharts();
+    }
+
+    // ---------- per-view field pickers ----------
+    function vrow(r) {
+      if (currentView === 'Graham') return { tf:r.g_taxFree, tx:r.g_taxable, other:r.g_other, draw:r.g_draw, income:r.g_income, out:r.gTarget, close:r.g_closing };
+      if (currentView === 'Julie')  return { tf:r.j_taxFree, tx:r.j_taxable, other:r.j_other, draw:r.j_draw, income:r.j_income, out:r.jTarget, close:r.j_closing };
+      return { tf:r.taxFree, tx:r.taxable, other:r.otherPensions, draw:r.drawdown, income:r.totalIncome, out:r.outgoings, close:r.combinedClosing };
+    }
+
+    function renderRetirementTable() {
+      const tb = document.querySelector('#rTable tbody');
+      if (!drawdownRows.length) { tb.innerHTML = '<tr><td colspan="9">No rows.</td></tr>'; return; }
+      tb.innerHTML = drawdownRows.map(r => {
+        const v = vrow(r);
+        return `<tr class="${r.shortfall ? 'shortfall' : ''}">
+          <td>${r.year}</td><td>G${r.gAge} / J${r.jAge}</td>
+          <td>${fmt(v.out)}</td><td>${fmt(v.tf)}</td><td>${fmt(v.tx)}</td>
+          <td>${fmt(v.other)}</td><td>${fmt(v.draw)}</td>
+          <td style="font-weight:bold;color:#27ae60;">${fmt(v.income)}</td><td>${fmt(v.close)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function drawCharts() {
+      if (!chartsReady || !drawdownRows.length) return;
+      // Pots runout (stacked tax-free + taxable)
+      const dPots = new google.visualization.DataTable();
+      dPots.addColumn('string','Year'); dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
+      // Income composition (guaranteed + drawdown)
+      const dInc = new google.visualization.DataTable();
+      dInc.addColumn('string','Year'); dInc.addColumn('number','Guaranteed Income'); dInc.addColumn('number','Drawdown');
+      drawdownRows.forEach(r => {
+        const v = vrow(r);
+        dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx)]);
+        dInc.addRow([String(r.year), Math.round(v.other), Math.round(v.draw)]);
+      });
+      const nf = new google.visualization.NumberFormat({ prefix:'£', fractionDigits:0 });
+      nf.format(dPots,1); nf.format(dPots,2); nf.format(dInc,1); nf.format(dInc,2);
+      new google.visualization.ColumnChart(document.getElementById('potChart')).draw(dPots, {
+        title: currentView + ' Pension Pots Through Retirement (£)', isStacked:true, legend:{position:'bottom'},
+        chartArea:{width:'85%',height:'70%'}, colors:['#2ecc71','#e74c3c'], vAxis:{minValue:0, format:'£#,###'}
+      });
+      new google.visualization.ColumnChart(document.getElementById('incomeChart')).draw(dInc, {
+        title: currentView + ' Retirement Income Composition (£)', isStacked:true, legend:{position:'bottom'},
+        chartArea:{width:'85%',height:'70%'}, colors:['#9b59b6','#3498db'], vAxis:{minValue:0, format:'£#,###'}
+      });
+    }
+
+    function renderOverview() {
+      const pots = PensionEngine.latestPots(data);
+      let g = 0, j = 0;
+      Object.keys(pots).forEach(k => { if (k.indexOf('Graham|') === 0) g += pots[k]; if (k.indexOf('Julie|') === 0) j += pots[k]; });
+      document.getElementById('ovGraham').textContent = fmt(g);
+      document.getElementById('ovJulie').textContent = fmt(j);
+      document.getElementById('ovCombined').textContent = fmt(g + j);
+      if (serverPots) {
+        document.getElementById('ovProjGraham').textContent = fmt(serverPots.graham);
+        document.getElementById('ovProjJulie').textContent = fmt(serverPots.julie);
+        document.getElementById('ovProjCombined').textContent = fmt(serverPots.graham + serverPots.julie);
+      }
+      const ry = savedPlan && savedPlan.retirementDate ? savedPlan.retirementDate.getFullYear() : '—';
+      document.getElementById('ovNote').textContent = 'Projected figures assume retirement in ' + ry + ', at your saved growth rate, contributions and working-pattern phases.';
+    }
+
+    function recomputeAll() {
+      const stateNames = new Set((data.guaranteed || []).map(x => x.income_name).filter(n => n && n.toLowerCase().indexOf('state') >= 0));
+      const nowYr = new Date().getFullYear();
+      const startYr = savedPlan && savedPlan.retirementDate ? savedPlan.retirementDate.getFullYear() : nowYr;
+      drawdownRows = PensionEngine.drawdown(data, {
+        pots: serverPots, gRatio: savedPlan.gRatio, spendRed: savedPlan.spendRed,
+        startYear: startYr, sp: PensionEngine.baselineSP(stateNames)
+      });
+      renderOverview();
+      renderRetirementTable();
+      if (chartsReady) drawCharts();
+    }
+
+    // ---------- embedded frames ----------
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Defaults:'pension_defaults.html' };
+    function hookFrame(f) {
+      f.addEventListener('load', function () {
+        try { var doc = f.contentWindow.document; var rz = function(){ f.style.height = Math.max(doc.body.scrollHeight, 500) + 'px'; }; rz();
+          if (window.ResizeObserver) new ResizeObserver(rz).observe(doc.body); else { setTimeout(rz,800); setTimeout(rz,2500); }
+        } catch(e) { f.style.height = '1200px'; }
+      });
+    }
+    function ensureFrame(id, src) { const f = document.getElementById(id); if (f && !f.getAttribute('src')) { hookFrame(f); f.setAttribute('src', src); } }
+    function showSub(evt, name) {
+      document.querySelectorAll('.subtabcontent').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.subtab-link').forEach(el => el.classList.remove('active-sub'));
+      document.getElementById('sub-' + name).style.display = 'block';
+      if (evt) evt.currentTarget.classList.add('active-sub'); else { const b = document.getElementById('subbtn-' + name); if (b) b.classList.add('active-sub'); }
+      ensureFrame('frame-' + name, SUB_SRC[name]);
+    }
+
+    function showTab(evt, id) {
+      document.querySelectorAll('.tabcontent').forEach(el => { el.style.display = 'none'; el.classList.remove('active'); });
+      document.querySelectorAll('.tab-link').forEach(el => el.classList.remove('active-btn'));
+      const el = document.getElementById(id); el.style.display = 'block'; el.classList.add('active');
+      evt.currentTarget.classList.add('active-btn');
+      if (id === 'Modelling') setTimeout(drawCharts, 40);
+      if (id === 'ScenarioLab') ensureFrame('frame-lab', 'state_pension_scenario_lab.html');
+      if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
+    }
+
+    window.addEventListener('resize', () => { clearTimeout(window.__rt); window.__rt = setTimeout(() => { if (document.getElementById('Modelling').style.display === 'block') drawCharts(); }, 150); });
+
+    // ---------- data load (after login) ----------
+    async function loadEverything() {
+      const status = document.getElementById('status');
+      try {
+        const [members, bills, dining, guaranteed, pensions, contributions, logs] = await Promise.all([
+          App.rest('bd_members'), App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
+          App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
+          App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc')
+        ]);
+        data = { members, bills, dining, guaranteed, pensions, contributions, logs };
+
+        const pRows = await App.rest('op_modelling_parameters?member_name=eq.Graham&order=updated_at.desc&limit=1');
+        const p = (pRows && pRows.length) ? pRows[0] : {};
+        savedPlan = {
+          retirementDate: App.parseLocalDate(p.retirement_date),
+          growthRate: p.pension_growth_rate != null ? Number(p.pension_growth_rate) : 0.05,
+          phase1Date: App.parseLocalDate(p.shorter_week_date_1), phase1Days: p.working_days_1 ? Number(p.working_days_1) : 5,
+          phase2Date: App.parseLocalDate(p.shorter_week_date_2), phase2Days: p.working_days_2 ? Number(p.working_days_2) : 5,
+          spendRed: p.spending_reduction_pct != null ? Number(p.spending_reduction_pct) : 1.0,
+          gRatio: p.drawdown_ratio_graham != null ? Number(p.drawdown_ratio_graham) : 0.5
+        };
+
+        // Starting pots: use the server forecast as the source of truth (matches the old dashboard exactly)
+        const f = await App.rpc('generate_monthly_pension_forecast', {});
+        serverPots = {
+          graham: Math.max(0, ...f.map(r => Number(r.graham_total) || 0)),
+          julie:  Math.max(0, ...f.map(r => Number(r.julie_total)  || 0))
+        };
+
+        recomputeAll();
+        status.className = 's-ok';
+        status.textContent = 'Loaded. Projections computed in your browser — switch the Joint / Graham / Julie toggle to re-slice instantly.';
+      } catch (e) {
+        status.className = 's-err';
+        status.textContent = 'Could not load: ' + e.message + '. Check your network settings allow access to Supabase.';
+      }
+    }
+
+    App.requireLogin(loadEverything, { title: 'Joint Pension Analytics' });
+  </script>
+</body>
+</html>

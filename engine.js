@@ -201,15 +201,18 @@
 
       rows.push({
         year: yr, gAge: gAge, jAge: jAge, outgoings: yrOut,
+        gTarget: gTarget, jTarget: jTarget,
         taxFree: gTfStart + jTfStart, taxable: gTxStart + jTxStart,
         // per-person opening pots (handy for Graham/Julie views)
         g_taxFree: gTfStart, g_taxable: gTxStart, j_taxFree: jTfStart, j_taxable: jTxStart,
         stateGross: stateGross, otherPensions: otherPensions, drawdown: drawdownTot,
+        g_other: gRes.inc.total, j_other: jRes.inc.total,
         g_draw: gRes.drawTf + gRes.drawGross, j_draw: jRes.drawTf + jRes.drawGross,
         g_income: gRes.inc.total + gRes.drawTf + gRes.drawGross,
         j_income: jRes.inc.total + jRes.drawTf + jRes.drawGross,
         totalIncome: otherPensions + drawdownTot,
         combinedClosing: gTf + gTx + jTf + jTx,
+        g_closing: gTf + gTx, j_closing: jTf + jTx,
         shortfall: gRes.shortfall || jRes.shortfall
       });
       yrsPassed++;
