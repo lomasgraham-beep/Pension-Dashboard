@@ -205,26 +205,52 @@
 
     function drawCharts() {
       if (!chartsReady || !drawdownRows.length) return;
-      // Pots runout (stacked tax-free + taxable)
+      const joint = (currentView === 'Joint');
+
       const dPots = new google.visualization.DataTable();
-      dPots.addColumn('string','Year'); dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
-      // Income composition (guaranteed + drawdown)
+      dPots.addColumn('string','Year');
       const dInc = new google.visualization.DataTable();
-      dInc.addColumn('string','Year'); dInc.addColumn('number','Guaranteed Income'); dInc.addColumn('number','Drawdown');
-      drawdownRows.forEach(r => {
-        const v = vrow(r);
-        dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx)]);
-        dInc.addRow([String(r.year), Math.round(v.other), Math.round(v.draw)]);
-      });
+      dInc.addColumn('string','Year');
+
+      let potColors, incColors, potTitle, incTitle;
+
+      if (joint) {
+        // Stack Graham ON Julie, so the split between the two is visible
+        dPots.addColumn('number','Julie pot'); dPots.addColumn('number','Graham pot');
+        dInc.addColumn('number','Julie income'); dInc.addColumn('number','Graham income');
+        drawdownRows.forEach(r => {
+          dPots.addRow([String(r.year), Math.round(r.j_taxFree + r.j_taxable), Math.round(r.g_taxFree + r.g_taxable)]);
+          dInc.addRow([String(r.year), Math.round(r.j_income), Math.round(r.g_income)]);
+        });
+        potColors = ['#9b59b6','#3498db'];   // Julie purple (base), Graham blue (top)
+        incColors = ['#9b59b6','#3498db'];
+        potTitle = 'Combined Pots — Graham stacked on Julie (£)';
+        incTitle = 'Combined Income — Graham stacked on Julie (£)';
+      } else {
+        // Single person: show their pot-type / income-type breakdown
+        dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
+        dInc.addColumn('number','Guaranteed Income'); dInc.addColumn('number','Drawdown');
+        drawdownRows.forEach(r => {
+          const v = vrow(r);
+          dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx)]);
+          dInc.addRow([String(r.year), Math.round(v.other), Math.round(v.draw)]);
+        });
+        potColors = ['#2ecc71','#e74c3c'];
+        incColors = ['#9b59b6','#3498db'];
+        potTitle = currentView + ' Pension Pots Through Retirement (£)';
+        incTitle = currentView + ' Retirement Income Composition (£)';
+      }
+
       const nf = new google.visualization.NumberFormat({ prefix:'£', fractionDigits:0 });
       nf.format(dPots,1); nf.format(dPots,2); nf.format(dInc,1); nf.format(dInc,2);
+
       new google.visualization.ColumnChart(document.getElementById('potChart')).draw(dPots, {
-        title: currentView + ' Pension Pots Through Retirement (£)', isStacked:true, legend:{position:'bottom'},
-        chartArea:{width:'85%',height:'70%'}, colors:['#2ecc71','#e74c3c'], vAxis:{minValue:0, format:'£#,###'}
+        title: potTitle, isStacked:true, legend:{position:'bottom'},
+        chartArea:{width:'85%',height:'70%'}, colors:potColors, vAxis:{minValue:0, format:'£#,###'}
       });
       new google.visualization.ColumnChart(document.getElementById('incomeChart')).draw(dInc, {
-        title: currentView + ' Retirement Income Composition (£)', isStacked:true, legend:{position:'bottom'},
-        chartArea:{width:'85%',height:'70%'}, colors:['#9b59b6','#3498db'], vAxis:{minValue:0, format:'£#,###'}
+        title: incTitle, isStacked:true, legend:{position:'bottom'},
+        chartArea:{width:'85%',height:'70%'}, colors:incColors, vAxis:{minValue:0, format:'£#,###'}
       });
     }
 
