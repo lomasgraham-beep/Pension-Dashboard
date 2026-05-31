@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Joint Pension Analytics Dashboard</title>
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; color: #333; }
     .header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
@@ -54,9 +55,39 @@
     .neg-growth { color: #c0392b; font-weight: bold; }
     .kpi-badge { font-size: 11px; padding: 3px 6px; border-radius: 12px; background: #e2e8f0; color: #4a5568; margin-left: 5px; }
     .contrib-badge { background:#d1fae5; color:#065f46; font-size:11px; padding:2px 8px; border-radius:12px; margin-left:8px; vertical-align:middle; font-weight:bold; }
+  #loginOverlay { position:fixed; inset:0; background:#f4f7f6; display:flex; align-items:center; justify-content:center; z-index:1000; }
+    .login-box { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:30px; width:100%; max-width:360px; box-shadow:0 4px 16px rgba(0,0,0,0.08); font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .login-box h2 { border:none; padding:0; margin:0 0 6px; color:#2c3e50; }
+    .login-box p { font-size:13px; color:#64748b; margin:0 0 20px; }
+    .login-box label { display:block; font-weight:bold; font-size:13px; color:#2c3e50; margin-bottom:5px; }
+    .login-box input { width:100%; padding:11px; border:1px solid #ccc; border-radius:6px; font-family:inherit; font-size:15px; box-sizing:border-box; margin-bottom:16px; }
+    .login-box button { width:100%; background:#3498db; color:#fff; border:none; padding:12px; border-radius:6px; font-weight:bold; font-size:15px; cursor:pointer; }
+    .login-box button:hover { background:#2980b9; }
+    .login-box button:disabled { background:#94a3b8; cursor:default; }
+    #loginErr { color:#c0392b; font-size:13px; font-weight:bold; margin-top:14px; min-height:18px; }
+    #appWrap { display:none; }
+    .logout-bar { display:flex; justify-content:flex-end; align-items:center; gap:12px; font-size:13px; color:#64748b; margin-bottom:6px; }
+    .logout-bar a { color:#3498db; font-weight:bold; cursor:pointer; text-decoration:none; }
+    .logout-bar a:hover { text-decoration:underline; }
   </style>
 </head>
 <body>
+
+  <div id="loginOverlay">
+    <div class="login-box">
+      <h2>Joint Pension Analytics</h2>
+      <p>Please sign in to view your data.</p>
+      <label for="loginEmail">Email</label>
+      <input type="email" id="loginEmail" autocomplete="username" inputmode="email">
+      <label for="loginPass">Password</label>
+      <input type="password" id="loginPass" autocomplete="current-password">
+      <button id="loginBtn" onclick="doLogin()">Sign in</button>
+      <div id="loginErr"></div>
+    </div>
+  </div>
+
+  <div id="appWrap">
+  <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
 
   <div class="header-container">
     <h1>Joint Pension Analytics (Supabase Cloud)</h1>
@@ -215,6 +246,8 @@
     <table id="rTable"><thead></thead><tbody><tr><td colspan="8">Recalculating math views...</td></tr></tbody></table>
   </div>
 
+  </div><!-- /appWrap -->
+
   <script>
     const SUPABASE_URL = "https://yavfcitgyyftpubqwddp.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
@@ -223,7 +256,9 @@
     const fmt = (n) => "£" + Math.round(n || 0).toLocaleString("en-GB");
     const fmtDiff = (n) => { let s = n >= 0 ? "+" : "-"; return `${s}£${Math.abs(Math.round(n)).toLocaleString("en-GB")}`; };
     const toInputDate = (ds) => { if (!ds) return ""; const d = new Date(ds); return d.getFullYear() + '-' + ("0" + (d.getMonth() + 1)).slice(-2) + '-' + ("0" + d.getDate()).slice(-2); };
-    const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" });
+    const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${authToken || SUPABASE_KEY}`, "Content-Type": "application/json" });
+    let authToken = null;
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let globalDrawdownData = null;
     let userPensions = []; 
@@ -887,7 +922,35 @@
         }, 150); 
     });
     
-    loadAllData(); 
+    // ---------- Auth gate ----------
+    let started = false;
+    function startApp(session) {
+      authToken = session.access_token;
+      document.getElementById('loginOverlay').style.display = 'none';
+      document.getElementById('appWrap').style.display = 'block';
+      document.getElementById('whoami').textContent = 'Signed in as ' + (session.user && session.user.email ? session.user.email : '');
+      if (!started) { started = true; loadAllData(); }
+    }
+    async function doLogin() {
+      const btn = document.getElementById('loginBtn');
+      const err = document.getElementById('loginErr');
+      err.textContent = '';
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPass').value;
+      if (!email || !password) { err.textContent = 'Enter your email and password.'; return; }
+      btn.disabled = true; btn.textContent = 'Signing in…';
+      try {
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        startApp(data.session);
+      } catch (e) {
+        err.textContent = (e && e.message) ? e.message : 'Sign in failed.';
+        btn.disabled = false; btn.textContent = 'Sign in';
+      }
+    }
+    async function doLogout() { await sb.auth.signOut(); location.reload(); }
+    document.getElementById('loginPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+    (async () => { const { data } = await sb.auth.getSession(); if (data && data.session) startApp(data.session); })();
   </script>
 </body>
 </html>
