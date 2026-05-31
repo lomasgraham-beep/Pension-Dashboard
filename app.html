@@ -215,16 +215,18 @@
       let potColors, incColors, potTitle, incTitle;
 
       if (joint) {
-        // Stack Graham ON Julie, so the split between the two is visible
-        dPots.addColumn('number','Julie pot'); dPots.addColumn('number','Graham pot');
+        // Stack Graham ON Julie, each split into taxable + tax-free → four bands
+        dPots.addColumn('number','Julie taxable'); dPots.addColumn('number','Julie tax-free');
+        dPots.addColumn('number','Graham taxable'); dPots.addColumn('number','Graham tax-free');
         dInc.addColumn('number','Julie income'); dInc.addColumn('number','Graham income');
         drawdownRows.forEach(r => {
-          dPots.addRow([String(r.year), Math.round(r.j_taxFree + r.j_taxable), Math.round(r.g_taxFree + r.g_taxable)]);
+          dPots.addRow([String(r.year), Math.round(r.j_taxable), Math.round(r.j_taxFree), Math.round(r.g_taxable), Math.round(r.g_taxFree)]);
           dInc.addRow([String(r.year), Math.round(r.j_income), Math.round(r.g_income)]);
         });
-        potColors = ['#9b59b6','#3498db'];   // Julie purple (base), Graham blue (top)
+        // Julie purples (base), Graham blues (top); darker = taxable, lighter = tax-free
+        potColors = ['#8e44ad','#c39bd3','#2471a3','#85c1e9'];
         incColors = ['#9b59b6','#3498db'];
-        potTitle = 'Combined Pots — Graham stacked on Julie (£)';
+        potTitle = 'Combined Pots — taxable & tax-free, Graham stacked on Julie (£)';
         incTitle = 'Combined Income — Graham stacked on Julie (£)';
       } else {
         // Single person: show their pot-type / income-type breakdown
@@ -242,7 +244,8 @@
       }
 
       const nf = new google.visualization.NumberFormat({ prefix:'£', fractionDigits:0 });
-      nf.format(dPots,1); nf.format(dPots,2); nf.format(dInc,1); nf.format(dInc,2);
+      for (let i = 1; i < dPots.getNumberOfColumns(); i++) nf.format(dPots, i);
+      for (let i = 1; i < dInc.getNumberOfColumns(); i++) nf.format(dInc, i);
 
       new google.visualization.ColumnChart(document.getElementById('potChart')).draw(dPots, {
         title: potTitle, isStacked:true, legend:{position:'bottom'},
