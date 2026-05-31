@@ -262,6 +262,11 @@
       for (let i = 1; i < dPots.getNumberOfColumns(); i++) nf.format(dPots, i);
       for (let i = 1; i < dInc.getNumberOfColumns(); i++) nf.format(dInc, i);
 
+      // shared y-scale for the income chart so the drawdown line overlays the bars truthfully
+      let incMax = 0;
+      drawdownRows.forEach(r => { const t = joint ? r.totalIncome : vrow(r).income; if (t > incMax) incMax = t; });
+      incMax = Math.ceil((incMax * 1.05) / 1000) * 1000; // round up to a tidy £1k
+
       new google.visualization.ColumnChart(document.getElementById('potChart')).draw(dPots, {
         title: potTitle, isStacked:true, legend:{position:'bottom'},
         chartArea:{width:'85%',height:'70%'}, colors:potColors, vAxis:{minValue:0, format:'£#,###'}
@@ -269,7 +274,10 @@
       new google.visualization.ComboChart(document.getElementById('incomeChart')).draw(dInc, {
         title: incTitle, seriesType:'bars', isStacked:true, series: incSeries,
         legend:{position:'bottom'}, chartArea:{width:'80%',height:'66%'},
-        vAxes: { 0: { title:'Income (£)', minValue:0, format:'£#,###' }, 1: { title:'Total drawdown (£)', viewWindow:{min:0}, format:'£#,###' } }
+        vAxes: {
+          0: { title:'Income (£)', viewWindow:{min:0, max:incMax}, format:'£#,###' },
+          1: { title:'Total drawdown (£)', viewWindow:{min:0, max:incMax}, format:'£#,###' }
+        }
       });
     }
 
