@@ -207,40 +207,55 @@
       if (!chartsReady || !drawdownRows.length) return;
       const joint = (currentView === 'Joint');
 
+      // ---------- POT CHART (stacked columns) ----------
       const dPots = new google.visualization.DataTable();
       dPots.addColumn('string','Year');
+      let potColors, potTitle;
+      if (joint) {
+        // order bottom -> top: Julie tax-free, Graham tax-free, Julie taxable, Graham taxable
+        dPots.addColumn('number','Julie tax-free'); dPots.addColumn('number','Graham tax-free');
+        dPots.addColumn('number','Julie taxable');  dPots.addColumn('number','Graham taxable');
+        drawdownRows.forEach(r => dPots.addRow([String(r.year),
+          Math.round(r.j_taxFree), Math.round(r.g_taxFree), Math.round(r.j_taxable), Math.round(r.g_taxable)]));
+        potColors = ['#c39bd3','#85c1e9','#8e44ad','#2471a3']; // Julie light, Graham light, Julie dark, Graham dark
+        potTitle = 'Combined Pots — tax-free (lower) then taxable (upper), by person (£)';
+      } else {
+        dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
+        drawdownRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx)]); });
+        potColors = ['#2ecc71','#e74c3c'];
+        potTitle = currentView + ' Pension Pots Through Retirement (£)';
+      }
+
+      // ---------- INCOME CHART (combo: stacked bars + drawdown line on 2nd axis) ----------
       const dInc = new google.visualization.DataTable();
       dInc.addColumn('string','Year');
-
-      let potColors, incColors, potTitle, incTitle;
-
+      let incSeries, incTitle;
       if (joint) {
-        // Stack Graham ON Julie, each split into taxable + tax-free → four bands
-        dPots.addColumn('number','Julie taxable'); dPots.addColumn('number','Julie tax-free');
-        dPots.addColumn('number','Graham taxable'); dPots.addColumn('number','Graham tax-free');
-        dInc.addColumn('number','Julie income'); dInc.addColumn('number','Graham income');
-        drawdownRows.forEach(r => {
-          dPots.addRow([String(r.year), Math.round(r.j_taxable), Math.round(r.j_taxFree), Math.round(r.g_taxable), Math.round(r.g_taxFree)]);
-          dInc.addRow([String(r.year), Math.round(r.j_income), Math.round(r.g_income)]);
-        });
-        // Julie purples (base), Graham blues (top); darker = taxable, lighter = tax-free
-        potColors = ['#8e44ad','#c39bd3','#2471a3','#85c1e9'];
-        incColors = ['#9b59b6','#3498db'];
-        potTitle = 'Combined Pots — taxable & tax-free, Graham stacked on Julie (£)';
-        incTitle = 'Combined Income — Graham stacked on Julie (£)';
+        // bars bottom -> top: Julie drawdown, Graham drawdown, Julie other, Graham other; line: total drawdown
+        dInc.addColumn('number','Julie drawdown'); dInc.addColumn('number','Graham drawdown');
+        dInc.addColumn('number','Julie other income'); dInc.addColumn('number','Graham other income');
+        dInc.addColumn('number','Total drawdown');
+        drawdownRows.forEach(r => dInc.addRow([String(r.year),
+          Math.round(r.j_draw), Math.round(r.g_draw), Math.round(r.j_other), Math.round(r.g_other),
+          Math.round(r.drawdown)]));
+        incSeries = {
+          0: { targetAxisIndex:0, color:'#9b59b6' }, // Julie drawdown
+          1: { targetAxisIndex:0, color:'#3498db' }, // Graham drawdown
+          2: { targetAxisIndex:0, color:'#c39bd3' }, // Julie other income
+          3: { targetAxisIndex:0, color:'#85c1e9' }, // Graham other income
+          4: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
+        };
+        incTitle = 'Income — drawdown & other income by person (bars), total drawdown (line)';
       } else {
-        // Single person: show their pot-type / income-type breakdown
-        dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
-        dInc.addColumn('number','Guaranteed Income'); dInc.addColumn('number','Drawdown');
-        drawdownRows.forEach(r => {
-          const v = vrow(r);
-          dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx)]);
-          dInc.addRow([String(r.year), Math.round(v.other), Math.round(v.draw)]);
-        });
-        potColors = ['#2ecc71','#e74c3c'];
-        incColors = ['#9b59b6','#3498db'];
-        potTitle = currentView + ' Pension Pots Through Retirement (£)';
-        incTitle = currentView + ' Retirement Income Composition (£)';
+        dInc.addColumn('number','Drawdown'); dInc.addColumn('number','Other income');
+        dInc.addColumn('number','Total drawdown');
+        drawdownRows.forEach(r => { const v = vrow(r); dInc.addRow([String(r.year), Math.round(v.draw), Math.round(v.other), Math.round(v.draw)]); });
+        incSeries = {
+          0: { targetAxisIndex:0, color:'#3498db' }, // drawdown
+          1: { targetAxisIndex:0, color:'#9b59b6' }, // other income
+          2: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
+        };
+        incTitle = currentView + ' Income — drawdown & other (bars), drawdown (line)';
       }
 
       const nf = new google.visualization.NumberFormat({ prefix:'£', fractionDigits:0 });
@@ -251,9 +266,10 @@
         title: potTitle, isStacked:true, legend:{position:'bottom'},
         chartArea:{width:'85%',height:'70%'}, colors:potColors, vAxis:{minValue:0, format:'£#,###'}
       });
-      new google.visualization.ColumnChart(document.getElementById('incomeChart')).draw(dInc, {
-        title: incTitle, isStacked:true, legend:{position:'bottom'},
-        chartArea:{width:'85%',height:'70%'}, colors:incColors, vAxis:{minValue:0, format:'£#,###'}
+      new google.visualization.ComboChart(document.getElementById('incomeChart')).draw(dInc, {
+        title: incTitle, seriesType:'bars', isStacked:true, series: incSeries,
+        legend:{position:'bottom'}, chartArea:{width:'80%',height:'66%'},
+        vAxes: { 0: { title:'Income (£)', minValue:0, format:'£#,###' }, 1: { title:'Total drawdown (£)', viewWindow:{min:0}, format:'£#,###' } }
       });
     }
 
