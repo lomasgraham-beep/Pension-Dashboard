@@ -184,6 +184,8 @@
       const baseDining = dining.reduce((s, d) => s + (Number(d.annual_total) || 0) * (d.spend_reduction ? spendRed : 1.0) * taperFor(d, oldest), 0);
 
       const inflFactor = Math.pow(1 + INFL, yrsPassed);
+      const billsTotal = baseBills * inflFactor;
+      const diningTotal = baseDining * inflFactor;
       const yrOut = (baseBills + baseDining) * inflFactor;
       const gTarget = yrOut * gRatio, jTarget = yrOut * jRatio;
 
@@ -201,6 +203,7 @@
 
       rows.push({
         year: yr, gAge: gAge, jAge: jAge, outgoings: yrOut,
+        billsTotal: billsTotal, diningTotal: diningTotal,
         gTarget: gTarget, jTarget: jTarget,
         taxFree: gTfStart + jTfStart, taxable: gTxStart + jTxStart,
         // per-person opening pots (handy for Graham/Julie views)

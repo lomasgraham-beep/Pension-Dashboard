@@ -104,8 +104,8 @@
     <h2><span class="viewlabel">Joint</span> Retirement Drawdown</h2>
     <div class="table-wrap">
       <table id="rTable">
-        <thead><tr><th>Year</th><th>Ages</th><th>Outgoings</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Guaranteed Income</th><th>Drawdown</th><th>Total Income</th><th>End Pot</th></tr></thead>
-        <tbody><tr><td colspan="9">Calculating…</td></tr></tbody>
+        <thead><tr><th>Year</th><th>Dining Target</th><th>Bills Target</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Guaranteed Incomes</th><th>Drawdown required</th><th>Total Gross Income</th></tr></thead>
+        <tbody><tr><td colspan="8">Calculating…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -152,21 +152,23 @@
 
     // ---------- per-view field pickers ----------
     function vrow(r) {
-      if (currentView === 'Graham') return { tf:r.g_taxFree, tx:r.g_taxable, other:r.g_other, draw:r.g_draw, income:r.g_income, out:r.gTarget, close:r.g_closing };
-      if (currentView === 'Julie')  return { tf:r.j_taxFree, tx:r.j_taxable, other:r.j_other, draw:r.j_draw, income:r.j_income, out:r.jTarget, close:r.j_closing };
-      return { tf:r.taxFree, tx:r.taxable, other:r.otherPensions, draw:r.drawdown, income:r.totalIncome, out:r.outgoings, close:r.combinedClosing };
+      if (currentView === 'Graham') { const g = savedPlan.gRatio; return { dining:r.diningTotal*g, bills:r.billsTotal*g, tf:r.g_taxFree, tx:r.g_taxable, other:r.g_other, draw:r.g_draw, income:r.g_income, close:r.g_closing }; }
+      if (currentView === 'Julie')  { const j = 1 - savedPlan.gRatio; return { dining:r.diningTotal*j, bills:r.billsTotal*j, tf:r.j_taxFree, tx:r.j_taxable, other:r.j_other, draw:r.j_draw, income:r.j_income, close:r.j_closing }; }
+      return { dining:r.diningTotal, bills:r.billsTotal, tf:r.taxFree, tx:r.taxable, other:r.otherPensions, draw:r.drawdown, income:r.totalIncome, close:r.combinedClosing };
     }
 
     function renderRetirementTable() {
       const tb = document.querySelector('#rTable tbody');
-      if (!drawdownRows.length) { tb.innerHTML = '<tr><td colspan="9">No rows.</td></tr>'; return; }
+      if (!drawdownRows.length) { tb.innerHTML = '<tr><td colspan="8">No rows.</td></tr>'; return; }
       tb.innerHTML = drawdownRows.map(r => {
         const v = vrow(r);
         return `<tr class="${r.shortfall ? 'shortfall' : ''}">
-          <td>${r.year}</td><td>G${r.gAge} / J${r.jAge}</td>
-          <td>${fmt(v.out)}</td><td>${fmt(v.tf)}</td><td>${fmt(v.tx)}</td>
+          <td>${r.year}</td>
+          <td style="font-weight:bold;color:#e67e22;">${fmt(v.dining)}</td>
+          <td style="font-weight:bold;color:#c0392b;">${fmt(v.bills)}</td>
+          <td>${fmt(v.tf)}</td><td>${fmt(v.tx)}</td>
           <td>${fmt(v.other)}</td><td>${fmt(v.draw)}</td>
-          <td style="font-weight:bold;color:#27ae60;">${fmt(v.income)}</td><td>${fmt(v.close)}</td>
+          <td style="font-weight:bold;color:#27ae60;">${fmt(v.income)}</td>
         </tr>`;
       }).join('');
     }
