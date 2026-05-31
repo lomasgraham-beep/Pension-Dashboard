@@ -69,6 +69,13 @@
     .logout-bar { display:flex; justify-content:flex-end; align-items:center; gap:12px; font-size:13px; color:#64748b; margin-bottom:6px; }
     .logout-bar a { color:#3498db; font-weight:bold; cursor:pointer; text-decoration:none; }
     .logout-bar a:hover { text-decoration:underline; }
+    .subtab-buttons { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:15px; border-bottom:2px solid #e2e8f0; padding-bottom:10px; }
+    .subtab-link { background:#eef2f7; border:1px solid #cbd5e1; color:#475569; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:14px; }
+    .subtab-link:hover { background:#e2e8f0; }
+    .subtab-link.active-sub { background:#3498db; color:#fff; border-color:#3498db; }
+    .subtabcontent { display:none; }
+    .app-frame { width:100%; border:none; min-height:500px; background:#fff; border-radius:8px; }
+    .frame-note { font-size:12px; color:#64748b; margin-bottom:10px; }
   </style>
 </head>
 <body>
@@ -111,6 +118,8 @@
     <button class="tab-link" onclick="showTab(event, 'NewEntry')">Log Entry</button>
     <button class="tab-link" onclick="showTab(event, 'History')">Recent Logs</button>
     <button class="tab-link" onclick="showTab(event, 'Retirement')">Retirement</button>
+    <button class="tab-link" onclick="showTab(event, 'ScenarioLab')">Scenario Lab</button>
+    <button class="tab-link" onclick="showTab(event, 'BasicData')">Basic Data</button>
   </div>
 
   <div id="Overview" class="tabcontent active">
@@ -244,6 +253,25 @@
   <div id="Retirement" class="tabcontent">
     <h2><span id="tableViewTitle">Joint</span> Retirement Drawdown Engine</h2>
     <table id="rTable"><thead></thead><tbody><tr><td colspan="8">Recalculating math views...</td></tr></tbody></table>
+  </div>
+
+  <div id="ScenarioLab" class="tabcontent">
+    <p class="frame-note">Live what-if modelling. Changes here are never saved — adjust freely. Use the main tabs above to return to the dashboard.</p>
+    <iframe id="frame-lab" class="app-frame" title="Scenario Lab"></iframe>
+  </div>
+
+  <div id="BasicData" class="tabcontent">
+    <div class="subtab-buttons">
+      <button id="subbtn-Members" class="subtab-link active-sub" onclick="showSub(event,'Members')">Members</button>
+      <button id="subbtn-Pensions" class="subtab-link" onclick="showSub(event,'Pensions')">Pensions</button>
+      <button id="subbtn-Contributions" class="subtab-link" onclick="showSub(event,'Contributions')">Contributions</button>
+      <button id="subbtn-Defaults" class="subtab-link" onclick="showSub(event,'Defaults')">Defaults</button>
+    </div>
+    <p class="frame-note">Edit your reference data here. Each editor saves separately. Use the main tabs above to return to the dashboard.</p>
+    <div id="sub-Members" class="subtabcontent"><iframe id="frame-Members" class="app-frame" title="Members"></iframe></div>
+    <div id="sub-Pensions" class="subtabcontent"><iframe id="frame-Pensions" class="app-frame" title="Pensions"></iframe></div>
+    <div id="sub-Contributions" class="subtabcontent"><iframe id="frame-Contributions" class="app-frame" title="Contributions"></iframe></div>
+    <div id="sub-Defaults" class="subtabcontent"><iframe id="frame-Defaults" class="app-frame" title="Defaults"></iframe></div>
   </div>
 
   </div><!-- /appWrap -->
@@ -911,6 +939,37 @@
       
       if(id === 'Parameters' || id === 'Retirement') setTimeout(drawRetirementCharts, 50);
       if(id === 'KPIs') setTimeout(drawAllActiveCharts, 50); 
+      if(id === 'ScenarioLab') ensureFrame('frame-lab', 'state_pension_scenario_lab.html');
+      if(id === 'BasicData' && !window.__basicInit) { window.__basicInit = true; showSub(null, 'Members'); }
+    }
+
+    // ---- Embedded page frames (Basic Data editors + Scenario Lab) ----
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Defaults:'pension_defaults.html' };
+
+    function hookFrame(f) {
+      f.addEventListener('load', function () {
+        try {
+          var doc = f.contentWindow.document;
+          var resize = function () { f.style.height = Math.max(doc.body.scrollHeight, 500) + 'px'; };
+          resize();
+          if (window.ResizeObserver) { new ResizeObserver(resize).observe(doc.body); }
+          else { setTimeout(resize, 800); setTimeout(resize, 2500); }
+        } catch (e) { f.style.height = '1200px'; }
+      });
+    }
+
+    function ensureFrame(frameId, src) {
+      const f = document.getElementById(frameId);
+      if (f && !f.getAttribute('src')) { hookFrame(f); f.setAttribute('src', src); }
+    }
+
+    function showSub(evt, name) {
+      document.querySelectorAll('.subtabcontent').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.subtab-link').forEach(el => el.classList.remove('active-sub'));
+      document.getElementById('sub-' + name).style.display = 'block';
+      if (evt) evt.currentTarget.classList.add('active-sub');
+      else { const b = document.getElementById('subbtn-' + name); if (b) b.classList.add('active-sub'); }
+      ensureFrame('frame-' + name, SUB_SRC[name]);
     }
 
     let resizeTimer;
