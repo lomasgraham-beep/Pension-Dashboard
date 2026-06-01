@@ -159,32 +159,53 @@
       return { stateGross, otherGross, total: stateGross + otherGross };
     }
 
-    // Fill one month's net target from guaranteed income then drawdown (tax-free first).
-    function drawMonth(target, inc, tfPot, txPot) {
+    // Floors (dynamic mode): each person's taxable pot is protected down to a % of
+    // its value at retirement. Drawing stops at the floor and the unmet need is
+    // redirected to the other person. If BOTH reach their floors, we draw below them.
+    const gFloor = cfg.dynamic ? (cfg.gFloorPct || 0) * (cfg.pots.graham * 0.75) : 0;
+    const jFloor = cfg.dynamic ? (cfg.jFloorPct || 0) * (cfg.pots.julie  * 0.75) : 0;
+
+    // Fund one person's monthly net target from guaranteed income, then tax-free pot,
+    // then taxable pot — but never taking the taxable pot below `txFloor`.
+    function fundPerson(target, inc, tfPot, txPot, txFloor) {
       const dbGross = inc.total;
       let dbNet, paRem;
       if (dbGross > MPA) { dbNet = MPA + (dbGross - MPA) * 0.80; paRem = 0; }
       else { dbNet = dbGross; paRem = MPA - dbGross; }
-      let gap = Math.max(target - dbNet, 0);
-      const drawTf = Math.min(gap, tfPot);
-      gap -= drawTf;
+      let netGap = Math.max(target - dbNet, 0);
+      const drawTf = Math.min(netGap, tfPot);
+      netGap -= drawTf;
+      const txAvail = Math.max(txPot - txFloor, 0);
       let desiredGross = 0;
-      if (gap > 0) desiredGross = (gap <= paRem) ? gap : paRem + (gap - paRem) / 0.80;
-      const drawGross = Math.min(desiredGross, txPot);
-      const shortfall = desiredGross > txPot + 0.5;
-      return { drawTf, drawGross, tfAfter: tfPot - drawTf, txAfter: txPot - drawGross, shortfall, privateDraw: drawTf + drawGross };
+      if (netGap > 0) desiredGross = (netGap <= paRem) ? netGap : paRem + (netGap - paRem) / 0.80;
+      const drawGross = Math.min(desiredGross, txAvail);
+      const netFromTax = (drawGross <= paRem) ? drawGross : paRem + (drawGross - paRem) * 0.80;
+      const unmetNet = Math.max(netGap - netFromTax, 0);
+      return { drawTf, drawGross, tfAfter: tfPot - drawTf, txAfter: txPot - drawGross, unmetNet, inc };
     }
 
-    function personMonth(target, incRaw, tfPot, txPot) {
-      const p1 = drawMonth(target, incRaw, tfPot, txPot);
+    // MANUAL mode: independent per person, no floor, no redistribution (with means test).
+    function personManual(target, incRaw, tfPot, txPot) {
+      const p1 = fundPerson(target, incRaw, tfPot, txPot, 0);
       let inc = incRaw;
       if (sp.meansTest && sp.meansTest.enabled && sp.meansTest.taper > 0 && incRaw.stateGross > 0) {
-        const over = Math.max(0, p1.privateDraw - (sp.meansTest.threshold / 12)); // monthly threshold
+        const over = Math.max(0, (p1.drawTf + p1.drawGross) - (sp.meansTest.threshold / 12));
         const reduction = Math.min(sp.meansTest.taper * over, incRaw.stateGross);
         if (reduction > 0) inc = { stateGross: incRaw.stateGross - reduction, otherGross: incRaw.otherGross, total: incRaw.total - reduction };
       }
-      const p2 = drawMonth(target, inc, tfPot, txPot);
-      return Object.assign({}, p2, { inc: inc });
+      const p2 = fundPerson(target, inc, tfPot, txPot, 0);
+      return Object.assign({}, p2, { inc: inc, shortfall: p2.unmetNet > 1 });
+    }
+
+    // DYNAMIC mode: split by ratio, cap at floors, redirect a capped person's shortfall
+    // to the other; returns the household residual still unfunded after redistribution.
+    function allocate(gT, jT, gInc, jInc, tfG, txG, tfJ, txJ, fG, fJ) {
+      let g = fundPerson(gT, gInc, tfG, txG, fG);
+      let j = fundPerson(jT, jInc, tfJ, txJ, fJ);
+      let residual = 0;
+      if (g.unmetNet > 0.5) { j = fundPerson(jT + g.unmetNet, jInc, tfJ, txJ, fJ); residual = j.unmetNet; }
+      else if (j.unmetNet > 0.5) { g = fundPerson(gT + j.unmetNet, gInc, tfG, txG, fG); residual = g.unmetNet; }
+      return { g: g, j: j, residual: residual };
     }
 
     const rows = [];
@@ -223,8 +244,21 @@
       // opening pots for THIS month (before drawdown)
       const oGTf = gTf, oGTx = gTx, oJTf = jTf, oJTx = jTx;
 
-      const gRes = personMonth(gTargetM, grossMonth('Graham', idx, elapsed), gTf, gTx);
-      const jRes = personMonth(jTargetM, grossMonth('Julie', idx, elapsed), jTf, jTx);
+      const gInc = grossMonth('Graham', idx, elapsed);
+      const jInc = grossMonth('Julie', idx, elapsed);
+
+      let gRes, jRes, monthShort;
+      if (cfg.dynamic) {
+        let a = allocate(gTargetM, jTargetM, gInc, jInc, gTf, gTx, jTf, jTx, gFloor, jFloor);
+        if (a.residual > 0.5) {            // both at their floors → draw below the floors
+          a = allocate(gTargetM, jTargetM, gInc, jInc, gTf, gTx, jTf, jTx, 0, 0);
+        }
+        gRes = a.g; jRes = a.j; monthShort = a.residual > 1; // genuine only if pots truly empty
+      } else {
+        gRes = personManual(gTargetM, gInc, gTf, gTx);
+        jRes = personManual(jTargetM, jInc, jTf, jTx);
+        monthShort = gRes.shortfall || jRes.shortfall;
+      }
 
       gTf = gRes.tfAfter; gTx = gRes.txAfter; jTf = jRes.tfAfter; jTx = jRes.txAfter;
 
@@ -247,7 +281,7 @@
         g_income: gRes.inc.total + gDraw, j_income: jRes.inc.total + jDraw,
         totalIncome: mOther + gDraw + jDraw,
         combinedClosing: gTf + gTx + jTf + jTx, g_closing: gTf + gTx, j_closing: jTf + jTx,
-        shortfall: gRes.shortfall || jRes.shortfall
+        shortfall: monthShort
       });
 
       acc.outgoings += outM; acc.billsTotal += billsM; acc.diningTotal += diningM;
@@ -260,7 +294,7 @@
       acc.totalIncome += gRes.inc.total + jRes.inc.total + gDraw + jDraw;
       acc.combinedClosing = gTf + gTx + jTf + jTx;
       acc.g_closing = gTf + gTx; acc.j_closing = jTf + jTx;
-      if (gRes.shortfall || jRes.shortfall) acc.shortfall = true;
+      if (monthShort) acc.shortfall = true;
     }
     flush();
     rows.monthly = monthlyRows;
