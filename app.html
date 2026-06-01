@@ -134,7 +134,7 @@
         <button id="vt-Julie" class="btn-toggle" onclick="setView('Julie')">Julie</button>
       </div>
       <span class="who"><span id="whoami"></span><a onclick="App.doLogout()">Log out</a></span>
-      <span style="font-size:11px; color:#94a3b8; margin-left:8px;">build: LC-9</span>
+      <span style="font-size:11px; color:#94a3b8; margin-left:8px;">build: LC-10</span>
     </div>
   </div>
 
@@ -504,6 +504,7 @@
     }
 
     // ---------- embedded frames ----------
+    const FV = '?v=cap1';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
@@ -531,7 +532,7 @@
       panel.querySelectorAll('.subtab-link').forEach(el => el.classList.remove('active-sub'));
       document.getElementById('sub-' + name).style.display = 'block';
       if (evt) evt.currentTarget.classList.add('active-sub'); else { const b = document.getElementById('subbtn-' + name); if (b) b.classList.add('active-sub'); }
-      ensureFrame('frame-' + name, SUB_SRC[name]);
+      ensureFrame('frame-' + name, SUB_SRC[name] + FV);
       // the frame may already be loaded (re-showing a hidden sub-tab) → re-measure now it's visible
       const f = document.getElementById('frame-' + name);
       if (f && f.getAttribute('src')) { setTimeout(() => sizeFrame(f), 50); }
@@ -543,11 +544,11 @@
       const el = document.getElementById(id); el.style.display = 'block'; el.classList.add('active');
       evt.currentTarget.classList.add('active-btn');
       if (id === 'Modelling') setTimeout(drawCharts, 40);
-      if (id === 'KPIs') { ensureFrame('frame-kpis', 'kpis.html'); pingFrame('frame-kpis'); }
-      if (id === 'Forecast') { ensureFrame('frame-forecast', 'forecast.html'); pingFrame('frame-forecast'); }
-      if (id === 'Logs') ensureFrame('frame-logs', 'logs.html');
+      if (id === 'KPIs') { ensureFrame('frame-kpis', 'kpis.html' + FV); pingFrame('frame-kpis'); }
+      if (id === 'Forecast') { ensureFrame('frame-forecast', 'forecast.html' + FV); pingFrame('frame-forecast'); }
+      if (id === 'Logs') ensureFrame('frame-logs', 'logs.html' + FV);
       if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Bills'); }
-      if (id === 'ScenarioLab') ensureFrame('frame-lab', 'state_pension_scenario_lab.html');
+      if (id === 'ScenarioLab') ensureFrame('frame-lab', 'state_pension_scenario_lab.html' + FV);
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
     }
 
