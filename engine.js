@@ -99,7 +99,7 @@
   }
 
   // ---- DRAWDOWN: port of calculate_joint_retirement ----
-  // cfg: { pots:{graham,julie}, gRatio, spendRed, startYear, sp }
+  // cfg: { pots:{graham,julie}, gRatio, spendRed, startYear, retirementDate, sp }
   // sp:  { spRate, spDelay:{Graham,Julie}, meansTest:{enabled,threshold,taper}, stateNames:Set }
   function drawdown(data, cfg) {
     const gRatio = cfg.gRatio, spendRed = cfg.spendRed, jRatio = 1 - gRatio, sp = cfg.sp;
@@ -108,6 +108,17 @@
     const jM = members.find(m => m.name === 'Julie') || {};
     const gDobYr = gM.dob ? new Date(gM.dob).getFullYear() : null;
     const jDobYr = jM.dob ? new Date(jM.dob).getFullYear() : null;
+
+    // Fraction of the FIRST calendar year spent in retirement.
+    // Retire 1 Jan -> 1.0 (full year); retire 1 Dec -> ~1/12 (one month).
+    // This removes the year-boundary "jump": a one-month change now moves
+    // the projection by ~1/12, not by a whole drawdown year.
+    let firstFrac = 1;
+    if (cfg.retirementDate) {
+      const rd = cfg.retirementDate;
+      firstFrac = (12 - rd.getMonth()) / 12; // months remaining incl. the retirement month
+      if (firstFrac <= 0 || firstFrac > 1) firstFrac = 1;
+    }
 
     let endYr = Math.max(
       gM.end_of_life_date ? new Date(gM.end_of_life_date).getFullYear() : -Infinity,
@@ -118,7 +129,9 @@
     let gTf = cfg.pots.graham * 0.25, gTx = cfg.pots.graham * 0.75;
     let jTf = cfg.pots.julie * 0.25,  jTx = cfg.pots.julie * 0.75;
 
-    let yrsPassed = 0, yr = 0;
+    // "elapsed" tracks real years since retirement (fractional in year one),
+    // driving inflation continuously instead of in whole-year steps.
+    let elapsed = 0, yr = 0;
     const rows = [];
 
     const taperFor = (row, oldest) => {
@@ -128,7 +141,8 @@
       return 1.0;
     };
 
-    function grossFor(who) {
+    function grossFor(who, yearFrac) {
+      if (yearFrac == null) yearFrac = 1;
       let stateGross = 0, otherGross = 0;
       guaranteed.filter(g => g.member_name === who).forEach(g => {
         if (!g.start_date) return;
@@ -138,7 +152,7 @@
         const endYrG = g.end_date ? new Date(g.end_date).getFullYear() : null;
         if (yr < startYr || (endYrG !== null && yr > endYrG)) return;
         const rate = isState ? sp.spRate : INFL;
-        const val = (Number(g.initial_annual_value) || 0) * Math.pow(1 + rate, yrsPassed);
+        const val = (Number(g.initial_annual_value) || 0) * Math.pow(1 + rate, elapsed) * yearFrac;
         if (isState) stateGross += val; else otherGross += val;
       });
       return { stateGross, otherGross, total: stateGross + otherGross };
@@ -178,19 +192,22 @@
       const jAge = jDobYr != null ? yr - jDobYr : 0;
       const oldest = Math.max(gAge, jAge);
 
+      // fraction of THIS calendar year that is "in retirement" (year one may be partial)
+      const yearFrac = (yr === cfg.startYear) ? firstFrac : 1;
+
       const gTfStart = gTf, gTxStart = gTx, jTfStart = jTf, jTxStart = jTx;
 
       const baseBills = bills.reduce((s, b) => s + (Number(b.total_annual) || 0) * (b.spend_reduction ? spendRed : 1.0) * taperFor(b, oldest), 0);
       const baseDining = dining.reduce((s, d) => s + (Number(d.annual_total) || 0) * (d.spend_reduction ? spendRed : 1.0) * taperFor(d, oldest), 0);
 
-      const inflFactor = Math.pow(1 + INFL, yrsPassed);
-      const billsTotal = baseBills * inflFactor;
-      const diningTotal = baseDining * inflFactor;
-      const yrOut = (baseBills + baseDining) * inflFactor;
+      const inflFactor = Math.pow(1 + INFL, elapsed);
+      const billsTotal = baseBills * inflFactor * yearFrac;
+      const diningTotal = baseDining * inflFactor * yearFrac;
+      const yrOut = (baseBills + baseDining) * inflFactor * yearFrac;
       const gTarget = yrOut * gRatio, jTarget = yrOut * jRatio;
 
-      const gRes = personYear(gTarget, grossFor('Graham'), gTf, gTx);
-      const jRes = personYear(jTarget, grossFor('Julie'), jTf, jTx);
+      const gRes = personYear(gTarget, grossFor('Graham', yearFrac), gTf, gTx);
+      const jRes = personYear(jTarget, grossFor('Julie', yearFrac), jTf, jTx);
 
       gTf = gRes.tfAfter; gTx = gRes.txAfter;
       jTf = jRes.tfAfter; jTx = jRes.txAfter;
@@ -199,7 +216,9 @@
       const stateGross = gRes.inc.stateGross + jRes.inc.stateGross;
       const otherPensions = gRes.inc.total + jRes.inc.total;
 
-      gTf *= (1 + GROWTH); gTx *= (1 + GROWTH); jTf *= (1 + GROWTH); jTx *= (1 + GROWTH);
+      // growth applies only for the fraction of the year actually elapsed
+      const grow = Math.pow(1 + GROWTH, yearFrac);
+      gTf *= grow; gTx *= grow; jTf *= grow; jTx *= grow;
 
       rows.push({
         year: yr, gAge: gAge, jAge: jAge, outgoings: yrOut,
@@ -218,7 +237,7 @@
         g_closing: gTf + gTx, j_closing: jTf + jTx,
         shortfall: gRes.shortfall || jRes.shortfall
       });
-      yrsPassed++;
+      elapsed += yearFrac;
     }
     return rows;
   }

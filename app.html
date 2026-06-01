@@ -362,7 +362,7 @@
       const startYr = plan.retirementDate ? plan.retirementDate.getFullYear() : new Date().getFullYear();
       drawdownRows = PensionEngine.drawdown(data, {
         pots: livePots, gRatio: plan.gRatio, spendRed: plan.spendRed,
-        startYear: startYr, sp: PensionEngine.baselineSP(stateNames)
+        startYear: startYr, retirementDate: plan.retirementDate, sp: PensionEngine.baselineSP(stateNames)
       });
       renderOverview();
       renderRetirementTable();
