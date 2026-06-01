@@ -121,6 +121,13 @@
     const rd = cfg.retirementDate || new Date(cfg.startYear, 0, 1);
     const startIdx = rd.getFullYear() * 12 + rd.getMonth();
 
+    // The state pension figure is stored as TODAY'S value, so it must be grown from
+    // now all the way to the claim date — i.e. an extra span on top of "elapsed since
+    // retirement". This is that head-start span, in years, from this month to retirement.
+    const nowMonth = new Date();
+    const nowIdx = nowMonth.getFullYear() * 12 + nowMonth.getMonth();
+    const preRetireYears = Math.max(0, (startIdx - nowIdx) / 12);
+
     // Run to the month of the latest end-of-life date (partial final year is fine).
     const gEol = gM.end_of_life_date ? new Date(gM.end_of_life_date) : null;
     const jEol = jM.end_of_life_date ? new Date(jM.end_of_life_date) : null;
@@ -152,9 +159,15 @@
         let eIdx = Infinity;
         if (g.end_date) { const ed = new Date(g.end_date); eIdx = ed.getFullYear() * 12 + ed.getMonth(); }
         if (idx < sIdx || idx > eIdx) return;
-        const rate = isState ? sp.spRate : INFL;
-        const monthly = (Number(g.initial_annual_value) || 0) / 12 * Math.pow(1 + rate, elapsed);
-        if (isState) stateGross += monthly; else otherGross += monthly;
+        if (isState) {
+          // stored as TODAY'S value → grow from now to this month (pre-retirement span + elapsed)
+          const monthly = (Number(g.initial_annual_value) || 0) / 12 * Math.pow(1 + sp.spRate, preRetireYears + elapsed);
+          stateGross += monthly;
+        } else {
+          // stored as value at retirement → grow only across years since retirement
+          const monthly = (Number(g.initial_annual_value) || 0) / 12 * Math.pow(1 + INFL, elapsed);
+          otherGross += monthly;
+        }
       });
       return { stateGross, otherGross, total: stateGross + otherGross };
     }
