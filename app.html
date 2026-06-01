@@ -6,8 +6,8 @@
   <title>Joint Pension Analytics</title>
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="common.js?v=dynamic1"></script>
-  <script src="engine.js?v=dynamic1"></script>
+  <script src="common.js?v=touch1"></script>
+  <script src="engine.js?v=touch1"></script>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; color: #333; }
     .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
@@ -52,19 +52,38 @@
     .note { font-size:12px; color:#64748b; margin-bottom:10px; }
     #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
     .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
-    .params { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px; margin:0 0 14px; }
-    .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:10px 18px; }
-    .params label { display:block; font-weight:bold; font-size:12px; color:#2c3e50; margin-bottom:3px; }
-    .params .sv { color:#3498db; font-weight:bold; }
-    .params input[type=date], .params select { padding:6px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:13px; box-sizing:border-box; }
-    .params input[type=date] { width:100%; max-width:180px; }
-    .params input[type=range] { width:100%; max-width:220px; cursor:pointer; }
-    .params .phase { display:flex; gap:8px; align-items:center; }
-    .params .actions { margin-top:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    .params .pbtn { padding:8px 16px; border:none; border-radius:4px; font-weight:bold; cursor:pointer; font-size:13px; color:#fff; }
+    .params { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px 18px; margin:0 0 14px; }
+    .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:18px 26px; }
+    .params .ctrl-wide { grid-column:1 / -1; }
+    .params label { display:block; font-weight:bold; font-size:14px; color:#2c3e50; margin-bottom:8px; }
+    .params .sv { color:#3498db; font-weight:bold; font-size:15px; }
+    .params .hint { font-size:12px; color:#94a3b8; margin-top:4px; }
+
+    /* big touch-friendly sliders */
+    .params input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:14px; border-radius:7px; background:#d6e0ea; outline:none; cursor:pointer; margin:6px 0; }
+    .params input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:34px; height:34px; border-radius:50%; background:#3498db; border:3px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); cursor:pointer; }
+    .params input[type=range]::-moz-range-thumb { width:34px; height:34px; border-radius:50%; background:#3498db; border:3px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); cursor:pointer; }
+
+    /* segmented day buttons */
+    .params .seg { display:flex; gap:0; margin-top:8px; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; max-width:300px; }
+    .params .seg button { flex:1; padding:12px 4px; border:none; background:#fff; color:#475569; font-weight:bold; font-size:14px; cursor:pointer; border-right:1px solid #cbd5e1; }
+    .params .seg button:last-child { border-right:none; }
+    .params .seg button.seg-on { background:#3498db; color:#fff; }
+
+    /* toggle switch */
+    .params .switch { display:flex; align-items:center; gap:12px; cursor:pointer; margin-bottom:0; }
+    .params .switch input { position:absolute; opacity:0; width:0; height:0; }
+    .params .switch .track { position:relative; width:56px; height:32px; background:#cbd5e1; border-radius:16px; transition:background .15s; flex:0 0 auto; }
+    .params .switch .track::after { content:''; position:absolute; top:3px; left:3px; width:26px; height:26px; background:#fff; border-radius:50%; box-shadow:0 1px 3px rgba(0,0,0,0.3); transition:left .15s; }
+    .params .switch input:checked + .track { background:#27ae60; }
+    .params .switch input:checked + .track::after { left:27px; }
+    .params .switch .switch-text { font-weight:bold; font-size:15px; color:#2c3e50; }
+
+    .params .actions { margin-top:18px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .params .pbtn { padding:13px 22px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:15px; color:#fff; }
     .pbtn-save { background:#27ae60; } .pbtn-save:hover { background:#219150; }
     .pbtn-reset { background:#64748b; } .pbtn-reset:hover { background:#475569; }
-    .params .msg { font-size:13px; font-weight:bold; }
+    .params .msg { font-size:14px; font-weight:bold; }
   </style>
 </head>
 <body>
@@ -109,19 +128,23 @@
   <div id="Modelling" class="tabcontent">
     <div class="params">
       <div class="grid">
-        <div><label>Fully retire on</label><input type="date" id="m_retire" oninput="onParam()"></div>
-        <div><label>Drop to 4-day week on</label><div class="phase"><input type="date" id="m_p1date" oninput="onParam()"><select id="m_p1days" onchange="onParam()"><option value="5">5d</option><option value="4">4d</option><option value="3">3d</option></select></div></div>
-        <div><label>Drop to 3-day week on</label><div class="phase"><input type="date" id="m_p2date" oninput="onParam()"><select id="m_p2days" onchange="onParam()"><option value="5">5d</option><option value="4">4d</option><option value="3">3d</option></select></div></div>
-        <div><label>Growth until retirement <span id="m_growth_v" class="sv">5.0%</span></label><input type="range" id="m_growth" min="0" max="10" step="0.25" value="5" oninput="onParam()"></div>
-        <div><label>Spending in retirement <span id="m_spend_v" class="sv">100%</span></label><input type="range" id="m_spend" min="25" max="100" step="1" value="100" oninput="onParam()"></div>
-        <div><label>Graham drawdown ratio <span id="m_ratio_v" class="sv">50%</span></label><input type="range" id="m_ratio" min="0" max="100" step="1" value="50" oninput="onParam()"></div>
-        <div>
-          <label>Dynamic model mode</label>
-          <label style="font-weight:normal; font-size:12px; cursor:pointer;"><input type="checkbox" id="m_dynamic" onchange="onParam()" style="width:auto; margin-right:6px;">Protect each pot to a floor; redirect drawdown to the fuller pot</label>
-          <div id="m_floors" style="display:none; margin-top:8px; font-size:12px; color:#475569;">
-            Graham floor <input type="number" id="m_gfloor" min="0" max="90" step="1" value="25" style="width:60px; padding:4px;" oninput="onParam()">%
-            &nbsp; Julie floor <input type="number" id="m_jfloor" min="0" max="90" step="1" value="20" style="width:60px; padding:4px;" oninput="onParam()">%
-            <span style="display:block; color:#94a3b8; margin-top:4px;">(% of each taxable pot's value at retirement)</span>
+        <div class="ctrl"><label>Fully retire <span id="m_retire_v" class="sv">—</span></label><input type="range" id="m_retire" min="0" max="120" step="1" value="60" oninput="onParam()"></div>
+        <div class="ctrl"><label>Drop to 4-day week <span id="m_p1date_v" class="sv">—</span></label><input type="range" id="m_p1date" min="0" max="120" step="1" value="0" oninput="onParam()">
+          <div class="seg" id="m_p1days_seg" data-target="m_p1days"><button type="button" data-v="5">5 days</button><button type="button" data-v="4">4 days</button><button type="button" data-v="3">3 days</button></div>
+          <input type="hidden" id="m_p1days" value="4"></div>
+        <div class="ctrl"><label>Drop to 3-day week <span id="m_p2date_v" class="sv">—</span></label><input type="range" id="m_p2date" min="0" max="120" step="1" value="0" oninput="onParam()">
+          <div class="seg" id="m_p2days_seg" data-target="m_p2days"><button type="button" data-v="5">5 days</button><button type="button" data-v="4">4 days</button><button type="button" data-v="3">3 days</button></div>
+          <input type="hidden" id="m_p2days" value="3"></div>
+        <div class="ctrl"><label>Growth until retirement <span id="m_growth_v" class="sv">5.0%</span></label><input type="range" id="m_growth" min="0" max="10" step="0.25" value="5" oninput="onParam()"></div>
+        <div class="ctrl"><label>Spending in retirement <span id="m_spend_v" class="sv">100%</span></label><input type="range" id="m_spend" min="25" max="100" step="1" value="100" oninput="onParam()"></div>
+        <div class="ctrl"><label>Graham drawdown ratio <span id="m_ratio_v" class="sv">50%</span></label><input type="range" id="m_ratio" min="0" max="100" step="1" value="50" oninput="onParam()"></div>
+        <div class="ctrl ctrl-wide">
+          <label class="switch"><input type="checkbox" id="m_dynamic" onchange="onParam()"><span class="track"></span><span class="switch-text">Dynamic model mode</span></label>
+          <div class="hint">Protect each pot to a floor; redirect drawdown to the fuller pot.</div>
+          <div id="m_floors" style="display:none; margin-top:10px;">
+            <div class="ctrl"><label>Graham floor <span id="m_gfloor_v" class="sv">25%</span></label><input type="range" id="m_gfloor" min="0" max="90" step="1" value="25" oninput="onParam()"></div>
+            <div class="ctrl"><label>Julie floor <span id="m_jfloor_v" class="sv">20%</span></label><input type="range" id="m_jfloor" min="0" max="90" step="1" value="20" oninput="onParam()"></div>
+            <div class="hint">% of each taxable pot's value at retirement.</div>
           </div>
         </div>
       </div>
@@ -316,14 +339,28 @@
     }
 
     // ---- live controls on the Modelling tab ----
+    // Dates are month-index sliders: 0 = first day of NEXT month, 1 = month after, etc.
+    function monthBase() { const n = new Date(); return new Date(n.getFullYear(), n.getMonth() + 1, 1); }
+    function idxToDate(i) { const b = monthBase(); return new Date(b.getFullYear(), b.getMonth() + Number(i), 1); }
+    function dateToIdx(d) { if (!d) return 0; const b = monthBase(); const i = (d.getFullYear() - b.getFullYear()) * 12 + (d.getMonth() - b.getMonth()); return Math.max(0, Math.min(120, i)); }
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function monthLabel(d) { return MONTHS[d.getMonth()] + ' ' + d.getFullYear(); }
+
+    function segValue(id) { return parseInt(document.getElementById(id).value); }
+    function setSeg(target, v) {
+      document.getElementById(target).value = String(v);
+      const seg = document.getElementById(target + '_seg');
+      if (seg) seg.querySelectorAll('button').forEach(b => b.classList.toggle('seg-on', Number(b.dataset.v) === Number(v)));
+    }
+
     function readControls() {
       return {
-        retirementDate: App.parseLocalDate(document.getElementById('m_retire').value),
+        retirementDate: idxToDate(document.getElementById('m_retire').value),
         growthRate: parseFloat(document.getElementById('m_growth').value) / 100,
-        phase1Date: App.parseLocalDate(document.getElementById('m_p1date').value),
-        phase1Days: parseInt(document.getElementById('m_p1days').value),
-        phase2Date: App.parseLocalDate(document.getElementById('m_p2date').value),
-        phase2Days: parseInt(document.getElementById('m_p2days').value),
+        phase1Date: idxToDate(document.getElementById('m_p1date').value),
+        phase1Days: segValue('m_p1days'),
+        phase2Date: idxToDate(document.getElementById('m_p2date').value),
+        phase2Days: segValue('m_p2days'),
         spendRed: parseFloat(document.getElementById('m_spend').value) / 100,
         gRatio: parseFloat(document.getElementById('m_ratio').value) / 100,
         dynamic: document.getElementById('m_dynamic').checked,
@@ -332,22 +369,37 @@
       };
     }
     function applyControls(plan) {
-      document.getElementById('m_retire').value = App.toInputDate(plan.retirementDate);
+      document.getElementById('m_retire').value = dateToIdx(plan.retirementDate);
       document.getElementById('m_growth').value = (plan.growthRate * 100).toFixed(2);
-      document.getElementById('m_p1date').value = App.toInputDate(plan.phase1Date);
-      document.getElementById('m_p1days').value = String(plan.phase1Days);
-      document.getElementById('m_p2date').value = App.toInputDate(plan.phase2Date);
-      document.getElementById('m_p2days').value = String(plan.phase2Days);
+      document.getElementById('m_p1date').value = dateToIdx(plan.phase1Date);
+      setSeg('m_p1days', plan.phase1Days);
+      document.getElementById('m_p2date').value = dateToIdx(plan.phase2Date);
+      setSeg('m_p2days', plan.phase2Days);
       document.getElementById('m_spend').value = Math.round(plan.spendRed * 100);
       document.getElementById('m_ratio').value = Math.round(plan.gRatio * 100);
+      document.getElementById('m_gfloor').value = Math.round((plan.gFloorPct != null ? plan.gFloorPct : 0.25) * 100);
+      document.getElementById('m_jfloor').value = Math.round((plan.jFloorPct != null ? plan.jFloorPct : 0.20) * 100);
       syncLabels();
     }
     function syncLabels() {
+      document.getElementById('m_retire_v').textContent = monthLabel(idxToDate(document.getElementById('m_retire').value));
+      document.getElementById('m_p1date_v').textContent = monthLabel(idxToDate(document.getElementById('m_p1date').value));
+      document.getElementById('m_p2date_v').textContent = monthLabel(idxToDate(document.getElementById('m_p2date').value));
       document.getElementById('m_growth_v').textContent = parseFloat(document.getElementById('m_growth').value).toFixed(1) + '%';
       document.getElementById('m_spend_v').textContent = document.getElementById('m_spend').value + '%';
       document.getElementById('m_ratio_v').textContent = document.getElementById('m_ratio').value + '%';
+      document.getElementById('m_gfloor_v').textContent = document.getElementById('m_gfloor').value + '%';
+      document.getElementById('m_jfloor_v').textContent = document.getElementById('m_jfloor').value + '%';
     }
     function onParam() { syncLabels(); document.getElementById('m_floors').style.display = document.getElementById('m_dynamic').checked ? 'block' : 'none'; recomputeAll(); }
+
+    // wire the segmented day buttons (delegated)
+    document.querySelectorAll('.seg').forEach(seg => {
+      seg.addEventListener('click', e => {
+        const btn = e.target.closest('button'); if (!btn) return;
+        setSeg(seg.dataset.target, Number(btn.dataset.v)); onParam();
+      });
+    });
 
     function resetPlan() { if (savedPlan) { applyControls(savedPlan); document.getElementById('m_msg').textContent = ''; recomputeAll(); } }
 
@@ -356,11 +408,11 @@
       const c = readControls();
       const payload = {
         member_name: 'Graham',
-        shorter_week_date_1: document.getElementById('m_p1date').value || null,
+        shorter_week_date_1: App.toInputDate(c.phase1Date) || null,
         working_days_1: c.phase1Days,
-        shorter_week_date_2: document.getElementById('m_p2date').value || null,
+        shorter_week_date_2: App.toInputDate(c.phase2Date) || null,
         working_days_2: c.phase2Days,
-        retirement_date: document.getElementById('m_retire').value || null,
+        retirement_date: App.toInputDate(c.retirementDate) || null,
         pension_growth_rate: c.growthRate,
         spending_reduction_pct: c.spendRed,
         drawdown_ratio_graham: c.gRatio,
