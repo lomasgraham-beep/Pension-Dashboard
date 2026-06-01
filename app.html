@@ -6,8 +6,8 @@
   <title>Joint Pension Analytics</title>
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="common.js?v=monthly2"></script>
-  <script src="engine.js?v=monthly2"></script>
+  <script src="common.js?v=dynamic1"></script>
+  <script src="engine.js?v=dynamic1"></script>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; color: #333; }
     .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
@@ -41,7 +41,7 @@
     th:first-child, td:first-child { text-align:left; }
     th { background:#f8fafc; color:#2c3e50; position:sticky; top:0; z-index:5; box-shadow:0 2px 0 #e2e8f0; }
     tr.shortfall td { background:#fdecea; }
-    .table-wrap { overflow-x:auto; }
+    .table-wrap { overflow-x:auto; overflow-y:visible; }
 
     .subtab-buttons { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:15px; border-bottom:2px solid #e2e8f0; padding-bottom:10px; }
     .subtab-link { background:#eef2f7; border:1px solid #cbd5e1; color:#475569; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:14px; }
@@ -115,6 +115,15 @@
         <div><label>Growth until retirement <span id="m_growth_v" class="sv">5.0%</span></label><input type="range" id="m_growth" min="0" max="10" step="0.25" value="5" oninput="onParam()"></div>
         <div><label>Spending in retirement <span id="m_spend_v" class="sv">100%</span></label><input type="range" id="m_spend" min="25" max="100" step="1" value="100" oninput="onParam()"></div>
         <div><label>Graham drawdown ratio <span id="m_ratio_v" class="sv">50%</span></label><input type="range" id="m_ratio" min="0" max="100" step="1" value="50" oninput="onParam()"></div>
+        <div>
+          <label>Dynamic model mode</label>
+          <label style="font-weight:normal; font-size:12px; cursor:pointer;"><input type="checkbox" id="m_dynamic" onchange="onParam()" style="width:auto; margin-right:6px;">Protect each pot to a floor; redirect drawdown to the fuller pot</label>
+          <div id="m_floors" style="display:none; margin-top:8px; font-size:12px; color:#475569;">
+            Graham floor <input type="number" id="m_gfloor" min="0" max="90" step="1" value="25" style="width:60px; padding:4px;" oninput="onParam()">%
+            &nbsp; Julie floor <input type="number" id="m_jfloor" min="0" max="90" step="1" value="20" style="width:60px; padding:4px;" oninput="onParam()">%
+            <span style="display:block; color:#94a3b8; margin-top:4px;">(% of each taxable pot's value at retirement)</span>
+          </div>
+        </div>
       </div>
       <div class="actions">
         <button class="pbtn pbtn-save" onclick="savePlan()">Save as my plan</button>
@@ -316,7 +325,10 @@
         phase2Date: App.parseLocalDate(document.getElementById('m_p2date').value),
         phase2Days: parseInt(document.getElementById('m_p2days').value),
         spendRed: parseFloat(document.getElementById('m_spend').value) / 100,
-        gRatio: parseFloat(document.getElementById('m_ratio').value) / 100
+        gRatio: parseFloat(document.getElementById('m_ratio').value) / 100,
+        dynamic: document.getElementById('m_dynamic').checked,
+        gFloorPct: (parseFloat(document.getElementById('m_gfloor').value) || 0) / 100,
+        jFloorPct: (parseFloat(document.getElementById('m_jfloor').value) || 0) / 100
       };
     }
     function applyControls(plan) {
@@ -335,7 +347,7 @@
       document.getElementById('m_spend_v').textContent = document.getElementById('m_spend').value + '%';
       document.getElementById('m_ratio_v').textContent = document.getElementById('m_ratio').value + '%';
     }
-    function onParam() { syncLabels(); recomputeAll(); }
+    function onParam() { syncLabels(); document.getElementById('m_floors').style.display = document.getElementById('m_dynamic').checked ? 'block' : 'none'; recomputeAll(); }
 
     function resetPlan() { if (savedPlan) { applyControls(savedPlan); document.getElementById('m_msg').textContent = ''; recomputeAll(); } }
 
@@ -372,7 +384,9 @@
       const startYr = plan.retirementDate ? plan.retirementDate.getFullYear() : new Date().getFullYear();
       drawdownRows = PensionEngine.drawdown(data, {
         pots: livePots, gRatio: plan.gRatio, spendRed: plan.spendRed,
-        startYear: startYr, retirementDate: plan.retirementDate, sp: PensionEngine.baselineSP(stateNames)
+        startYear: startYr, retirementDate: plan.retirementDate,
+        dynamic: plan.dynamic, gFloorPct: plan.gFloorPct, jFloorPct: plan.jFloorPct,
+        sp: PensionEngine.baselineSP(stateNames)
       });
       renderOverview();
       renderRetirementTable();
