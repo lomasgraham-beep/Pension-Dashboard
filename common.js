@@ -79,7 +79,7 @@
     showOverlay(false);
     const w = document.getElementById('whoami');
     if (w) w.textContent = 'Signed in as ' + (session.user && session.user.email ? session.user.email : '');
-    if (!started) { started = true; if (onReadyCb) onReadyCb(session); }
+    if (!started) { started = true; startIdleWatch(); if (onReadyCb) onReadyCb(session); }
   }
 
   async function doLogin() {
@@ -101,6 +101,67 @@
   }
 
   async function doLogout() { await sb.auth.signOut(); location.reload(); }
+
+  // ---- inactivity auto-logout (15 min, with a 1 min warning) ----
+  const IDLE_MS = 15 * 60 * 1000;   // sign out after this long with no activity
+  const WARN_MS = 14 * 60 * 1000;   // show warning 1 minute before
+  let idleTimer = null, warnTimer = null, countdownTimer = null;
+
+  function removeIdleWarning() {
+    const w = document.getElementById('idleWarn');
+    if (w) w.parentNode.removeChild(w);
+    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+  }
+
+  function showIdleWarning() {
+    if (document.getElementById('idleWarn')) return;
+    let secs = Math.round((IDLE_MS - WARN_MS) / 1000);
+    const html =
+      '<div id="idleWarn" style="position:fixed;left:0;right:0;bottom:0;z-index:3000;background:#fef3c7;border-top:2px solid #fcd34d;color:#92400e;padding:12px 16px;font-family:\'Segoe UI\',Tahoma,sans-serif;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;">' +
+        '<span style="font-weight:bold;">You\'ll be signed out in <span id="idleSecs">' + secs + '</span>s due to inactivity.</span>' +
+        '<button id="idleStay" style="background:#3498db;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:bold;cursor:pointer;">Stay signed in</button>' +
+      '</div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+    document.getElementById('idleStay').addEventListener('click', bumpActivity);
+    countdownTimer = setInterval(function () {
+      secs -= 1;
+      const el = document.getElementById('idleSecs');
+      if (el) el.textContent = Math.max(0, secs);
+    }, 1000);
+  }
+
+  async function idleLogout() {
+    removeIdleWarning();
+    try { await sb.auth.signOut(); } catch (e) {}
+    location.reload();
+  }
+
+  function bumpActivity() {
+    if (!started) return;            // only run once signed in
+    removeIdleWarning();
+    if (warnTimer) clearTimeout(warnTimer);
+    if (idleTimer) clearTimeout(idleTimer);
+    warnTimer = setTimeout(showIdleWarning, WARN_MS);
+    idleTimer = setTimeout(idleLogout, IDLE_MS);
+  }
+
+  function startIdleWatch() {
+    ['click', 'keydown', 'mousemove', 'scroll', 'touchstart', 'touchmove'].forEach(function (ev) {
+      window.addEventListener(ev, onLocalActivity, { passive: true });
+    });
+    // If we're embedded in a parent (iframe), tell the parent we're active too.
+    // If we're the parent, accept activity pings from our frames.
+    window.addEventListener('message', function (e) {
+      if (e && e.data === 'app-activity') bumpActivity();
+    });
+    bumpActivity(); // start the clock
+  }
+
+  function onLocalActivity() {
+    bumpActivity();
+    // notify parent (no-op if we're not embedded)
+    try { if (window.parent && window.parent !== window) window.parent.postMessage('app-activity', '*'); } catch (e) {}
+  }
 
   function requireLogin(onReady, opts) {
     onReadyCb = onReady;
