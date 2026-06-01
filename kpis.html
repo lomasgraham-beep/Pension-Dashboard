@@ -5,7 +5,7 @@
 <title>Performance KPIs</title>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=style8"></script>
+<script src="common.js?v=style9"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:#333; }
   h2 { color:#2c3e50; margin-top:0; }
@@ -187,12 +187,33 @@
     });
     const months = Object.keys(timeline).sort().slice(-12);
     const dt = new google.visualization.DataTable();
-    dt.addColumn('string', 'Month'); dt.addColumn('number', 'Organic Monthly Growth'); dt.addColumn({ type: 'string', role: 'style' });
-    months.forEach(m => { const v = Math.round(timeline[m]); const lbl = m.split('-'); const d = new Date(lbl[0], lbl[1] - 1, 1); dt.addRow([d.toLocaleString('default', { month: 'short', year: 'numeric' }), v, v >= 0 ? '#27ae60' : '#c0392b']); });
-    const nf = new google.visualization.NumberFormat({ prefix: '£', fractionDigits: 0 }); nf.format(dt, 1);
+    dt.addColumn('string', 'Month');
+    dt.addColumn('number', 'Organic Monthly Growth');
+    dt.addColumn({ type: 'string', role: 'style' });
+    dt.addColumn({ type: 'string', role: 'annotation' });
+    const vals = months.map(m => Math.round(timeline[m]));
+    months.forEach((m, idx) => {
+      const v = vals[idx]; const lbl = m.split('-'); const d = new Date(lbl[0], lbl[1] - 1, 1);
+      dt.addRow([d.toLocaleString('default', { month: 'short', year: 'numeric' }), v, v >= 0 ? '#27ae60' : '#c0392b', '£' + v.toLocaleString('en-GB')]);
+    });
+
+    // Cap the axis at a "normal" ceiling derived from the typical months, so one spike
+    // doesn't squash the rest. Bars above the cap are clipped but keep their true label.
+    const sorted = vals.map(Math.abs).filter(x => x > 0).sort((a, b) => a - b);
+    let vMax = null;
+    if (sorted.length) {
+      const median = sorted[Math.floor(sorted.length / 2)];
+      const biggest = sorted[sorted.length - 1];
+      // only cap if the biggest bar is a genuine outlier (more than ~2.5x the median)
+      if (biggest > median * 2.5) vMax = Math.ceil((median * 2.5) / 500) * 500;
+    }
+    const vAxis = { format: '£#,###' };
+    if (vMax) vAxis.viewWindow = { max: vMax, min: Math.min(0, ...vals) };
+
     new google.visualization.ColumnChart(document.getElementById('chartGrowth')).draw(dt, {
-      title: 'Combined Organic Monthly Growth (£)', legend: { position: 'none' },
-      chartArea: { left: 85, right: 30, top: 40, bottom: 60 }, vAxis: { format: '£#,###' }
+      title: 'Combined Organic Monthly Growth (£)' + (vMax ? '  — axis capped; spike value labelled' : ''),
+      legend: { position: 'none' }, annotations: { alwaysOutside: false, textStyle: { fontSize: 10, color: '#333' } },
+      chartArea: { left: 85, right: 30, top: 40, bottom: 60 }, vAxis: vAxis
     });
   }
 
