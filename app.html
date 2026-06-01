@@ -6,69 +6,103 @@
   <title>Joint Pension Analytics</title>
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="common.js?v=tabs1"></script>
-  <script src="engine.js?v=tabs1"></script>
+  <script src="common.js?v=style1"></script>
+  <script src="engine.js?v=style1"></script>
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; color: #333; }
-    .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
-    .topbar h1 { margin:0; font-size:22px; color:#2c3e50; }
+    :root {
+      --accent:#2c7a7b;            /* slate-teal */
+      --accent-dark:#236668;
+      --accent-soft:#e6f2f2;       /* faint teal wash for highlights */
+      --accent-border:#b8dadb;
+      --page:#eef2f3;              /* tinted-neutral page background */
+      --surface:#ffffff;           /* cards / panels */
+      --surface-2:#f7f9fa;         /* subtle inset background */
+      --ink:#26333a;               /* primary text */
+      --ink-soft:#64748b;          /* secondary text */
+      --line:#e2e8f0;              /* hairlines */
+      --line-strong:#cbd5e1;
+      --shadow:0 1px 3px rgba(20,40,50,0.06), 0 4px 12px rgba(20,40,50,0.05);
+      --radius:10px;
+      --pos:#2f8f5b; --neg:#c0392b; --warn:#e67e22; --bills:#c0392b;
+    }
+    * { box-sizing:border-box; }
+    body { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding:20px; background:var(--page); color:var(--ink); }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+    .topbar h1 { margin:0; font-size:22px; color:var(--ink); letter-spacing:-0.01em; }
     .right { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
-    .view-toggle { background:#e2e8f0; border-radius:6px; overflow:hidden; display:flex; border:1px solid #cbd5e1; }
-    .btn-toggle { background:transparent; border:none; padding:9px 16px; font-weight:bold; cursor:pointer; color:#64748b; font-size:13px; }
-    .btn-toggle:hover { background:#cbd5e1; }
-    .btn-toggle.active-toggle { background:#3498db; color:#fff; }
-    .who { font-size:13px; color:#64748b; }
-    .who a { color:#3498db; font-weight:bold; cursor:pointer; text-decoration:none; margin-left:10px; }
+    .view-toggle { background:var(--surface); border-radius:8px; overflow:hidden; display:flex; border:1px solid var(--line-strong); box-shadow:var(--shadow); }
+    .btn-toggle { background:transparent; border:none; padding:9px 16px; font-weight:600; cursor:pointer; color:var(--ink-soft); font-size:13px; transition:background .12s,color .12s; }
+    .btn-toggle:hover { background:var(--accent-soft); }
+    .btn-toggle.active-toggle { background:var(--accent); color:#fff; }
+    .who { font-size:13px; color:var(--ink-soft); }
+    .who a { color:var(--accent); font-weight:600; cursor:pointer; text-decoration:none; margin-left:10px; }
     .who a:hover { text-decoration:underline; }
 
-    .tab-buttons { display:flex; flex-wrap:wrap; border:1px solid #ccc; background:#e2e8f0; border-radius:8px 8px 0 0; }
-    .tab-buttons button { background:inherit; border:none; cursor:pointer; padding:13px 16px; font-size:15px; font-weight:bold; color:#4a5568; }
-    .tab-buttons button.active-btn { background:#fff; border-bottom:3px solid #3498db; color:#2c3e50; }
-    .tabcontent { display:none; padding:20px; background:#fff; border:1px solid #ccc; border-top:none; border-radius:0 0 8px 8px; }
+    /* responsive shell: side-rail on wide screens, stacked top-bar on narrow */
+    .shell { display:block; }
+    .tab-buttons { display:flex; flex-wrap:wrap; gap:4px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius) var(--radius) 0 0; padding:6px 6px 0; box-shadow:var(--shadow); }
+    .tab-buttons button { background:transparent; border:none; cursor:pointer; padding:13px 16px; font-size:15px; font-weight:600; color:var(--ink-soft); border-radius:8px 8px 0 0; transition:background .12s,color .12s; }
+    .tab-buttons button:hover { background:var(--accent-soft); color:var(--accent-dark); }
+    .tab-buttons button.active-btn { background:var(--accent-soft); border-bottom:3px solid var(--accent); color:var(--accent-dark); }
+    .tabcontent { display:none; padding:22px; background:var(--surface); border:1px solid var(--line); border-top:none; border-radius:0 0 var(--radius) var(--radius); box-shadow:var(--shadow); }
     .tabcontent.active { display:block; }
-    h2 { color:#2c3e50; margin-top:0; padding-bottom:5px; border-bottom:2px solid #e2e8f0; }
+    h2 { color:var(--ink); margin-top:0; padding-bottom:6px; border-bottom:2px solid var(--line); font-weight:700; }
 
     .card-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:15px; margin-bottom:10px; }
-    .card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:15px; text-align:center; }
-    .card.hl { background:#eff6ff; border-color:#bfdbfe; }
-    .card h3 { margin:0 0 8px; font-size:12px; color:#64748b; text-transform:uppercase; }
-    .card .value { font-size:24px; font-weight:bold; color:#2c3e50; }
-    .card.hl .value { color:#1e3a8a; }
+    .card { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:18px 15px; text-align:center; }
+    .card.hl { background:var(--accent-soft); border-color:var(--accent-border); }
+    .card h3 { margin:0 0 8px; font-size:12px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; }
+    .card .value { font-size:24px; font-weight:700; color:var(--ink); }
+    .card.hl .value { color:var(--accent-dark); }
 
     .chart-box { width:100%; height:400px; margin-bottom:20px; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
-    th, td { padding:9px 10px; border-bottom:1px solid #e2e8f0; text-align:right; white-space:nowrap; }
+    th, td { padding:9px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
     th:first-child, td:first-child { text-align:left; }
-    th { background:#f8fafc; color:#2c3e50; position:sticky; top:0; z-index:5; box-shadow:0 2px 0 #e2e8f0; }
+    th { background:var(--surface-2); color:var(--ink); position:sticky; top:0; z-index:5; box-shadow:0 2px 0 var(--line); }
     tr.shortfall td { background:#fdecea; }
     .table-wrap { overflow-x:auto; overflow-y:visible; }
 
-    .subtab-buttons { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:15px; border-bottom:2px solid #e2e8f0; padding-bottom:10px; }
-    .subtab-link { background:#eef2f7; border:1px solid #cbd5e1; color:#475569; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:14px; }
-    .subtab-link:hover { background:#e2e8f0; }
-    .subtab-link.active-sub { background:#3498db; color:#fff; border-color:#3498db; }
+    .subtab-buttons { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:15px; border-bottom:2px solid var(--line); padding-bottom:10px; }
+    .subtab-link { background:var(--surface-2); border:1px solid var(--line-strong); color:var(--ink-soft); padding:9px 16px; border-radius:8px; font-weight:600; cursor:pointer; font-size:14px; transition:background .12s,color .12s; }
+    .subtab-link:hover { background:var(--accent-soft); }
+    .subtab-link.active-sub { background:var(--accent); color:#fff; border-color:var(--accent); }
     .subtabcontent { display:none; }
-    .app-frame { width:100%; border:none; min-height:500px; background:#fff; border-radius:8px; }
-    .note { font-size:12px; color:#64748b; margin-bottom:10px; }
+    .app-frame { width:100%; border:none; min-height:500px; background:var(--surface); border-radius:var(--radius); }
+    .note { font-size:12px; color:var(--ink-soft); margin-bottom:10px; }
     #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
+
+    /* ---- Wide screens: vertical side-rail nav ---- */
+    @media (min-width: 1000px) {
+      .shell { display:flex; gap:18px; align-items:flex-start; }
+      .tab-buttons {
+        flex-direction:column; flex-wrap:nowrap; width:210px; flex:0 0 210px;
+        border-radius:var(--radius); border:1px solid var(--line); padding:10px;
+        position:sticky; top:20px; gap:2px;
+      }
+      .tab-buttons button { width:100%; text-align:left; border-radius:8px; padding:12px 14px; }
+      .tab-buttons button.active-btn { border-bottom:none; background:var(--accent); color:#fff; }
+      .tab-buttons button.active-btn:hover { background:var(--accent-dark); color:#fff; }
+      .shell .tabcontent { flex:1 1 auto; min-width:0; border-radius:var(--radius); border:1px solid var(--line); border-top:1px solid var(--line); }
+    }
     .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
-    .params { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px 18px; margin:0 0 14px; }
+    .params { background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:16px 18px; margin:0 0 14px; }
     .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:18px 26px; }
     .params .ctrl-wide { grid-column:1 / -1; }
-    .params label { display:block; font-weight:bold; font-size:14px; color:#2c3e50; margin-bottom:8px; }
-    .params .sv { color:#3498db; font-weight:bold; font-size:15px; }
+    .params label { display:block; font-weight:bold; font-size:14px; color:var(--ink); margin-bottom:8px; }
+    .params .sv { color:var(--accent); font-weight:bold; font-size:15px; }
     .params .hint { font-size:12px; color:#94a3b8; margin-top:4px; }
 
     /* big touch-friendly sliders */
     .params input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:14px; border-radius:7px; background:#d6e0ea; outline:none; cursor:pointer; margin:6px 0; }
-    .params input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:34px; height:34px; border-radius:50%; background:#3498db; border:3px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); cursor:pointer; }
-    .params input[type=range]::-moz-range-thumb { width:34px; height:34px; border-radius:50%; background:#3498db; border:3px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); cursor:pointer; }
+    .params input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:34px; height:34px; border-radius:50%; background:var(--accent); border:3px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); cursor:pointer; }
+    .params input[type=range]::-moz-range-thumb { width:34px; height:34px; border-radius:50%; background:var(--accent); border:3px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); cursor:pointer; }
 
     /* segmented day buttons */
     .params .seg { display:flex; gap:0; margin-top:8px; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; max-width:300px; }
     .params .seg button { flex:1; padding:12px 4px; border:none; background:#fff; color:#475569; font-weight:bold; font-size:14px; cursor:pointer; border-right:1px solid #cbd5e1; }
     .params .seg button:last-child { border-right:none; }
-    .params .seg button.seg-on { background:#3498db; color:#fff; }
+    .params .seg button.seg-on { background:var(--accent); color:#fff; }
 
     /* toggle switch */
     .params .switch { display:flex; align-items:center; gap:12px; cursor:pointer; margin-bottom:0; }
@@ -77,7 +111,7 @@
     .params .switch .track::after { content:''; position:absolute; top:3px; left:3px; width:26px; height:26px; background:#fff; border-radius:50%; box-shadow:0 1px 3px rgba(0,0,0,0.3); transition:left .15s; }
     .params .switch input:checked + .track { background:#27ae60; }
     .params .switch input:checked + .track::after { left:27px; }
-    .params .switch .switch-text { font-weight:bold; font-size:15px; color:#2c3e50; }
+    .params .switch .switch-text { font-weight:bold; font-size:15px; color:var(--ink); }
 
     .params .actions { margin-top:18px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
     .params .pbtn { padding:13px 22px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:15px; color:#fff; }
@@ -100,6 +134,7 @@
     </div>
   </div>
 
+  <div class="shell">
   <div class="tab-buttons">
     <button class="tab-link active-btn" onclick="showTab(event,'Overview')">Overview</button>
     <button class="tab-link" onclick="showTab(event,'KPIs')">Performance KPIs</button>
@@ -107,8 +142,7 @@
     <button class="tab-link" onclick="showTab(event,'Modelling')">Modelling</button>
     <button class="tab-link" onclick="showTab(event,'Retirement')">Retirement</button>
     <button class="tab-link" onclick="showTab(event,'Logs')">Log Entry</button>
-    <button class="tab-link" onclick="showTab(event,'Bills')">Bills</button>
-    <button class="tab-link" onclick="showTab(event,'Dining')">Dining</button>
+    <button class="tab-link" onclick="showTab(event,'LivingCosts')">Living Costs</button>
     <button class="tab-link" onclick="showTab(event,'ScenarioLab')">Scenario Lab</button>
     <button class="tab-link" onclick="showTab(event,'BasicData')">Basic Data</button>
   </div>
@@ -183,8 +217,14 @@
   <div id="KPIs" class="tabcontent"><iframe id="frame-kpis" class="app-frame" title="Performance KPIs"></iframe></div>
   <div id="Forecast" class="tabcontent"><iframe id="frame-forecast" class="app-frame" title="Monthly Forecast"></iframe></div>
   <div id="Logs" class="tabcontent"><iframe id="frame-logs" class="app-frame" title="Log Entry and Recent Logs"></iframe></div>
-  <div id="Bills" class="tabcontent"><iframe id="frame-bills" class="app-frame" title="Household Bills"></iframe></div>
-  <div id="Dining" class="tabcontent"><iframe id="frame-dining" class="app-frame" title="Dining"></iframe></div>
+  <div id="LivingCosts" class="tabcontent">
+    <div class="subtab-buttons">
+      <button id="subbtn-Bills" class="subtab-link active-sub" onclick="showSub(event,'Bills')">Household Bills</button>
+      <button id="subbtn-Dining" class="subtab-link" onclick="showSub(event,'Dining')">Dining</button>
+    </div>
+    <div id="sub-Bills" class="subtabcontent"><iframe id="frame-bills" class="app-frame" title="Household Bills"></iframe></div>
+    <div id="sub-Dining" class="subtabcontent"><iframe id="frame-dining" class="app-frame" title="Dining"></iframe></div>
+  </div>
 
   <div id="ScenarioLab" class="tabcontent">
     <p class="note">Live what-if modelling — nothing here is saved. Use the tabs above to return.</p>
@@ -204,6 +244,7 @@
     <div id="sub-Contributions" class="subtabcontent"><iframe id="frame-Contributions" class="app-frame" title="Contributions"></iframe></div>
     <div id="sub-Defaults" class="subtabcontent"><iframe id="frame-Defaults" class="app-frame" title="Defaults"></iframe></div>
   </div>
+  </div><!-- /.shell -->
 
   <script>
     const fmt = App.fmt;
@@ -457,7 +498,7 @@
     }
 
     // ---------- embedded frames ----------
-    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Defaults:'pension_defaults.html' };
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function hookFrame(f) {
       f.addEventListener('load', function () {
         try { var doc = f.contentWindow.document; var rz = function(){ f.style.height = Math.max(doc.body.scrollHeight, 500) + 'px'; }; rz();
@@ -467,8 +508,9 @@
     }
     function ensureFrame(id, src) { const f = document.getElementById(id); if (f && !f.getAttribute('src')) { hookFrame(f); f.setAttribute('src', src); } }
     function showSub(evt, name) {
-      document.querySelectorAll('.subtabcontent').forEach(el => el.style.display = 'none');
-      document.querySelectorAll('.subtab-link').forEach(el => el.classList.remove('active-sub'));
+      const panel = document.getElementById('sub-' + name).parentElement;     // the parent tab holding this group
+      panel.querySelectorAll('.subtabcontent').forEach(el => el.style.display = 'none');
+      panel.querySelectorAll('.subtab-link').forEach(el => el.classList.remove('active-sub'));
       document.getElementById('sub-' + name).style.display = 'block';
       if (evt) evt.currentTarget.classList.add('active-sub'); else { const b = document.getElementById('subbtn-' + name); if (b) b.classList.add('active-sub'); }
       ensureFrame('frame-' + name, SUB_SRC[name]);
@@ -483,8 +525,7 @@
       if (id === 'KPIs') ensureFrame('frame-kpis', 'kpis.html');
       if (id === 'Forecast') ensureFrame('frame-forecast', 'forecast.html');
       if (id === 'Logs') ensureFrame('frame-logs', 'logs.html');
-      if (id === 'Bills') ensureFrame('frame-bills', 'bills.html');
-      if (id === 'Dining') ensureFrame('frame-dining', 'dining.html');
+      if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Bills'); }
       if (id === 'ScenarioLab') ensureFrame('frame-lab', 'state_pension_scenario_lab.html');
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
     }
