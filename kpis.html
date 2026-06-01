@@ -5,7 +5,7 @@
 <title>Performance KPIs</title>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=style7"></script>
+<script src="common.js?v=style8"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:#333; }
   h2 { color:#2c3e50; margin-top:0; }
@@ -210,7 +210,7 @@
     const status = document.getElementById('status');
     try {
       const [logs, contribs, pRows] = await Promise.all([
-        App.rest('op_pension_logs?order=log_date.asc'), App.rest('bd_pension_contributions'),
+        App.rest('op_pension_logs?order=log_date.desc&limit=2000'), App.rest('bd_pension_contributions'),
         App.rest('op_modelling_parameters?member_name=eq.Graham&limit=1')
       ]);
       allLogs = logs; allContributions = contribs; grahamParams = pRows && pRows[0] ? pRows[0] : null;
