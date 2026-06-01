@@ -6,8 +6,8 @@
   <title>Joint Pension Analytics</title>
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="common.js?v=style2"></script>
-  <script src="engine.js?v=style2"></script>
+  <script src="common.js?v=style4"></script>
+  <script src="engine.js?v=style4"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -70,7 +70,7 @@
     .subtabcontent { display:none; }
     .subtabcontent[style*="block"] { display:block; }
     #LivingCosts, #BasicData { min-width:0; }
-    .app-frame { width:100%; display:block; }
+    .app-frame { width:100%; display:block; min-height:900px; }
     .app-frame { width:100%; border:none; min-height:500px; background:var(--surface); border-radius:var(--radius); }
     .note { font-size:12px; color:var(--ink-soft); margin-bottom:10px; }
     #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
@@ -134,7 +134,7 @@
         <button id="vt-Julie" class="btn-toggle" onclick="setView('Julie')">Julie</button>
       </div>
       <span class="who"><span id="whoami"></span><a onclick="App.doLogout()">Log out</a></span>
-      <span style="font-size:11px; color:#94a3b8; margin-left:8px;">build: LC-2</span>
+      <span style="font-size:11px; color:#94a3b8; margin-left:8px;">build: LC-4</span>
     </div>
   </div>
 
@@ -226,8 +226,8 @@
       <button id="subbtn-Bills" class="subtab-link active-sub" onclick="showSub(event,'Bills')">Household Bills</button>
       <button id="subbtn-Dining" class="subtab-link" onclick="showSub(event,'Dining')">Dining</button>
     </div>
-    <div id="sub-Bills" class="subtabcontent"><iframe id="frame-bills" class="app-frame" title="Household Bills"></iframe></div>
-    <div id="sub-Dining" class="subtabcontent"><iframe id="frame-dining" class="app-frame" title="Dining"></iframe></div>
+    <div id="sub-Bills" class="subtabcontent"><iframe id="frame-Bills" class="app-frame" title="Household Bills"></iframe></div>
+    <div id="sub-Dining" class="subtabcontent"><iframe id="frame-Dining" class="app-frame" title="Dining"></iframe></div>
   </div>
 
   <div id="ScenarioLab" class="tabcontent">
