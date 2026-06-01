@@ -130,9 +130,14 @@
 
   <div id="Retirement" class="tabcontent">
     <h2><span class="viewlabel">Joint</span> Retirement Drawdown</h2>
+    <div style="margin:0 0 12px; font-size:14px;">
+      <strong style="color:#2c3e50; margin-right:10px;">View:</strong>
+      <label style="margin-right:16px; cursor:pointer;"><input type="radio" name="retGran" value="year" checked onchange="setRetGran('year')"> Annual</label>
+      <label style="cursor:pointer;"><input type="radio" name="retGran" value="month" onchange="setRetGran('month')"> Monthly</label>
+    </div>
     <div class="table-wrap">
       <table id="rTable">
-        <thead><tr><th>Year</th><th>Dining Target</th><th>Bills Target</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Guaranteed Incomes</th><th>Drawdown required</th><th>Total Gross Income</th></tr></thead>
+        <thead><tr><th id="rThPeriod">Year</th><th>Dining Target</th><th>Bills Target</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Guaranteed Incomes</th><th>Drawdown required</th><th>Total Gross Income</th></tr></thead>
         <tbody><tr><td colspan="8">Calculating…</td></tr></tbody>
       </table>
     </div>
@@ -166,6 +171,7 @@
     let calib = { g: 1, j: 1 };   // calibrates the JS forecast to the server's figure
     let livePots = { graham: 0, julie: 0 }; // pots at retirement for the current controls
     let currentView = 'Joint';
+    let retGran = 'year';     // Retirement table granularity: 'year' or 'month'
     let chartsReady = false;
 
     google.charts.load('current', { packages: ['corechart'] });
@@ -187,13 +193,17 @@
       return { dining:r.diningTotal, bills:r.billsTotal, tf:r.taxFree, tx:r.taxable, other:r.otherPensions, draw:r.drawdown, income:r.totalIncome, close:r.combinedClosing };
     }
 
+    function setRetGran(g) { retGran = g; document.getElementById('rThPeriod').textContent = (g === 'month') ? 'Month' : 'Year'; renderRetirementTable(); }
+
     function renderRetirementTable() {
       const tb = document.querySelector('#rTable tbody');
-      if (!drawdownRows.length) { tb.innerHTML = '<tr><td colspan="8">No rows.</td></tr>'; return; }
-      tb.innerHTML = drawdownRows.map(r => {
+      const rowsToShow = (retGran === 'month') ? (drawdownRows.monthly || []) : drawdownRows;
+      if (!rowsToShow.length) { tb.innerHTML = '<tr><td colspan="8">No rows.</td></tr>'; return; }
+      tb.innerHTML = rowsToShow.map(r => {
         const v = vrow(r);
+        const period = (retGran === 'month') ? r.label : r.year;
         return `<tr class="${r.shortfall ? 'shortfall' : ''}">
-          <td>${r.year}</td>
+          <td>${period}</td>
           <td style="font-weight:bold;color:#e67e22;">${fmt(v.dining)}</td>
           <td style="font-weight:bold;color:#c0392b;">${fmt(v.bills)}</td>
           <td>${fmt(v.tf)}</td><td>${fmt(v.tx)}</td>
