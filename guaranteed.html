@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guaranteed Incomes</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=style5"></script>
+<style>
+  :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
+  h2 { color:var(--ink); margin-top:0; }
+  .note { color:var(--ink-soft); font-size:13px; margin:-4px 0 14px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  .btn { border:none; border-radius:8px; font-weight:bold; font-size:14px; cursor:pointer; padding:11px 18px; color:#fff; }
+  .btn-save { background:var(--accent); } .btn-save:hover { background:var(--accent-dark); }
+  .btn-reload { background:#64748b; } .btn-reload:hover { background:#475569; }
+  .btn-add { background:#475569; }
+  .unsaved { display:none; background:#fef3c7; color:#92400e; font-weight:bold; font-size:13px; padding:6px 12px; border-radius:6px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th,td { padding:8px 9px; border-bottom:1px solid var(--line); text-align:left; vertical-align:middle; }
+  th { background:var(--surface-2); color:var(--ink); font-size:12px; text-transform:uppercase; letter-spacing:0.03em; }
+  input, select { padding:9px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px; font-family:inherit; box-sizing:border-box; }
+  input[type=text] { width:100%; min-width:140px; } input[type=date] { min-width:140px; }
+  input[type=number] { width:120px; text-align:right; }
+  .val-input { font-weight:bold; }
+  .del { background:#fdecea; color:#c0392b; border:none; border-radius:6px; padding:7px 11px; font-weight:bold; cursor:pointer; }
+  .msg { font-weight:bold; font-size:14px; }
+  #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
+  .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
+  .hint-state { font-size:11px; color:var(--accent-dark); font-weight:bold; }
+</style>
+</head>
+<body>
+  <div id="status" class="s-load">Loading…</div>
+  <h2>Guaranteed Incomes</h2>
+  <p class="note">Edit guaranteed income streams. For <strong>State Pension</strong> rows, enter <strong>today's</strong> annual value — the model grows it forward to your claim date at 2.5%. Other pensions should hold their value at the start date.</p>
+  <div class="bar">
+    <button class="btn btn-save" onclick="saveAll()">Save changes</button>
+    <button class="btn btn-reload" onclick="reload()">↺ Reload</button>
+    <button class="btn btn-add" onclick="addRow()">+ Add income</button>
+    <span class="unsaved" id="unsaved">● Unsaved changes</span>
+    <span class="msg" id="msg"></span>
+  </div>
+  <table id="tbl">
+    <thead><tr><th>Member</th><th>Income Name</th><th>Start Date</th><th>End Date</th><th>Today's Annual Value (£)</th><th>Inflation Linked</th><th></th></tr></thead>
+    <tbody><tr><td colspan="7">Loading…</td></tr></tbody>
+  </table>
+
+<script>
+  let rows = [], dirty = false, deleted = [];
+  const tbody = document.querySelector('#tbl tbody');
+  const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
+
+  function isState(name) { return (name || '').toLowerCase().indexOf('state') >= 0; }
+
+  function rowHtml(r, i) {
+    return `<tr data-i="${i}">
+      <td><select class="f-member" onchange="mark()"><option ${r.member_name==='Graham'?'selected':''}>Graham</option><option ${r.member_name==='Julie'?'selected':''}>Julie</option></select></td>
+      <td><input type="text" class="f-name" value="${(r.income_name||'').replace(/"/g,'&quot;')}" oninput="mark();flagState(this)"> <span class="hint-state" style="display:${isState(r.income_name)?'inline':'none'}">grows from today</span></td>
+      <td><input type="date" class="f-start" value="${r.start_date?String(r.start_date).split('T')[0]:''}" onchange="mark()"></td>
+      <td><input type="date" class="f-end" value="${r.end_date?String(r.end_date).split('T')[0]:''}" onchange="mark()"></td>
+      <td><input type="number" class="f-value val-input" step="0.01" value="${r.initial_annual_value!=null?r.initial_annual_value:0}" oninput="mark()"></td>
+      <td><input type="checkbox" class="f-infl" ${r.inflation_linked?'checked':''} onchange="mark()" style="width:auto;"></td>
+      <td><button class="del" onclick="delRow(this)">Delete</button></td>
+    </tr>`;
+  }
+  function render() { tbody.innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="7">No guaranteed incomes. Use “Add income”.</td></tr>'; }
+  function mark() { setDirty(); }
+  function flagState(inp) { const span = inp.parentElement.querySelector('.hint-state'); if (span) span.style.display = isState(inp.value) ? 'inline' : 'none'; }
+
+  function collect() {
+    return [...tbody.querySelectorAll('tr[data-i]')].map(tr => {
+      const i = Number(tr.dataset.i);
+      const base = rows[i] || {};
+      return {
+        id: base.id,
+        member_name: tr.querySelector('.f-member').value,
+        income_name: tr.querySelector('.f-name').value.trim(),
+        start_date: tr.querySelector('.f-start').value || null,
+        end_date: tr.querySelector('.f-end').value || null,
+        initial_annual_value: parseFloat(tr.querySelector('.f-value').value) || 0,
+        inflation_linked: tr.querySelector('.f-infl').checked
+      };
+    });
+  }
+
+  function addRow() {
+    const current = collect();
+    current.push({ id: undefined, member_name: 'Graham', income_name: '', start_date: null, end_date: null, initial_annual_value: 0, inflation_linked: true });
+    rows = current; render(); setDirty();
+  }
+  function delRow(btn) {
+    const tr = btn.closest('tr'); const i = Number(tr.dataset.i); const r = rows[i];
+    if (r && r.id != null) deleted.push(r.id);
+    rows = collect().filter((_, idx) => idx !== i); render(); setDirty();
+  }
+
+  async function saveAll() {
+    const msg = document.getElementById('msg'); msg.style.color = '#1e3a8a'; msg.textContent = 'Saving…';
+    const data = collect();
+    for (const r of data) { if (!r.income_name) { msg.style.color = '#c0392b'; msg.textContent = 'Every row needs an income name.'; return; } }
+    try {
+      for (const id of deleted) await App.write('DELETE', 'bd_guaranteed_incomes?id=eq.' + id, undefined);
+      for (const r of data) {
+        const payload = { member_name: r.member_name, income_name: r.income_name, start_date: r.start_date, end_date: r.end_date, initial_annual_value: r.initial_annual_value, inflation_linked: r.inflation_linked };
+        if (r.id != null) await App.write('PATCH', 'bd_guaranteed_incomes?id=eq.' + r.id, payload);
+        else await App.write('POST', 'bd_guaranteed_incomes', payload);
+      }
+      deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
+      msg.style.color = '#065f46'; msg.textContent = '✓ Saved. Reopen the dashboard to see updated projections.';
+      await reload(true);
+    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
+  }
+
+  async function reload(quiet) {
+    if (!quiet && dirty && !confirm('Discard unsaved changes and reload?')) return;
+    const status = document.getElementById('status');
+    try {
+      rows = await App.rest('bd_guaranteed_incomes?order=member_name.asc,income_name.asc');
+      deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
+      render(); status.style.display = 'none';
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+  App.requireLogin(() => reload(true), { title: 'Guaranteed Incomes' });
+</script>
+</body>
+</html>
