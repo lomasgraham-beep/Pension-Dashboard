@@ -5,7 +5,7 @@
 <title>Performance KPIs</title>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=style1"></script>
+<script src="common.js?v=style7"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:#333; }
   h2 { color:#2c3e50; margin-top:0; }
@@ -148,17 +148,17 @@
     const months = Object.keys(map).sort(), last12 = months.slice(-12);
     const dt = new google.visualization.DataTable(); dt.addColumn('string', 'Month');
     pensions.forEach(p => dt.addColumn('number', p));
-    const prev = {}; pensions.forEach(p => prev[p] = 0);
+    const prev = {}, seen = {}; pensions.forEach(p => { prev[p] = 0; seen[p] = false; });
     months.forEach(m => {
-      pensions.forEach(p => { if (map[m].values[p] !== undefined) prev[p] = map[m].values[p]; });
-      if (last12.includes(m)) { const row = [map[m].label]; pensions.forEach(p => row.push(prev[p])); dt.addRow(row); }
+      pensions.forEach(p => { if (map[m].values[p] !== undefined) { prev[p] = map[m].values[p]; seen[p] = true; } });
+      if (last12.includes(m)) { const row = [map[m].label]; pensions.forEach(p => row.push(seen[p] ? prev[p] : null)); dt.addRow(row); }
     });
     const nf = new google.visualization.NumberFormat({ prefix: '£', fractionDigits: 0 });
     for (let i = 1; i <= pensions.length; i++) nf.format(dt, i);
     new google.visualization.LineChart(document.getElementById('chartValue')).draw(dt, {
       title: 'Total Pension Value — Last 12 Months', curveType: 'function', legend: { position: 'bottom' },
       chartArea: { left: 85, right: 30, top: 40, bottom: 60 }, vAxis: { format: '£#,###', minValue: 0 },
-      lineWidth: 3, pointsVisible: true, colors: ['#3498db', '#9b59b6', '#2ecc71', '#e67e22', '#f1c40f', '#e74c3c']
+      lineWidth: 3, pointsVisible: true, interpolateNulls: true, colors: ['#3498db', '#9b59b6', '#2ecc71', '#e67e22', '#f1c40f', '#e74c3c']
     });
   }
 
@@ -219,6 +219,8 @@
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
   App.requireLogin(load, { title: 'Performance KPIs' });
+  // Re-fetch whenever the dashboard re-shows this tab (frames otherwise keep their first fetch).
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
   window.addEventListener('resize', () => { clearTimeout(window.__r); window.__r = setTimeout(drawCharts, 150); });
 </script>
 </body>

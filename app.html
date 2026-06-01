@@ -6,8 +6,8 @@
   <title>Joint Pension Analytics</title>
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="common.js?v=style5"></script>
-  <script src="engine.js?v=style5"></script>
+  <script src="common.js?v=style7"></script>
+  <script src="engine.js?v=style7"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -134,7 +134,7 @@
         <button id="vt-Julie" class="btn-toggle" onclick="setView('Julie')">Julie</button>
       </div>
       <span class="who"><span id="whoami"></span><a onclick="App.doLogout()">Log out</a></span>
-      <span style="font-size:11px; color:#94a3b8; margin-left:8px;">build: LC-5</span>
+      <span style="font-size:11px; color:#94a3b8; margin-left:8px;">build: LC-7</span>
     </div>
   </div>
 
@@ -518,7 +518,13 @@
         try { if (window.ResizeObserver && f.contentWindow.document.body) new ResizeObserver(() => sizeFrame(f)).observe(f.contentWindow.document.body); } catch (e) {}
       });
     }
-    function ensureFrame(id, src) { const f = document.getElementById(id); if (f && !f.getAttribute('src')) { hookFrame(f); f.setAttribute('src', src); } }
+    function ensureFrame(id, src) { const f = document.getElementById(id); if (f && !f.getAttribute('src')) { hookFrame(f); f.setAttribute('src', src); f.__loadedOnce = true; return; } }
+    function pingFrame(id) {
+      const f = document.getElementById(id);
+      // only ask for a refresh if the frame was already loaded on a previous open
+      if (f && f.getAttribute('src') && f.__pinged) { try { f.contentWindow.postMessage('refresh-data', '*'); } catch (e) {} }
+      if (f) f.__pinged = true;
+    }
     function showSub(evt, name) {
       const panel = document.getElementById('sub-' + name).parentElement;     // the parent tab holding this group
       panel.querySelectorAll('.subtabcontent').forEach(el => el.style.display = 'none');
@@ -537,8 +543,8 @@
       const el = document.getElementById(id); el.style.display = 'block'; el.classList.add('active');
       evt.currentTarget.classList.add('active-btn');
       if (id === 'Modelling') setTimeout(drawCharts, 40);
-      if (id === 'KPIs') ensureFrame('frame-kpis', 'kpis.html');
-      if (id === 'Forecast') ensureFrame('frame-forecast', 'forecast.html');
+      if (id === 'KPIs') { ensureFrame('frame-kpis', 'kpis.html'); pingFrame('frame-kpis'); }
+      if (id === 'Forecast') { ensureFrame('frame-forecast', 'forecast.html'); pingFrame('frame-forecast'); }
       if (id === 'Logs') ensureFrame('frame-logs', 'logs.html');
       if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Bills'); }
       if (id === 'ScenarioLab') ensureFrame('frame-lab', 'state_pension_scenario_lab.html');
