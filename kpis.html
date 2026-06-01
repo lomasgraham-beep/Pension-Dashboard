@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Performance KPIs</title>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=tabs1"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:#333; }
+  h2 { color:#2c3e50; margin-top:0; }
+  .note { color:#64748b; font-size:13px; margin-top:-4px; }
+  .card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:15px; margin:18px 0; }
+  .card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:15px; text-align:center; }
+  .card.hl { background:#eff6ff; border-color:#bfdbfe; }
+  .card h3 { margin:0 0 8px; font-size:12px; color:#64748b; text-transform:uppercase; }
+  .card .value { font-size:24px; font-weight:bold; }
+  .pos-growth { color:#27ae60; } .neg-growth { color:#c0392b; }
+  .filter-bar { display:flex; gap:18px; flex-wrap:wrap; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; margin-bottom:15px; }
+  .filter-bar label { display:block; font-size:12px; color:#64748b; font-weight:bold; margin-bottom:4px; }
+  .filter-bar select { padding:8px; border:1px solid #ccc; border-radius:6px; font-size:14px; }
+  .charts { display:flex; gap:20px; flex-wrap:wrap; margin-bottom:25px; }
+  .chart-box { flex:1; min-width:380px; height:350px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th,td { padding:9px 10px; border-bottom:1px solid #e2e8f0; text-align:right; white-space:nowrap; }
+  th:first-child,td:first-child,th:nth-child(2),td:nth-child(2) { text-align:left; }
+  th { background:#f8fafc; color:#2c3e50; }
+  #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
+  .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
+</style>
+</head>
+<body>
+  <div id="status" class="s-load">Loading…</div>
+  <h2>Pension Performance Metrics</h2>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em></p>
+  <div class="card-grid">
+    <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
+    <div class="card"><h3>Graham expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
+    <div class="card"><h3>Julie expected monthly growth</h3><div id="kpiJ" class="value">£0</div></div>
+  </div>
+  <div class="filter-bar">
+    <div><label>Isolate by member</label><select id="fMember" onchange="updatePensionFilter()"><option value="All">All Members</option><option>Graham</option><option>Julie</option></select></div>
+    <div><label>Isolate by pension</label><select id="fPension" onchange="drawCharts()"><option value="All">All Pensions</option></select></div>
+  </div>
+  <div class="charts"><div id="chartValue" class="chart-box"></div><div id="chartGrowth" class="chart-box"></div></div>
+  <table id="kpiTable">
+    <thead><tr><th>Member</th><th>Pension</th><th>Current Value</th><th>Latest Monthly Growth</th><th>Expected (Median)</th><th>Avg Monthly £</th><th>Avg Monthly %</th></tr></thead>
+    <tbody><tr><td colspan="7">Crunching…</td></tr></tbody>
+  </table>
+
+<script>
+  const fmt = App.fmt, fmtDiff = App.fmtDiff;
+  let allLogs = [], allContributions = [], grahamParams = null;
+  let chartsReady = false;
+  google.charts.load('current', { packages:['corechart'] });
+  google.charts.setOnLoadCallback(() => { chartsReady = true; if (allLogs.length) drawCharts(); });
+
+  function getExpectedContribution(log) {
+    if (log.member_name === 'Graham' && log.pension_name === 'Pru') {
+      const d = new Date(log.log_date), yr = d.getFullYear(), mo = d.getMonth() + 1;
+      if ((yr === 2025 && mo >= 10) || (yr === 2026 && mo <= 3)) return 2313;
+    }
+    let expectedDays = 5;
+    if (log.member_name === 'Graham' && grahamParams) {
+      const ld = new Date(log.log_date);
+      const d1 = grahamParams.shorter_week_date_1 ? new Date(grahamParams.shorter_week_date_1) : null;
+      const d2 = grahamParams.shorter_week_date_2 ? new Date(grahamParams.shorter_week_date_2) : null;
+      if (d2 && ld >= d2) expectedDays = grahamParams.working_days_2 || 5;
+      else if (d1 && ld >= d1) expectedDays = grahamParams.working_days_1 || 5;
+    }
+    const match = allContributions.find(c => {
+      if (c.member_name !== log.member_name || c.pension_name !== log.pension_name) return false;
+      if (log.member_name === 'Graham') return Number(c.working_days) === Number(expectedDays);
+      return true;
+    });
+    return match ? (Number(match.monthly_contribution) || 0) : 0;
+  }
+
+  function monthlyBuckets(logs) {
+    const md = {};
+    logs.forEach(l => {
+      const d = new Date(l.log_date); if (isNaN(d)) return;
+      const k = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+      if (!md[k]) md[k] = { logs: [], hasContrib: false, expectedAmt: 0 };
+      md[k].logs.push(l);
+      if (l.contribution_applied) { md[k].hasContrib = true; md[k].expectedAmt = getExpectedContribution(l); }
+    });
+    return md;
+  }
+
+  function renderKPIs() {
+    const tbody = document.querySelector('#kpiTable tbody');
+    if (!allLogs.length) { tbody.innerHTML = '<tr><td colspan="7">No log data.</td></tr>'; return; }
+    const dict = {};
+    allLogs.forEach(l => { const k = l.member_name + '|' + l.pension_name; (dict[k] = dict[k] || []).push(l); });
+    let html = '', eTot = 0, eG = 0, eJ = 0;
+    const median = a => { const s = [...a].sort((x, y) => x - y), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+    Object.keys(dict).forEach(key => {
+      const logs = dict[key].sort((a, b) => new Date(a.log_date) - new Date(b.log_date));
+      if (logs.length < 2) return;
+      const member = logs[0].member_name, name = logs[0].pension_name;
+      const md = monthlyBuckets(logs), mk = Object.keys(md).sort();
+      const diffs = [], pcts = []; let latest = 0;
+      for (let i = 1; i < mk.length; i++) {
+        const cur = Number(md[mk[i]].logs[md[mk[i]].logs.length - 1].pot_value);
+        const prev = Number(md[mk[i - 1]].logs[md[mk[i - 1]].logs.length - 1].pot_value);
+        const pp = mk[i - 1].split('-'), mp = mk[i].split('-');
+        let monthDiff = (mp[0] - pp[0]) * 12 + (mp[1] - pp[1]); if (monthDiff < 1) monthDiff = 1;
+        const contrib = (md[mk[i]].hasContrib ? md[mk[i]].expectedAmt : 0) * monthDiff;
+        const organic = (cur - prev - contrib) / monthDiff;
+        diffs.push(organic); pcts.push(prev ? organic / prev * 100 : 0);
+        if (i === mk.length - 1) latest = organic;
+      }
+      if (mk.length === 1) {
+        const ml = md[mk[0]].logs, fv = Number(ml[0].pot_value), cv = Number(ml[ml.length - 1].pot_value);
+        const sc = md[mk[0]].hasContrib ? md[mk[0]].expectedAmt : 0;
+        latest = cv - fv - sc; diffs.push(latest); pcts.push(fv ? latest / fv * 100 : 0);
+      }
+      const medAmt = diffs.length ? median(diffs) : 0;
+      const avgAmt = diffs.length ? diffs.reduce((a, b) => a + b, 0) / diffs.length : 0;
+      const avgPct = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
+      eTot += medAmt; if (member === 'Graham') eG += medAmt; if (member === 'Julie') eJ += medAmt;
+      const cls = v => v >= 0 ? 'pos-growth' : 'neg-growth';
+      html += `<tr><td>${member}</td><td>${name}</td><td style="font-weight:bold;">${fmt(Number(logs[logs.length - 1].pot_value))}</td>
+        <td class="${cls(latest)}">${fmtDiff(latest)}</td><td class="${cls(medAmt)}">${fmtDiff(medAmt)}</td>
+        <td class="${cls(avgAmt)}">${fmtDiff(avgAmt)}</td><td class="${cls(avgPct)}">${avgPct >= 0 ? '+' : ''}${avgPct.toFixed(2)}%</td></tr>`;
+    });
+    tbody.innerHTML = html || '<tr><td colspan="7">Need at least two logs per pension.</td></tr>';
+    const setCard = (id, v) => { const el = document.getElementById(id); el.textContent = fmtDiff(v); el.className = 'value ' + (v >= 0 ? 'pos-growth' : 'neg-growth'); };
+    setCard('kpiTot', eTot); setCard('kpiG', eG); setCard('kpiJ', eJ);
+  }
+
+  function filteredLogs() {
+    const mf = document.getElementById('fMember').value, pf = document.getElementById('fPension').value;
+    return allLogs.filter(l => (mf === 'All' || l.member_name === mf) && (pf === 'All' || l.pension_name === pf));
+  }
+
+  function drawValueChart() {
+    const logs = filteredLogs(); if (!chartsReady || !logs.length) return;
+    const pensions = [...new Set(logs.map(l => l.member_name + ' - ' + l.pension_name))];
+    const map = {};
+    logs.slice().sort((a, b) => new Date(a.log_date) - new Date(b.log_date)).forEach(l => {
+      const d = new Date(l.log_date); if (isNaN(d)) return;
+      const k = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+      if (!map[k]) map[k] = { label: d.toLocaleString('default', { month: 'short', year: 'numeric' }), values: {} };
+      map[k].values[l.member_name + ' - ' + l.pension_name] = Number(l.pot_value);
+    });
+    const months = Object.keys(map).sort(), last12 = months.slice(-12);
+    const dt = new google.visualization.DataTable(); dt.addColumn('string', 'Month');
+    pensions.forEach(p => dt.addColumn('number', p));
+    const prev = {}; pensions.forEach(p => prev[p] = 0);
+    months.forEach(m => {
+      pensions.forEach(p => { if (map[m].values[p] !== undefined) prev[p] = map[m].values[p]; });
+      if (last12.includes(m)) { const row = [map[m].label]; pensions.forEach(p => row.push(prev[p])); dt.addRow(row); }
+    });
+    const nf = new google.visualization.NumberFormat({ prefix: '£', fractionDigits: 0 });
+    for (let i = 1; i <= pensions.length; i++) nf.format(dt, i);
+    new google.visualization.LineChart(document.getElementById('chartValue')).draw(dt, {
+      title: 'Total Pension Value — Last 12 Months', curveType: 'function', legend: { position: 'bottom' },
+      chartArea: { left: 85, right: 30, top: 40, bottom: 60 }, vAxis: { format: '£#,###', minValue: 0 },
+      lineWidth: 3, pointsVisible: true, colors: ['#3498db', '#9b59b6', '#2ecc71', '#e67e22', '#f1c40f', '#e74c3c']
+    });
+  }
+
+  function drawGrowthChart() {
+    if (!chartsReady) return;
+    const mf = document.getElementById('fMember').value, pf = document.getElementById('fPension').value;
+    const dict = {};
+    allLogs.forEach(l => {
+      if (mf !== 'All' && l.member_name !== mf) return;
+      if (pf !== 'All' && l.pension_name !== pf) return;
+      const k = l.member_name + '|' + l.pension_name; (dict[k] = dict[k] || []).push(l);
+    });
+    const timeline = {};
+    Object.keys(dict).forEach(key => {
+      const logs = dict[key].sort((a, b) => new Date(a.log_date) - new Date(b.log_date));
+      if (logs.length < 2) return;
+      const md = monthlyBuckets(logs), mk = Object.keys(md).sort();
+      for (let i = 1; i < mk.length; i++) {
+        const cur = Number(md[mk[i]].logs[md[mk[i]].logs.length - 1].pot_value);
+        const prev = Number(md[mk[i - 1]].logs[md[mk[i - 1]].logs.length - 1].pot_value);
+        const pp = mk[i - 1].split('-'), mp = mk[i].split('-');
+        let monthDiff = (mp[0] - pp[0]) * 12 + (mp[1] - pp[1]); if (monthDiff < 1) monthDiff = 1;
+        const contrib = (md[mk[i]].hasContrib ? md[mk[i]].expectedAmt : 0) * monthDiff;
+        timeline[mk[i]] = (timeline[mk[i]] || 0) + (cur - prev - contrib) / monthDiff;
+      }
+    });
+    const months = Object.keys(timeline).sort().slice(-12);
+    const dt = new google.visualization.DataTable();
+    dt.addColumn('string', 'Month'); dt.addColumn('number', 'Organic Monthly Growth'); dt.addColumn({ type: 'string', role: 'style' });
+    months.forEach(m => { const v = Math.round(timeline[m]); const lbl = m.split('-'); const d = new Date(lbl[0], lbl[1] - 1, 1); dt.addRow([d.toLocaleString('default', { month: 'short', year: 'numeric' }), v, v >= 0 ? '#27ae60' : '#c0392b']); });
+    const nf = new google.visualization.NumberFormat({ prefix: '£', fractionDigits: 0 }); nf.format(dt, 1);
+    new google.visualization.ColumnChart(document.getElementById('chartGrowth')).draw(dt, {
+      title: 'Combined Organic Monthly Growth (£)', legend: { position: 'none' },
+      chartArea: { left: 85, right: 30, top: 40, bottom: 60 }, vAxis: { format: '£#,###' }
+    });
+  }
+
+  function drawCharts() { drawValueChart(); drawGrowthChart(); }
+
+  function updatePensionFilter() {
+    const mf = document.getElementById('fMember').value, sel = document.getElementById('fPension'), cur = sel.value;
+    const names = [...new Set(allLogs.filter(l => mf === 'All' || l.member_name === mf).map(l => l.pension_name))].sort();
+    sel.innerHTML = '<option value="All">All Pensions</option>' + names.map(n => `<option>${n}</option>`).join('');
+    sel.value = [...sel.options].some(o => o.value === cur) ? cur : 'All';
+    drawCharts();
+  }
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      const [logs, contribs, pRows] = await Promise.all([
+        App.rest('op_pension_logs?order=log_date.asc'), App.rest('bd_pension_contributions'),
+        App.rest('op_modelling_parameters?member_name=eq.Graham&limit=1')
+      ]);
+      allLogs = logs; allContributions = contribs; grahamParams = pRows && pRows[0] ? pRows[0] : null;
+      updatePensionFilter(); renderKPIs(); drawCharts();
+      status.style.display = 'none';
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+  App.requireLogin(load, { title: 'Performance KPIs' });
+  window.addEventListener('resize', () => { clearTimeout(window.__r); window.__r = setTimeout(drawCharts, 150); });
+</script>
+</body>
+</html>

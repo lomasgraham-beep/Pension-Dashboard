@@ -6,8 +6,8 @@
   <title>Joint Pension Analytics</title>
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="common.js?v=touch1"></script>
-  <script src="engine.js?v=touch1"></script>
+  <script src="common.js?v=tabs1"></script>
+  <script src="engine.js?v=tabs1"></script>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; color: #333; }
     .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
@@ -102,8 +102,13 @@
 
   <div class="tab-buttons">
     <button class="tab-link active-btn" onclick="showTab(event,'Overview')">Overview</button>
+    <button class="tab-link" onclick="showTab(event,'KPIs')">Performance KPIs</button>
+    <button class="tab-link" onclick="showTab(event,'Forecast')">Monthly Forecast</button>
     <button class="tab-link" onclick="showTab(event,'Modelling')">Modelling</button>
     <button class="tab-link" onclick="showTab(event,'Retirement')">Retirement</button>
+    <button class="tab-link" onclick="showTab(event,'Logs')">Log Entry</button>
+    <button class="tab-link" onclick="showTab(event,'Bills')">Bills</button>
+    <button class="tab-link" onclick="showTab(event,'Dining')">Dining</button>
     <button class="tab-link" onclick="showTab(event,'ScenarioLab')">Scenario Lab</button>
     <button class="tab-link" onclick="showTab(event,'BasicData')">Basic Data</button>
   </div>
@@ -174,6 +179,12 @@
       </table>
     </div>
   </div>
+
+  <div id="KPIs" class="tabcontent"><iframe id="frame-kpis" class="app-frame" title="Performance KPIs"></iframe></div>
+  <div id="Forecast" class="tabcontent"><iframe id="frame-forecast" class="app-frame" title="Monthly Forecast"></iframe></div>
+  <div id="Logs" class="tabcontent"><iframe id="frame-logs" class="app-frame" title="Log Entry and Recent Logs"></iframe></div>
+  <div id="Bills" class="tabcontent"><iframe id="frame-bills" class="app-frame" title="Household Bills"></iframe></div>
+  <div id="Dining" class="tabcontent"><iframe id="frame-dining" class="app-frame" title="Dining"></iframe></div>
 
   <div id="ScenarioLab" class="tabcontent">
     <p class="note">Live what-if modelling — nothing here is saved. Use the tabs above to return.</p>
@@ -469,6 +480,11 @@
       const el = document.getElementById(id); el.style.display = 'block'; el.classList.add('active');
       evt.currentTarget.classList.add('active-btn');
       if (id === 'Modelling') setTimeout(drawCharts, 40);
+      if (id === 'KPIs') ensureFrame('frame-kpis', 'kpis.html');
+      if (id === 'Forecast') ensureFrame('frame-forecast', 'forecast.html');
+      if (id === 'Logs') ensureFrame('frame-logs', 'logs.html');
+      if (id === 'Bills') ensureFrame('frame-bills', 'bills.html');
+      if (id === 'Dining') ensureFrame('frame-dining', 'dining.html');
       if (id === 'ScenarioLab') ensureFrame('frame-lab', 'state_pension_scenario_lab.html');
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
     }

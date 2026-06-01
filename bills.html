@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Household Bills</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=tabs1"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:#333; }
+  h2 { color:#2c3e50; margin-top:0; }
+  .filter-bar { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; margin-bottom:15px; }
+  .filter-bar label { display:block; font-size:12px; color:#64748b; font-weight:bold; margin-bottom:4px; }
+  .filter-bar select { padding:8px; border:1px solid #ccc; border-radius:6px; font-size:14px; }
+  .btn { background:#64748b; color:#fff; border:none; padding:9px 16px; border-radius:6px; font-weight:bold; cursor:pointer; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th,td { padding:9px 10px; border-bottom:1px solid #e2e8f0; text-align:right; }
+  th:first-child,td:first-child,th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3) { text-align:left; }
+  th { background:#f8fafc; color:#2c3e50; }
+  tfoot { background:#f8fafc; font-weight:bold; }
+  #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
+  .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
+</style>
+</head>
+<body>
+  <div id="status" class="s-load">Loading…</div>
+  <h2>Household Bills &amp; Future Inflation</h2>
+  <div class="filter-bar">
+    <div><label>Filter by Category</label><select id="filterCategory" onchange="render()"><option value="All">All Categories</option></select></div>
+    <button class="btn" onclick="document.getElementById('filterCategory').value='All';render();">Clear Filter</button>
+  </div>
+  <table id="bTable">
+    <thead><tr><th>Category</th><th>Bill Name</th><th>Subject to Slider?</th><th>Baseline (Today)</th><th>Est. at Age 70</th><th>Est. at Age 80</th><th>Est. at Age 90</th></tr></thead>
+    <tbody><tr><td colspan="7">Loading…</td></tr></tbody>
+    <tfoot></tfoot>
+  </table>
+
+<script>
+  const fmt = App.fmt;
+  let allBills = [], allMembers = [];
+
+  function inflMult() {
+    const yr = new Date().getFullYear(); let oldest = 55;
+    if (allMembers.length) oldest = Math.max(...allMembers.map(m => m.dob ? yr - new Date(m.dob).getFullYear() : 0));
+    const r = 0.025;
+    return { i70: Math.pow(1 + r, Math.max(0, 70 - oldest)), i80: Math.pow(1 + r, Math.max(0, 80 - oldest)), i90: Math.pow(1 + r, Math.max(0, 90 - oldest)) };
+  }
+
+  function render() {
+    const tbody = document.querySelector('#bTable tbody'), tfoot = document.querySelector('#bTable tfoot');
+    const cat = document.getElementById('filterCategory').value, { i70, i80, i90 } = inflMult();
+    let bills = allBills;
+    if (cat !== 'All') bills = bills.filter(b => (b.category_code || 'Uncategorized') === cat);
+    if (!bills.length) { tbody.innerHTML = '<tr><td colspan="7">No bills match.</td></tr>'; tfoot.innerHTML = ''; return; }
+    let html = '', tb = 0, t70 = 0, t80 = 0, t90 = 0;
+    bills.forEach(b => {
+      const cat = b.category_code || 'Uncategorized', name = b.bill_name || b.name || 'Unnamed', red = b.spend_reduction ? 'Yes' : 'No', base = Number(b.total_annual) || 0;
+      const r70 = b.taper_at_70 != null ? Number(b.taper_at_70) : 1, r80 = b.taper_at_80 != null ? Number(b.taper_at_80) : 1, r90 = b.taper_at_90 != null ? Number(b.taper_at_90) : 1;
+      const v70 = base * r70 * i70, v80 = base * r80 * i80, v90 = base * r90 * i90;
+      tb += base; t70 += v70; t80 += v80; t90 += v90;
+      html += `<tr><td>${cat}</td><td>${name}</td><td>${red}</td><td style="font-weight:bold;">${fmt(base)}</td>
+        <td>${fmt(v70)}<br><span style="font-size:11px;color:#64748b;">(${Math.round(r70*100)}% retained)</span></td>
+        <td>${fmt(v80)}<br><span style="font-size:11px;color:#64748b;">(${Math.round(r80*100)}% retained)</span></td>
+        <td>${fmt(v90)}<br><span style="font-size:11px;color:#64748b;">(${Math.round(r90*100)}% retained)</span></td></tr>`;
+    });
+    tbody.innerHTML = html;
+    tfoot.innerHTML = `<tr><td colspan="3" style="text-align:right;">TOTAL FOR SELECTION:</td><td>${fmt(tb)}</td><td style="color:#3498db;">${fmt(t70)}</td><td style="color:#9b59b6;">${fmt(t80)}</td><td style="color:#27ae60;">${fmt(t90)}</td></tr>`;
+  }
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      const [bills, members] = await Promise.all([App.rest('bd_household_bills'), App.rest('bd_members')]);
+      allBills = bills; allMembers = members;
+      const sel = document.getElementById('filterCategory');
+      const cats = [...new Set(allBills.map(b => b.category_code || 'Uncategorized'))].filter(c => c !== 'Uncategorized').sort();
+      sel.innerHTML = '<option value="All">All Categories</option>' + cats.map(c => `<option>${c}</option>`).join('') + (allBills.some(b => !b.category_code) ? '<option>Uncategorized</option>' : '');
+      render(); status.style.display = 'none';
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+  App.requireLogin(load, { title: 'Household Bills' });
+</script>
+</body>
+</html>
