@@ -4,67 +4,176 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dining</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=style1"></script>
+<script src="common.js?v=cap3"></script>
 <style>
-  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:#333; }
-  h2 { color:#2c3e50; margin-top:0; }
-  table { width:100%; border-collapse:collapse; font-size:14px; }
-  th,td { padding:9px 10px; border-bottom:1px solid #e2e8f0; text-align:right; }
-  th:first-child,td:first-child,th:nth-child(2),td:nth-child(2) { text-align:left; }
-  th { background:#f8fafc; color:#2c3e50; }
-  tfoot { background:#f8fafc; font-weight:bold; }
+  :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
+  h2 { color:var(--ink); margin-top:0; }
+  .note { color:var(--ink-soft); font-size:13px; margin:-4px 0 14px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  .btn { border:none; border-radius:8px; font-weight:bold; font-size:14px; cursor:pointer; padding:11px 18px; color:#fff; }
+  .btn-save { background:var(--accent); } .btn-save:hover { background:var(--accent-dark); }
+  .btn-reload { background:#64748b; } .btn-add { background:#475569; }
+  .unsaved { display:none; background:#fef3c7; color:#92400e; font-weight:bold; font-size:13px; padding:6px 12px; border-radius:6px; }
+  .msg { font-weight:bold; font-size:14px; }
+  .card { border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:16px; background:#fff; box-shadow:0 1px 3px rgba(20,40,50,0.05); }
+  .card-head { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  .card-head input[type=text] { font-size:16px; font-weight:bold; padding:8px; border:1px solid var(--line-strong); border-radius:6px; min-width:200px; }
+  .meal-grid { display:grid; grid-template-columns:auto repeat(2, 1fr); gap:6px 10px; max-width:360px; align-items:center; }
+  .meal-grid .hd { font-size:11px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; }
+  .meal-grid .day { font-size:13px; font-weight:bold; }
+  .meal-grid input { width:100%; padding:7px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px; text-align:right; box-sizing:border-box; }
+  .extras { display:flex; gap:18px; flex-wrap:wrap; margin:12px 0; align-items:flex-end; }
+  .extras label { display:block; font-size:12px; font-weight:bold; color:var(--ink-soft); margin-bottom:3px; }
+  .extras input[type=number] { width:90px; padding:8px; border:1px solid var(--line-strong); border-radius:6px; text-align:right; }
+  .totals { background:var(--surface-2); border-radius:8px; padding:10px 12px; font-size:14px; display:flex; gap:22px; flex-wrap:wrap; align-items:center; }
+  .totals b { color:var(--accent-dark); }
+  .opts { display:flex; gap:18px; flex-wrap:wrap; align-items:center; margin-top:10px; font-size:13px; }
+  .opts label { font-weight:bold; color:var(--ink-soft); }
+  .opts input[type=number] { width:60px; padding:6px; border:1px solid var(--line-strong); border-radius:6px; text-align:right; }
+  .del { background:#fdecea; color:#c0392b; border:none; border-radius:6px; padding:8px 13px; font-weight:bold; cursor:pointer; margin-left:auto; }
   #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
+  .grand { background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:12px 14px; font-size:14px; font-weight:bold; }
 </style>
 </head>
 <body>
-  <div id="status" class="s-load">Loading…</div>
-  <h2>Dining &amp; Future Inflation</h2>
-  <table id="dTable">
-    <thead><tr><th>Dining Type</th><th>Subject to Slider?</th><th>Baseline (Today)</th><th>Est. at Age 70</th><th>Est. at Age 80</th><th>Est. at Age 90</th></tr></thead>
-    <tbody><tr><td colspan="6">Loading…</td></tr></tbody>
-    <tfoot></tfoot>
-  </table>
+  <div id="status" class="s-load">Loading&hellip;</div>
+  <h2>Dining</h2>
+  <p class="note">Each card is a dining routine. Enter the cost of each meal and drinks; <strong>weekly</strong> and <strong>annual</strong> totals calculate automatically. <strong>Weeks/year</strong> scales it (e.g. 48 if you skip holidays). <span style="color:var(--accent-dark);">(dining build: edit-1)</span></p>
+  <div class="bar">
+    <button class="btn btn-save" onclick="saveAll()">Save changes</button>
+    <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
+    <button class="btn btn-add" onclick="addRow()">+ Add routine</button>
+    <span class="unsaved" id="unsaved">&#9679; Unsaved changes</span>
+    <span class="msg" id="msg"></span>
+  </div>
+  <div id="cards"></div>
+  <div class="grand" id="grand"></div>
 
 <script>
+  const DAYS = [['mon','Mon'],['tue','Tue'],['wed','Wed'],['thu','Thu'],['fri','Fri'],['sat','Sat'],['sun','Sun']];
+  let rows = [], dirty = false, deleted = [];
   const fmt = App.fmt;
-  let allDining = [], allMembers = [];
+  const wrap = document.getElementById('cards');
+  const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
 
-  function inflMult() {
-    const yr = new Date().getFullYear(); let oldest = 55;
-    if (allMembers.length) oldest = Math.max(...allMembers.map(m => m.dob ? yr - new Date(m.dob).getFullYear() : 0));
-    const r = 0.025;
-    return { i70: Math.pow(1 + r, Math.max(0, 70 - oldest)), i80: Math.pow(1 + r, Math.max(0, 80 - oldest)), i90: Math.pow(1 + r, Math.max(0, 90 - oldest)) };
+  function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+  function cardHtml(r, i) {
+    const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
+    let grid = '<div class="meal-grid"><div class="hd"></div><div class="hd">Lunch &pound;</div><div class="hd">Dinner &pound;</div>';
+    DAYS.forEach(d => {
+      grid += '<div class="day">' + d[1] + '</div>' +
+        '<input type="number" step="0.01" class="m" data-f="' + d[0] + '_lunch" value="' + (r[d[0] + '_lunch'] != null ? r[d[0] + '_lunch'] : 0) + '" oninput="recalc(' + i + ')">' +
+        '<input type="number" step="0.01" class="m" data-f="' + d[0] + '_dinner" value="' + (r[d[0] + '_dinner'] != null ? r[d[0] + '_dinner'] : 0) + '" oninput="recalc(' + i + ')">';
+    });
+    grid += '</div>';
+    return '<div class="card" data-i="' + i + '">' +
+      '<div class="card-head"><input type="text" class="f-name" value="' + esc(r.routine_name) + '" placeholder="Routine name" oninput="mark()">' +
+      '<button class="del" onclick="delRow(' + i + ')">Delete routine</button></div>' +
+      grid +
+      '<div class="extras">' +
+        '<div><label>Weekly drinks &pound;</label><input type="number" step="0.01" class="f-drinks" value="' + (r.drinks != null ? r.drinks : 0) + '" oninput="recalc(' + i + ')"></div>' +
+        '<div><label>Weeks per year</label><input type="number" step="1" class="f-weeks" value="' + (r.weeks_per_year != null ? r.weeks_per_year : 52) + '" oninput="recalc(' + i + ')"></div>' +
+      '</div>' +
+      '<div class="totals"><span>Weekly total: <b class="wk">&pound;0</b></span><span>Annual total: <b class="an">&pound;0</b></span></div>' +
+      '<div class="opts">' +
+        '<label><input type="checkbox" class="f-red" ' + (r.spend_reduction ? 'checked' : '') + ' onchange="mark()" style="width:auto;"> Tie to spending slider</label>' +
+        '<span>Taper 70 <input type="number" step="0.05" min="0" max="1" class="f-t70" value="' + (r.taper_at_70 != null ? r.taper_at_70 : 1) + '" oninput="mark()"></span>' +
+        '<span>80 <input type="number" step="0.05" min="0" max="1" class="f-t80" value="' + (r.taper_at_80 != null ? r.taper_at_80 : 1) + '" oninput="mark()"></span>' +
+        '<span>90 <input type="number" step="0.05" min="0" max="1" class="f-t90" value="' + (r.taper_at_90 != null ? r.taper_at_90 : 1) + '" oninput="mark()"></span>' +
+      '</div></div>';
   }
 
   function render() {
-    const tbody = document.querySelector('#dTable tbody'), tfoot = document.querySelector('#dTable tfoot');
-    const { i70, i80, i90 } = inflMult();
-    if (!allDining.length) { tbody.innerHTML = '<tr><td colspan="6">No dining habits found.</td></tr>'; tfoot.innerHTML = ''; return; }
-    let html = '', tb = 0, t70 = 0, t80 = 0, t90 = 0;
-    allDining.forEach(d => {
-      const name = d.routine_name || d.habit_name || d.name || 'Unnamed', red = d.spend_reduction ? 'Yes' : 'No', base = Number(d.annual_total) || 0;
-      const r70 = d.taper_at_70 != null ? Number(d.taper_at_70) : 1, r80 = d.taper_at_80 != null ? Number(d.taper_at_80) : 1, r90 = d.taper_at_90 != null ? Number(d.taper_at_90) : 1;
-      const v70 = base * r70 * i70, v80 = base * r80 * i80, v90 = base * r90 * i90;
-      tb += base; t70 += v70; t80 += v80; t90 += v90;
-      html += `<tr><td>${name}</td><td>${red}</td><td style="font-weight:bold;">${fmt(base)}</td>
-        <td>${fmt(v70)}<br><span style="font-size:11px;color:#64748b;">(${Math.round(r70*100)}% retained)</span></td>
-        <td>${fmt(v80)}<br><span style="font-size:11px;color:#64748b;">(${Math.round(r80*100)}% retained)</span></td>
-        <td>${fmt(v90)}<br><span style="font-size:11px;color:#64748b;">(${Math.round(r90*100)}% retained)</span></td></tr>`;
-    });
-    tbody.innerHTML = html;
-    tfoot.innerHTML = `<tr><td colspan="2" style="text-align:right;">TOTAL ANNUAL DINING:</td><td>${fmt(tb)}</td><td style="color:#3498db;">${fmt(t70)}</td><td style="color:#9b59b6;">${fmt(t80)}</td><td style="color:#27ae60;">${fmt(t90)}</td></tr>`;
+    wrap.innerHTML = rows.length ? rows.map(cardHtml).join('') : '<p>No dining routines. Use \u201cAdd routine\u201d.</p>';
+    rows.forEach((_, i) => recalc(i, true));
+    updateGrand();
+  }
+  function mark() { setDirty(); updateGrand(); }
+
+  function cardEl(i) { return wrap.querySelector('.card[data-i="' + i + '"]'); }
+
+  function weeklyOf(card) {
+    let wk = 0;
+    card.querySelectorAll('.m').forEach(inp => wk += num(inp.value));
+    wk += num(card.querySelector('.f-drinks').value);
+    return wk;
   }
 
-  async function load() {
+  function recalc(i, quiet) {
+    const card = cardEl(i); if (!card) return;
+    const wk = weeklyOf(card);
+    const weeks = num(card.querySelector('.f-weeks').value);
+    const annual = wk * weeks;
+    card.querySelector('.wk').textContent = fmt(wk);
+    card.querySelector('.an').textContent = fmt(annual);
+    if (!quiet) { setDirty(); }
+    updateGrand();
+  }
+
+  function updateGrand() {
+    let total = 0, n = 0;
+    wrap.querySelectorAll('.card').forEach(card => { total += num(weeklyOf(card)) * num(card.querySelector('.f-weeks').value); n++; });
+    document.getElementById('grand').textContent = n + ' routines \u00b7 total annual dining today: ' + fmt(total);
+  }
+
+  function collect() {
+    return [...wrap.querySelectorAll('.card')].map(card => {
+      const i = Number(card.dataset.i), base = rows[i] || {};
+      const o = { id: base.id, routine_name: card.querySelector('.f-name').value.trim(),
+        drinks: num(card.querySelector('.f-drinks').value), weeks_per_year: Math.round(num(card.querySelector('.f-weeks').value)),
+        spend_reduction: card.querySelector('.f-red').checked,
+        taper_at_70: parseFloat(card.querySelector('.f-t70').value), taper_at_80: parseFloat(card.querySelector('.f-t80').value), taper_at_90: parseFloat(card.querySelector('.f-t90').value) };
+      card.querySelectorAll('.m').forEach(inp => { o[inp.dataset.f] = num(inp.value); });
+      const wk = weeklyOf(card);
+      o.weekly_total = Math.round(wk * 100) / 100;
+      o.annual_total = Math.round(wk * o.weeks_per_year * 100) / 100;
+      return o;
+    });
+  }
+
+  function addRow() {
+    const cur = collect();
+    const blank = { id: undefined, routine_name: '', drinks: 0, weeks_per_year: 52, spend_reduction: false, taper_at_70: 1, taper_at_80: 1, taper_at_90: 1 };
+    DAYS.forEach(d => { blank[d[0] + '_lunch'] = 0; blank[d[0] + '_dinner'] = 0; });
+    cur.push(blank); rows = cur; render(); setDirty();
+  }
+  function delRow(i) {
+    const r = rows[i]; if (r && r.id != null) deleted.push(r.id);
+    rows = collect().filter((_, idx) => idx !== i); render(); setDirty();
+  }
+
+  async function saveAll() {
+    const msg = document.getElementById('msg'); msg.style.color = '#1e3a8a'; msg.textContent = 'Saving\u2026';
+    const data = collect();
+    for (const r of data) if (!r.routine_name) { msg.style.color = '#c0392b'; msg.textContent = 'Every routine needs a name.'; return; }
+    try {
+      for (const id of deleted) await App.write('DELETE', 'bd_dining_habits?id=eq.' + id, undefined);
+      for (const r of data) {
+        const payload = Object.assign({}, r); delete payload.id;
+        if (r.id != null) await App.write('PATCH', 'bd_dining_habits?id=eq.' + r.id, payload);
+        else await App.write('POST', 'bd_dining_habits', payload);
+      }
+      deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
+      msg.style.color = '#065f46'; msg.textContent = '\u2713 Saved. Reopen the dashboard to update projections.';
+      await reload(true);
+    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
+  }
+
+  async function reload(quiet) {
+    if (!quiet && dirty && !confirm('Discard unsaved changes and reload?')) return;
     const status = document.getElementById('status');
     try {
-      const [dining, members] = await Promise.all([App.rest('bd_dining_habits'), App.rest('bd_members')]);
-      allDining = dining; allMembers = members;
+      rows = await App.rest('bd_dining_habits?order=routine_name.asc');
+      deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
       render(); status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
-  App.requireLogin(load, { title: 'Dining' });
+
+  window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+  App.requireLogin(() => reload(true), { title: 'Dining' });
 </script>
 </body>
 </html>
