@@ -78,6 +78,16 @@
     .note { font-size:12px; color:var(--ink-soft); margin-bottom:10px; }
     #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
 
+    /* phone nav dropdown — hidden except on narrow screens */
+    .tab-select { display:none; width:100%; padding:13px 14px; font-size:16px; font-weight:600; color:var(--ink); background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:14px; font-family:inherit; }
+
+    /* ---- Phones: replace the wrapping tab bar with a dropdown ---- */
+    @media (max-width: 600px) {
+      .tab-buttons { display:none; }
+      .tab-select { display:block; }
+      .tabcontent { border-radius:var(--radius); border-top:1px solid var(--line); }
+    }
+
     /* ---- Wide screens: vertical side-rail nav ---- */
     @media (min-width: 1000px) {
       .shell { display:flex; gap:18px; align-items:flex-start; }
@@ -137,11 +147,22 @@
         <button id="vt-Julie" class="btn-toggle" onclick="setView('Julie')">Julie</button>
       </div>
       <span class="who"><span id="whoami"></span><a onclick="App.doLogout()">Log out</a></span>
-      <span style="font-size:11px; color:#94a3b8; margin-left:8px;">build: LC-19</span>
+      <span style="font-size:11px; color:#94a3b8; margin-left:8px;">build: LC-20</span>
     </div>
   </div>
 
   <div class="shell">
+  <select id="tabSelect" class="tab-select" onchange="showTab(null, this.value)" aria-label="Choose section">
+    <option value="Overview">Overview</option>
+    <option value="KPIs">Performance KPIs</option>
+    <option value="Forecast">Monthly Forecast</option>
+    <option value="Modelling">Modelling</option>
+    <option value="Retirement">Retirement</option>
+    <option value="Logs">Log Entry</option>
+    <option value="LivingCosts">Living Costs</option>
+    <option value="ScenarioLab">Scenario Lab</option>
+    <option value="BasicData">Basic Data</option>
+  </select>
   <div class="tab-buttons">
     <button class="tab-link active-btn" onclick="showTab(event,'Overview')">Overview</button>
     <button class="tab-link" onclick="showTab(event,'KPIs')">Performance KPIs</button>
@@ -545,7 +566,10 @@
       document.querySelectorAll('.tabcontent').forEach(el => { el.style.display = 'none'; el.classList.remove('active'); });
       document.querySelectorAll('.tab-link').forEach(el => el.classList.remove('active-btn'));
       const el = document.getElementById(id); el.style.display = 'block'; el.classList.add('active');
-      evt.currentTarget.classList.add('active-btn');
+      // mark the matching tab button active (works whether triggered by a button click or the dropdown)
+      document.querySelectorAll('.tab-link').forEach(b => { if (b.getAttribute('onclick') && b.getAttribute('onclick').indexOf("'" + id + "'") >= 0) b.classList.add('active-btn'); });
+      // keep the phone dropdown in sync
+      const sel = document.getElementById('tabSelect'); if (sel && sel.value !== id) sel.value = id;
       if (id === 'Modelling') setTimeout(drawCharts, 40);
       if (id === 'KPIs') { ensureFrame('frame-kpis', 'kpis.html' + FV); pingFrame('frame-kpis'); }
       if (id === 'Forecast') { ensureFrame('frame-forecast', 'forecast.html' + FV); pingFrame('frame-forecast'); }
