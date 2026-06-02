@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Log Entry &amp; Recent Logs</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=err2"></script>
+<script src="common.js?v=err7"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:#333; }
   h2 { color:#2c3e50; margin-top:0; border-bottom:2px solid #e2e8f0; padding-bottom:6px; }
@@ -13,25 +13,47 @@
   .form-group input, .form-group select { padding:11px; border:1px solid #ccc; border-radius:6px; font-size:15px; box-sizing:border-box; max-width:360px; width:100%; }
   .btn { background:#3498db; color:#fff; border:none; padding:13px 22px; border-radius:8px; font-weight:bold; font-size:15px; cursor:pointer; }
   .btn-clear { background:#64748b; padding:9px 16px; font-size:14px; }
-  .pot-card { background:#f8fafc; padding:15px; border-radius:6px; border:1px solid #e2e8f0; margin-bottom:15px; max-width:360px; }
+  .pot-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; max-width:740px; margin-bottom:15px; }
+  .pot-card { background:#f8fafc; padding:14px; border-radius:8px; border:1px solid #e2e8f0; }
+  .pot-label { display:block; font-weight:bold; font-size:14px; color:#2c3e50; margin-bottom:6px; }
+  .pot-input { width:100%; padding:11px; border:1px solid #ccc; border-radius:6px; font-size:16px; box-sizing:border-box; text-align:right; }
+  .contrib-label { display:flex; align-items:flex-start; gap:8px; font-weight:normal; color:#64748b; cursor:pointer; margin-top:10px; font-size:13px; }
+  .contrib-label input { width:auto; flex:0 0 auto; margin-top:2px; }
   .filter-bar { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; margin:16px 0; }
   .filter-bar label { display:block; font-size:12px; color:#64748b; font-weight:bold; margin-bottom:4px; }
   .filter-bar select, .filter-bar input { padding:8px; border:1px solid #ccc; border-radius:6px; font-size:14px; }
   table { width:100%; border-collapse:collapse; font-size:14px; }
   #hTable { width:auto; }
-  #hTable th, #hTable td { padding-right:30px; white-space:nowrap; }
+  #hTable th, #hTable td { padding-right:18px; white-space:nowrap; }
   th,td { padding:9px 10px; border-bottom:1px solid #e2e8f0; text-align:left; }
   th { background:#f8fafc; color:#2c3e50; }
   .contrib-badge { display:inline-block; background:#dbeafe; color:#1e40af; font-size:11px; font-weight:bold; padding:2px 7px; border-radius:10px; margin-left:6px; }
   .msg { font-weight:bold; margin-top:12px; }
   #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
+
+  /* ---- Phone compacting ---- */
+  @media (max-width: 600px) {
+    body { padding:12px; }
+    h2 { font-size:19px; }
+    .form-group { margin-bottom:10px; }
+    .form-group label { font-size:12px; margin-bottom:3px; }
+    .form-group input, .form-group select { padding:9px; font-size:15px; max-width:none; }
+    .pot-grid { grid-template-columns:1fr 1fr; gap:10px; }
+    .pot-card { padding:10px; }
+    .pot-label { font-size:13px; }
+    .contrib-label { font-size:12px; }
+    .filter-bar { gap:8px 10px; padding:10px; }
+    .filter-bar > div { flex:1 1 auto; }
+    .filter-bar label { font-size:11px; }
+    #hTable th, #hTable td { padding:7px 10px 7px 0; font-size:13px; }
+  }
 </style>
 </head>
 <body>
   <div id="status" class="s-load">Loading…</div>
 
-  <h2>Log New Balances</h2>
+  <h2>Log New Balances <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(logs build: phone-1)</span></h2>
   <div class="form-group"><label>Whose accounts are you updating?</label><select id="logMember" onchange="renderInputs()"><option>Graham</option><option>Julie</option></select></div>
   <div class="form-group"><label>Date</label><input type="date" id="entryDate"></div>
   <div id="inputs"></div>
@@ -72,13 +94,13 @@
     const member = document.getElementById('logMember').value, box = document.getElementById('inputs');
     const pots = userPensions.filter(p => p.member_name === member && p.pension_type === 'Defined Contributions');
     if (!pots.length) { box.innerHTML = '<p>No DC pots found for ' + member + '.</p>'; return; }
-    box.innerHTML = pots.map(p => `
+    box.innerHTML = '<div class="pot-grid">' + pots.map(p => `
       <div class="pot-card">
-        <label>${p.pension_name} Value (£)</label>
-        <input type="number" class="pot-input" data-pension="${p.pension_name}" step="0.01" value="0.00">
-        <label style="display:inline-flex;align-items:center;font-weight:normal;color:#64748b;cursor:pointer;margin-top:10px;">
-          <input type="checkbox" class="contrib-input" data-pension="${p.pension_name}" style="width:auto;margin-right:8px;">Includes standard monthly contribution?</label>
-      </div>`).join('');
+        <label class="pot-label">${p.pension_name} Value (£)</label>
+        <input type="number" class="pot-input" data-pension="${p.pension_name}" step="1" value="0">
+        <label class="contrib-label">
+          <input type="checkbox" class="contrib-input" data-pension="${p.pension_name}">Includes standard monthly contribution?</label>
+      </div>`).join('') + '</div>';
   }
 
   async function submitEntry() {
