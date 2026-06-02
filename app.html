@@ -177,7 +177,7 @@
 </head>
 <body>
   <div class="topbar">
-    <h1>Joint Pension Analytics</h1>
+    <h1 id="appTitle">Joint Pension Analytics</h1>
     <div class="right">
       <div class="view-toggle">
         <button id="vt-Joint" class="btn-toggle active-toggle" onclick="setView('Joint')">Joint</button>
@@ -316,7 +316,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-27</span>
+    <span class="build-stamp">build: LC-28</span>
   </div>
 
   <script>
@@ -648,6 +648,8 @@
       document.querySelectorAll('.tab-link').forEach(b => { if (b.getAttribute('onclick') && b.getAttribute('onclick').indexOf("'" + id + "'") >= 0) b.classList.add('active-btn'); });
       // keep the phone dropdown in sync
       const sel = document.getElementById('tabSelect'); if (sel && sel.value !== id) sel.value = id;
+      // the main title shows only on Overview, freeing space elsewhere
+      const title = document.getElementById('appTitle'); if (title) title.style.display = (id === 'Overview') ? '' : 'none';
       if (id === 'Modelling') setTimeout(drawCharts, 40);
       if (id === 'KPIs') { ensureFrame('frame-kpis', 'kpis.html' + FV); pingFrame('frame-kpis'); }
       if (id === 'Forecast') { ensureFrame('frame-forecast', 'forecast.html' + FV); pingFrame('frame-forecast'); }
