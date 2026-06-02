@@ -40,7 +40,7 @@
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
   <h2>Dining</h2>
-  <p class="note">Each card is a dining routine. Enter the cost of each meal and drinks; <strong>weekly</strong> and <strong>annual</strong> totals calculate automatically. <strong>Weeks/year</strong> scales it (e.g. 48 if you skip holidays). <span style="color:var(--accent-dark);">(dining build: edit-2)</span></p>
+  <p class="note">Each card is a dining routine. Enter the cost of each meal and drinks; <strong>weekly</strong> and <strong>annual</strong> totals calculate automatically. <strong>Weeks/year</strong> scales it (e.g. 48 if you skip holidays). <span style="color:var(--accent-dark);">(dining build: edit-3)</span></p>
   <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -65,8 +65,8 @@
     let grid = '<div class="meal-grid"><div class="hd"></div><div class="hd">Lunch &pound;</div><div class="hd">Dinner &pound;</div>';
     DAYS.forEach(d => {
       grid += '<div class="day">' + d[1] + '</div>' +
-        '<input type="number" step="0.01" class="m" data-f="' + d[0] + '_lunch" value="' + (r[d[0] + '_lunch'] != null ? r[d[0] + '_lunch'] : 0) + '" oninput="recalc(' + i + ')">' +
-        '<input type="number" step="0.01" class="m" data-f="' + d[0] + '_dinner" value="' + (r[d[0] + '_dinner'] != null ? r[d[0] + '_dinner'] : 0) + '" oninput="recalc(' + i + ')">';
+        '<input type="number" step="1" class="m" data-f="' + d[0] + '_lunch" value="' + (r[d[0] + '_lunch'] != null ? r[d[0] + '_lunch'] : 0) + '" oninput="recalc(' + i + ')">' +
+        '<input type="number" step="1" class="m" data-f="' + d[0] + '_dinner" value="' + (r[d[0] + '_dinner'] != null ? r[d[0] + '_dinner'] : 0) + '" oninput="recalc(' + i + ')">';
     });
     grid += '</div>';
     return '<div class="card" data-i="' + i + '">' +
@@ -74,7 +74,7 @@
       '<button class="del" onclick="delRow(' + i + ')">Delete routine</button></div>' +
       grid +
       '<div class="extras">' +
-        '<div><label>Weekly drinks &pound;</label><input type="number" step="0.01" class="f-drinks" value="' + (r.drinks != null ? r.drinks : 0) + '" oninput="recalc(' + i + ')"></div>' +
+        '<div><label>Drinking &pound;</label><input type="number" step="1" class="f-drinks" value="' + (r.drinks != null ? r.drinks : 0) + '" oninput="recalc(' + i + ')"></div>' +
         '<div><label>Weeks per year</label><input type="number" step="1" class="f-weeks" value="' + (r.weeks_per_year != null ? r.weeks_per_year : 52) + '" oninput="recalc(' + i + ')"></div>' +
       '</div>' +
       '<div class="totals"><span>Weekly total: <b class="wk">&pound;0</b></span><span>Annual total: <b class="an">&pound;0</b></span></div>' +
