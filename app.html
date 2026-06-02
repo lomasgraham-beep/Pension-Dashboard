@@ -62,7 +62,7 @@
     .chart-box { width:100%; height:400px; margin-bottom:20px; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
     #rTable { width:auto; }
-    #rTable th { white-space:normal; vertical-align:bottom; line-height:1.2; }
+    #rTable th { white-space:normal; vertical-align:bottom; line-height:1.2; text-align:center; }
     #rTable td { white-space:nowrap; }
     #rTable th, #rTable td { padding-right:22px; }
     #rTable th:first-child, #rTable td:first-child { padding-right:30px; }
@@ -282,7 +282,7 @@
     </div>
     <div class="table-wrap">
       <table id="rTable">
-        <thead><tr><th id="rThPeriod">Year</th><th>Dining Target</th><th>Bills Target</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Guaranteed Incomes</th><th>Drawdown required</th><th>Total Gross Income</th></tr></thead>
+        <thead><tr><th id="rThPeriod">Year</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Other Incomes</th><th>Bills</th><th>Dining</th><th>Drawdown required</th><th>Total Gross Income</th></tr></thead>
         <tbody><tr><td colspan="8">Calculating…</td></tr></tbody>
       </table>
     </div>
@@ -324,7 +324,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-30</span>
+    <span class="build-stamp">build: LC-31</span>
   </div>
 
   <script>
@@ -369,10 +369,11 @@
         const period = (retGran === 'month') ? r.label : r.year;
         return `<tr class="${r.shortfall ? 'shortfall' : ''}">
           <td>${period}</td>
-          <td style="font-weight:bold;color:#e67e22;">${fmt(v.dining)}</td>
-          <td style="font-weight:bold;color:#c0392b;">${fmt(v.bills)}</td>
           <td>${fmt(v.tf)}</td><td>${fmt(v.tx)}</td>
-          <td>${fmt(v.other)}</td><td>${fmt(v.draw)}</td>
+          <td>${fmt(v.other)}</td>
+          <td style="font-weight:bold;color:#c0392b;">${fmt(v.bills)}</td>
+          <td style="font-weight:bold;color:#e67e22;">${fmt(v.dining)}</td>
+          <td>${fmt(v.draw)}</td>
           <td style="font-weight:bold;color:#27ae60;">${fmt(v.income)}</td>
         </tr>`;
       }).join('');
