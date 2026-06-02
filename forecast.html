@@ -4,25 +4,35 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monthly Forecast</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=err2"></script>
+<script src="common.js?v=err8"></script>
 <script src="engine.js?v=style9"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:#333; }
   h2 { color:#2c3e50; margin-top:0; }
   .note { color:#64748b; font-size:13px; margin-top:-4px; margin-bottom:14px; }
   table { width:auto; border-collapse:collapse; font-size:14px; }
-  th,td { padding:9px 22px 9px 10px; border-bottom:1px solid #e2e8f0; text-align:right; white-space:nowrap; }
-  th:first-child,td:first-child { text-align:left; padding-right:32px; }
+  th,td { padding:9px 16px 9px 10px; border-bottom:1px solid #e2e8f0; text-align:right; }
+  th { white-space:normal; text-align:center; vertical-align:bottom; line-height:1.2; max-width:90px; }
+  td { white-space:nowrap; }
+  th:first-child,td:first-child { text-align:left; padding-right:24px; }
   td:first-child { color:#475569; }
   th { background:#f8fafc; color:#2c3e50; position:sticky; top:0; }
   #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
+
+  @media (max-width: 600px) {
+    body { padding:12px; }
+    table { font-size:12px; }
+    th, td { padding:6px 8px 6px 0; }
+    th { max-width:64px; font-size:11px; }
+    th:first-child, td:first-child { padding-right:12px; }
+  }
 </style>
 </head>
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pre-Retirement Monthly Forecast</h2>
-  <p class="note">Projected pot growth to your retirement date, computed in your browser. Adjust the plan on the Modelling tab.</p>
+  <p class="note">Projected pot growth to your retirement date, computed in your browser. Adjust the plan on the Modelling tab. <span style="color:#94a3b8;">(forecast build: phone-1)</span></p>
   <table id="fTable">
     <thead><tr><th>Month</th><th>Graham's Tracked Total</th><th>Julie's Tracked Total</th><th>Joint Trajectory</th></tr></thead>
     <tbody><tr><td colspan="4">Computing…</td></tr></tbody>
