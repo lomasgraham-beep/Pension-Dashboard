@@ -5,7 +5,7 @@
 <title>Performance KPIs</title>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=style9"></script>
+<script src="common.js?v=err9"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:#333; }
   h2 { color:#2c3e50; margin-top:0; }
@@ -21,18 +21,28 @@
   .filter-bar select { padding:8px; border:1px solid #ccc; border-radius:6px; font-size:14px; }
   .charts { display:flex; gap:20px; flex-wrap:wrap; margin-bottom:25px; }
   .chart-box { flex:1; min-width:380px; height:350px; }
-  table { width:100%; border-collapse:collapse; font-size:14px; }
-  th,td { padding:9px 10px; border-bottom:1px solid #e2e8f0; text-align:right; white-space:nowrap; }
+  table { width:auto; border-collapse:collapse; font-size:14px; }
+  th,td { padding:9px 16px 9px 10px; border-bottom:1px solid #e2e8f0; text-align:right; }
+  th { white-space:normal; text-align:center; vertical-align:bottom; line-height:1.2; max-width:90px; }
+  td { white-space:nowrap; }
   th:first-child,td:first-child,th:nth-child(2),td:nth-child(2) { text-align:left; }
   th { background:#f8fafc; color:#2c3e50; }
   #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
+
+  @media (max-width: 600px) {
+    body { padding:12px; }
+    table { font-size:12px; }
+    th, td { padding:6px 8px 6px 0; }
+    th { max-width:60px; font-size:11px; }
+    th:first-child, td:first-child { padding-right:10px; }
+  }
 </style>
 </head>
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cap-2)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: phone-1)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
     <div class="card"><h3>Graham expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
