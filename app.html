@@ -6,7 +6,7 @@
   <title>Joint Pension Analytics</title>
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="common.js?v=err1"></script>
+  <script src="common.js?v=err2"></script>
   <script src="engine.js?v=style9"></script>
   <style>
     :root {
@@ -134,7 +134,7 @@
         <button id="vt-Julie" class="btn-toggle" onclick="setView('Julie')">Julie</button>
       </div>
       <span class="who"><span id="whoami"></span><a onclick="App.doLogout()">Log out</a></span>
-      <span style="font-size:11px; color:#94a3b8; margin-left:8px;">build: LC-14</span>
+      <span style="font-size:11px; color:#94a3b8; margin-left:8px;">build: LC-15</span>
     </div>
   </div>
 
@@ -504,7 +504,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=cap5';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err2';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }

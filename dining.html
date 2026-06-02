@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dining</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=cap3"></script>
+<script src="common.js?v=err2"></script>
 <style>
   :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
@@ -40,7 +40,7 @@
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
   <h2>Dining</h2>
-  <p class="note">Each card is a dining routine. Enter the cost of each meal and drinks; <strong>weekly</strong> and <strong>annual</strong> totals calculate automatically. <strong>Weeks/year</strong> scales it (e.g. 48 if you skip holidays). <span style="color:var(--accent-dark);">(dining build: edit-1)</span></p>
+  <p class="note">Each card is a dining routine. Enter the cost of each meal and drinks; <strong>weekly</strong> and <strong>annual</strong> totals calculate automatically. <strong>Weeks/year</strong> scales it (e.g. 48 if you skip holidays). <span style="color:var(--accent-dark);">(dining build: edit-2)</span></p>
   <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -153,6 +153,8 @@
       for (const id of deleted) await App.write('DELETE', 'bd_dining_habits?id=eq.' + id, undefined);
       for (const r of data) {
         const payload = Object.assign({}, r); delete payload.id;
+        // weekly_total and annual_total are GENERATED columns — never write them
+        delete payload.weekly_total; delete payload.annual_total;
         if (r.id != null) await App.write('PATCH', 'bd_dining_habits?id=eq.' + r.id, payload);
         else await App.write('POST', 'bd_dining_habits', payload);
       }

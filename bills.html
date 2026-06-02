@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Household Bills</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=cap4"></script>
+<script src="common.js?v=err2"></script>
 <style>
   :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
@@ -31,7 +31,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: edit-2)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: edit-3)</span></p>
   <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -44,8 +44,8 @@
     <select id="filterCat" onchange="render()" style="padding:8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px;"><option value="All">All categories</option></select>
   </div>
   <table id="tbl">
-    <thead><tr><th>Bill Name</th><th>Category</th><th>Annual &pound;</th><th>Reduce?</th><th>Taper 70</th><th>Taper 80</th><th>Taper 90</th><th></th></tr></thead>
-    <tbody><tr><td colspan="8">Loading&hellip;</td></tr></tbody>
+    <thead><tr><th>Bill Name</th><th>Category</th><th>Premium &pound;</th><th>Frequency</th><th>Annual &pound;</th><th>Reduce?</th><th>Taper 70</th><th>Taper 80</th><th>Taper 90</th><th></th></tr></thead>
+    <tbody><tr><td colspan="10">Loading&hellip;</td></tr></tbody>
   </table>
   <div class="proj" id="proj"></div>
 
@@ -55,17 +55,37 @@
   const fmt = App.fmt;
   const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
 
+  // Exact replica of the database's generated formula for total_annual.
+  function annualOf(premium, frequency) {
+    const p = Number(premium) || 0;
+    if (frequency === 'Weekly') return p * 52;
+    if (frequency === 'Monthly') return p * 12;
+    if (frequency === 'Annual') return p * 1;
+    return 0;
+  }
+
   function rowHtml(r, i) {
     const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
+    const freqOpt = f => ['Annual', 'Monthly', 'Weekly'].map(o => '<option' + (r.frequency === o ? ' selected' : '') + '>' + o + '</option>').join('');
     return '<tr data-i="' + i + '">' +
       '<td><input type="text" class="f-name" value="' + esc(r.bill_name) + '" oninput="mark()"></td>' +
       '<td><input type="text" class="f-cat" value="' + esc(r.category_code) + '" oninput="mark()" style="min-width:90px;"></td>' +
-      '<td><input type="number" class="f-annual" step="1" value="' + (r.total_annual != null ? r.total_annual : 0) + '" oninput="mark()"></td>' +
+      '<td><input type="number" class="f-premium" step="1" value="' + (r.premium != null ? r.premium : 0) + '" oninput="rowCalc(this)"></td>' +
+      '<td><select class="f-freq" onchange="rowCalc(this)">' + freqOpt(r.frequency) + '</select></td>' +
+      '<td class="annual-cell" style="font-weight:bold; color:var(--accent-dark);">' + fmt(annualOf(r.premium, r.frequency)) + '</td>' +
       '<td style="text-align:center;"><input type="checkbox" class="f-red" ' + (r.spend_reduction ? 'checked' : '') + ' onchange="mark()" style="width:auto;"></td>' +
       '<td><input type="number" class="f-t70 taper" step="0.05" min="0" max="1" value="' + (r.taper_at_70 != null ? r.taper_at_70 : 1) + '" oninput="mark()"></td>' +
       '<td><input type="number" class="f-t80 taper" step="0.05" min="0" max="1" value="' + (r.taper_at_80 != null ? r.taper_at_80 : 1) + '" oninput="mark()"></td>' +
       '<td><input type="number" class="f-t90 taper" step="0.05" min="0" max="1" value="' + (r.taper_at_90 != null ? r.taper_at_90 : 1) + '" oninput="mark()"></td>' +
       '<td><button class="del" onclick="delRow(this)">Delete</button></td></tr>';
+  }
+
+  // Live-update one row's annual cell when premium/frequency changes (no full re-render → keeps focus).
+  function rowCalc(el) {
+    const tr = el.closest('tr');
+    const prem = tr.querySelector('.f-premium').value, freq = tr.querySelector('.f-freq').value;
+    tr.querySelector('.annual-cell').textContent = fmt(annualOf(prem, freq));
+    mark();
   }
 
   // Read the currently-visible rows back into the full `rows` model, by their real index.
@@ -74,7 +94,8 @@
       const i = Number(tr.dataset.i); if (!rows[i]) return;
       rows[i].bill_name = tr.querySelector('.f-name').value.trim();
       rows[i].category_code = tr.querySelector('.f-cat').value.trim() || null;
-      rows[i].total_annual = Math.round(parseFloat(tr.querySelector('.f-annual').value) || 0);
+      rows[i].premium = Math.round(parseFloat(tr.querySelector('.f-premium').value) || 0);
+      rows[i].frequency = tr.querySelector('.f-freq').value;
       rows[i].spend_reduction = tr.querySelector('.f-red').checked;
       rows[i].taper_at_70 = parseFloat(tr.querySelector('.f-t70').value);
       rows[i].taper_at_80 = parseFloat(tr.querySelector('.f-t80').value);
@@ -95,7 +116,7 @@
     const html = rows.map((r, i) => ({ r, i }))
       .filter(x => cat === 'All' || (x.r.category_code || '') === cat)
       .map(x => rowHtml(x.r, x.i)).join('');
-    tbody.innerHTML = html || '<tr><td colspan="8">No bills in this view. Use \u201cAdd bill\u201d or change the filter.</td></tr>';
+    tbody.innerHTML = html || '<tr><td colspan="10">No bills in this view. Use \u201cAdd bill\u201d or change the filter.</td></tr>';
     updateProj();
   }
   function mark() { syncDom(); setDirty(); updateProj(); }
@@ -103,7 +124,7 @@
   function collect() { syncDom(); return rows; }
 
   function updateProj() {
-    const total = rows.reduce((s, r) => s + (Number(r.total_annual) || 0), 0);
+    const total = rows.reduce((s, r) => s + annualOf(r.premium, r.frequency), 0);
     const cat = document.getElementById('filterCat').value;
     const shown = cat === 'All' ? rows.length : rows.filter(r => (r.category_code || '') === cat).length;
     const label = cat === 'All' ? (rows.length + ' bills') : (shown + ' of ' + rows.length + ' bills shown');
@@ -112,7 +133,7 @@
 
   function addRow() {
     syncDom();
-    rows.push({ id: undefined, bill_name: '', category_code: document.getElementById('filterCat').value === 'All' ? '' : document.getElementById('filterCat').value, total_annual: 0, spend_reduction: false, taper_at_70: 1, taper_at_80: 1, taper_at_90: 1 });
+    rows.push({ id: undefined, bill_name: '', category_code: document.getElementById('filterCat').value === 'All' ? '' : document.getElementById('filterCat').value, premium: 0, frequency: 'Monthly', spend_reduction: false, taper_at_70: 1, taper_at_80: 1, taper_at_90: 1 });
     populateCatFilter(); render(); setDirty();
   }
   function delRow(btn) {
@@ -129,7 +150,8 @@
     try {
       for (const id of deleted) await App.write('DELETE', 'bd_household_bills?id=eq.' + id, undefined);
       for (const r of rows) {
-        const payload = { bill_name: r.bill_name, category_code: r.category_code, total_annual: r.total_annual, spend_reduction: r.spend_reduction, taper_at_70: r.taper_at_70, taper_at_80: r.taper_at_80, taper_at_90: r.taper_at_90 };
+        // total_annual is a GENERATED column — never write it; the DB computes it from premium + frequency
+        const payload = { bill_name: r.bill_name, category_code: r.category_code, premium: r.premium, frequency: r.frequency, spend_reduction: r.spend_reduction, taper_at_70: r.taper_at_70, taper_at_80: r.taper_at_80, taper_at_90: r.taper_at_90 };
         if (r.id != null) await App.write('PATCH', 'bd_household_bills?id=eq.' + r.id, payload);
         else await App.write('POST', 'bd_household_bills', payload);
       }
