@@ -86,6 +86,20 @@
       .tab-buttons { display:none; }
       .tab-select { display:block; }
       .tabcontent { border-radius:var(--radius); border-top:1px solid var(--line); }
+
+      /* compact the Modelling controls so they don't dominate the screen */
+      .params { padding:12px; }
+      .params .grid { grid-template-columns:1fr 1fr; gap:12px 14px; }
+      .params .ctrl-wide { grid-column:1 / -1; }
+      .params label { font-size:12px; margin-bottom:5px; }
+      .params .sv { font-size:13px; }
+      .params input[type=range] { height:10px; margin:4px 0; }
+      .params input[type=range]::-webkit-slider-thumb { width:26px; height:26px; }
+      .params input[type=range]::-moz-range-thumb { width:26px; height:26px; }
+      .params .seg button { padding:9px 2px; font-size:13px; }
+      .params .actions { margin-top:12px; gap:8px; }
+      .params .pbtn { padding:11px 16px; font-size:14px; }
+      .params .hint { font-size:11px; }
     }
 
     /* ---- Wide screens: vertical side-rail nav ---- */
@@ -147,7 +161,7 @@
         <button id="vt-Julie" class="btn-toggle" onclick="setView('Julie')">Julie</button>
       </div>
       <span class="who"><span id="whoami"></span><a onclick="App.doLogout()">Log out</a></span>
-      <span style="font-size:11px; color:#94a3b8; margin-left:8px;">build: LC-20</span>
+      <span style="font-size:11px; color:#94a3b8; margin-left:8px;">build: LC-21</span>
     </div>
   </div>
 
