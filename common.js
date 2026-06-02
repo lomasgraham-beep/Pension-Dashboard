@@ -39,7 +39,11 @@
   }
   async function write(method, path, payload) {
     const r = await fetch(SUPABASE_URL + "/rest/v1/" + path, { method: method, headers: Object.assign(getHeaders(), { Prefer: "return=minimal" }), body: JSON.stringify(payload) });
-    if (!r.ok) throw new Error(method + " " + path + " -> " + r.status);
+    if (!r.ok) {
+      let detail = "";
+      try { const body = await r.json(); detail = body.message || body.hint || body.details || JSON.stringify(body); } catch (e) { try { detail = await r.text(); } catch (e2) {} }
+      throw new Error(method + " " + path + " -> " + r.status + (detail ? " | " + detail : ""));
+    }
     return true;
   }
 
