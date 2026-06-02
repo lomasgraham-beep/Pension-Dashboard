@@ -310,7 +310,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-24</span>
+    <span class="build-stamp">build: LC-26</span>
   </div>
 
   <script>
@@ -428,16 +428,50 @@
       drawdownRows.forEach(r => { const t = joint ? r.totalIncome : vrow(r).income; if (t > incMax) incMax = t; });
       incMax = Math.ceil((incMax * 1.05) / 1000) * 1000; // round up to a tidy £1k
 
+      // On narrow screens, percentage chart margins are too small for the y-axis
+      // numbers (they clip to "£…"). Use a fixed left margin + short £1.2M/£250K ticks.
+      const phone = window.innerWidth <= 600;
+      const axisText = phone ? { fontSize: 10 } : { fontSize: 12 };
+      const potArea = phone ? { left: 50, right: 10, top: 40, bottom: 90, height: '62%' } : { width: '85%', height: '70%' };
+      const incArea = phone ? { left: 50, right: 50, top: 40, bottom: 90, height: '58%' } : { width: '80%', height: '66%' };
+
+      // Compact currency for phone axis labels: £1.2M, £250K, £500
+      function shortGBP(n) {
+        const a = Math.abs(n);
+        if (a >= 1e6) { const v = n / 1e6; return '£' + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + 'M'; }
+        if (a >= 1e3) { const v = n / 1e3; return '£' + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(0)) + 'K'; }
+        return '£' + Math.round(n);
+      }
+      function shortTicks(maxValue, steps) {
+        steps = steps || 5; const ticks = [];
+        if (maxValue <= 0) return [{ v: 0, f: '£0' }];
+        const step = maxValue / steps;
+        for (let i = 0; i <= steps; i++) { const v = Math.round(step * i); ticks.push({ v: v, f: shortGBP(v) }); }
+        return ticks;
+      }
+      // stacked pot chart max = largest row total across the stacked segments
+      let potMax = 0;
+      for (let row = 0; row < dPots.getNumberOfRows(); row++) {
+        let t = 0; for (let col = 1; col < dPots.getNumberOfColumns(); col++) t += (dPots.getValue(row, col) || 0);
+        if (t > potMax) potMax = t;
+      }
+      potMax = Math.ceil((potMax * 1.05) / 1000) * 1000;
+
+      const potVAxis = phone
+        ? { minValue: 0, viewWindow: { min: 0, max: potMax }, ticks: shortTicks(potMax), textStyle: axisText }
+        : { minValue: 0, format: '£#,###', textStyle: axisText };
+      const incTicks = phone ? shortTicks(incMax) : null;
+
       new google.visualization.ColumnChart(document.getElementById('potChart')).draw(dPots, {
         title: potTitle, isStacked:true, legend:{position:'bottom'},
-        chartArea:{width:'85%',height:'70%'}, colors:potColors, vAxis:{minValue:0, format:'£#,###'}
+        chartArea: potArea, colors:potColors, vAxis: potVAxis
       });
       new google.visualization.ComboChart(document.getElementById('incomeChart')).draw(dInc, {
         title: incTitle, seriesType:'bars', isStacked:true, series: incSeries,
-        legend:{position:'bottom'}, chartArea:{width:'80%',height:'66%'},
+        legend:{position:'bottom'}, chartArea: incArea,
         vAxes: {
-          0: { title:'Income (£)', viewWindow:{min:0, max:incMax}, format:'£#,###' },
-          1: { title:'Total drawdown (£)', viewWindow:{min:0, max:incMax}, format:'£#,###' }
+          0: phone ? { title:'', viewWindow:{min:0, max:incMax}, ticks: incTicks, textStyle: axisText } : { title:'Income (£)', viewWindow:{min:0, max:incMax}, format:'£#,###', textStyle: axisText },
+          1: phone ? { title:'', viewWindow:{min:0, max:incMax}, ticks: incTicks, textStyle: axisText } : { title:'Total drawdown (£)', viewWindow:{min:0, max:incMax}, format:'£#,###', textStyle: axisText }
         }
       });
     }
