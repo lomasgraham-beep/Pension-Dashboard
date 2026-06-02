@@ -103,6 +103,12 @@
     .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:18px 26px; }
     .params .ctrl-wide { grid-column:1 / -1; }
     .params label { display:block; font-weight:bold; font-size:14px; color:var(--ink); margin-bottom:8px; }
+    .params .ctrl { display:flex; flex-direction:column; }
+    .params .ctrl > label { min-height:2.6em; }   /* reserve 2 lines so sliders align even when a label wraps */
+    .params .ctrl > label.switch { min-height:0; }
+    .params .ctrl-note { justify-content:center; }
+    .params .ctrl-note > label { min-height:0; }
+    .params .ctrl-note .note { font-size:13px; color:var(--ink-soft); line-height:1.4; }
     .params .sv { color:var(--accent); font-weight:bold; font-size:15px; }
     .params .hint { font-size:12px; color:#94a3b8; margin-top:4px; }
 
@@ -236,6 +242,7 @@
           <input type="hidden" id="m_p1days" value="4"></div>
         <div class="ctrl"><label>Spending in retirement <span id="m_spend_v" class="sv">100%</span></label><input type="range" id="m_spend" min="25" max="100" step="1" value="100" oninput="onParam()"></div>
         <div class="ctrl"><label>Graham drawdown ratio <span id="m_ratio_v" class="sv">50%</span></label><input type="range" id="m_ratio" min="0" max="100" step="1" value="50" oninput="onParam()"></div>
+        <div class="ctrl ctrl-note"><p class="note" style="margin:0;">Drag any control and the whole dashboard updates instantly — nothing is saved until you tap <strong>Save</strong>.</p></div>
         <div class="ctrl ctrl-wide">
           <label class="switch"><input type="checkbox" id="m_dynamic" onchange="onParam()"><span class="track"></span><span class="switch-text">Dynamic model mode</span>
             <button type="button" class="info-btn" onclick="toggleInfo(event,'info_dyn')" aria-label="What is dynamic model mode?">i</button></label>
@@ -253,7 +260,6 @@
         <span class="msg" id="m_msg"></span>
       </div>
     </div>
-    <p class="note">Drag any control and the whole dashboard updates instantly — nothing is saved until you tap <strong>Save</strong>.</p>
     <h2><span class="viewlabel">Joint</span> Projections</h2>
     <div id="potChart" class="chart-box"></div>
     <div id="incomeChart" class="chart-box"></div>
@@ -310,7 +316,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-26</span>
+    <span class="build-stamp">build: LC-27</span>
   </div>
 
   <script>
@@ -379,12 +385,12 @@
         drawdownRows.forEach(r => dPots.addRow([String(r.year),
           Math.round(r.j_taxFree), Math.round(r.g_taxFree), Math.round(r.j_taxable), Math.round(r.g_taxable)]));
         potColors = ['#c39bd3','#85c1e9','#8e44ad','#2471a3']; // Julie light, Graham light, Julie dark, Graham dark
-        potTitle = 'Combined Pots — tax-free (lower) then taxable (upper), by person (£)';
+        potTitle = 'Combined Pots';
       } else {
         dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
         drawdownRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx)]); });
         potColors = ['#2ecc71','#e74c3c'];
-        potTitle = currentView + ' Pension Pots Through Retirement (£)';
+        potTitle = currentView + ' Pots';
       }
 
       // ---------- INCOME CHART (combo: stacked bars + drawdown line on 2nd axis) ----------
@@ -406,7 +412,7 @@
           3: { targetAxisIndex:0, color:'#85c1e9' }, // Graham other income
           4: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
         };
-        incTitle = 'Income — drawdown & other income by person (bars), total drawdown (line)';
+        incTitle = 'Income';
       } else {
         dInc.addColumn('number','Drawdown'); dInc.addColumn('number','Other income');
         dInc.addColumn('number','Total drawdown');
@@ -416,7 +422,7 @@
           1: { targetAxisIndex:0, color:'#9b59b6' }, // other income
           2: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
         };
-        incTitle = currentView + ' Income — drawdown & other (bars), drawdown (line)';
+        incTitle = currentView + ' Income';
       }
 
       const nf = new google.visualization.NumberFormat({ prefix:'£', fractionDigits:0 });
