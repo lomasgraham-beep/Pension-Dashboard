@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Household Bills</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=err2"></script>
+<script src="common.js?v=err3"></script>
 <style>
   :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
@@ -31,7 +31,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: edit-3)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: edit-4)</span></p>
   <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -64,12 +64,26 @@
     return 0;
   }
 
+  // Build the <option>s for a row's category dropdown from the live category list.
+  function catOptions(selected) {
+    const cats = allCategories();
+    let opts = cats.map(c => '<option' + (c === selected ? ' selected' : '') + '>' + c.replace(/"/g, '&quot;') + '</option>').join('');
+    // if the row's current category isn't in the known list (legacy/odd value), include it so it isn't lost
+    if (selected && cats.indexOf(selected) < 0) opts = '<option selected>' + selected.replace(/"/g, '&quot;') + '</option>' + opts;
+    opts += '<option value="__new__">+ New category\u2026</option>';
+    return opts;
+  }
+  function allCategories() {
+    return [...new Set(rows.map(r => r.category_code).filter(c => c))].sort();
+  }
+
   function rowHtml(r, i) {
     const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
     const freqOpt = f => ['Annual', 'Monthly', 'Weekly'].map(o => '<option' + (r.frequency === o ? ' selected' : '') + '>' + o + '</option>').join('');
     return '<tr data-i="' + i + '">' +
       '<td><input type="text" class="f-name" value="' + esc(r.bill_name) + '" oninput="mark()"></td>' +
-      '<td><input type="text" class="f-cat" value="' + esc(r.category_code) + '" oninput="mark()" style="min-width:90px;"></td>' +
+      '<td><select class="f-cat" onchange="catChanged(this)" style="min-width:120px;">' + catOptions(r.category_code) + '</select>' +
+        '<input type="text" class="f-cat-new" placeholder="New category" style="display:none; margin-top:5px; min-width:120px;" oninput="mark()"></td>' +
       '<td><input type="number" class="f-premium" step="1" value="' + (r.premium != null ? r.premium : 0) + '" oninput="rowCalc(this)"></td>' +
       '<td><select class="f-freq" onchange="rowCalc(this)">' + freqOpt(r.frequency) + '</select></td>' +
       '<td class="annual-cell" style="font-weight:bold; color:var(--accent-dark);">' + fmt(annualOf(r.premium, r.frequency)) + '</td>' +
@@ -78,6 +92,14 @@
       '<td><input type="number" class="f-t80 taper" step="0.05" min="0" max="1" value="' + (r.taper_at_80 != null ? r.taper_at_80 : 1) + '" oninput="mark()"></td>' +
       '<td><input type="number" class="f-t90 taper" step="0.05" min="0" max="1" value="' + (r.taper_at_90 != null ? r.taper_at_90 : 1) + '" oninput="mark()"></td>' +
       '<td><button class="del" onclick="delRow(this)">Delete</button></td></tr>';
+  }
+
+  // Show/hide the "new category" textbox when the dropdown is set to "+ New category…"
+  function catChanged(sel) {
+    const newBox = sel.parentElement.querySelector('.f-cat-new');
+    if (sel.value === '__new__') { newBox.style.display = 'block'; newBox.focus(); }
+    else { newBox.style.display = 'none'; }
+    mark();
   }
 
   // Live-update one row's annual cell when premium/frequency changes (no full re-render → keeps focus).
@@ -93,7 +115,9 @@
     tbody.querySelectorAll('tr[data-i]').forEach(tr => {
       const i = Number(tr.dataset.i); if (!rows[i]) return;
       rows[i].bill_name = tr.querySelector('.f-name').value.trim();
-      rows[i].category_code = tr.querySelector('.f-cat').value.trim() || null;
+      const catSel = tr.querySelector('.f-cat');
+      if (catSel.value === '__new__') { rows[i].category_code = tr.querySelector('.f-cat-new').value.trim() || null; }
+      else { rows[i].category_code = catSel.value.trim() || null; }
       rows[i].premium = Math.round(parseFloat(tr.querySelector('.f-premium').value) || 0);
       rows[i].frequency = tr.querySelector('.f-freq').value;
       rows[i].spend_reduction = tr.querySelector('.f-red').checked;
