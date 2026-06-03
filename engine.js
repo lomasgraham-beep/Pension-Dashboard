@@ -161,6 +161,32 @@
       return { name: p.purchase_name, pIdx: pIdx, deposit: deposit, pay: pay, term: term };
     }).filter(p => p.pIdx != null);
 
+    // ---- Market crashes (PruFund smoothed) ----
+    // Each crash: starts at startIdx; pot falls by fall% over fallMonths to the trough,
+    // then climbs back to the pre-crash value over recoveryMonths. During a crash window
+    // the normal monthly growth is REPLACED by the crash trajectory factor; withdrawals
+    // still happen, so a crash during drawdown erodes the pot faster (sequence risk).
+    const crashes = (data.crashes || []).map(c => {
+      const d = c.start_date ? new Date(c.start_date) : null;
+      if (!d) return null;
+      const startIdx = d.getFullYear() * 12 + d.getMonth();
+      const F = Math.max(0, Math.min(0.99, (Number(c.fall_pct) || 0) / 100));
+      const D = Math.max(1, Math.round(Number(c.fall_months) || 1));
+      const R = Math.max(1, Math.round(Number(c.recovery_months) || 1));
+      const fallStep = Math.pow(1 - F, 1 / D);            // compounded over D months = (1-F)
+      const recoverStep = F < 1 ? Math.pow(1 / (1 - F), 1 / R) : 1; // climbs (1-F) back to 1.0 over R months
+      return { startIdx, D, R, fallStep, recoverStep, endIdx: startIdx + D + R };
+    }).filter(Boolean);
+    // returns the growth factor to use THIS month if a crash is active, else null (use normal growth)
+    function crashFactor(idx) {
+      let factor = null;
+      for (const c of crashes) {
+        if (idx >= c.startIdx && idx < c.startIdx + c.D) { factor = (factor == null ? 1 : factor) * c.fallStep; }
+        else if (idx >= c.startIdx + c.D && idx < c.endIdx) { factor = (factor == null ? 1 : factor) * c.recoverStep; }
+      }
+      return factor;
+    }
+
     const taperFor = (row, oldest) => {
       if (oldest >= 90) return row.taper_at_90 != null ? Number(row.taper_at_90) : 1.0;
       if (oldest >= 80) return row.taper_at_80 != null ? Number(row.taper_at_80) : 1.0;
@@ -320,8 +346,10 @@
 
       gTf = gRes.tfAfter; gTx = gRes.txAfter; jTf = jRes.tfAfter; jTx = jRes.txAfter;
 
-      // monthly growth on what remains
-      gTf *= mGrow; gTx *= mGrow; jTf *= mGrow; jTx *= mGrow;
+      // monthly growth on what remains — overridden by a crash trajectory if one is active
+      const cf = crashFactor(idx);
+      const gm = (cf != null) ? cf : mGrow;
+      gTf *= gm; gTx *= gm; jTf *= gm; jTx *= gm;
 
       const gDraw = gRes.drawTf + gRes.drawGross, jDraw = jRes.drawTf + jRes.drawGross;
       const mState = gRes.inc.stateGross + jRes.inc.stateGross;
