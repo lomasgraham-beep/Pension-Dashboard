@@ -286,12 +286,10 @@
     </div>
     <div class="table-wrap">
       <table id="rTable">
-        <thead><tr><th id="rThPeriod">Year</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Other Incomes</th><th>Bills</th><th>Dining</th><th>Drawdown required</th><th>Total Gross Income</th></tr></thead>
-        <tbody><tr><td colspan="8">Calculating…</td></tr></tbody>
+        <thead><tr><th id="rThPeriod">Year</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Cash Savings</th><th>Other Incomes</th><th>Bills</th><th>Dining</th><th>Drawdown required</th><th>Total Gross Income</th></tr></thead>
+        <tbody><tr><td colspan="9">Calculating…</td></tr></tbody>
       </table>
     </div>
-    <h3 id="cashChartHead" style="color:var(--ink); margin:26px 0 4px; display:none;">Cash Savings Pot</h3>
-    <div id="cashChart" class="chart-box" style="display:none;"></div>
   </div>
 
   <div id="KPIs" class="tabcontent"><iframe id="frame-kpis" class="app-frame" title="Performance KPIs"></iframe></div>
@@ -330,7 +328,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-38</span>
+    <span class="build-stamp">build: LC-39</span>
   </div>
 
   <script>
@@ -369,13 +367,14 @@
     function renderRetirementTable() {
       const tb = document.querySelector('#rTable tbody');
       const rowsToShow = (retGran === 'month') ? (drawdownRows.monthly || []) : drawdownRows;
-      if (!rowsToShow.length) { tb.innerHTML = '<tr><td colspan="8">No rows.</td></tr>'; return; }
+      if (!rowsToShow.length) { tb.innerHTML = '<tr><td colspan="9">No rows.</td></tr>'; return; }
       tb.innerHTML = rowsToShow.map(r => {
         const v = vrow(r);
         const period = (retGran === 'month') ? r.label : r.year;
         return `<tr class="${r.shortfall ? 'shortfall' : ''}">
           <td>${period}</td>
           <td>${fmt(v.tf)}</td><td>${fmt(v.tx)}</td>
+          <td style="color:#2c7a7b;">${fmt(r.cashBalance || 0)}</td>
           <td>${fmt(v.other)}</td>
           <td style="font-weight:bold;color:#c0392b;">${fmt(v.bills)}</td>
           <td style="font-weight:bold;color:#e67e22;">${fmt(v.dining)}</td>
@@ -383,37 +382,6 @@
           <td style="font-weight:bold;color:#27ae60;">${fmt(v.income)}</td>
         </tr>`;
       }).join('');
-      drawCashChart();
-    }
-
-    function drawCashChart() {
-      const head = document.getElementById('cashChartHead'), box = document.getElementById('cashChart');
-      const monthly = drawdownRows.monthly || [];
-      // only show if there's a cash pot in play (any balance or purchase)
-      const hasCash = monthly.some(m => (m.cashBalance || 0) > 0 || (m.cashDeposit || 0) > 0);
-      if (!chartsReady || !hasCash) { head.style.display = 'none'; box.style.display = 'none'; return; }
-      head.style.display = ''; box.style.display = '';
-
-      const dt = new google.visualization.DataTable();
-      dt.addColumn('string', 'Month');
-      dt.addColumn('number', 'Cash balance');
-      dt.addColumn({ type: 'string', role: 'annotation' });
-      dt.addColumn({ type: 'string', role: 'annotationText' });
-      monthly.forEach(m => {
-        const note = (m.cashDeposit > 0) ? '▼' : null;          // mark purchase-deposit months
-        const noteText = (m.cashDeposit > 0) ? (m.label + ': deposit ' + fmt(m.cashDeposit)) : null;
-        dt.addRow([m.label, Math.round(m.cashBalance || 0), note, noteText]);
-      });
-
-      const phone = window.innerWidth <= 600;
-      new google.visualization.LineChart(box).draw(dt, {
-        title: 'Cash savings balance over retirement (deposits marked ▼)',
-        legend: { position: 'none' }, curveType: 'function', lineWidth: 3, colors: ['#2c7a7b'],
-        chartArea: phone ? { left: 60, right: 16, top: 40, bottom: 60, height: '70%' } : { left: 80, right: 30, top: 40, bottom: 60 },
-        vAxis: { minValue: 0, format: phone ? 'short' : '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
-        hAxis: { showTextEvery: Math.max(1, Math.round(monthly.length / 12)), slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: phone ? 9 : 11 } },
-        annotations: { style: 'point', textStyle: { fontSize: 11, color: '#c0392b', bold: true } }
-      });
     }
 
     function drawCharts() {
@@ -652,7 +620,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err12';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err13';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }

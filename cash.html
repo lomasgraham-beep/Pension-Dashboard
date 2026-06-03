@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cash &amp; Purchases</title>
+<script src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=err12"></script>
+<script src="common.js?v=err13"></script>
 <style>
   :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
@@ -59,7 +60,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v3)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v4)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
 
   <div class="bar">
@@ -68,6 +69,9 @@
     <span class="unsaved" id="unsaved">&#9679; Unsaved changes</span>
     <span class="msg" id="msg"></span>
   </div>
+
+  <div id="cashChart" style="width:100%; height:340px; margin-bottom:10px;"></div>
+  <p class="note" id="chartHint" style="display:none;">Projected balance from retirement, updated when you reload after saving. Deposit months are marked.</p>
 
   <h3>Savings</h3>
   <div class="settings">
@@ -173,19 +177,81 @@
     if (!quiet && dirty && !confirm('Discard unsaved changes and reload?')) return;
     const status = document.getElementById('status');
     try {
-      const [sRows, pRows] = await Promise.all([
+      const [sRows, pRows, mRows, memRows] = await Promise.all([
         App.rest('bd_cash_savings?limit=1'),
-        App.rest('bd_purchases?order=purchase_date.asc')
+        App.rest('bd_purchases?order=purchase_date.asc'),
+        App.rest('op_modelling_parameters?member_name=eq.Graham&order=updated_at.desc&limit=1'),
+        App.rest('bd_members')
       ]);
       settingsRow = sRows && sRows[0] ? sRows[0] : null;
       document.getElementById('s_start').value = settingsRow ? (settingsRow.start_balance || 0) : 0;
       document.getElementById('s_monthly').value = settingsRow ? (settingsRow.monthly_amount || 0) : 0;
       document.getElementById('s_growth').value = settingsRow ? ((settingsRow.growth_rate || 0) * 100) : 3;
       purchases = pRows || [];
+      // timeline: retirement date -> latest end-of-life
+      retireDate = (mRows && mRows[0] && mRows[0].retirement_date) ? new Date(mRows[0].retirement_date) : null;
+      let endIdx = null;
+      (memRows || []).forEach(m => { if (m.end_of_life_date) { const d = new Date(m.end_of_life_date); const ix = d.getFullYear()*12 + d.getMonth(); if (endIdx == null || ix > endIdx) endIdx = ix; } });
+      endMonthIdx = endIdx;
       deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
-      render(); status.style.display = 'none';
+      render(); drawCashChart(); status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
+
+  // Standalone cash projection — mirrors the engine's monthly cash logic exactly.
+  let retireDate = null, endMonthIdx = null, chartsReady = false;
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  google.charts.load('current', { packages:['corechart'] });
+  google.charts.setOnLoadCallback(() => { chartsReady = true; drawCashChart(); });
+
+  function drawCashChart() {
+    const box = document.getElementById('cashChart'), hint = document.getElementById('chartHint');
+    if (!chartsReady) return;
+    const monthlyAmt = num(document.getElementById('s_monthly').value);
+    const startBal = num(document.getElementById('s_start').value);
+    const growthM = Math.pow(1 + num(document.getElementById('s_growth').value)/100, 1/12);
+    if (!retireDate || endMonthIdx == null || (startBal === 0 && monthlyAmt === 0 && !purchases.length)) {
+      box.style.display = 'none'; hint.style.display = 'none'; return;
+    }
+    box.style.display = ''; hint.style.display = '';
+    const startIdx = retireDate.getFullYear()*12 + retireDate.getMonth();
+    // precompute purchase deposit month-indices
+    const deps = purchases.map(p => {
+      const d = p.purchase_date ? new Date(p.purchase_date) : null;
+      return d ? { idx: d.getFullYear()*12 + d.getMonth(), deposit: num(p.deposit), name: (p.purchase_name||'Purchase') } : null;
+    }).filter(Boolean);
+
+    const dt = new google.visualization.DataTable();
+    dt.addColumn('string','Month');
+    dt.addColumn('number','Cash balance');
+    dt.addColumn({ type:'string', role:'annotation' });
+    dt.addColumn({ type:'string', role:'annotationText' });
+
+    let bal = startBal;
+    for (let idx = startIdx; idx <= endMonthIdx; idx++) {
+      bal = (bal + monthlyAmt) * growthM;          // saving first, then growth
+      let depThis = 0, names = [];
+      deps.forEach(d => { if (d.idx === idx) { depThis += d.deposit; names.push(d.name); } });
+      if (depThis > 0) bal -= Math.min(depThis, bal);
+      const yr = Math.floor(idx/12), mo = idx%12;
+      const label = MONTHS[mo] + ' ' + yr;
+      const note = depThis > 0 ? '▼' : null;
+      const noteText = depThis > 0 ? (names.join(', ') + ' — deposit ' + fmt(depThis)) : null;
+      dt.addRow([label, Math.round(bal), note, noteText]);
+    }
+
+    const phone = window.innerWidth <= 600;
+    const months = endMonthIdx - startIdx + 1;
+    new google.visualization.LineChart(box).draw(dt, {
+      title: 'Projected cash savings balance',
+      legend: { position:'none' }, curveType:'function', lineWidth:3, colors:['#2c7a7b'],
+      chartArea: phone ? { left:64, right:16, top:40, bottom:70, height:'66%' } : { left:88, right:30, top:44, bottom:70 },
+      vAxis: { title: phone ? '' : 'Balance (£)', minValue:0, format:'£#,###', textStyle:{ fontSize: phone?10:12 } },
+      hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, Math.round(months/(phone?6:12))), slantedText:true, slantedTextAngle:45, textStyle:{ fontSize: phone?9:11 } },
+      annotations: { style:'point', stem:{ color:'#c0392b' }, textStyle:{ fontSize:11, color:'#c0392b', bold:true } }
+    });
+  }
+  window.addEventListener('resize', () => { clearTimeout(window.__cr); window.__cr = setTimeout(drawCashChart, 150); });
 
   window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
   App.requireLogin(() => reload(true), { title: 'Cash & Purchases' });
