@@ -5,7 +5,7 @@
 <title>Performance KPIs</title>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=err15"></script>
+<script src="common.js?v=err16"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:#333; }
   h2 { color:#2c3e50; margin-top:0; }
@@ -42,7 +42,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: geomean)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: median-pct)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
     <div class="card"><h3>Graham expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
@@ -54,7 +54,7 @@
   </div>
   <div class="charts"><div id="chartValue" class="chart-box"></div><div id="chartGrowth" class="chart-box"></div></div>
   <table id="kpiTable">
-    <thead><tr><th>Member</th><th>Pension</th><th>Current Value</th><th>Latest Monthly Growth</th><th>Expected (Median)</th><th>Avg Monthly £</th><th>Avg Monthly %</th></tr></thead>
+    <thead><tr><th>Member</th><th>Pension</th><th>Current Value</th><th>Latest Monthly Growth</th><th>Expected (Median)</th><th>Avg Monthly £</th><th>Median Monthly %</th></tr></thead>
     <tbody><tr><td colspan="7">Crunching…</td></tr></tbody>
   </table>
 
@@ -128,19 +128,9 @@
       }
       const medAmt = diffs.length ? median(diffs) : 0;
       const avgAmt = diffs.length ? diffs.reduce((a, b) => a + b, 0) / diffs.length : 0;
-      // Geometric mean of monthly returns = true average monthly growth rate.
-      // Compound the (1 + p/100) factors, then take the n-th root. Falls back to the
-      // arithmetic mean only if a factor is non-positive (pot fell by ≥100% in a month),
-      // where the geometric mean is undefined.
-      let avgPct;
-      if (!pcts.length) {
-        avgPct = 0;
-      } else if (pcts.some(p => 1 + p / 100 <= 0)) {
-        avgPct = pcts.reduce((a, b) => a + b, 0) / pcts.length;
-      } else {
-        const factor = pcts.reduce((acc, p) => acc * (1 + p / 100), 1);
-        avgPct = (Math.pow(factor, 1 / pcts.length) - 1) * 100;
-      }
+      // Median monthly % — spike-resistant (a one-off month, e.g. a market jump,
+      // can't drag it), matching the median approach used for the amount column.
+      const avgPct = pcts.length ? median(pcts) : 0;
       eTot += medAmt; if (member === 'Graham') eG += medAmt; if (member === 'Julie') eJ += medAmt;
       const cls = v => v >= 0 ? 'pos-growth' : 'neg-growth';
       html += `<tr><td>${member}</td><td>${name}</td><td style="font-weight:bold;">${fmt(Number(logs[logs.length - 1].pot_value))}</td>
