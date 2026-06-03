@@ -145,6 +145,7 @@
     // payments are an extra outgoing for term_months. Tracked per month for charting.
     const cashCfg = data.cashSavings || {};
     const cashMonthly = Number(cashCfg.monthly_amount) || 0;
+    const cashContribGrowth = (cashCfg.contribution_growth_rate != null) ? Number(cashCfg.contribution_growth_rate) : 0.025;  // annual escalation of the saving
     const cashGrowthM = Math.pow(1 + (Number(cashCfg.growth_rate) || 0), 1 / 12);
     let cashBal = Number(cashCfg.start_balance) || 0;
     // precompute purchases: month index of deposit, the deposit, and the monthly payment over its term
@@ -276,9 +277,10 @@
       const diningM = dining.reduce((s, d) => s + (Number(d.annual_total) || 0) * (d.spend_reduction ? spendRed : 1.0) * taperFor(d, oldest), 0) / 12 * inflFactor;
 
       // ---- Cash pot for THIS month ----
-      // 1) add this month's saving, then 2) grow the pot.
+      // 1) add this month's saving (escalated annually), then 2) grow the pot.
       const cashOpen = cashBal;
-      cashBal = (cashBal + cashMonthly) * cashGrowthM;
+      const cashSaveThis = cashMonthly * Math.pow(1 + cashContribGrowth, Math.floor(elapsed));
+      cashBal = (cashBal + cashSaveThis) * cashGrowthM;
       // 3) any purchase deposits dated this month come out of the pot; shortfall spills to drawdown.
       // 4) sum finance payments for any purchase whose term is active this month.
       let depositThisMonth = 0, financeThisMonth = 0, depositShortfall = 0;

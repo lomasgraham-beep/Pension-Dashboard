@@ -5,7 +5,7 @@
 <title>Cash &amp; Purchases</title>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=err13"></script>
+<script src="common.js?v=err14"></script>
 <style>
   :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
@@ -60,7 +60,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v4)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v5)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
 
   <div class="bar">
@@ -77,7 +77,8 @@
   <div class="settings">
     <div class="fld"><label>Starting balance at retirement (£)</label><input type="number" id="s_start" step="1" value="0" oninput="mark()"></div>
     <div class="fld"><label>Monthly saving (£)</label><input type="number" id="s_monthly" step="1" value="0" oninput="mark()"></div>
-    <div class="fld"><label>Annual growth rate (%)</label><input type="number" id="s_growth" step="0.1" value="3" oninput="mark()"></div>
+    <div class="fld"><label>Balance growth rate (%)</label><input type="number" id="s_growth" step="0.1" value="3" oninput="mark()"></div>
+    <div class="fld"><label>Saving increase / yr (%)</label><input type="number" id="s_contribgrowth" step="0.1" value="2.5" oninput="mark()"></div>
   </div>
 
   <h3>Purchases <button class="btn btn-add" style="font-size:13px; padding:8px 14px; margin-left:8px;" onclick="addRow()">+ Add purchase</button></h3>
@@ -157,7 +158,7 @@
     for (const p of purchases) if (!p.purchase_name) { msg.style.color = '#c0392b'; msg.textContent = 'Every purchase needs a name.'; return; }
     try {
       // settings: single row — update if exists, else insert
-      const sPayload = { monthly_amount: num(document.getElementById('s_monthly').value), growth_rate: num(document.getElementById('s_growth').value) / 100, start_balance: num(document.getElementById('s_start').value) };
+      const sPayload = { monthly_amount: num(document.getElementById('s_monthly').value), growth_rate: num(document.getElementById('s_growth').value) / 100, start_balance: num(document.getElementById('s_start').value), contribution_growth_rate: num(document.getElementById('s_contribgrowth').value) / 100 };
       if (settingsRow && settingsRow.id != null) await App.write('PATCH', 'bd_cash_savings?id=eq.' + settingsRow.id, sPayload);
       else await App.write('POST', 'bd_cash_savings', sPayload);
       // purchases
@@ -187,6 +188,7 @@
       document.getElementById('s_start').value = settingsRow ? (settingsRow.start_balance || 0) : 0;
       document.getElementById('s_monthly').value = settingsRow ? (settingsRow.monthly_amount || 0) : 0;
       document.getElementById('s_growth').value = settingsRow ? ((settingsRow.growth_rate || 0) * 100) : 3;
+      document.getElementById('s_contribgrowth').value = settingsRow && settingsRow.contribution_growth_rate != null ? (settingsRow.contribution_growth_rate * 100) : 2.5;
       purchases = pRows || [];
       // timeline: retirement date -> latest end-of-life
       retireDate = (mRows && mRows[0] && mRows[0].retirement_date) ? new Date(mRows[0].retirement_date) : null;
@@ -210,6 +212,7 @@
     const monthlyAmt = num(document.getElementById('s_monthly').value);
     const startBal = num(document.getElementById('s_start').value);
     const growthM = Math.pow(1 + num(document.getElementById('s_growth').value)/100, 1/12);
+    const contribGrowth = num(document.getElementById('s_contribgrowth').value)/100;   // annual escalation of the saving
     if (!retireDate || endMonthIdx == null || (startBal === 0 && monthlyAmt === 0 && !purchases.length)) {
       box.style.display = 'none'; hint.style.display = 'none'; return;
     }
@@ -229,7 +232,9 @@
 
     let bal = startBal;
     for (let idx = startIdx; idx <= endMonthIdx; idx++) {
-      bal = (bal + monthlyAmt) * growthM;          // saving first, then growth
+      const yrsIn = Math.floor((idx - startIdx) / 12);                 // whole years since retirement
+      const thisMonthly = monthlyAmt * Math.pow(1 + contribGrowth, yrsIn);
+      bal = (bal + thisMonthly) * growthM;          // escalated saving first, then growth
       let depThis = 0, names = [];
       deps.forEach(d => { if (d.idx === idx) { depThis += d.deposit; names.push(d.name); } });
       if (depThis > 0) bal -= Math.min(depThis, bal);
