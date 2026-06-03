@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cash &amp; Purchases</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=err10"></script>
+<script src="common.js?v=err11"></script>
 <style>
   :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
@@ -35,14 +35,30 @@
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
   .table-wrap { overflow-x:auto; }
   @media (max-width: 600px) {
-    .settings { grid-template-columns:1fr 1fr; gap:10px; padding:12px; }
-    table { font-size:12px; } th,td { padding:6px 8px 6px 0; } th { max-width:60px; font-size:11px; }
+    body { padding:12px; }
+    /* savings: all three on one line, compact */
+    .settings { grid-template-columns:1fr 1fr 1fr; gap:8px; padding:12px; max-width:none; }
+    .settings .fld label { font-size:10px; letter-spacing:0; }
+    .settings .fld input { padding:8px 6px; font-size:14px; }
+
+    /* purchases: reflow the table into a card per purchase */
+    #pTbl thead { display:none; }
+    #pTbl, #pTbl tbody, #pTbl tr, #pTbl td { display:block; width:auto; }
+    #pTbl tr { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:12px; background:var(--surface-2); }
+    #pTbl td { border:none; padding:6px 0; text-align:right; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    #pTbl td::before { content:attr(data-label); font-size:12px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; text-align:left; }
+    #pTbl td input { flex:0 0 auto; }
+    #pTbl td input[type=text] { width:150px; }
+    #pTbl td .del, #pTbl td:last-child { width:100%; }
+    #pTbl td:last-child::before { content:""; }
+    #pTbl td .del { width:100%; padding:10px; }
+    .pay-cell { font-size:15px; }
   }
 </style>
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v1)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v2)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
 
   <div class="bar">
@@ -88,13 +104,13 @@
     const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
     const pay = monthlyPayment(p.total_cost, p.deposit, p.apr, p.term_months);
     return '<tr data-i="' + i + '">' +
-      '<td><input type="text" class="f-name" value="' + esc(p.purchase_name) + '" oninput="mark()"></td>' +
-      '<td><input type="date" class="f-date" value="' + (p.purchase_date ? String(p.purchase_date).split('T')[0] : '') + '" onchange="mark()"></td>' +
-      '<td><input type="number" class="f-total" step="1" value="' + (p.total_cost != null ? p.total_cost : 0) + '" oninput="rowCalc(this)"></td>' +
-      '<td><input type="number" class="f-deposit" step="1" value="' + (p.deposit != null ? p.deposit : 0) + '" oninput="rowCalc(this)"></td>' +
-      '<td><input type="number" class="f-apr" step="0.1" value="' + (p.apr != null ? p.apr : 0) + '" oninput="rowCalc(this)"></td>' +
-      '<td><input type="number" class="f-term" step="1" value="' + (p.term_months != null ? p.term_months : 0) + '" oninput="rowCalc(this)"></td>' +
-      '<td class="pay-cell">' + fmt(pay) + '</td>' +
+      '<td data-label="Name"><input type="text" class="f-name" value="' + esc(p.purchase_name) + '" oninput="mark()"></td>' +
+      '<td data-label="Date"><input type="date" class="f-date" value="' + (p.purchase_date ? String(p.purchase_date).split('T')[0] : '') + '" onchange="mark()"></td>' +
+      '<td data-label="Total Cost"><input type="number" class="f-total" step="1" value="' + (p.total_cost != null ? p.total_cost : 0) + '" oninput="rowCalc(this)"></td>' +
+      '<td data-label="Deposit"><input type="number" class="f-deposit" step="1" value="' + (p.deposit != null ? p.deposit : 0) + '" oninput="rowCalc(this)"></td>' +
+      '<td data-label="APR %"><input type="number" class="f-apr" step="0.1" value="' + (p.apr != null ? p.apr : 0) + '" oninput="rowCalc(this)"></td>' +
+      '<td data-label="Term Months"><input type="number" class="f-term" step="1" value="' + (p.term_months != null ? p.term_months : 0) + '" oninput="rowCalc(this)"></td>' +
+      '<td data-label="Monthly Payment" class="pay-cell">' + fmt(pay) + '</td>' +
       '<td><button class="del" onclick="delRow(this)">Delete</button></td></tr>';
   }
   function render() {
