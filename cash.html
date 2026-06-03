@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cash &amp; Purchases</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err10"></script>
+<style>
+  :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
+  h2 { color:var(--ink); margin:0 0 4px; }
+  h3 { color:var(--ink); margin:26px 0 8px; padding-bottom:5px; border-bottom:2px solid var(--line); }
+  .note { color:var(--ink-soft); font-size:13px; margin:0 0 14px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  .btn { border:none; border-radius:8px; font-weight:bold; font-size:14px; cursor:pointer; padding:11px 18px; color:#fff; }
+  .btn-save { background:var(--accent); } .btn-save:hover { background:var(--accent-dark); }
+  .btn-reload { background:#64748b; } .btn-add { background:#475569; }
+  .unsaved { display:none; background:#fef3c7; color:#92400e; font-weight:bold; font-size:13px; padding:6px 12px; border-radius:6px; }
+  .msg { font-weight:bold; font-size:14px; }
+  .settings { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; max-width:680px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .fld label { display:block; font-size:12px; font-weight:bold; color:var(--ink-soft); margin-bottom:5px; text-transform:uppercase; letter-spacing:0.03em; }
+  .fld input { width:100%; padding:11px; border:1px solid var(--line-strong); border-radius:6px; font-size:16px; box-sizing:border-box; text-align:right; }
+  table { width:auto; border-collapse:collapse; font-size:14px; margin-top:6px; }
+  th,td { padding:8px 14px 8px 8px; border-bottom:1px solid var(--line); text-align:right; }
+  th { background:var(--surface-2); color:var(--ink); font-size:12px; text-transform:uppercase; letter-spacing:0.03em; white-space:normal; text-align:center; vertical-align:bottom; line-height:1.2; max-width:84px; }
+  td { white-space:nowrap; }
+  th:first-child, td:first-child { text-align:left; }
+  td input { padding:8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px; box-sizing:border-box; }
+  td input[type=text] { width:130px; text-align:left; }
+  td input[type=date] { width:140px; }
+  td input[type=number] { width:84px; text-align:right; }
+  .pay-cell { font-weight:bold; color:var(--accent-dark); }
+  .del { background:#fdecea; color:#c0392b; border:none; border-radius:6px; padding:7px 11px; font-weight:bold; cursor:pointer; }
+  #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
+  .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
+  .table-wrap { overflow-x:auto; }
+  @media (max-width: 600px) {
+    .settings { grid-template-columns:1fr 1fr; gap:10px; padding:12px; }
+    table { font-size:12px; } th,td { padding:6px 8px 6px 0; } th { max-width:60px; font-size:11px; }
+  }
+</style>
+</head>
+<body>
+  <div id="status" class="s-load">Loading&hellip;</div>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v1)</span></h2>
+  <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
+
+  <div class="bar">
+    <button class="btn btn-save" onclick="saveAll()">Save changes</button>
+    <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
+    <span class="unsaved" id="unsaved">&#9679; Unsaved changes</span>
+    <span class="msg" id="msg"></span>
+  </div>
+
+  <h3>Savings</h3>
+  <div class="settings">
+    <div class="fld"><label>Starting balance at retirement (£)</label><input type="number" id="s_start" step="1" value="0" oninput="mark()"></div>
+    <div class="fld"><label>Monthly saving (£)</label><input type="number" id="s_monthly" step="1" value="0" oninput="mark()"></div>
+    <div class="fld"><label>Annual growth rate (%)</label><input type="number" id="s_growth" step="0.1" value="3" oninput="mark()"></div>
+  </div>
+
+  <h3>Purchases <button class="btn btn-add" style="font-size:13px; padding:8px 14px; margin-left:8px;" onclick="addRow()">+ Add purchase</button></h3>
+  <div class="table-wrap">
+    <table id="pTbl">
+      <thead><tr><th>Name</th><th>Date</th><th>Total Cost</th><th>Deposit</th><th>APR %</th><th>Term Months</th><th>Monthly Payment</th><th></th></tr></thead>
+      <tbody><tr><td colspan="8">Loading&hellip;</td></tr></tbody>
+    </table>
+  </div>
+
+<script>
+  const fmt = App.fmt;
+  let settingsRow = null, purchases = [], dirty = false, deleted = [];
+  const tbody = document.querySelector('#pTbl tbody');
+  const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
+  function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+  // Standard amortising monthly payment: financed = total - deposit; at APR over term months.
+  function monthlyPayment(total, deposit, aprPct, term) {
+    const financed = Math.max(0, num(total) - num(deposit));
+    const n = Math.round(num(term));
+    if (n <= 0) return 0;
+    const r = num(aprPct) / 100 / 12;
+    if (r === 0) return financed / n;
+    return financed * r / (1 - Math.pow(1 + r, -n));
+  }
+
+  function rowHtml(p, i) {
+    const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
+    const pay = monthlyPayment(p.total_cost, p.deposit, p.apr, p.term_months);
+    return '<tr data-i="' + i + '">' +
+      '<td><input type="text" class="f-name" value="' + esc(p.purchase_name) + '" oninput="mark()"></td>' +
+      '<td><input type="date" class="f-date" value="' + (p.purchase_date ? String(p.purchase_date).split('T')[0] : '') + '" onchange="mark()"></td>' +
+      '<td><input type="number" class="f-total" step="1" value="' + (p.total_cost != null ? p.total_cost : 0) + '" oninput="rowCalc(this)"></td>' +
+      '<td><input type="number" class="f-deposit" step="1" value="' + (p.deposit != null ? p.deposit : 0) + '" oninput="rowCalc(this)"></td>' +
+      '<td><input type="number" class="f-apr" step="0.1" value="' + (p.apr != null ? p.apr : 0) + '" oninput="rowCalc(this)"></td>' +
+      '<td><input type="number" class="f-term" step="1" value="' + (p.term_months != null ? p.term_months : 0) + '" oninput="rowCalc(this)"></td>' +
+      '<td class="pay-cell">' + fmt(pay) + '</td>' +
+      '<td><button class="del" onclick="delRow(this)">Delete</button></td></tr>';
+  }
+  function render() {
+    tbody.innerHTML = purchases.length ? purchases.map(rowHtml).join('') : '<tr><td colspan="8">No purchases. Use \u201cAdd purchase\u201d.</td></tr>';
+  }
+  function mark() { syncDom(); setDirty(); }
+  function rowCalc(el) {
+    const tr = el.closest('tr');
+    const pay = monthlyPayment(tr.querySelector('.f-total').value, tr.querySelector('.f-deposit').value, tr.querySelector('.f-apr').value, tr.querySelector('.f-term').value);
+    tr.querySelector('.pay-cell').textContent = fmt(pay);
+    mark();
+  }
+  function syncDom() {
+    tbody.querySelectorAll('tr[data-i]').forEach(tr => {
+      const i = Number(tr.dataset.i); if (!purchases[i]) return;
+      purchases[i].purchase_name = tr.querySelector('.f-name').value.trim();
+      purchases[i].purchase_date = tr.querySelector('.f-date').value || null;
+      purchases[i].total_cost = num(tr.querySelector('.f-total').value);
+      purchases[i].deposit = num(tr.querySelector('.f-deposit').value);
+      purchases[i].apr = num(tr.querySelector('.f-apr').value);
+      purchases[i].term_months = Math.round(num(tr.querySelector('.f-term').value));
+    });
+  }
+  function addRow() {
+    syncDom();
+    purchases.push({ id: undefined, purchase_name: '', purchase_date: null, total_cost: 0, deposit: 0, apr: 0, term_months: 0 });
+    render(); setDirty();
+  }
+  function delRow(btn) {
+    syncDom();
+    const tr = btn.closest('tr'); const i = Number(tr.dataset.i); const p = purchases[i];
+    if (p && p.id != null) deleted.push(p.id);
+    purchases.splice(i, 1); render(); setDirty();
+  }
+
+  async function saveAll() {
+    const msg = document.getElementById('msg'); msg.style.color = '#1e3a8a'; msg.textContent = 'Saving\u2026';
+    syncDom();
+    for (const p of purchases) if (!p.purchase_name) { msg.style.color = '#c0392b'; msg.textContent = 'Every purchase needs a name.'; return; }
+    try {
+      // settings: single row — update if exists, else insert
+      const sPayload = { monthly_amount: num(document.getElementById('s_monthly').value), growth_rate: num(document.getElementById('s_growth').value) / 100, start_balance: num(document.getElementById('s_start').value) };
+      if (settingsRow && settingsRow.id != null) await App.write('PATCH', 'bd_cash_savings?id=eq.' + settingsRow.id, sPayload);
+      else await App.write('POST', 'bd_cash_savings', sPayload);
+      // purchases
+      for (const id of deleted) await App.write('DELETE', 'bd_purchases?id=eq.' + id, undefined);
+      for (const p of purchases) {
+        const payload = { purchase_name: p.purchase_name, purchase_date: p.purchase_date, total_cost: p.total_cost, deposit: p.deposit, apr: p.apr, term_months: p.term_months };
+        if (p.id != null) await App.write('PATCH', 'bd_purchases?id=eq.' + p.id, payload);
+        else await App.write('POST', 'bd_purchases', payload);
+      }
+      deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
+      msg.style.color = '#065f46'; msg.textContent = '\u2713 Saved. Reopen the dashboard to update projections.';
+      await reload(true);
+    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
+  }
+
+  async function reload(quiet) {
+    if (!quiet && dirty && !confirm('Discard unsaved changes and reload?')) return;
+    const status = document.getElementById('status');
+    try {
+      const [sRows, pRows] = await Promise.all([
+        App.rest('bd_cash_savings?limit=1'),
+        App.rest('bd_purchases?order=purchase_date.asc')
+      ]);
+      settingsRow = sRows && sRows[0] ? sRows[0] : null;
+      document.getElementById('s_start').value = settingsRow ? (settingsRow.start_balance || 0) : 0;
+      document.getElementById('s_monthly').value = settingsRow ? (settingsRow.monthly_amount || 0) : 0;
+      document.getElementById('s_growth').value = settingsRow ? ((settingsRow.growth_rate || 0) * 100) : 3;
+      purchases = pRows || [];
+      deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
+      render(); status.style.display = 'none';
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+  App.requireLogin(() => reload(true), { title: 'Cash & Purchases' });
+</script>
+</body>
+</html>
