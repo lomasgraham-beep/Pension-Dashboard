@@ -203,6 +203,7 @@
     <option value="Forecast">Monthly Forecast</option>
     <option value="Modelling">Modelling</option>
     <option value="Cash">Cash &amp; Purchases</option>
+    <option value="Crashes">Market Crashes</option>
     <option value="Retirement">Retirement</option>
     <option value="Logs">Log Entry</option>
     <option value="LivingCosts">Living Costs</option>
@@ -215,6 +216,7 @@
     <button class="tab-link" onclick="showTab(event,'Forecast')">Monthly Forecast</button>
     <button class="tab-link" onclick="showTab(event,'Modelling')">Modelling</button>
     <button class="tab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+    <button class="tab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
     <button class="tab-link" onclick="showTab(event,'Retirement')">Retirement</button>
     <button class="tab-link" onclick="showTab(event,'Logs')">Log Entry</button>
     <button class="tab-link" onclick="showTab(event,'LivingCosts')">Living Costs</button>
@@ -240,6 +242,7 @@
   </div>
 
   <div id="Cash" class="tabcontent"><iframe id="frame-Cash" class="app-frame" title="Cash and Purchases"></iframe></div>
+  <div id="Crashes" class="tabcontent"><iframe id="frame-Crashes" class="app-frame" title="Market Crashes"></iframe></div>
 
   <div id="Modelling" class="tabcontent">
     <div class="params">
@@ -328,7 +331,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-43</span>
+    <span class="build-stamp">build: LC-44</span>
   </div>
 
   <script>
@@ -620,7 +623,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err16';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err17';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
@@ -666,6 +669,7 @@
       const title = document.getElementById('appTitle'); if (title) title.style.display = (id === 'Overview') ? '' : 'none';
       if (id === 'Modelling') setTimeout(drawCharts, 40);
       if (id === 'Cash') ensureFrame('frame-Cash', 'cash.html' + FV);
+      if (id === 'Crashes') ensureFrame('frame-Crashes', 'crashes.html' + FV);
       if (id === 'KPIs') { ensureFrame('frame-kpis', 'kpis.html' + FV); pingFrame('frame-kpis'); }
       if (id === 'Forecast') { ensureFrame('frame-forecast', 'forecast.html' + FV); pingFrame('frame-forecast'); }
       if (id === 'Logs') ensureFrame('frame-logs', 'logs.html' + FV);

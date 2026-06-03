@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Crashes</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err17"></script>
+<style>
+  :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
+  h2 { color:var(--ink); margin:0 0 4px; }
+  h3 { color:var(--ink); margin:22px 0 8px; }
+  .note { color:var(--ink-soft); font-size:13px; margin:0 0 14px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  .btn { border:none; border-radius:8px; font-weight:bold; font-size:14px; cursor:pointer; padding:11px 18px; color:#fff; }
+  .btn-save { background:var(--accent); } .btn-save:hover { background:var(--accent-dark); }
+  .btn-reload { background:#64748b; } .btn-add { background:#475569; }
+  .unsaved { display:none; background:#fef3c7; color:#92400e; font-weight:bold; font-size:13px; padding:6px 12px; border-radius:6px; }
+  .msg { font-weight:bold; font-size:14px; }
+  table { width:auto; border-collapse:collapse; font-size:14px; margin-top:6px; }
+  th,td { padding:8px 14px 8px 8px; border-bottom:1px solid var(--line); text-align:right; }
+  th { background:var(--surface-2); color:var(--ink); font-size:12px; text-transform:uppercase; letter-spacing:0.03em; white-space:normal; text-align:center; vertical-align:bottom; line-height:1.2; max-width:90px; }
+  td { white-space:nowrap; }
+  th:first-child, td:first-child { text-align:left; }
+  td input { padding:8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px; box-sizing:border-box; }
+  td input[type=text] { width:150px; text-align:left; }
+  td input[type=date] { width:150px; }
+  td input[type=number] { width:80px; text-align:right; }
+  .del { background:#fdecea; color:#c0392b; border:none; border-radius:6px; padding:7px 11px; font-weight:bold; cursor:pointer; }
+  #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
+  .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
+  .table-wrap { overflow-x:auto; }
+  @media (max-width: 600px) {
+    body { padding:12px; }
+    #cTbl thead { display:none; }
+    #cTbl, #cTbl tbody, #cTbl tr, #cTbl td { display:block; width:auto; }
+    #cTbl tr { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:12px; background:var(--surface-2); }
+    #cTbl td { border:none; padding:6px 0; text-align:right; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    #cTbl td::before { content:attr(data-label); font-size:12px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; text-align:left; }
+    #cTbl td input[type=text], #cTbl td input[type=date] { width:160px; }
+    #cTbl td:last-child::before { content:""; }
+    #cTbl td .del { width:100%; padding:10px; }
+  }
+</style>
+</head>
+<body>
+  <div id="status" class="s-load">Loading&hellip;</div>
+  <h2>Market Crashes <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(crashes build: v1)</span></h2>
+  <p class="note">Model downturns in the Pru smoothed fund. Each crash drops the combined pots by the fall %, reaching the low after the &ldquo;months to trough&rdquo;, then climbs back to the pre-crash value over the recovery months. Because Aegon transfers to Pru at retirement, one smoothed behaviour covers both pots. Defaults reflect PruFund&rsquo;s gentler, smoothed falls.</p>
+
+  <div class="bar">
+    <button class="btn btn-save" onclick="saveAll()">Save changes</button>
+    <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
+    <button class="btn btn-add" onclick="addRow()">+ Add crash</button>
+    <span class="unsaved" id="unsaved">&#9679; Unsaved changes</span>
+    <span class="msg" id="msg"></span>
+  </div>
+
+  <div class="table-wrap">
+    <table id="cTbl">
+      <thead><tr><th>Crash Name</th><th>Start Date</th><th>Fall %</th><th>Months to Trough</th><th>Recovery Months</th><th></th></tr></thead>
+      <tbody><tr><td colspan="6">Loading&hellip;</td></tr></tbody>
+    </table>
+  </div>
+
+<script>
+  const fmt = App.fmt;
+  let crashes = [], dirty = false, deleted = [];
+  const tbody = document.querySelector('#cTbl tbody');
+  const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
+  function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+  function rowHtml(c, i) {
+    const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
+    return '<tr data-i="' + i + '">' +
+      '<td data-label="Crash Name"><input type="text" class="f-name" value="' + esc(c.crash_name) + '" oninput="mark()"></td>' +
+      '<td data-label="Start Date"><input type="date" class="f-date" value="' + (c.start_date ? String(c.start_date).split('T')[0] : '') + '" onchange="mark()"></td>' +
+      '<td data-label="Fall %"><input type="number" class="f-fall" step="0.5" value="' + (c.fall_pct != null ? c.fall_pct : 15) + '" oninput="mark()"></td>' +
+      '<td data-label="Months to Trough"><input type="number" class="f-fmonths" step="1" value="' + (c.fall_months != null ? c.fall_months : 9) + '" oninput="mark()"></td>' +
+      '<td data-label="Recovery Months"><input type="number" class="f-rmonths" step="1" value="' + (c.recovery_months != null ? c.recovery_months : 18) + '" oninput="mark()"></td>' +
+      '<td><button class="del" onclick="delRow(this)">Delete</button></td></tr>';
+  }
+  function render() {
+    tbody.innerHTML = crashes.length ? crashes.map(rowHtml).join('') : '<tr><td colspan="6">No crashes modelled. Use \u201cAdd crash\u201d.</td></tr>';
+  }
+  function mark() { syncDom(); setDirty(); }
+  function syncDom() {
+    tbody.querySelectorAll('tr[data-i]').forEach(tr => {
+      const i = Number(tr.dataset.i); if (!crashes[i]) return;
+      crashes[i].crash_name = tr.querySelector('.f-name').value.trim();
+      crashes[i].start_date = tr.querySelector('.f-date').value || null;
+      crashes[i].fall_pct = num(tr.querySelector('.f-fall').value);
+      crashes[i].fall_months = Math.round(num(tr.querySelector('.f-fmonths').value));
+      crashes[i].recovery_months = Math.round(num(tr.querySelector('.f-rmonths').value));
+    });
+  }
+  function addRow() {
+    syncDom();
+    crashes.push({ id: undefined, crash_name: '', start_date: null, fall_pct: 15, fall_months: 9, recovery_months: 18 });
+    render(); setDirty();
+  }
+  function delRow(btn) {
+    syncDom();
+    const tr = btn.closest('tr'); const i = Number(tr.dataset.i); const c = crashes[i];
+    if (c && c.id != null) deleted.push(c.id);
+    crashes.splice(i, 1); render(); setDirty();
+  }
+
+  async function saveAll() {
+    const msg = document.getElementById('msg'); msg.style.color = '#1e3a8a'; msg.textContent = 'Saving\u2026';
+    syncDom();
+    for (const c of crashes) if (!c.crash_name) { msg.style.color = '#c0392b'; msg.textContent = 'Every crash needs a name.'; return; }
+    try {
+      for (const id of deleted) await App.write('DELETE', 'bd_market_crashes?id=eq.' + id, undefined);
+      for (const c of crashes) {
+        const payload = { crash_name: c.crash_name, start_date: c.start_date, fall_pct: c.fall_pct, fall_months: c.fall_months, recovery_months: c.recovery_months };
+        if (c.id != null) await App.write('PATCH', 'bd_market_crashes?id=eq.' + c.id, payload);
+        else await App.write('POST', 'bd_market_crashes', payload);
+      }
+      deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
+      msg.style.color = '#065f46'; msg.textContent = '\u2713 Saved. Reopen the dashboard to update projections.';
+      await reload(true);
+    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
+  }
+
+  async function reload(quiet) {
+    if (!quiet && dirty && !confirm('Discard unsaved changes and reload?')) return;
+    const status = document.getElementById('status');
+    try {
+      crashes = await App.rest('bd_market_crashes?order=start_date.asc') || [];
+      deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
+      render(); status.style.display = 'none';
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+  App.requireLogin(() => reload(true), { title: 'Market Crashes' });
+</script>
+</body>
+</html>
