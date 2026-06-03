@@ -170,6 +170,7 @@
 
     // Monthly guaranteed income for one person, by actual start month.
     function grossMonth(who, idx, elapsed) {
+      const elapsedYrs = Math.floor(elapsed);   // annual step: flat within each year since retirement
       let stateGross = 0, otherGross = 0;
       guaranteed.filter(g => g.member_name === who).forEach(g => {
         if (!g.start_date) return;
@@ -181,12 +182,12 @@
         if (g.end_date) { const ed = new Date(g.end_date); eIdx = ed.getFullYear() * 12 + ed.getMonth(); }
         if (idx < sIdx || idx > eIdx) return;
         if (isState) {
-          // stored as TODAY'S value → grow from now to this month (pre-retirement span + elapsed)
-          const monthly = (Number(g.initial_annual_value) || 0) / 12 * Math.pow(1 + sp.spRate, preRetireYears + elapsed);
+          // stored as TODAY'S value → grow from now to this month (pre-retirement span + whole years since)
+          const monthly = (Number(g.initial_annual_value) || 0) / 12 * Math.pow(1 + sp.spRate, Math.floor(preRetireYears + elapsed));
           stateGross += monthly;
         } else {
-          // stored as value at retirement → grow only across years since retirement
-          const monthly = (Number(g.initial_annual_value) || 0) / 12 * Math.pow(1 + INFL, elapsed);
+          // stored as value at retirement → grow only across whole years since retirement
+          const monthly = (Number(g.initial_annual_value) || 0) / 12 * Math.pow(1 + INFL, elapsedYrs);
           otherGross += monthly;
         }
       });
@@ -270,7 +271,7 @@
         };
       }
 
-      const inflFactor = Math.pow(1 + INFL, elapsed);
+      const inflFactor = Math.pow(1 + INFL, Math.floor(elapsed));   // annual step: flat within each year since retirement
       const billsM = bills.reduce((s, b) => s + (Number(b.total_annual) || 0) * (b.spend_reduction ? spendRed : 1.0) * taperFor(b, oldest), 0) / 12 * inflFactor;
       const diningM = dining.reduce((s, d) => s + (Number(d.annual_total) || 0) * (d.spend_reduction ? spendRed : 1.0) * taperFor(d, oldest), 0) / 12 * inflFactor;
 
