@@ -139,6 +139,27 @@
     let gTf = cfg.pots.graham * 0.25, gTx = cfg.pots.graham * 0.75;
     let jTf = cfg.pots.julie * 0.25,  jTx = cfg.pots.julie * 0.75;
 
+    // ---- Cash savings pot (separate from pensions) ----
+    // Seeds at start_balance at retirement; each month adds the saving then grows;
+    // purchase deposits come out of it (shortfall spills to drawdown); finance
+    // payments are an extra outgoing for term_months. Tracked per month for charting.
+    const cashCfg = data.cashSavings || {};
+    const cashMonthly = Number(cashCfg.monthly_amount) || 0;
+    const cashGrowthM = Math.pow(1 + (Number(cashCfg.growth_rate) || 0), 1 / 12);
+    let cashBal = Number(cashCfg.start_balance) || 0;
+    // precompute purchases: month index of deposit, the deposit, and the monthly payment over its term
+    const purchases = (data.purchases || []).map(p => {
+      const d = p.purchase_date ? new Date(p.purchase_date) : null;
+      const pIdx = d ? d.getFullYear() * 12 + d.getMonth() : null;
+      const total = Number(p.total_cost) || 0, deposit = Number(p.deposit) || 0;
+      const term = Math.round(Number(p.term_months) || 0);
+      const financed = Math.max(0, total - deposit);
+      const r = (Number(p.apr) || 0) / 100 / 12;
+      let pay = 0;
+      if (term > 0) pay = (r === 0) ? financed / term : financed * r / (1 - Math.pow(1 + r, -term));
+      return { name: p.purchase_name, pIdx: pIdx, deposit: deposit, pay: pay, term: term };
+    }).filter(p => p.pIdx != null);
+
     const taperFor = (row, oldest) => {
       if (oldest >= 90) return row.taper_at_90 != null ? Number(row.taper_at_90) : 1.0;
       if (oldest >= 80) return row.taper_at_80 != null ? Number(row.taper_at_80) : 1.0;
@@ -244,14 +265,35 @@
           g_taxFree: gTf, g_taxable: gTx, j_taxFree: jTf, j_taxable: jTx,
           stateGross: 0, otherPensions: 0, drawdown: 0,
           g_other: 0, j_other: 0, g_draw: 0, j_draw: 0, g_income: 0, j_income: 0, totalIncome: 0,
-          combinedClosing: 0, g_closing: 0, j_closing: 0, shortfall: false
+          combinedClosing: 0, g_closing: 0, j_closing: 0, shortfall: false,
+          cashBalance: 0, cashFinance: 0, cashDeposit: 0, cashShortfall: 0
         };
       }
 
       const inflFactor = Math.pow(1 + INFL, elapsed);
       const billsM = bills.reduce((s, b) => s + (Number(b.total_annual) || 0) * (b.spend_reduction ? spendRed : 1.0) * taperFor(b, oldest), 0) / 12 * inflFactor;
       const diningM = dining.reduce((s, d) => s + (Number(d.annual_total) || 0) * (d.spend_reduction ? spendRed : 1.0) * taperFor(d, oldest), 0) / 12 * inflFactor;
-      const outM = billsM + diningM;
+
+      // ---- Cash pot for THIS month ----
+      // 1) add this month's saving, then 2) grow the pot.
+      const cashOpen = cashBal;
+      cashBal = (cashBal + cashMonthly) * cashGrowthM;
+      // 3) any purchase deposits dated this month come out of the pot; shortfall spills to drawdown.
+      // 4) sum finance payments for any purchase whose term is active this month.
+      let depositThisMonth = 0, financeThisMonth = 0, depositShortfall = 0;
+      for (const p of purchases) {
+        if (p.pIdx === idx) depositThisMonth += p.deposit;
+        if (idx >= p.pIdx && idx < p.pIdx + p.term) financeThisMonth += p.pay;
+      }
+      if (depositThisMonth > 0) {
+        const fromCash = Math.min(depositThisMonth, cashBal);
+        cashBal -= fromCash;
+        depositShortfall = depositThisMonth - fromCash;   // covered by pension drawdown this month
+      }
+
+      // finance payments + any deposit shortfall are extra outgoings the drawdown must cover
+      const cashOutM = financeThisMonth + depositShortfall;
+      const outM = billsM + diningM + cashOutM;
       const gTargetM = outM * gRatio, jTargetM = outM * jRatio;
 
       // opening pots for THIS month (before drawdown)
@@ -294,7 +336,8 @@
         g_income: gRes.inc.total + gDraw, j_income: jRes.inc.total + jDraw,
         totalIncome: mOther + gDraw + jDraw,
         combinedClosing: gTf + gTx + jTf + jTx, g_closing: gTf + gTx, j_closing: jTf + jTx,
-        shortfall: monthShort
+        shortfall: monthShort,
+        cashBalance: cashBal, cashFinance: financeThisMonth, cashDeposit: depositThisMonth, cashShortfall: depositShortfall
       });
 
       acc.outgoings += outM; acc.billsTotal += billsM; acc.diningTotal += diningM;
@@ -307,6 +350,10 @@
       acc.totalIncome += gRes.inc.total + jRes.inc.total + gDraw + jDraw;
       acc.combinedClosing = gTf + gTx + jTf + jTx;
       acc.g_closing = gTf + gTx; acc.j_closing = jTf + jTx;
+      acc.cashBalance = cashBal;                     // year-end balance (last month wins)
+      acc.cashFinance += financeThisMonth;
+      acc.cashDeposit += depositThisMonth;
+      acc.cashShortfall += depositShortfall;
       if (monthShort) acc.shortfall = true;
     }
     flush();

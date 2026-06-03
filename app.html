@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=err2"></script>
-  <script src="engine.js?v=style9"></script>
+  <script src="engine.js?v=cash1"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -328,7 +328,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-36</span>
+    <span class="build-stamp">build: LC-37</span>
   </div>
 
   <script>
@@ -679,12 +679,14 @@
     async function loadEverything() {
       const status = document.getElementById('status');
       try {
-        const [members, bills, dining, guaranteed, pensions, contributions, logs] = await Promise.all([
+        const [members, bills, dining, guaranteed, pensions, contributions, logs, cashRows, purchases] = await Promise.all([
           App.rest('bd_members'), App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
           App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
-          App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc')
+          App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
+          App.rest('bd_cash_savings?limit=1'), App.rest('bd_purchases?order=purchase_date.asc')
         ]);
-        data = { members, bills, dining, guaranteed, pensions, contributions, logs };
+        data = { members, bills, dining, guaranteed, pensions, contributions, logs,
+                 cashSavings: (cashRows && cashRows[0]) ? cashRows[0] : {}, purchases: purchases || [] };
 
         const pRows = await App.rest('op_modelling_parameters?member_name=eq.Graham&order=updated_at.desc&limit=1');
         const p = (pRows && pRows.length) ? pRows[0] : {};
