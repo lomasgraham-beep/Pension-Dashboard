@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cash &amp; Purchases</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=err11"></script>
+<script src="common.js?v=err12"></script>
 <style>
   :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
@@ -18,8 +18,9 @@
   .unsaved { display:none; background:#fef3c7; color:#92400e; font-weight:bold; font-size:13px; padding:6px 12px; border-radius:6px; }
   .msg { font-weight:bold; font-size:14px; }
   .settings { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; max-width:680px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:16px; }
-  .fld label { display:block; font-size:12px; font-weight:bold; color:var(--ink-soft); margin-bottom:5px; text-transform:uppercase; letter-spacing:0.03em; }
-  .fld input { width:100%; padding:11px; border:1px solid var(--line-strong); border-radius:6px; font-size:16px; box-sizing:border-box; text-align:right; }
+  .fld { display:flex; flex-direction:column; }
+  .fld label { font-size:12px; font-weight:bold; color:var(--ink-soft); margin-bottom:5px; text-transform:uppercase; letter-spacing:0.03em; min-height:2.4em; display:flex; align-items:flex-end; }
+  .fld input { width:100%; padding:11px; border:1px solid var(--line-strong); border-radius:6px; font-size:16px; box-sizing:border-box; text-align:right; margin-top:auto; }
   table { width:auto; border-collapse:collapse; font-size:14px; margin-top:6px; }
   th,td { padding:8px 14px 8px 8px; border-bottom:1px solid var(--line); text-align:right; }
   th { background:var(--surface-2); color:var(--ink); font-size:12px; text-transform:uppercase; letter-spacing:0.03em; white-space:normal; text-align:center; vertical-align:bottom; line-height:1.2; max-width:84px; }
@@ -58,7 +59,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v2)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v3)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
 
   <div class="bar">
