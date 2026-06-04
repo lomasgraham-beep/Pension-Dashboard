@@ -282,6 +282,7 @@
           <label class="switch"><input type="checkbox" id="m_savingscap" onchange="onParam()"><span class="track"></span><span class="switch-text">Cap savings — redirect extra to living costs</span>
             <button type="button" class="info-btn" onclick="toggleInfo(event,'info_cap')" aria-label="What is the savings cap feature?">i</button></label>
           <div class="info-text" id="info_cap">During a cap period (set on the Cash &amp; Purchases page), once savings reach the cap (their maximum), the monthly saving is no longer added — it's redirected to cover living costs, reducing the pension drawdown. Growth may still drift the balance slightly above the cap.</div>
+          <div id="capDiag" style="margin-top:6px; font-size:12px; color:#7c3f00; background:#fff7ed; border:1px solid #fed7aa; border-radius:6px; padding:6px 8px;">cap diagnostic loading…</div>
         </div>
       </div>
       <div class="actions">
@@ -362,7 +363,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-61</span>
+    <span class="build-stamp">build: LC-62</span>
   </div>
 
   <script>
@@ -823,11 +824,24 @@
         pots: livePots, gRatio: plan.gRatio, spendRed: plan.spendRed,
         startYear: startYr, retirementDate: plan.retirementDate,
         dynamic: plan.dynamic, gFloorPct: plan.gFloorPct, jFloorPct: plan.jFloorPct,
+        savingsCap: plan.savingsCap,
         sp: PensionEngine.baselineSP(stateNames)
       });
       renderOverview();
       renderRetirementTable();
       if (chartsReady) drawCharts();
+      // temporary diagnostic
+      try {
+        const dg = document.getElementById('capDiag');
+        if (dg) {
+          const caps = data.savingsCaps || [];
+          const totalCapDraw = drawdownRows.reduce((s, r) => s + (r.cashCapDraw || 0), 0);
+          dg.textContent = 'Diagnostic — toggle: ' + (plan.savingsCap ? 'ON' : 'OFF') +
+            ' · caps loaded: ' + caps.length +
+            (caps.length ? ' (first: £' + (caps[0].cap_value) + ', ' + (caps[0].start_date || '?') + '→' + (caps[0].end_date || '?') + ')' : '') +
+            ' · total redirected across plan: £' + Math.round(totalCapDraw);
+        }
+      } catch (e) {}
     }
 
     // ---------- embedded frames ----------
