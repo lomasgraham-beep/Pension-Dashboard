@@ -276,6 +276,12 @@
       </div>
     </div>
     <h2><span class="viewlabel">Joint</span> Projections</h2>
+    <div id="zoomBar" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px; font-size:14px; color:var(--ink-soft);">
+      <strong style="color:var(--ink);">Focus years:</strong>
+      <label>From <select id="zoomFrom" onchange="onZoom()" style="padding:6px 8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px;"></select></label>
+      <label>To <select id="zoomTo" onchange="onZoom()" style="padding:6px 8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px;"></select></label>
+      <button onclick="resetZoom()" style="padding:6px 12px; border:none; border-radius:6px; background:#64748b; color:#fff; font-weight:bold; cursor:pointer; font-size:13px;">Reset</button>
+    </div>
     <div id="potChart" class="chart-box"></div>
     <div id="incomeChart" class="chart-box"></div>
     <h3 id="crashChartHead" style="color:var(--ink); margin:18px 0 4px; display:none;">Pot Through Market Crashes</h3>
@@ -335,7 +341,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-50</span>
+    <span class="build-stamp">build: LC-51</span>
   </div>
 
   <script>
@@ -349,6 +355,37 @@
     let currentView = 'Joint';
     let retGran = 'year';     // Retirement table granularity: 'year' or 'month'
     let chartsReady = false;
+    let zoomFrom = null, zoomTo = null;   // year range for the chart focus control
+
+    // populate the From/To year dropdowns from the current projection range
+    function buildZoomOptions() {
+      if (!drawdownRows.length) return;
+      const years = drawdownRows.map(r => r.year);
+      const minY = years[0], maxY = years[years.length - 1];
+      const selF = document.getElementById('zoomFrom'), selT = document.getElementById('zoomTo');
+      if (!selF || !selT) return;
+      const keepF = zoomFrom, keepT = zoomTo;
+      selF.innerHTML = ''; selT.innerHTML = '';
+      years.forEach(y => { selF.innerHTML += '<option value="' + y + '">' + y + '</option>'; selT.innerHTML += '<option value="' + y + '">' + y + '</option>'; });
+      zoomFrom = (keepF != null && keepF >= minY && keepF <= maxY) ? keepF : minY;
+      zoomTo   = (keepT != null && keepT >= minY && keepT <= maxY) ? keepT : maxY;
+      selF.value = zoomFrom; selT.value = zoomTo;
+    }
+    function onZoom() {
+      zoomFrom = Number(document.getElementById('zoomFrom').value);
+      zoomTo = Number(document.getElementById('zoomTo').value);
+      if (zoomFrom > zoomTo) { const t = zoomFrom; zoomFrom = zoomTo; zoomTo = t; document.getElementById('zoomFrom').value = zoomFrom; document.getElementById('zoomTo').value = zoomTo; }
+      if (chartsReady) drawCharts();
+    }
+    function resetZoom() {
+      if (!drawdownRows.length) return;
+      zoomFrom = drawdownRows[0].year; zoomTo = drawdownRows[drawdownRows.length - 1].year;
+      document.getElementById('zoomFrom').value = zoomFrom; document.getElementById('zoomTo').value = zoomTo;
+      if (chartsReady) drawCharts();
+    }
+    // filter helpers honouring the zoom range
+    function zYears(rows) { return rows.filter(r => (zoomFrom == null || r.year >= zoomFrom) && (zoomTo == null || r.year <= zoomTo)); }
+    function zMonths(rows) { return rows.filter(r => (zoomFrom == null || r.year >= zoomFrom) && (zoomTo == null || r.year <= zoomTo)); }
 
     google.charts.load('current', { packages: ['corechart'] });
     google.charts.setOnLoadCallback(() => { chartsReady = true; if (drawdownRows.length) drawCharts(); });
@@ -395,6 +432,8 @@
     function drawCharts() {
       if (!chartsReady || !drawdownRows.length) return;
       const joint = (currentView === 'Joint');
+      buildZoomOptions();
+      const yrRows = zYears(drawdownRows);   // rows within the focus-year range
 
       // map a calendar year -> event marker text (crash starts and cash purchases that year)
       const eventByYear = {};
@@ -420,7 +459,7 @@
         dPots.addColumn('number','Julie tax-free'); dPots.addColumn('number','Graham tax-free');
         dPots.addColumn('number','Julie taxable');  dPots.addColumn('number','Graham taxable');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
-        drawdownRows.forEach(r => dPots.addRow([String(r.year),
+        yrRows.forEach(r => dPots.addRow([String(r.year),
           Math.round(r.j_taxFree), Math.round(r.g_taxFree), Math.round(r.j_taxable), Math.round(r.g_taxable),
           evDot(r.year), evText(r.year)]));
         potColors = ['#c39bd3','#85c1e9','#8e44ad','#2471a3']; // Julie light, Graham light, Julie dark, Graham dark
@@ -428,7 +467,7 @@
       } else {
         dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
-        drawdownRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx), evDot(r.year), evText(r.year)]); });
+        yrRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx), evDot(r.year), evText(r.year)]); });
         potColors = ['#2ecc71','#e74c3c'];
         potTitle = currentView + ' Pots';
       }
@@ -443,7 +482,7 @@
         dInc.addColumn('number','Julie other income'); dInc.addColumn('number','Graham other income');
         dInc.addColumn('number','Total drawdown');
         dInc.addColumn({type:'string', role:'annotation'}); dInc.addColumn({type:'string', role:'annotationText'});
-        drawdownRows.forEach(r => dInc.addRow([String(r.year),
+        yrRows.forEach(r => dInc.addRow([String(r.year),
           Math.round(r.j_draw), Math.round(r.g_draw), Math.round(r.j_other), Math.round(r.g_other),
           Math.round(r.drawdown), evDot(r.year), evText(r.year)]));
         incSeries = {
@@ -458,7 +497,7 @@
         dInc.addColumn('number','Drawdown'); dInc.addColumn('number','Other income');
         dInc.addColumn('number','Total drawdown');
         dInc.addColumn({type:'string', role:'annotation'}); dInc.addColumn({type:'string', role:'annotationText'});
-        drawdownRows.forEach(r => { const v = vrow(r); dInc.addRow([String(r.year), Math.round(v.draw), Math.round(v.other), Math.round(v.draw), evDot(r.year), evText(r.year)]); });
+        yrRows.forEach(r => { const v = vrow(r); dInc.addRow([String(r.year), Math.round(v.draw), Math.round(v.other), Math.round(v.draw), evDot(r.year), evText(r.year)]); });
         incSeries = {
           0: { targetAxisIndex:0, color:'#3498db' }, // drawdown
           1: { targetAxisIndex:0, color:'#9b59b6' }, // other income
@@ -530,7 +569,7 @@
 
     function drawCrashChart() {
       const head = document.getElementById('crashChartHead'), box = document.getElementById('crashChart');
-      const monthly = drawdownRows.monthly || [];
+      const monthly = zMonths(drawdownRows.monthly || []);
       const windows = drawdownRows.crashWindows || [];
       if (!chartsReady || !windows.length || !monthly.length) { head.style.display = 'none'; box.style.display = 'none'; return; }
       head.style.display = ''; box.style.display = '';
@@ -582,7 +621,7 @@
 
     function drawCashModelChart() {
       const head = document.getElementById('cashModelHead'), box = document.getElementById('cashModelChart');
-      const monthly = drawdownRows.monthly || [];
+      const monthly = zMonths(drawdownRows.monthly || []);
       const pw = drawdownRows.purchaseWindows || [];
       const hasCash = monthly.some(m => (m.cashBalance || 0) > 0 || (m.cashDeposit || 0) > 0);
       if (!chartsReady || !hasCash || !monthly.length) { head.style.display = 'none'; box.style.display = 'none'; return; }
