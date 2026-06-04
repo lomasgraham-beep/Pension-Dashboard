@@ -139,6 +139,16 @@
     .pbtn-save { background:#27ae60; } .pbtn-save:hover { background:#219150; }
     .pbtn-reset { background:#64748b; } .pbtn-reset:hover { background:#475569; }
     .params .msg { font-size:14px; font-weight:bold; }
+
+    /* dual-handle year range slider */
+    .range-slider { position:relative; height:36px; }
+    .range-track { position:absolute; top:50%; left:0; right:0; height:6px; transform:translateY(-50%); background:#cbd5e1; border-radius:3px; }
+    .range-fill { position:absolute; top:50%; height:6px; transform:translateY(-50%); background:var(--accent); border-radius:3px; }
+    .range-slider input[type=range] { position:absolute; top:0; left:0; width:100%; height:36px; margin:0; background:none; -webkit-appearance:none; appearance:none; pointer-events:none; }
+    .range-slider input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:26px; height:26px; border-radius:50%; background:var(--accent); border:3px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); cursor:pointer; pointer-events:auto; }
+    .range-slider input[type=range]::-moz-range-thumb { width:26px; height:26px; border-radius:50%; background:var(--accent); border:3px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); cursor:pointer; pointer-events:auto; }
+    .range-slider input[type=range]::-webkit-slider-runnable-track { background:none; }
+    .range-slider input[type=range]::-moz-range-track { background:none; }
     .floors-panel { display:none; margin-top:10px; }
     .floors-panel.show { display:block; }
     .info-btn { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; margin-left:10px; border:none; border-radius:50%; background:var(--accent); color:#fff; font-style:italic; font-weight:bold; font-size:12px; font-family:Georgia, serif; cursor:pointer; flex:0 0 auto; }
@@ -276,11 +286,17 @@
       </div>
     </div>
     <h2><span class="viewlabel">Joint</span> Projections</h2>
-    <div id="zoomBar" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px; font-size:14px; color:var(--ink-soft);">
-      <strong style="color:var(--ink);">Focus years:</strong>
-      <label>From <select id="zoomFrom" onchange="onZoom()" style="padding:6px 8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px;"></select></label>
-      <label>To <select id="zoomTo" onchange="onZoom()" style="padding:6px 8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px;"></select></label>
-      <button onclick="resetZoom()" style="padding:6px 12px; border:none; border-radius:6px; background:#64748b; color:#fff; font-weight:bold; cursor:pointer; font-size:13px;">Reset</button>
+    <div id="zoomBar" style="margin-bottom:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <strong style="color:var(--ink); font-size:14px;">Focus years: <span id="zoomLabel" style="color:var(--accent); font-weight:bold;">—</span></strong>
+        <button onclick="resetZoom()" style="padding:6px 12px; border:none; border-radius:6px; background:#64748b; color:#fff; font-weight:bold; cursor:pointer; font-size:13px;">Reset</button>
+      </div>
+      <div class="range-slider" id="rangeSlider">
+        <div class="range-track"></div>
+        <div class="range-fill" id="rangeFill"></div>
+        <input type="range" id="zoomFrom" min="0" max="100" value="0" oninput="onZoom('from')">
+        <input type="range" id="zoomTo" min="0" max="100" value="100" oninput="onZoom('to')">
+      </div>
     </div>
     <div id="potChart" class="chart-box"></div>
     <div id="incomeChart" class="chart-box"></div>
@@ -341,7 +357,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-51</span>
+    <span class="build-stamp">build: LC-52</span>
   </div>
 
   <script>
@@ -355,32 +371,47 @@
     let currentView = 'Joint';
     let retGran = 'year';     // Retirement table granularity: 'year' or 'month'
     let chartsReady = false;
-    let zoomFrom = null, zoomTo = null;   // year range for the chart focus control
+    let zoomFrom = null, zoomTo = null;   // actual years
 
-    // populate the From/To year dropdowns from the current projection range
-    function buildZoomOptions() {
+    // set up the range slider from the current projection's year span
+    function buildZoomSlider() {
       if (!drawdownRows.length) return;
       const years = drawdownRows.map(r => r.year);
       const minY = years[0], maxY = years[years.length - 1];
       const selF = document.getElementById('zoomFrom'), selT = document.getElementById('zoomTo');
       if (!selF || !selT) return;
-      const keepF = zoomFrom, keepT = zoomTo;
-      selF.innerHTML = ''; selT.innerHTML = '';
-      years.forEach(y => { selF.innerHTML += '<option value="' + y + '">' + y + '</option>'; selT.innerHTML += '<option value="' + y + '">' + y + '</option>'; });
-      zoomFrom = (keepF != null && keepF >= minY && keepF <= maxY) ? keepF : minY;
-      zoomTo   = (keepT != null && keepT >= minY && keepT <= maxY) ? keepT : maxY;
-      selF.value = zoomFrom; selT.value = zoomTo;
+      // keep prior selection if still valid, else full range
+      if (zoomFrom == null || zoomFrom < minY || zoomFrom > maxY) zoomFrom = minY;
+      if (zoomTo == null || zoomTo < minY || zoomTo > maxY) zoomTo = maxY;
+      const n = years.length - 1;
+      selF.min = 0; selF.max = n; selT.min = 0; selT.max = n;
+      selF.value = zoomFrom - minY; selT.value = zoomTo - minY;
+      updateZoomVisual();
     }
-    function onZoom() {
-      zoomFrom = Number(document.getElementById('zoomFrom').value);
-      zoomTo = Number(document.getElementById('zoomTo').value);
-      if (zoomFrom > zoomTo) { const t = zoomFrom; zoomFrom = zoomTo; zoomTo = t; document.getElementById('zoomFrom').value = zoomFrom; document.getElementById('zoomTo').value = zoomTo; }
+    function yearSpan() { const ys = drawdownRows.map(r => r.year); return { minY: ys[0], maxY: ys[ys.length - 1], n: ys.length - 1 }; }
+    function updateZoomVisual() {
+      const { minY, n } = yearSpan();
+      const selF = document.getElementById('zoomFrom'), selT = document.getElementById('zoomTo');
+      const a = Number(selF.value), b = Number(selT.value);
+      const lo = Math.min(a, b), hi = Math.max(a, b);
+      const fill = document.getElementById('rangeFill');
+      if (fill && n > 0) { fill.style.left = (lo / n * 100) + '%'; fill.style.width = ((hi - lo) / n * 100) + '%'; }
+      document.getElementById('zoomLabel').textContent = (minY + lo) + ' → ' + (minY + hi);
+    }
+    function onZoom(which) {
+      const { minY } = yearSpan();
+      const selF = document.getElementById('zoomFrom'), selT = document.getElementById('zoomTo');
+      let a = Number(selF.value), b = Number(selT.value);
+      // prevent handles crossing: the one being dragged pushes against the other
+      if (a > b) { if (which === 'from') { b = a; selT.value = b; } else { a = b; selF.value = a; } }
+      zoomFrom = minY + Math.min(a, b); zoomTo = minY + Math.max(a, b);
+      updateZoomVisual();
       if (chartsReady) drawCharts();
     }
     function resetZoom() {
-      if (!drawdownRows.length) return;
-      zoomFrom = drawdownRows[0].year; zoomTo = drawdownRows[drawdownRows.length - 1].year;
-      document.getElementById('zoomFrom').value = zoomFrom; document.getElementById('zoomTo').value = zoomTo;
+      const { minY, maxY } = yearSpan();
+      zoomFrom = minY; zoomTo = maxY;
+      buildZoomSlider();
       if (chartsReady) drawCharts();
     }
     // filter helpers honouring the zoom range
@@ -432,7 +463,7 @@
     function drawCharts() {
       if (!chartsReady || !drawdownRows.length) return;
       const joint = (currentView === 'Joint');
-      buildZoomOptions();
+      buildZoomSlider();
       const yrRows = zYears(drawdownRows);   // rows within the focus-year range
 
       // map a calendar year -> event marker text (crash starts and cash purchases that year)
