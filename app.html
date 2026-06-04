@@ -333,7 +333,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-47</span>
+    <span class="build-stamp">build: LC-48</span>
   </div>
 
   <script>
@@ -394,6 +394,21 @@
       if (!chartsReady || !drawdownRows.length) return;
       const joint = (currentView === 'Joint');
 
+      // map a calendar year -> event marker text (crash starts and cash purchases that year)
+      const eventByYear = {};
+      (drawdownRows.crashWindows || []).forEach(w => {
+        const y = Math.floor(w.startIdx / 12);
+        eventByYear[y] = (eventByYear[y] ? eventByYear[y] + '; ' : '') + 'Market crash';
+      });
+      (data.purchases || []).forEach(p => {
+        if (!p.purchase_date) return;
+        const y = new Date(p.purchase_date).getFullYear();
+        const nm = p.purchase_name || 'Purchase';
+        eventByYear[y] = (eventByYear[y] ? eventByYear[y] + '; ' : '') + nm;
+      });
+      function evDot(year) { return eventByYear[year] ? '●' : null; }
+      function evText(year) { return eventByYear[year] || null; }
+
       // ---------- POT CHART (stacked columns) ----------
       const dPots = new google.visualization.DataTable();
       dPots.addColumn('string','Year');
@@ -402,13 +417,16 @@
         // order bottom -> top: Julie tax-free, Graham tax-free, Julie taxable, Graham taxable
         dPots.addColumn('number','Julie tax-free'); dPots.addColumn('number','Graham tax-free');
         dPots.addColumn('number','Julie taxable');  dPots.addColumn('number','Graham taxable');
+        dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
         drawdownRows.forEach(r => dPots.addRow([String(r.year),
-          Math.round(r.j_taxFree), Math.round(r.g_taxFree), Math.round(r.j_taxable), Math.round(r.g_taxable)]));
+          Math.round(r.j_taxFree), Math.round(r.g_taxFree), Math.round(r.j_taxable), Math.round(r.g_taxable),
+          evDot(r.year), evText(r.year)]));
         potColors = ['#c39bd3','#85c1e9','#8e44ad','#2471a3']; // Julie light, Graham light, Julie dark, Graham dark
         potTitle = 'Combined Pots';
       } else {
         dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
-        drawdownRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx)]); });
+        dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
+        drawdownRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx), evDot(r.year), evText(r.year)]); });
         potColors = ['#2ecc71','#e74c3c'];
         potTitle = currentView + ' Pots';
       }
@@ -422,9 +440,10 @@
         dInc.addColumn('number','Julie drawdown'); dInc.addColumn('number','Graham drawdown');
         dInc.addColumn('number','Julie other income'); dInc.addColumn('number','Graham other income');
         dInc.addColumn('number','Total drawdown');
+        dInc.addColumn({type:'string', role:'annotation'}); dInc.addColumn({type:'string', role:'annotationText'});
         drawdownRows.forEach(r => dInc.addRow([String(r.year),
           Math.round(r.j_draw), Math.round(r.g_draw), Math.round(r.j_other), Math.round(r.g_other),
-          Math.round(r.drawdown)]));
+          Math.round(r.drawdown), evDot(r.year), evText(r.year)]));
         incSeries = {
           0: { targetAxisIndex:0, color:'#9b59b6' }, // Julie drawdown
           1: { targetAxisIndex:0, color:'#3498db' }, // Graham drawdown
@@ -436,7 +455,8 @@
       } else {
         dInc.addColumn('number','Drawdown'); dInc.addColumn('number','Other income');
         dInc.addColumn('number','Total drawdown');
-        drawdownRows.forEach(r => { const v = vrow(r); dInc.addRow([String(r.year), Math.round(v.draw), Math.round(v.other), Math.round(v.draw)]); });
+        dInc.addColumn({type:'string', role:'annotation'}); dInc.addColumn({type:'string', role:'annotationText'});
+        drawdownRows.forEach(r => { const v = vrow(r); dInc.addRow([String(r.year), Math.round(v.draw), Math.round(v.other), Math.round(v.draw), evDot(r.year), evText(r.year)]); });
         incSeries = {
           0: { targetAxisIndex:0, color:'#3498db' }, // drawdown
           1: { targetAxisIndex:0, color:'#9b59b6' }, // other income
@@ -446,8 +466,8 @@
       }
 
       const nf = new google.visualization.NumberFormat({ prefix:'£', fractionDigits:0 });
-      for (let i = 1; i < dPots.getNumberOfColumns(); i++) nf.format(dPots, i);
-      for (let i = 1; i < dInc.getNumberOfColumns(); i++) nf.format(dInc, i);
+      for (let i = 1; i < dPots.getNumberOfColumns(); i++) if (dPots.getColumnType(i) === 'number') nf.format(dPots, i);
+      for (let i = 1; i < dInc.getNumberOfColumns(); i++) if (dInc.getColumnType(i) === 'number') nf.format(dInc, i);
 
       // shared y-scale for the income chart so the drawdown line overlays the bars truthfully
       let incMax = 0;
@@ -475,10 +495,10 @@
         for (let i = 0; i <= steps; i++) { const v = Math.round(step * i); ticks.push({ v: v, f: shortGBP(v) }); }
         return ticks;
       }
-      // stacked pot chart max = largest row total across the stacked segments
+      // stacked pot chart max = largest row total across the stacked segments (number cols only)
       let potMax = 0;
       for (let row = 0; row < dPots.getNumberOfRows(); row++) {
-        let t = 0; for (let col = 1; col < dPots.getNumberOfColumns(); col++) t += (dPots.getValue(row, col) || 0);
+        let t = 0; for (let col = 1; col < dPots.getNumberOfColumns(); col++) if (dPots.getColumnType(col) === 'number') t += (dPots.getValue(row, col) || 0);
         if (t > potMax) potMax = t;
       }
       potMax = Math.ceil((potMax * 1.05) / 1000) * 1000;
@@ -490,7 +510,8 @@
 
       new google.visualization.ColumnChart(document.getElementById('potChart')).draw(dPots, {
         title: potTitle, isStacked:true, legend:{position:'bottom'},
-        chartArea: potArea, colors:potColors, vAxis: potVAxis
+        chartArea: potArea, colors:potColors, vAxis: potVAxis,
+        annotations: { alwaysOutside:true, textStyle:{ fontSize:13, color:'#c0392b', bold:true }, stem:{ color:'#c0392b' } }
       });
       new google.visualization.ComboChart(document.getElementById('incomeChart')).draw(dInc, {
         title: incTitle, seriesType:'bars', isStacked:true, series: incSeries,
@@ -498,7 +519,8 @@
         vAxes: {
           0: phone ? { title:'', viewWindow:{min:0, max:incMax}, ticks: incTicks, textStyle: axisText } : { title:'Income (£)', viewWindow:{min:0, max:incMax}, format:'£#,###', textStyle: axisText },
           1: phone ? { title:'', viewWindow:{min:0, max:incMax}, ticks: incTicks, textStyle: axisText } : { title:'Total drawdown (£)', viewWindow:{min:0, max:incMax}, format:'£#,###', textStyle: axisText }
-        }
+        },
+        annotations: { alwaysOutside:true, textStyle:{ fontSize:13, color:'#c0392b', bold:true }, stem:{ color:'#c0392b' } }
       });
       drawCrashChart();
     }
