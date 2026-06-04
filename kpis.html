@@ -42,7 +42,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: median-pct)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: trendline)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
     <div class="card"><h3>Graham expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
@@ -214,22 +214,38 @@
     dt.addColumn('number', 'Organic Monthly Growth');
     dt.addColumn({ type: 'string', role: 'style' });
     dt.addColumn({ type: 'string', role: 'annotation' });
+    dt.addColumn('number', 'Trend');
+
+    // least-squares linear fit over the monthly values (x = 0..n-1) to get a trend line
+    const n = vals.length;
+    let trendSlope = 0, trendAt = () => null;
+    if (n >= 2) {
+      let sx = 0, sy = 0, sxy = 0, sxx = 0;
+      vals.forEach((y, x) => { sx += x; sy += y; sxy += x * y; sxx += x * x; });
+      const denom = (n * sxx - sx * sx) || 1;
+      trendSlope = (n * sxy - sx * sy) / denom;
+      const intercept = (sy - trendSlope * sx) / n;
+      trendAt = (x) => Math.round(intercept + trendSlope * x);
+    }
+    const trendColor = trendSlope >= 0 ? '#27ae60' : '#c0392b';   // rising trend green, falling red
+
     months.forEach((m, idx) => {
       const v = vals[idx]; const lbl = m.split('-'); const d = new Date(lbl[0], lbl[1] - 1, 1);
       const clipped = (vMax != null && v > vMax);
-      // plot at the ceiling if clipped (keeps bar + label on-screen); annotate the TRUE value with an arrow
       const plotted = clipped ? vMax : v;
       const note = (clipped ? '▲ £' : '£') + v.toLocaleString('en-GB');
-      dt.addRow([d.toLocaleString('default', { month: 'short', year: 'numeric' }), plotted, v >= 0 ? '#27ae60' : '#c0392b', note]);
+      dt.addRow([d.toLocaleString('default', { month: 'short', year: 'numeric' }), plotted, v >= 0 ? '#27ae60' : '#c0392b', note, (n >= 2 ? trendAt(idx) : null)]);
     });
 
     const vAxis = { format: '£#,###' };
     if (vMax) vAxis.viewWindow = { max: vMax, min: Math.min(0, ...vals) };
 
-    new google.visualization.ColumnChart(document.getElementById('chartGrowth')).draw(dt, {
+    new google.visualization.ComboChart(document.getElementById('chartGrowth')).draw(dt, {
       title: 'Combined Organic Monthly Growth (£)' + (vMax ? '  — axis capped; ▲ = true value' : ''),
       legend: { position: 'none' }, annotations: { alwaysOutside: false, stem: { color: 'transparent' }, textStyle: { fontSize: 10, color: '#333', bold: true } },
-      chartArea: { left: 85, right: 30, top: 40, bottom: 60 }, vAxis: vAxis
+      chartArea: { left: 85, right: 30, top: 40, bottom: 60 }, vAxis: vAxis,
+      seriesType: 'bars',
+      series: { 0: { type: 'bars' }, 1: { type: 'line', color: trendColor, lineWidth: 3, pointSize: 0, enableInteractivity: false } }
     });
   }
 
