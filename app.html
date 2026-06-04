@@ -320,8 +320,8 @@
     </div>
     <div class="table-wrap">
       <table id="rTable">
-        <thead><tr><th id="rThPeriod">Year</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Cash Savings</th><th>Other Incomes</th><th>Bills</th><th>Dining</th><th>Loan Payment</th><th>Drawdown required</th><th>Total Gross Income</th></tr></thead>
-        <tbody><tr><td colspan="10">Calculating…</td></tr></tbody>
+        <thead><tr><th id="rThPeriod">Year</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Cash Savings</th><th>Other Incomes</th><th>Savings to Bills</th><th>Bills</th><th>Dining</th><th>Loan Payment</th><th>Drawdown required</th><th>Total Gross Income</th></tr></thead>
+        <tbody><tr><td colspan="11">Calculating…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -362,7 +362,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-59</span>
+    <span class="build-stamp">build: LC-60</span>
   </div>
 
   <script>
@@ -437,9 +437,9 @@
 
     // ---------- per-view field pickers ----------
     function vrow(r) {
-      if (currentView === 'Graham') { const g = savedPlan.gRatio; return { dining:r.diningTotal*g, bills:r.billsTotal*g, loan:(r.cashFinance||0)*g, tf:r.g_taxFree, tx:r.g_taxable, other:r.g_other, draw:r.g_draw, income:r.g_income, close:r.g_closing }; }
-      if (currentView === 'Julie')  { const j = 1 - savedPlan.gRatio; return { dining:r.diningTotal*j, bills:r.billsTotal*j, loan:(r.cashFinance||0)*j, tf:r.j_taxFree, tx:r.j_taxable, other:r.j_other, draw:r.j_draw, income:r.j_income, close:r.j_closing }; }
-      return { dining:r.diningTotal, bills:r.billsTotal, loan:(r.cashFinance||0), tf:r.taxFree, tx:r.taxable, other:r.otherPensions, draw:r.drawdown, income:r.totalIncome, close:r.combinedClosing };
+      if (currentView === 'Graham') { const g = savedPlan.gRatio; return { dining:r.diningTotal*g, bills:r.billsTotal*g, loan:(r.cashFinance||0)*g, savToBills:(r.cashCapDraw||0)*g, tf:r.g_taxFree, tx:r.g_taxable, other:r.g_other, draw:r.g_draw, income:r.g_income, close:r.g_closing }; }
+      if (currentView === 'Julie')  { const j = 1 - savedPlan.gRatio; return { dining:r.diningTotal*j, bills:r.billsTotal*j, loan:(r.cashFinance||0)*j, savToBills:(r.cashCapDraw||0)*j, tf:r.j_taxFree, tx:r.j_taxable, other:r.j_other, draw:r.j_draw, income:r.j_income, close:r.j_closing }; }
+      return { dining:r.diningTotal, bills:r.billsTotal, loan:(r.cashFinance||0), savToBills:(r.cashCapDraw||0), tf:r.taxFree, tx:r.taxable, other:r.otherPensions, draw:r.drawdown, income:r.totalIncome, close:r.combinedClosing };
     }
 
     function setRetGran(g) { retGran = g; document.getElementById('rThPeriod').textContent = (g === 'month') ? 'Month' : 'Year'; renderRetirementTable(); }
@@ -447,7 +447,7 @@
     function renderRetirementTable() {
       const tb = document.querySelector('#rTable tbody');
       const rowsToShow = (retGran === 'month') ? (drawdownRows.monthly || []) : drawdownRows;
-      if (!rowsToShow.length) { tb.innerHTML = '<tr><td colspan="10">No rows.</td></tr>'; return; }
+      if (!rowsToShow.length) { tb.innerHTML = '<tr><td colspan="11">No rows.</td></tr>'; return; }
       tb.innerHTML = rowsToShow.map(r => {
         const v = vrow(r);
         const period = (retGran === 'month') ? r.label : r.year;
@@ -456,6 +456,7 @@
           <td>${fmt(v.tf)}</td><td>${fmt(v.tx)}</td>
           <td style="color:#2c7a7b;">${fmt(r.cashBalance || 0)}</td>
           <td>${fmt(v.other)}</td>
+          <td style="font-weight:bold;color:#2c7a7b;">${fmt(v.savToBills)}</td>
           <td style="font-weight:bold;color:#c0392b;">${fmt(v.bills)}</td>
           <td style="font-weight:bold;color:#e67e22;">${fmt(v.dining)}</td>
           <td style="font-weight:bold;color:#2563eb;">${fmt(v.loan)}</td>
