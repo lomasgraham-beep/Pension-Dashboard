@@ -335,7 +335,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-49</span>
+    <span class="build-stamp">build: LC-50</span>
   </div>
 
   <script>
@@ -588,16 +588,17 @@
       if (!chartsReady || !hasCash || !monthly.length) { head.style.display = 'none'; box.style.display = 'none'; return; }
       head.style.display = ''; box.style.display = '';
 
-      let peak = 0; monthly.forEach(m => { if ((m.cashBalance || 0) > peak) peak = m.cashBalance; });
-      const bandTop = Math.ceil(Math.max(peak, 1) * 1.05 / 1000) * 1000;
-      function inFinance(idx) { return pw.some(w => w.term > 0 && idx >= w.depositIdx && idx < w.payoffIdx); }
+      let peak = 0, payPeak = 0;
+      monthly.forEach(m => { if ((m.cashBalance || 0) > peak) peak = m.cashBalance; if ((m.cashFinance || 0) > payPeak) payPeak = m.cashFinance; });
+      const balTop = Math.ceil(Math.max(peak, 1) * 1.05 / 1000) * 1000;
+      const payTop = Math.ceil(Math.max(payPeak, 1) * 1.4 / 100) * 100;   // headroom so the band sits in the lower portion
       function depHere(idx) { return pw.filter(w => w.depositIdx === idx); }
       function payoffHere(idx) { return pw.filter(w => w.term > 0 && w.payoffIdx === idx); }
 
       const dt = new google.visualization.DataTable();
       dt.addColumn('string', 'Month');
-      dt.addColumn('number', 'Finance period');     // shaded band during a loan's term
-      dt.addColumn('number', 'Cash balance');       // the balance line
+      dt.addColumn('number', 'Monthly finance (£)');   // band height = stacked monthly loan payment (2nd axis)
+      dt.addColumn('number', 'Cash balance');          // the balance line (1st axis)
       dt.addColumn({ type: 'string', role: 'annotation' });
       dt.addColumn({ type: 'string', role: 'annotationText' });
       monthly.forEach(m => {
@@ -606,21 +607,24 @@
         let note = null, noteText = null;
         if (deps.length) { note = '▼'; noteText = deps.map(d => d.name + ' deposit ' + fmt(d.deposit)).join('; '); }
         else if (pays.length) { note = '◆'; noteText = pays.map(d => d.name + ' paid off (£' + Math.round(d.pay) + '/mo ended)').join('; '); }
-        dt.addRow([m.label, inFinance(idx) ? bandTop : 0, Math.round(m.cashBalance || 0), note, noteText]);
+        dt.addRow([m.label, Math.round(m.cashFinance || 0), Math.round(m.cashBalance || 0), note, noteText]);
       });
 
       const phone = window.innerWidth <= 600;
       const months = monthly.length;
       new google.visualization.ComboChart(box).draw(dt, {
-        title: 'Cash savings balance (finance periods shaded, ▼ deposit, ◆ paid off)',
+        title: 'Cash savings balance + monthly finance (overlapping loans stack the orange band)',
         seriesType: 'line',
         series: {
-          0: { type: 'area', color: '#e67e22', areaOpacity: 0.12, lineWidth: 0, enableInteractivity: false, visibleInLegend: false },
-          1: { type: 'line', color: '#2c7a7b', lineWidth: 3 }
+          0: { type: 'area', color: '#e67e22', areaOpacity: 0.25, lineWidth: 1, targetAxisIndex: 1 },
+          1: { type: 'line', color: '#2c7a7b', lineWidth: 3, targetAxisIndex: 0 }
         },
-        legend: { position: 'none' },
-        chartArea: phone ? { left: 60, right: 16, top: 40, bottom: 70, height: '64%' } : { left: 88, right: 30, top: 44, bottom: 70 },
-        vAxis: { minValue: 0, viewWindow: { min: 0, max: bandTop }, title: phone ? '' : 'Balance (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
+        legend: { position: 'bottom' },
+        chartArea: phone ? { left: 56, right: 50, top: 40, bottom: 70, height: '62%' } : { left: 84, right: 84, top: 44, bottom: 70 },
+        vAxes: {
+          0: { minValue: 0, viewWindow: { min: 0, max: balTop }, title: phone ? '' : 'Balance (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
+          1: { minValue: 0, viewWindow: { min: 0, max: payTop }, title: phone ? '' : 'Finance £/mo', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } }
+        },
         hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, Math.round(months / (phone ? 6 : 12))), slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: phone ? 9 : 11 } },
         annotations: { style: 'point', textStyle: { fontSize: 11, color: '#236668', bold: true } }
       });
