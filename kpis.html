@@ -42,7 +42,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: trendline)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: theilsen)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
     <div class="card"><h3>Graham expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
@@ -216,15 +216,16 @@
     dt.addColumn({ type: 'string', role: 'annotation' });
     dt.addColumn('number', 'Trend');
 
-    // least-squares linear fit over the monthly values (x = 0..n-1) to get a trend line
+    // robust Theil–Sen trend: median of all pairwise slopes (one outlier month can't drag it).
     const n = vals.length;
     let trendSlope = 0, trendAt = () => null;
     if (n >= 2) {
-      let sx = 0, sy = 0, sxy = 0, sxx = 0;
-      vals.forEach((y, x) => { sx += x; sy += y; sxy += x * y; sxx += x * x; });
-      const denom = (n * sxx - sx * sx) || 1;
-      trendSlope = (n * sxy - sx * sy) / denom;
-      const intercept = (sy - trendSlope * sx) / n;
+      const slopes = [];
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) slopes.push((vals[j] - vals[i]) / (j - i));
+      slopes.sort((a, b) => a - b);
+      const med = arr => { const s = [...arr].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+      trendSlope = med(slopes);
+      const intercept = med(vals.map((y, x) => y - trendSlope * x));   // robust intercept
       trendAt = (x) => Math.round(intercept + trendSlope * x);
     }
     const trendColor = trendSlope >= 0 ? '#27ae60' : '#c0392b';   // rising trend green, falling red
