@@ -44,23 +44,23 @@
     .settings .fld input { padding:8px 6px; font-size:14px; }
 
     /* purchases: reflow the table into a card per purchase */
-    #pTbl thead { display:none; }
-    #pTbl, #pTbl tbody, #pTbl tr, #pTbl td { display:block; width:auto; }
-    #pTbl tr { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:12px; background:var(--surface-2); }
-    #pTbl td { border:none; padding:6px 0; text-align:right; display:flex; align-items:center; justify-content:space-between; gap:10px; }
-    #pTbl td::before { content:attr(data-label); font-size:12px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; text-align:left; }
-    #pTbl td input { flex:0 0 auto; }
-    #pTbl td input[type=text] { width:150px; }
-    #pTbl td .del, #pTbl td:last-child { width:100%; }
-    #pTbl td:last-child::before { content:""; }
-    #pTbl td .del { width:100%; padding:10px; }
+    #pTbl thead, #capTbl thead { display:none; }
+    #pTbl, #pTbl tbody, #pTbl tr, #pTbl td, #capTbl, #capTbl tbody, #capTbl tr, #capTbl td { display:block; width:auto; }
+    #pTbl tr, #capTbl tr { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:12px; background:var(--surface-2); }
+    #pTbl td, #capTbl td { border:none; padding:6px 0; text-align:right; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    #pTbl td::before, #capTbl td::before { content:attr(data-label); font-size:12px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; text-align:left; }
+    #pTbl td input, #capTbl td input { flex:0 0 auto; }
+    #pTbl td input[type=text], #capTbl td input[type=text] { width:150px; }
+    #pTbl td .del, #pTbl td:last-child, #capTbl td .del, #capTbl td:last-child { width:100%; }
+    #pTbl td:last-child::before, #capTbl td:last-child::before { content:""; }
+    #pTbl td .del, #capTbl td .del { width:100%; padding:10px; }
     .pay-cell { font-size:15px; }
   }
 </style>
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v5)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v6)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
 
   <div class="bar">
@@ -89,10 +89,21 @@
     </table>
   </div>
 
+  <h3>Savings Caps <button class="btn btn-add" style="font-size:13px; padding:8px 14px; margin-left:8px;" onclick="addCap()">+ Add cap</button></h3>
+  <p class="note">During a cap period, any savings <em>above</em> the cap are used to cover living costs before the pension drawdown (when the cap feature is switched on in Modelling). Savings are only drained down to the cap, never below.</p>
+  <div class="table-wrap">
+    <table id="capTbl">
+      <thead><tr><th>Name</th><th>Start Date</th><th>End Date</th><th>Cap Value (£)</th><th></th></tr></thead>
+      <tbody><tr><td colspan="5">Loading&hellip;</td></tr></tbody>
+    </table>
+  </div>
+
 <script>
   const fmt = App.fmt;
   let settingsRow = null, purchases = [], dirty = false, deleted = [];
+  let caps = [], deletedCaps = [];
   const tbody = document.querySelector('#pTbl tbody');
+  const capBody = document.querySelector('#capTbl tbody');
   const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
   function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
 
@@ -152,10 +163,47 @@
     purchases.splice(i, 1); render(); setDirty();
   }
 
+  // ---- Savings caps ----
+  function capRowHtml(c, i) {
+    const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
+    return '<tr data-i="' + i + '">' +
+      '<td data-label="Name"><input type="text" class="c-name" value="' + esc(c.cap_name) + '" oninput="markCaps()"></td>' +
+      '<td data-label="Start Date"><input type="date" class="c-start" value="' + (c.start_date ? String(c.start_date).split('T')[0] : '') + '" onchange="markCaps()"></td>' +
+      '<td data-label="End Date"><input type="date" class="c-end" value="' + (c.end_date ? String(c.end_date).split('T')[0] : '') + '" onchange="markCaps()"></td>' +
+      '<td data-label="Cap Value (£)"><input type="number" class="c-value" step="1" value="' + (c.cap_value != null ? c.cap_value : 0) + '" oninput="markCaps()"></td>' +
+      '<td><button class="del" onclick="delCap(this)">Delete</button></td></tr>';
+  }
+  function renderCaps() {
+    capBody.innerHTML = caps.length ? caps.map(capRowHtml).join('') : '<tr><td colspan="5">No caps. Use \u201cAdd cap\u201d.</td></tr>';
+  }
+  function markCaps() { syncCaps(); setDirty(); }
+  function syncCaps() {
+    capBody.querySelectorAll('tr[data-i]').forEach(tr => {
+      const i = Number(tr.dataset.i); if (!caps[i]) return;
+      caps[i].cap_name = tr.querySelector('.c-name').value.trim();
+      caps[i].start_date = tr.querySelector('.c-start').value || null;
+      caps[i].end_date = tr.querySelector('.c-end').value || null;
+      caps[i].cap_value = num(tr.querySelector('.c-value').value);
+    });
+  }
+  function addCap() {
+    syncCaps();
+    caps.push({ id: undefined, cap_name: '', start_date: null, end_date: null, cap_value: 0 });
+    renderCaps(); setDirty();
+  }
+  function delCap(btn) {
+    syncCaps();
+    const tr = btn.closest('tr'); const i = Number(tr.dataset.i); const c = caps[i];
+    if (c && c.id != null) deletedCaps.push(c.id);
+    caps.splice(i, 1); renderCaps(); setDirty();
+  }
+
   async function saveAll() {
     const msg = document.getElementById('msg'); msg.style.color = '#1e3a8a'; msg.textContent = 'Saving\u2026';
     syncDom();
     for (const p of purchases) if (!p.purchase_name) { msg.style.color = '#c0392b'; msg.textContent = 'Every purchase needs a name.'; return; }
+    syncCaps();
+    for (const c of caps) if (!c.cap_name) { msg.style.color = '#c0392b'; msg.textContent = 'Every savings cap needs a name.'; return; }
     try {
       // settings: single row — update if exists, else insert
       const sPayload = { monthly_amount: num(document.getElementById('s_monthly').value), growth_rate: num(document.getElementById('s_growth').value) / 100, start_balance: num(document.getElementById('s_start').value), contribution_growth_rate: num(document.getElementById('s_contribgrowth').value) / 100 };
@@ -168,7 +216,14 @@
         if (p.id != null) await App.write('PATCH', 'bd_purchases?id=eq.' + p.id, payload);
         else await App.write('POST', 'bd_purchases', payload);
       }
-      deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
+      // savings caps
+      for (const id of deletedCaps) await App.write('DELETE', 'bd_savings_caps?id=eq.' + id, undefined);
+      for (const c of caps) {
+        const payload = { cap_name: c.cap_name, start_date: c.start_date, end_date: c.end_date, cap_value: c.cap_value };
+        if (c.id != null) await App.write('PATCH', 'bd_savings_caps?id=eq.' + c.id, payload);
+        else await App.write('POST', 'bd_savings_caps', payload);
+      }
+      deleted = []; deletedCaps = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
       msg.style.color = '#065f46'; msg.textContent = '\u2713 Saved. Reopen the dashboard to update projections.';
       await reload(true);
     } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
@@ -178,11 +233,12 @@
     if (!quiet && dirty && !confirm('Discard unsaved changes and reload?')) return;
     const status = document.getElementById('status');
     try {
-      const [sRows, pRows, mRows, memRows] = await Promise.all([
+      const [sRows, pRows, mRows, memRows, capRows] = await Promise.all([
         App.rest('bd_cash_savings?limit=1'),
         App.rest('bd_purchases?order=purchase_date.asc'),
         App.rest('op_modelling_parameters?member_name=eq.Graham&order=updated_at.desc&limit=1'),
-        App.rest('bd_members')
+        App.rest('bd_members'),
+        App.rest('bd_savings_caps?order=start_date.asc')
       ]);
       settingsRow = sRows && sRows[0] ? sRows[0] : null;
       document.getElementById('s_start').value = settingsRow ? (settingsRow.start_balance || 0) : 0;
@@ -195,8 +251,9 @@
       let endIdx = null;
       (memRows || []).forEach(m => { if (m.end_of_life_date) { const d = new Date(m.end_of_life_date); const ix = d.getFullYear()*12 + d.getMonth(); if (endIdx == null || ix > endIdx) endIdx = ix; } });
       endMonthIdx = endIdx;
-      deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
-      render(); drawCashChart(); status.style.display = 'none';
+      caps = capRows || [];
+      deleted = []; deletedCaps = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
+      render(); renderCaps(); drawCashChart(); status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
 
