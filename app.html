@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=err2"></script>
-  <script src="engine.js?v=crash1"></script>
+  <script src="engine.js?v=crash2"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -278,6 +278,8 @@
     <h2><span class="viewlabel">Joint</span> Projections</h2>
     <div id="potChart" class="chart-box"></div>
     <div id="incomeChart" class="chart-box"></div>
+    <h3 id="crashChartHead" style="color:var(--ink); margin:18px 0 4px; display:none;">Pot Through Market Crashes</h3>
+    <div id="crashChart" class="chart-box" style="display:none;"></div>
   </div>
 
   <div id="Retirement" class="tabcontent">
@@ -331,7 +333,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-45</span>
+    <span class="build-stamp">build: LC-46</span>
   </div>
 
   <script>
@@ -496,6 +498,59 @@
           0: phone ? { title:'', viewWindow:{min:0, max:incMax}, ticks: incTicks, textStyle: axisText } : { title:'Income (£)', viewWindow:{min:0, max:incMax}, format:'£#,###', textStyle: axisText },
           1: phone ? { title:'', viewWindow:{min:0, max:incMax}, ticks: incTicks, textStyle: axisText } : { title:'Total drawdown (£)', viewWindow:{min:0, max:incMax}, format:'£#,###', textStyle: axisText }
         }
+      });
+      drawCrashChart();
+    }
+
+    function drawCrashChart() {
+      const head = document.getElementById('crashChartHead'), box = document.getElementById('crashChart');
+      const monthly = drawdownRows.monthly || [];
+      const windows = drawdownRows.crashWindows || [];
+      if (!chartsReady || !windows.length || !monthly.length) { head.style.display = 'none'; box.style.display = 'none'; return; }
+      head.style.display = ''; box.style.display = '';
+
+      // total pot per month for the current view
+      function potOf(r) {
+        if (currentView === 'Graham') return (r.g_taxFree || 0) + (r.g_taxable || 0);
+        if (currentView === 'Julie')  return (r.j_taxFree || 0) + (r.j_taxable || 0);
+        return (r.g_taxFree || 0) + (r.g_taxable || 0) + (r.j_taxFree || 0) + (r.j_taxable || 0);
+      }
+      // peak for scaling the shaded bands to full height
+      let peak = 0; monthly.forEach(r => { const v = potOf(r); if (v > peak) peak = v; });
+      const bandTop = Math.ceil(peak * 1.05 / 1000) * 1000;
+
+      // is this month inside any crash window? and is it a trough month?
+      const startMonthIdx = monthly.length ? monthly[0].year * 12 + monthly[0].month : 0;
+      function inCrash(idx) { return windows.some(w => idx >= w.startIdx && idx < w.endIdx); }
+      function isTrough(idx) { return windows.some(w => idx === w.troughIdx); }
+
+      const dt = new google.visualization.DataTable();
+      dt.addColumn('string', 'Month');
+      dt.addColumn('number', 'Crash period');           // shaded band (area) — full height during a crash
+      dt.addColumn('number', 'Total pot');              // the pot line
+      dt.addColumn({ type: 'string', role: 'annotation' });
+      dt.addColumn({ type: 'string', role: 'annotationText' });
+      monthly.forEach(r => {
+        const idx = r.year * 12 + r.month;
+        const note = isTrough(idx) ? '▼ trough' : null;
+        const noteText = isTrough(idx) ? ('Crash trough — ' + r.label + ': ' + fmt(potOf(r))) : null;
+        dt.addRow([r.label, inCrash(idx) ? bandTop : 0, Math.round(potOf(r)), note, noteText]);
+      });
+
+      const phone = window.innerWidth <= 600;
+      const months = monthly.length;
+      new google.visualization.ComboChart(box).draw(dt, {
+        title: 'Total pot through market crashes' + (currentView !== 'Joint' ? ' — ' + currentView : ''),
+        seriesType: 'line',
+        series: {
+          0: { type: 'area', color: '#c0392b', areaOpacity: 0.12, lineWidth: 0, enableInteractivity: false, visibleInLegend: false },
+          1: { type: 'line', color: '#2c7a7b', lineWidth: 3 }
+        },
+        legend: { position: 'none' },
+        chartArea: phone ? { left: 60, right: 16, top: 40, bottom: 70, height: '64%' } : { left: 88, right: 30, top: 44, bottom: 70 },
+        vAxis: { minValue: 0, viewWindow: { min: 0, max: bandTop }, title: phone ? '' : 'Total pot (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
+        hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, Math.round(months / (phone ? 6 : 12))), slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: phone ? 9 : 11 } },
+        annotations: { style: 'point', textStyle: { fontSize: 11, color: '#c0392b', bold: true } }
       });
     }
 

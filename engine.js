@@ -389,6 +389,7 @@
     }
     flush();
     rows.monthly = monthlyRows;
+    rows.crashWindows = crashes.map(c => ({ startIdx: c.startIdx, troughIdx: c.startIdx + c.D, endIdx: c.endIdx }));
     return rows;
   }
 
