@@ -357,7 +357,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-52</span>
+    <span class="build-stamp">build: LC-53</span>
   </div>
 
   <script>
@@ -689,8 +689,8 @@
           0: { type: 'area', color: '#e67e22', areaOpacity: 0.25, lineWidth: 1, targetAxisIndex: 1 },
           1: { type: 'line', color: '#2c7a7b', lineWidth: 3, targetAxisIndex: 0 }
         },
-        legend: { position: 'bottom' },
-        chartArea: phone ? { left: 56, right: 50, top: 40, bottom: 70, height: '62%' } : { left: 84, right: 84, top: 44, bottom: 70 },
+        legend: { position: 'top', alignment: 'center' },
+        chartArea: phone ? { left: 56, right: 50, top: 60, bottom: 90, height: '58%' } : { left: 84, right: 84, top: 60, bottom: 95 },
         vAxes: {
           0: { minValue: 0, viewWindow: { min: 0, max: balTop }, title: phone ? '' : 'Balance (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
           1: { minValue: 0, viewWindow: { min: 0, max: payTop }, title: phone ? '' : 'Finance £/mo', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } }
