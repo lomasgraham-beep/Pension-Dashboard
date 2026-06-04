@@ -187,6 +187,25 @@
       return factor;
     }
 
+    // ---- Savings caps ----
+    // When enabled (cfg.savingsCap), within an active cap period any cash savings ABOVE the
+    // cap are used to cover cost of living (after guaranteed income, before drawdown), draining
+    // the pot down TO the cap but never below. Returns the lowest applicable cap, or null.
+    const savingsCaps = (data.savingsCaps || []).map(c => {
+      const s = c.start_date ? new Date(c.start_date) : null;
+      const e = c.end_date ? new Date(c.end_date) : null;
+      return {
+        startIdx: s ? s.getFullYear() * 12 + s.getMonth() : -Infinity,
+        endIdx: e ? e.getFullYear() * 12 + e.getMonth() : Infinity,
+        value: Number(c.cap_value) || 0
+      };
+    });
+    function capForMonth(idx) {
+      let cap = null;
+      for (const c of savingsCaps) if (idx >= c.startIdx && idx <= c.endIdx) cap = (cap == null) ? c.value : Math.min(cap, c.value);
+      return cap;
+    }
+
     const taperFor = (row, oldest) => {
       if (oldest >= 90) return row.taper_at_90 != null ? Number(row.taper_at_90) : 1.0;
       if (oldest >= 80) return row.taper_at_80 != null ? Number(row.taper_at_80) : 1.0;
@@ -294,7 +313,7 @@
           stateGross: 0, otherPensions: 0, drawdown: 0,
           g_other: 0, j_other: 0, g_draw: 0, j_draw: 0, g_income: 0, j_income: 0, totalIncome: 0,
           combinedClosing: 0, g_closing: 0, j_closing: 0, shortfall: false,
-          cashBalance: 0, cashFinance: 0, cashDeposit: 0, cashShortfall: 0
+          cashBalance: 0, cashFinance: 0, cashDeposit: 0, cashShortfall: 0, cashCapDraw: 0
         };
       }
 
@@ -322,7 +341,25 @@
 
       // finance payments + any deposit shortfall are extra outgoings the drawdown must cover
       const cashOutM = financeThisMonth + depositShortfall;
-      const outM = billsM + diningM + cashOutM;
+      let outM = billsM + diningM + cashOutM;
+
+      // ---- Savings cap: use surplus above the cap to cover living costs before drawdown ----
+      // Order (per design): saving+growth and purchase deposit already applied above; now, if the
+      // cap feature is on and a cap is active, drain savings above the cap to meet the net cost of
+      // living (after guaranteed income), reducing what the pension drawdown must provide.
+      let capDrawFromSavings = 0;
+      if (cfg.savingsCap) {
+        const cap = capForMonth(idx);
+        if (cap != null && cashBal > cap) {
+          const guaranteedTotal = grossMonth('Graham', idx, elapsed).total + grossMonth('Julie', idx, elapsed).total;
+          const netNeed = Math.max(0, outM - guaranteedTotal);   // cost of living not met by guaranteed income
+          const surplus = cashBal - cap;                          // available above the cap
+          capDrawFromSavings = Math.min(surplus, netNeed);
+          cashBal -= capDrawFromSavings;                          // drain savings (never below the cap)
+          outM -= capDrawFromSavings;                             // drawdown now covers less
+        }
+      }
+
       const gTargetM = outM * gRatio, jTargetM = outM * jRatio;
 
       // opening pots for THIS month (before drawdown)
@@ -368,7 +405,7 @@
         totalIncome: mOther + gDraw + jDraw,
         combinedClosing: gTf + gTx + jTf + jTx, g_closing: gTf + gTx, j_closing: jTf + jTx,
         shortfall: monthShort,
-        cashBalance: cashBal, cashFinance: financeThisMonth, cashDeposit: depositThisMonth, cashShortfall: depositShortfall
+        cashBalance: cashBal, cashFinance: financeThisMonth, cashDeposit: depositThisMonth, cashShortfall: depositShortfall, cashCapDraw: capDrawFromSavings
       });
 
       acc.outgoings += outM; acc.billsTotal += billsM; acc.diningTotal += diningM;
@@ -382,6 +419,7 @@
       acc.combinedClosing = gTf + gTx + jTf + jTx;
       acc.g_closing = gTf + gTx; acc.j_closing = jTf + jTx;
       acc.cashBalance = cashBal;                     // year-end balance (last month wins)
+      acc.cashCapDraw = (acc.cashCapDraw || 0) + capDrawFromSavings;
       acc.cashFinance += financeThisMonth;
       acc.cashDeposit += depositThisMonth;
       acc.cashShortfall += depositShortfall;
