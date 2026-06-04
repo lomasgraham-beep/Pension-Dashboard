@@ -5,7 +5,7 @@
 <title>Cash &amp; Purchases</title>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=err14"></script>
+<script src="common.js?v=err23"></script>
 <style>
   :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
@@ -60,7 +60,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v6)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v8)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
 
   <div class="bar">
@@ -90,7 +90,7 @@
   </div>
 
   <h3>Savings Caps <button class="btn btn-add" style="font-size:13px; padding:8px 14px; margin-left:8px;" onclick="addCap()">+ Add cap</button></h3>
-  <p class="note">During a cap period, any savings <em>above</em> the cap are used to cover living costs before the pension drawdown (when the cap feature is switched on in Modelling). Savings are only drained down to the cap, never below.</p>
+  <p class="note">A cap is the <em>maximum</em> your savings build to during a period. Once the balance reaches the cap, the monthly saving is redirected to cover living costs instead (reducing pension drawdown), when the cap feature is switched on in Modelling. Growth may still drift the balance slightly above the cap.</p>
   <div class="table-wrap">
     <table id="capTbl">
       <thead><tr><th>Name</th><th>Start Date</th><th>End Date</th><th>Cap Value (£)</th><th></th></tr></thead>

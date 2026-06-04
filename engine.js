@@ -322,12 +322,23 @@
       const diningM = dining.reduce((s, d) => s + (Number(d.annual_total) || 0) * (d.spend_reduction ? spendRed : 1.0) * taperFor(d, oldest), 0) / 12 * inflFactor;
 
       // ---- Cash pot for THIS month ----
-      // 1) add this month's saving (escalated annually), then 2) grow the pot.
+      // Grow the existing balance first (growth always applies — balance may drift above the cap).
       const cashOpen = cashBal;
+      cashBal = cashBal * cashGrowthM;
       const cashSaveThis = cashMonthly * Math.pow(1 + cashContribGrowth, Math.floor(elapsed));
-      cashBal = (cashBal + cashSaveThis) * cashGrowthM;
-      // 3) any purchase deposits dated this month come out of the pot; shortfall spills to drawdown.
-      // 4) sum finance payments for any purchase whose term is active this month.
+      // Ceiling rule: if the cap feature is on and a cap is active and the balance is already at/above
+      // the cap, the monthly contribution is NOT added — it's redirected to cover living costs (reduces
+      // drawdown). Otherwise it's saved as normal.
+      let capRedirect = 0;
+      if (cfg.savingsCap) {
+        const cap = capForMonth(idx);
+        if (cap != null && cashBal >= cap) capRedirect = cashSaveThis;   // at ceiling: redirect contribution
+        else cashBal += cashSaveThis;                                     // below ceiling: save normally
+      } else {
+        cashBal += cashSaveThis;
+      }
+      // purchase deposits dated this month come out of the pot; shortfall spills to drawdown.
+      // finance payments for any purchase whose term is active this month.
       let depositThisMonth = 0, financeThisMonth = 0, depositShortfall = 0;
       for (const p of purchases) {
         if (p.pIdx === idx) depositThisMonth += p.deposit;
@@ -339,25 +350,19 @@
         depositShortfall = depositThisMonth - fromCash;   // covered by pension drawdown this month
       }
 
-      // finance payments + any deposit shortfall are extra outgoings the drawdown must cover
+      // finance payments + any deposit shortfall are extra outgoings the drawdown must cover;
+      // the redirected contribution REDUCES the cost the drawdown must cover.
       const cashOutM = financeThisMonth + depositShortfall;
       let outM = billsM + diningM + cashOutM;
 
-      // ---- Savings cap: use surplus above the cap to cover living costs before drawdown ----
-      // Order (per design): saving+growth and purchase deposit already applied above; now, if the
-      // cap feature is on and a cap is active, drain savings above the cap to meet the net cost of
-      // living (after guaranteed income), reducing what the pension drawdown must provide.
+      // The redirected contribution (when at the savings ceiling) covers living costs, reducing
+      // what the pension drawdown must provide — but only up to the net need after guaranteed income.
       let capDrawFromSavings = 0;
-      if (cfg.savingsCap) {
-        const cap = capForMonth(idx);
-        if (cap != null && cashBal > cap) {
-          const guaranteedTotal = grossMonth('Graham', idx, elapsed).total + grossMonth('Julie', idx, elapsed).total;
-          const netNeed = Math.max(0, outM - guaranteedTotal);   // cost of living not met by guaranteed income
-          const surplus = cashBal - cap;                          // available above the cap
-          capDrawFromSavings = Math.min(surplus, netNeed);
-          cashBal -= capDrawFromSavings;                          // drain savings (never below the cap)
-          outM -= capDrawFromSavings;                             // drawdown now covers less
-        }
+      if (capRedirect > 0) {
+        const guaranteedTotal = grossMonth('Graham', idx, elapsed).total + grossMonth('Julie', idx, elapsed).total;
+        const netNeed = Math.max(0, outM - guaranteedTotal);
+        capDrawFromSavings = Math.min(capRedirect, netNeed);
+        outM -= capDrawFromSavings;
       }
 
       const gTargetM = outM * gRatio, jTargetM = outM * jRatio;
