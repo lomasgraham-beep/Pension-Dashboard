@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=err2"></script>
-  <script src="engine.js?v=crash2"></script>
+  <script src="engine.js?v=crash3"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -280,6 +280,8 @@
     <div id="incomeChart" class="chart-box"></div>
     <h3 id="crashChartHead" style="color:var(--ink); margin:18px 0 4px; display:none;">Pot Through Market Crashes</h3>
     <div id="crashChart" class="chart-box" style="display:none;"></div>
+    <h3 id="cashModelHead" style="color:var(--ink); margin:18px 0 4px; display:none;">Cash Savings Balance</h3>
+    <div id="cashModelChart" class="chart-box" style="display:none;"></div>
   </div>
 
   <div id="Retirement" class="tabcontent">
@@ -333,7 +335,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-48</span>
+    <span class="build-stamp">build: LC-49</span>
   </div>
 
   <script>
@@ -523,6 +525,7 @@
         annotations: { alwaysOutside:true, textStyle:{ fontSize:13, color:'#c0392b', bold:true }, stem:{ color:'#c0392b' } }
       });
       drawCrashChart();
+      drawCashModelChart();
     }
 
     function drawCrashChart() {
@@ -574,6 +577,52 @@
         vAxis: { minValue: 0, viewWindow: { min: 0, max: bandTop }, title: phone ? '' : 'Total pot (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
         hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, Math.round(months / (phone ? 6 : 12))), slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: phone ? 9 : 11 } },
         annotations: { style: 'point', textStyle: { fontSize: 11, color: '#c0392b', bold: true } }
+      });
+    }
+
+    function drawCashModelChart() {
+      const head = document.getElementById('cashModelHead'), box = document.getElementById('cashModelChart');
+      const monthly = drawdownRows.monthly || [];
+      const pw = drawdownRows.purchaseWindows || [];
+      const hasCash = monthly.some(m => (m.cashBalance || 0) > 0 || (m.cashDeposit || 0) > 0);
+      if (!chartsReady || !hasCash || !monthly.length) { head.style.display = 'none'; box.style.display = 'none'; return; }
+      head.style.display = ''; box.style.display = '';
+
+      let peak = 0; monthly.forEach(m => { if ((m.cashBalance || 0) > peak) peak = m.cashBalance; });
+      const bandTop = Math.ceil(Math.max(peak, 1) * 1.05 / 1000) * 1000;
+      function inFinance(idx) { return pw.some(w => w.term > 0 && idx >= w.depositIdx && idx < w.payoffIdx); }
+      function depHere(idx) { return pw.filter(w => w.depositIdx === idx); }
+      function payoffHere(idx) { return pw.filter(w => w.term > 0 && w.payoffIdx === idx); }
+
+      const dt = new google.visualization.DataTable();
+      dt.addColumn('string', 'Month');
+      dt.addColumn('number', 'Finance period');     // shaded band during a loan's term
+      dt.addColumn('number', 'Cash balance');       // the balance line
+      dt.addColumn({ type: 'string', role: 'annotation' });
+      dt.addColumn({ type: 'string', role: 'annotationText' });
+      monthly.forEach(m => {
+        const idx = m.year * 12 + m.month;
+        const deps = depHere(idx), pays = payoffHere(idx);
+        let note = null, noteText = null;
+        if (deps.length) { note = '▼'; noteText = deps.map(d => d.name + ' deposit ' + fmt(d.deposit)).join('; '); }
+        else if (pays.length) { note = '◆'; noteText = pays.map(d => d.name + ' paid off (£' + Math.round(d.pay) + '/mo ended)').join('; '); }
+        dt.addRow([m.label, inFinance(idx) ? bandTop : 0, Math.round(m.cashBalance || 0), note, noteText]);
+      });
+
+      const phone = window.innerWidth <= 600;
+      const months = monthly.length;
+      new google.visualization.ComboChart(box).draw(dt, {
+        title: 'Cash savings balance (finance periods shaded, ▼ deposit, ◆ paid off)',
+        seriesType: 'line',
+        series: {
+          0: { type: 'area', color: '#e67e22', areaOpacity: 0.12, lineWidth: 0, enableInteractivity: false, visibleInLegend: false },
+          1: { type: 'line', color: '#2c7a7b', lineWidth: 3 }
+        },
+        legend: { position: 'none' },
+        chartArea: phone ? { left: 60, right: 16, top: 40, bottom: 70, height: '64%' } : { left: 88, right: 30, top: 44, bottom: 70 },
+        vAxis: { minValue: 0, viewWindow: { min: 0, max: bandTop }, title: phone ? '' : 'Balance (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
+        hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, Math.round(months / (phone ? 6 : 12))), slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: phone ? 9 : 11 } },
+        annotations: { style: 'point', textStyle: { fontSize: 11, color: '#236668', bold: true } }
       });
     }
 
