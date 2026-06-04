@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=err2"></script>
-  <script src="engine.js?v=cap1"></script>
+  <script src="engine.js?v=cap2"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -279,9 +279,9 @@
           </div>
         </div>
         <div class="ctrl ctrl-wide">
-          <label class="switch"><input type="checkbox" id="m_savingscap" onchange="onParam()"><span class="track"></span><span class="switch-text">Use savings above cap for living costs</span>
+          <label class="switch"><input type="checkbox" id="m_savingscap" onchange="onParam()"><span class="track"></span><span class="switch-text">Cap savings — redirect extra to living costs</span>
             <button type="button" class="info-btn" onclick="toggleInfo(event,'info_cap')" aria-label="What is the savings cap feature?">i</button></label>
-          <div class="info-text" id="info_cap">During a cap period (set on the Cash &amp; Purchases page), savings above the cap cover living costs before the pension drawdown — draining savings down to the cap, never below. Reduces early drawdown and preserves the pot.</div>
+          <div class="info-text" id="info_cap">During a cap period (set on the Cash &amp; Purchases page), once savings reach the cap (their maximum), the monthly saving is no longer added — it's redirected to cover living costs, reducing the pension drawdown. Growth may still drift the balance slightly above the cap.</div>
         </div>
       </div>
       <div class="actions">
@@ -362,7 +362,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-58</span>
+    <span class="build-stamp">build: LC-59</span>
   </div>
 
   <script>
@@ -830,7 +830,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err21';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err22';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
