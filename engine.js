@@ -61,8 +61,13 @@
     const monthlyGrowth = (plan.growthRate != null ? plan.growthRate : 0.05) / 12;
     let augusts = 0;
 
-    let maxG = sumMember(data, pots, 'Graham');
-    let maxJ = sumMember(data, pots, 'Julie');
+    // person 1 / person 2 alphabetically; person 1 carries the shorter-week phasing.
+    const fMembers = (data.members || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    const fp1 = fMembers[0] ? fMembers[0].name : 'Graham';
+    const fp2 = fMembers[1] ? fMembers[1].name : null;
+
+    let maxG = sumMember(data, pots, fp1);
+    let maxJ = fp2 ? sumMember(data, pots, fp2) : 0;
 
     let guard = 0;
     while (cur < retire && guard < 1200) {
@@ -76,22 +81,22 @@
       if (cur.getMonth() === 7) augusts++; // August
 
       (data.contributions || []).forEach(c => {
-        if (c.member_name === 'Graham' && Number(c.working_days) === Number(gDays)) {
-          const k = 'Graham|' + c.pension_name;
+        if (c.member_name === fp1 && Number(c.working_days) === Number(gDays)) {
+          const k = fp1 + '|' + c.pension_name;
           if (k in pots) pots[k] += (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), augusts);
         }
       });
-      (data.contributions || []).forEach(c => {
-        if (c.member_name === 'Julie') {
-          const k = 'Julie|' + c.pension_name;
+      if (fp2) (data.contributions || []).forEach(c => {
+        if (c.member_name === fp2) {
+          const k = fp2 + '|' + c.pension_name;
           if (k in pots) pots[k] += (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), augusts);
         }
       });
 
       Object.keys(pots).forEach(k => pots[k] *= (1 + monthlyGrowth));
 
-      const g = sumMember(data, pots, 'Graham');
-      const j = sumMember(data, pots, 'Julie');
+      const g = sumMember(data, pots, fp1);
+      const j = fp2 ? sumMember(data, pots, fp2) : 0;
       if (g > maxG) maxG = g;
       if (j > maxJ) maxJ = j;
     }
@@ -107,8 +112,13 @@
   function drawdown(data, cfg) {
     const gRatio = cfg.gRatio, spendRed = cfg.spendRed, jRatio = 1 - gRatio, sp = cfg.sp;
     const members = data.members || [], bills = data.bills || [], dining = data.dining || [], guaranteed = data.guaranteed || [];
-    const gM = members.find(m => m.name === 'Graham') || {};
-    const jM = members.find(m => m.name === 'Julie') || {};
+    // person 1 / person 2 derived from the members table, alphabetically by name.
+    // Single-member instances leave p2 empty, so all j_* contributions are zero.
+    const sortedMembers = members.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    const p1Name = sortedMembers[0] ? sortedMembers[0].name : 'Graham';
+    const p2Name = sortedMembers[1] ? sortedMembers[1].name : null;   // null = single-person instance
+    const gM = sortedMembers[0] || {};
+    const jM = sortedMembers[1] || {};
     const gDobYr = gM.dob ? new Date(gM.dob).getFullYear() : null;
     const jDobYr = jM.dob ? new Date(jM.dob).getFullYear() : null;
     const gDob = gM.dob ? new Date(gM.dob) : null;
@@ -392,8 +402,8 @@
       // opening pots for THIS month (before drawdown)
       const oGTf = gTf, oGTx = gTx, oJTf = jTf, oJTx = jTx;
 
-      const gInc = grossMonth('Graham', idx, elapsed);
-      const jInc = grossMonth('Julie', idx, elapsed);
+      const gInc = grossMonth(p1Name, idx, elapsed);
+      const jInc = p2Name ? grossMonth(p2Name, idx, elapsed) : { stateGross: 0, otherGross: 0, total: 0 };
 
       let gRes, jRes, monthShort;
       if (cfg.dynamic) {
