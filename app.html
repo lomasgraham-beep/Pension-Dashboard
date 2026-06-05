@@ -266,15 +266,15 @@
           <div class="seg" id="m_p1days_seg" data-target="m_p1days"><button type="button" data-v="5">5 days</button><button type="button" data-v="4">4 days</button><button type="button" data-v="3">3 days</button></div>
           <input type="hidden" id="m_p1days" value="4"></div>
         <div class="ctrl"><label>Spending in retirement <span id="m_spend_v" class="sv">100%</span></label><input type="range" id="m_spend" min="25" max="100" step="1" value="100" oninput="onParam()"></div>
-        <div class="ctrl"><label>Graham drawdown ratio <span id="m_ratio_v" class="sv">50%</span></label><input type="range" id="m_ratio" min="0" max="100" step="1" value="50" oninput="onParam()"></div>
+        <div class="ctrl" id="ctrlRatio"><label><span class="nm-p1">Graham</span> drawdown ratio <span id="m_ratio_v" class="sv">50%</span></label><input type="range" id="m_ratio" min="0" max="100" step="1" value="50" oninput="onParam()"></div>
         <div class="ctrl ctrl-note"><p class="note" style="margin:0;">Drag any control and the whole dashboard updates instantly — nothing is saved until you tap <strong>Save</strong>.</p></div>
         <div class="ctrl ctrl-wide">
           <label class="switch"><input type="checkbox" id="m_dynamic" onchange="onParam()"><span class="track"></span><span class="switch-text">Dynamic model mode</span>
             <button type="button" class="info-btn" onclick="toggleInfo(event,'info_dyn')" aria-label="What is dynamic model mode?">i</button></label>
           <div class="info-text" id="info_dyn">Protect each pot to a floor; redirect drawdown to the fuller pot.</div>
           <div id="m_floors" class="floors-panel">
-            <div class="ctrl"><label>Graham floor <span id="m_gfloor_v" class="sv">25%</span></label><input type="range" id="m_gfloor" min="0" max="90" step="1" value="25" oninput="onParam()"></div>
-            <div class="ctrl"><label>Julie floor <span id="m_jfloor_v" class="sv">20%</span></label><input type="range" id="m_jfloor" min="0" max="90" step="1" value="20" oninput="onParam()"></div>
+            <div class="ctrl" id="ctrlGFloor"><label><span class="nm-p1">Graham</span> floor <span id="m_gfloor_v" class="sv">25%</span></label><input type="range" id="m_gfloor" min="0" max="90" step="1" value="25" oninput="onParam()"></div>
+            <div class="ctrl" id="ctrlJFloor"><label><span class="nm-p2">Julie</span> floor <span id="m_jfloor_v" class="sv">20%</span></label><input type="range" id="m_jfloor" min="0" max="90" step="1" value="20" oninput="onParam()"></div>
             <div class="hint">% of each taxable pot's value at retirement.</div>
           </div>
         </div>
@@ -357,7 +357,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-71</span>
+    <span class="build-stamp">build: LC-72</span>
   </div>
 
   <script>
@@ -454,6 +454,8 @@
       // person-2 / combined cards
       ['cardP2Now','cardP2Ret'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = single ? 'none' : ''; });
       ['cardCombinedNow','cardCombinedRet'].forEach(id => { const el = document.getElementById(id); if (el) { const h = el.querySelector('h3'); if (single && h) h.textContent = h.textContent.replace('Combined pot', 'Pot'); } });
+      // Modelling controls that only make sense with two people
+      ['ctrlRatio','ctrlJFloor'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = single ? 'none' : ''; });
     }
 
     // ---------- per-view field pickers ----------
@@ -777,7 +779,7 @@
         phase2Date: idxToDate(document.getElementById('m_p2date').value),
         phase2Days: segValue('m_p2days'),
         spendRed: parseFloat(document.getElementById('m_spend').value) / 100,
-        gRatio: parseFloat(document.getElementById('m_ratio').value) / 100,
+        gRatio: p2Name ? (parseFloat(document.getElementById('m_ratio').value) / 100) : 1,
         dynamic: document.getElementById('m_dynamic').checked,
         gFloorPct: (parseFloat(document.getElementById('m_gfloor').value) || 0) / 100,
         jFloorPct: (parseFloat(document.getElementById('m_jfloor').value) || 0) / 100
