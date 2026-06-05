@@ -5,7 +5,7 @@
 <title>Cash &amp; Purchases</title>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=err24"></script>
+<script src="common.js?v=err25"></script>
 <style>
   :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
@@ -60,7 +60,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v9)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v10)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
 
   <div class="bar">
@@ -77,8 +77,8 @@
   <p class="note">Each account belongs to a member. <strong>Instant access</strong> accounts can be drawn on to cover living costs (the cap feature) and purchase deposits; non-instant accounts (e.g. fixed-term ISAs) still grow but can't be tapped. Interest can compound monthly, pay annually, or only at the end of the term.</p>
   <div class="table-wrap">
     <table id="acctTbl">
-      <thead><tr><th>Name</th><th>Member</th><th>Start Balance</th><th>Monthly</th><th>Increase/yr %</th><th>Start Date</th><th>End Date</th><th>APR %</th><th>Interest</th><th>Type</th><th>Instant Access</th><th></th></tr></thead>
-      <tbody><tr><td colspan="12">Loading&hellip;</td></tr></tbody>
+      <thead><tr><th>Name</th><th>Member</th><th>Start Balance</th><th>Monthly</th><th>Increase/yr %</th><th>Savings Cap</th><th>Start Date</th><th>End Date</th><th>APR %</th><th>Interest</th><th>Type</th><th>Instant Access</th><th></th></tr></thead>
+      <tbody><tr><td colspan="13">Loading&hellip;</td></tr></tbody>
     </table>
   </div>
 
@@ -213,6 +213,7 @@
       '<td data-label="Start Balance"><input type="number" class="a-start" step="1" value="' + (a.start_balance != null ? a.start_balance : 0) + '" oninput="markAcct()"></td>' +
       '<td data-label="Monthly"><input type="number" class="a-monthly" step="1" value="' + (a.monthly_amount != null ? a.monthly_amount : 0) + '" oninput="markAcct()"></td>' +
       '<td data-label="Increase/yr %"><input type="number" class="a-grow" step="0.1" value="' + (a.contribution_growth_rate != null ? (a.contribution_growth_rate * 100) : 0) + '" oninput="markAcct()"></td>' +
+      '<td data-label="Savings Cap"><input type="number" class="a-cap" step="1" value="' + (a.savings_cap != null ? a.savings_cap : 0) + '" oninput="markAcct()"></td>' +
       '<td data-label="Start Date"><input type="date" class="a-startdate" value="' + (a.start_date ? String(a.start_date).split('T')[0] : '') + '" onchange="markAcct()"></td>' +
       '<td data-label="End Date"><input type="date" class="a-enddate" value="' + (a.end_date ? String(a.end_date).split('T')[0] : '') + '" onchange="markAcct()"></td>' +
       '<td data-label="APR %"><input type="number" class="a-apr" step="0.1" value="' + (a.apr != null ? a.apr : 0) + '" oninput="markAcct()"></td>' +
@@ -222,7 +223,7 @@
       '<td><button class="del" onclick="delAcct(this)">Delete</button></td></tr>';
   }
   function renderAccts() {
-    acctBody.innerHTML = accounts.length ? accounts.map(acctRowHtml).join('') : '<tr><td colspan="12">No savings accounts. Use \u201cAdd account\u201d.</td></tr>';
+    acctBody.innerHTML = accounts.length ? accounts.map(acctRowHtml).join('') : '<tr><td colspan="13">No savings accounts. Use \u201cAdd account\u201d.</td></tr>';
   }
   function markAcct() { syncAccts(); setDirty(); }
   function syncAccts() {
@@ -233,6 +234,7 @@
       accounts[i].start_balance = num(tr.querySelector('.a-start').value);
       accounts[i].monthly_amount = num(tr.querySelector('.a-monthly').value);
       accounts[i].contribution_growth_rate = num(tr.querySelector('.a-grow').value) / 100;
+      accounts[i].savings_cap = num(tr.querySelector('.a-cap').value);
       accounts[i].start_date = tr.querySelector('.a-startdate').value || null;
       accounts[i].end_date = tr.querySelector('.a-enddate').value || null;
       accounts[i].apr = num(tr.querySelector('.a-apr').value);
@@ -243,7 +245,7 @@
   }
   function addAcct() {
     syncAccts();
-    accounts.push({ id: undefined, account_name: '', member_name: members[0] || '', start_balance: 0, monthly_amount: 0, contribution_growth_rate: 0, start_date: null, end_date: null, apr: 0, interest_frequency: 'monthly', interest_type: 'compound', instant_access: true });
+    accounts.push({ id: undefined, account_name: '', member_name: members[0] || '', start_balance: 0, monthly_amount: 0, contribution_growth_rate: 0, savings_cap: 0, start_date: null, end_date: null, apr: 0, interest_frequency: 'monthly', interest_type: 'compound', instant_access: true });
     renderAccts(); setDirty();
   }
   function delAcct(btn) {
@@ -266,7 +268,7 @@
       // savings accounts
       for (const id of deletedAccts) await App.write('DELETE', 'bd_savings_accounts?id=eq.' + id, undefined);
       for (const a of accounts) {
-        const payload = { account_name: a.account_name, member_name: a.member_name, start_balance: a.start_balance, monthly_amount: a.monthly_amount, contribution_growth_rate: a.contribution_growth_rate, start_date: a.start_date, end_date: a.end_date, apr: a.apr, interest_frequency: a.interest_frequency, interest_type: a.interest_type, instant_access: a.instant_access };
+        const payload = { account_name: a.account_name, member_name: a.member_name, start_balance: a.start_balance, monthly_amount: a.monthly_amount, contribution_growth_rate: a.contribution_growth_rate, savings_cap: a.savings_cap, start_date: a.start_date, end_date: a.end_date, apr: a.apr, interest_frequency: a.interest_frequency, interest_type: a.interest_type, instant_access: a.instant_access };
         if (a.id != null) await App.write('PATCH', 'bd_savings_accounts?id=eq.' + a.id, payload);
         else await App.write('POST', 'bd_savings_accounts', payload);
       }
