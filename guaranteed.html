@@ -48,6 +48,7 @@
 
 <script>
   let rows = [], dirty = false, deleted = [];
+  let members = ['Graham', 'Julie'];
   const tbody = document.querySelector('#tbl tbody');
   const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
 
@@ -55,7 +56,7 @@
 
   function rowHtml(r, i) {
     return `<tr data-i="${i}">
-      <td><select class="f-member" onchange="mark()"><option ${r.member_name==='Graham'?'selected':''}>Graham</option><option ${r.member_name==='Julie'?'selected':''}>Julie</option></select></td>
+      <td><select class="f-member" onchange="mark()">${members.map(m => `<option ${r.member_name===m?'selected':''}>${m}</option>`).join('')}</select></td>
       <td><input type="text" class="f-name" value="${(r.income_name||'').replace(/"/g,'&quot;')}" oninput="mark();flagState(this)"> <span class="hint-state" style="display:${isState(r.income_name)?'inline':'none'}">grows from today</span></td>
       <td><input type="date" class="f-start" value="${r.start_date?String(r.start_date).split('T')[0]:''}" onchange="mark()"></td>
       <td><input type="date" class="f-end" value="${r.end_date?String(r.end_date).split('T')[0]:''}" onchange="mark()"></td>
@@ -86,7 +87,7 @@
 
   function addRow() {
     const current = collect();
-    current.push({ id: undefined, member_name: 'Graham', income_name: '', start_date: null, end_date: null, initial_annual_value: 0, inflation_linked: true });
+    current.push({ id: undefined, member_name: members[0] || 'Graham', income_name: '', start_date: null, end_date: null, initial_annual_value: 0, inflation_linked: true });
     rows = current; render(); setDirty();
   }
   function delRow(btn) {
@@ -116,6 +117,8 @@
     if (!quiet && dirty && !confirm('Discard unsaved changes and reload?')) return;
     const status = document.getElementById('status');
     try {
+      const mn = await App.memberNames();
+      if (mn.all && mn.all.length) members = mn.all;
       rows = await App.rest('bd_guaranteed_incomes?order=member_name.asc,income_name.asc');
       deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
       render(); status.style.display = 'none';

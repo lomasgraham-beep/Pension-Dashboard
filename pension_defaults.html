@@ -83,7 +83,7 @@
   <h2>Retirement Timing</h2>
   <div class="field">
     <label>Drop to a 4-day week on</label>
-    <span class="hint">When Graham first reduces hours. Leave blank if not planned.</span>
+    <span class="hint">When <span class="nm-p1">Graham</span> first reduces hours. Leave blank if not planned.</span>
     <div class="phase-row">
       <input type="date" id="d_p1date" oninput="markDirty()">
       <div><div class="sub">Days</div><select id="d_p1days" onchange="markDirty()"><option value="5">5</option><option value="4">4</option><option value="3">3</option></select></div>
@@ -112,8 +112,8 @@
     <input type="range" id="d_spend" min="25" max="100" step="1" value="100" oninput="document.getElementById('v_spend').innerText=this.value+'%'; markDirty()">
   </div>
   <div class="field">
-    <label>Graham drawdown ratio <span id="v_ratio" class="slider-val">50%</span></label>
-    <span class="hint" id="ratioHint">Share of joint outgoings funded from Graham's pots; Julie funds the rest.</span>
+    <label><span class="nm-p1">Graham</span> drawdown ratio <span id="v_ratio" class="slider-val">50%</span></label>
+    <span class="hint" id="ratioHint">Share of joint outgoings funded from <span class="nm-p1">Graham</span>'s pots; <span class="nm-p2">Julie</span> funds the rest.</span>
     <input type="range" id="d_ratio" min="0" max="100" step="1" value="50" oninput="updateRatioHint(); markDirty()">
   </div>
 </div>
@@ -133,6 +133,8 @@
   const SUPABASE_URL = "https://yavfcitgyyftpubqwddp.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
   const PARAMS_URL = `${SUPABASE_URL}/rest/v1/op_modelling_parameters`;
+  const MEMBERS_URL = `${SUPABASE_URL}/rest/v1/bd_members`;
+  let p1Name = 'Graham', p2Name = null;
   const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${authToken || SUPABASE_KEY}`, "Content-Type": "application/json" });
   let authToken = null;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -148,10 +150,19 @@
   function markDirty() { dirty = true; document.getElementById('dirtyFlag').style.display = 'inline-block'; }
   function clearDirty() { dirty = false; document.getElementById('dirtyFlag').style.display = 'none'; }
 
+  function applyNames() {
+    document.querySelectorAll('.nm-p1').forEach(el => el.textContent = p1Name);
+    document.querySelectorAll('.nm-p2').forEach(el => el.textContent = p2Name || '');
+    // a single person has no drawdown split — hide the ratio field
+    const ratioField = document.getElementById('d_ratio') ? document.getElementById('d_ratio').closest('.field') : null;
+    if (ratioField) ratioField.style.display = p2Name ? '' : 'none';
+    updateRatioHint();
+  }
+
   function updateRatioHint() {
     const g = parseInt(val('d_ratio'));
     document.getElementById('v_ratio').innerText = g + '%';
-    document.getElementById('ratioHint').innerText = `Graham funds ${g}% of joint outgoings; Julie funds the remaining ${100 - g}%.`;
+    document.getElementById('ratioHint').innerText = `${p1Name} funds ${g}% of joint outgoings; ${p2Name || 'the other member'} funds the remaining ${100 - g}%.`;
   }
 
   function refreshSummary() {
@@ -162,7 +173,7 @@
       `3-day week from <b>${fmtDate(r.shorter_week_date_2)}</b> (${r.working_days_2 ?? '—'}d), ` +
       `retire <b>${fmtDate(r.retirement_date)}</b>, ` +
       `spend <b>${Math.round((r.spending_reduction_pct ?? 1) * 100)}%</b>, ` +
-      `Graham ratio <b>${Math.round((r.drawdown_ratio_graham ?? 0.5) * 100)}%</b>.`;
+      `${p1Name} ratio <b>${Math.round((r.drawdown_ratio_graham ?? 0.5) * 100)}%</b>.`;
   }
 
   function populate(r) {
@@ -181,7 +192,13 @@
     const status = document.getElementById('status');
     if (isReload && dirty && !confirm('Discard your unsaved edits and reload the saved values?')) return;
     try {
-      const r = await fetch(`${PARAMS_URL}?member_name=eq.Graham&order=updated_at.desc&limit=1`, { headers: getHeaders() });
+      // derive person names (alphabetical) and apply to labels/hints
+      try {
+        const mr = await fetch(`${MEMBERS_URL}?order=name.asc`, { headers: getHeaders() });
+        if (mr.ok) { const ms = (await mr.json()).map(m => m.name).filter(Boolean); if (ms.length) { p1Name = ms[0]; p2Name = ms[1] || null; } }
+      } catch (e) {}
+      applyNames();
+      const r = await fetch(`${PARAMS_URL}?member_name=eq.${encodeURIComponent(p1Name)}&order=updated_at.desc&limit=1`, { headers: getHeaders() });
       if (!r.ok) throw new Error('load → ' + r.status);
       const rows = await r.json();
       loadedRow = (rows && rows.length) ? rows[0] : null;
@@ -206,7 +223,7 @@
     msg.style.color = '#1e3a8a'; msg.innerText = 'Saving…';
 
     const payload = {
-      member_name: 'Graham',
+      member_name: p1Name,
       shorter_week_date_1: d1 || null,
       working_days_1: parseInt(val('d_p1days')),
       shorter_week_date_2: d2 || null,
@@ -218,10 +235,10 @@
     };
 
     try {
-      const check = await fetch(`${PARAMS_URL}?member_name=eq.Graham`, { headers: getHeaders() });
+      const check = await fetch(`${PARAMS_URL}?member_name=eq.${encodeURIComponent(p1Name)}`, { headers: getHeaders() });
       const existing = check.ok ? await check.json() : [];
       const method = existing.length ? 'PATCH' : 'POST';
-      const url = existing.length ? `${PARAMS_URL}?member_name=eq.Graham` : PARAMS_URL;
+      const url = existing.length ? `${PARAMS_URL}?member_name=eq.${encodeURIComponent(p1Name)}` : PARAMS_URL;
       const res = await fetch(url, { method, headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error(method + ' → ' + res.status);
       msg.style.color = '#065f46';

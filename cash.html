@@ -60,7 +60,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v11)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v12)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
 
   <div class="bar">
@@ -242,10 +242,11 @@
     if (!quiet && dirty && !confirm('Discard unsaved changes and reload?')) return;
     const status = document.getElementById('status');
     try {
+      const mn = await App.memberNames();
       const [acctRows, pRows, mRows, memRows] = await Promise.all([
         App.rest('bd_savings_accounts?order=account_name.asc'),
         App.rest('bd_purchases?order=purchase_date.asc'),
-        App.rest('op_modelling_parameters?member_name=eq.Graham&order=updated_at.desc&limit=1'),
+        App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(mn.p1 || 'Graham') + '&order=updated_at.desc&limit=1'),
         App.rest('bd_members')
       ]);
       members = (memRows || []).map(m => m.name).filter(Boolean);
