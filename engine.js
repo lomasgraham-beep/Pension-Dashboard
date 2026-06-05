@@ -141,13 +141,35 @@
 
     // ---- Cash savings pot (separate from pensions) ----
     // Seeds at start_balance at retirement; each month adds the saving then grows;
-    // purchase deposits come out of it (shortfall spills to drawdown); finance
-    // payments are an extra outgoing for term_months. Tracked per month for charting.
-    const cashCfg = data.cashSavings || {};
-    const cashMonthly = Number(cashCfg.monthly_amount) || 0;
-    const cashContribGrowth = (cashCfg.contribution_growth_rate != null) ? Number(cashCfg.contribution_growth_rate) : 0.025;  // annual escalation of the saving
-    const cashGrowthM = Math.pow(1 + (Number(cashCfg.growth_rate) || 0), 1 / 12);
-    let cashBal = Number(cashCfg.start_balance) || 0;
+    // ---- Savings accounts (per member) ----
+    // Each account grows by its own rule (monthly/annual/end-of-term, simple/compound), within its
+    // contribution window, optionally escalating, optionally capped. Only instant-access accounts can
+    // fund purchase deposits and the cap-redirect to living costs. cashBal (total) and per-member
+    // totals are tracked for the table/charts.
+    const savingsAccts = (data.savingsAccounts || []).map(a => {
+      const cgrRaw = (a.contribution_growth_rate != null) ? Number(a.contribution_growth_rate) : 0;
+      const cs = a.start_date ? new Date(a.start_date) : null;
+      const ce = a.end_date ? new Date(a.end_date) : null;
+      return {
+        name: a.account_name, member: a.member_name,
+        bal: Number(a.start_balance) || 0,
+        monthly: Number(a.monthly_amount) || 0,
+        cgr: cgrRaw > 1 ? cgrRaw / 100 : cgrRaw,         // tolerate decimal or percent
+        cap: Number(a.savings_cap) || 0,                 // 0 = no cap
+        aprM: (Number(a.apr) || 0) / 100 / 12,
+        aprA: (Number(a.apr) || 0) / 100,
+        freq: a.interest_frequency || 'monthly',
+        simple: (a.interest_type === 'simple'),
+        instant: (a.instant_access !== false),
+        cStartIdx: cs ? cs.getFullYear() * 12 + cs.getMonth() : startIdx,
+        cEndIdx: ce ? ce.getFullYear() * 12 + ce.getMonth() : Infinity,
+        accruedSimple: 0,                                // running simple-interest accrual
+        principalBase: Number(a.start_balance) || 0      // base for simple interest
+      };
+    });
+    function totalCash() { return savingsAccts.reduce((s, a) => s + a.bal, 0); }
+    function instantCash() { return savingsAccts.reduce((s, a) => s + (a.instant ? a.bal : 0), 0); }
+    let cashBal = totalCash();   // kept for compatibility with existing per-row reporting
     // precompute purchases: month index of deposit, the deposit, and the monthly payment over its term
     const purchases = (data.purchases || []).map(p => {
       const d = p.purchase_date ? new Date(p.purchase_date) : null;
@@ -321,47 +343,66 @@
       const billsM = bills.reduce((s, b) => s + (Number(b.total_annual) || 0) * (b.spend_reduction ? spendRed : 1.0) * taperFor(b, oldest), 0) / 12 * inflFactor;
       const diningM = dining.reduce((s, d) => s + (Number(d.annual_total) || 0) * (d.spend_reduction ? spendRed : 1.0) * taperFor(d, oldest), 0) / 12 * inflFactor;
 
-      // ---- Cash pot for THIS month ----
-      // Grow the existing balance first (growth always applies — balance may drift above the cap).
-      const cashOpen = cashBal;
-      cashBal = cashBal * cashGrowthM;
-      const cashSaveThis = cashMonthly * Math.pow(1 + cashContribGrowth, Math.floor(elapsed));
-      // Ceiling rule: if the cap feature is on and a cap is active and the balance is already at/above
-      // the cap, the monthly contribution is NOT added — it's redirected to cover living costs (reduces
-      // drawdown). Otherwise it's saved as normal.
-      let capRedirect = 0;
-      if (cfg.savingsCap) {
-        const cap = capForMonth(idx);
-        if (cap != null && cashBal >= cap) capRedirect = cashSaveThis;   // at ceiling: redirect contribution
-        else cashBal += cashSaveThis;                                     // below ceiling: save normally
-      } else {
-        cashBal += cashSaveThis;
+      // ---- Savings accounts for THIS month ----
+      // For each account: add contribution (within its window) unless at its own cap (then withhold and
+      // redirect to living costs); then apply interest per its frequency/type. Only instant-access
+      // accounts can later fund deposits and redirect to bills.
+      const cashOpen = totalCash();
+      let capRedirectInstant = 0;          // withheld contributions from instant-access accounts (offset bills)
+      for (const a of savingsAccts) {
+        // contribution (escalated), within the contribution window
+        if (idx >= a.cStartIdx && idx <= a.cEndIdx && a.monthly) {
+          const saveThis = a.monthly * Math.pow(1 + a.cgr, Math.floor(elapsed));
+          if (a.cap > 0 && a.bal >= a.cap) {
+            // at this account's ceiling: withhold the contribution
+            if (a.instant) capRedirectInstant += saveThis;   // only instant-access can offset bills
+          } else {
+            a.bal += saveThis; a.principalBase += saveThis;
+          }
+        }
+        // interest by frequency / type
+        if (a.simple) {
+          a.accruedSimple += a.principalBase * a.aprM;
+          const payNow = (a.freq === 'monthly') ||
+                         (a.freq === 'annually' && (idx - startIdx + 1) % 12 === 0) ||
+                         (a.freq === 'end_of_term' && idx === a.cEndIdx);
+          if (payNow) { a.bal += a.accruedSimple; a.accruedSimple = 0; }
+        } else {
+          if (a.freq === 'monthly') a.bal *= (1 + a.aprM);
+          else if (a.freq === 'annually' && (idx - startIdx + 1) % 12 === 0) a.bal *= (1 + a.aprA);
+          else if (a.freq === 'end_of_term' && idx === a.cEndIdx) { const yrs = Math.max(0, (a.cEndIdx - a.cStartIdx + 1) / 12); a.bal *= Math.pow(1 + a.aprA, yrs); }
+        }
       }
-      // purchase deposits dated this month come out of the pot; shortfall spills to drawdown.
-      // finance payments for any purchase whose term is active this month.
+
+      // purchase deposits dated this month come from INSTANT-ACCESS accounts (proportionally);
+      // shortfall spills to drawdown. finance payments for any purchase active this month.
       let depositThisMonth = 0, financeThisMonth = 0, depositShortfall = 0;
       for (const p of purchases) {
         if (p.pIdx === idx) depositThisMonth += p.deposit;
         if (idx >= p.pIdx && idx < p.pIdx + p.term) financeThisMonth += p.pay;
       }
       if (depositThisMonth > 0) {
-        const fromCash = Math.min(depositThisMonth, cashBal);
-        cashBal -= fromCash;
+        const avail = instantCash();
+        const fromCash = Math.min(depositThisMonth, avail);
+        // draw proportionally from instant-access accounts
+        if (fromCash > 0 && avail > 0) {
+          for (const a of savingsAccts) if (a.instant && a.bal > 0) a.bal -= fromCash * (a.bal / avail);
+        }
         depositShortfall = depositThisMonth - fromCash;   // covered by pension drawdown this month
       }
 
+      cashBal = totalCash();   // refresh the reported total after this month's account movements
+
       // finance payments + any deposit shortfall are extra outgoings the drawdown must cover;
-      // the redirected contribution REDUCES the cost the drawdown must cover.
+      // withheld instant-access contributions reduce the cost the drawdown must cover.
       const cashOutM = financeThisMonth + depositShortfall;
       let outM = billsM + diningM + cashOutM;
 
-      // The redirected contribution (when at the savings ceiling) covers living costs, reducing
-      // what the pension drawdown must provide — but only up to the net need after guaranteed income.
+      // Withheld contributions from instant-access accounts cover living costs, reducing drawdown
+      // (capped so drawdown can't go below zero across the household).
       let capDrawFromSavings = 0;
-      if (capRedirect > 0) {
-        const guaranteedTotal = grossMonth('Graham', idx, elapsed).total + grossMonth('Julie', idx, elapsed).total;
-        const netNeed = Math.max(0, outM - guaranteedTotal);
-        capDrawFromSavings = Math.min(capRedirect, netNeed);
+      if (capRedirectInstant > 0) {
+        capDrawFromSavings = Math.min(capRedirectInstant, outM);
         outM -= capDrawFromSavings;
       }
 
