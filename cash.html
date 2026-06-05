@@ -5,7 +5,7 @@
 <title>Cash &amp; Purchases</title>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=err23"></script>
+<script src="common.js?v=err24"></script>
 <style>
   :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
@@ -44,23 +44,23 @@
     .settings .fld input { padding:8px 6px; font-size:14px; }
 
     /* purchases: reflow the table into a card per purchase */
-    #pTbl thead, #capTbl thead { display:none; }
-    #pTbl, #pTbl tbody, #pTbl tr, #pTbl td, #capTbl, #capTbl tbody, #capTbl tr, #capTbl td { display:block; width:auto; }
-    #pTbl tr, #capTbl tr { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:12px; background:var(--surface-2); }
-    #pTbl td, #capTbl td { border:none; padding:6px 0; text-align:right; display:flex; align-items:center; justify-content:space-between; gap:10px; }
-    #pTbl td::before, #capTbl td::before { content:attr(data-label); font-size:12px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; text-align:left; }
-    #pTbl td input, #capTbl td input { flex:0 0 auto; }
+    #pTbl thead, #capTbl thead, #acctTbl thead { display:none; }
+    #pTbl, #pTbl tbody, #pTbl tr, #pTbl td, #capTbl, #capTbl tbody, #capTbl tr, #capTbl td, #acctTbl, #acctTbl tbody, #acctTbl tr, #acctTbl td { display:block; width:auto; }
+    #pTbl tr, #capTbl tr, #acctTbl tr { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:12px; background:var(--surface-2); }
+    #pTbl td, #capTbl td, #acctTbl td { border:none; padding:6px 0; text-align:right; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    #pTbl td::before, #capTbl td::before, #acctTbl td::before { content:attr(data-label); font-size:12px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; text-align:left; }
+    #pTbl td input, #capTbl td input, #acctTbl td input, #acctTbl td select { flex:0 0 auto; }
     #pTbl td input[type=text], #capTbl td input[type=text] { width:150px; }
     #pTbl td .del, #pTbl td:last-child, #capTbl td .del, #capTbl td:last-child { width:100%; }
-    #pTbl td:last-child::before, #capTbl td:last-child::before { content:""; }
-    #pTbl td .del, #capTbl td .del { width:100%; padding:10px; }
+    #pTbl td:last-child::before, #capTbl td:last-child::before, #acctTbl td:last-child::before { content:""; }
+    #pTbl td .del, #capTbl td .del, #acctTbl td .del { width:100%; padding:10px; }
     .pay-cell { font-size:15px; }
   }
 </style>
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v8)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v9)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
 
   <div class="bar">
@@ -73,12 +73,13 @@
   <div id="cashChart" style="width:100%; height:340px; margin-bottom:10px;"></div>
   <p class="note" id="chartHint" style="display:none;">Projected balance from retirement, updated when you reload after saving. Deposit months are marked.</p>
 
-  <h3>Savings</h3>
-  <div class="settings">
-    <div class="fld"><label>Starting balance at retirement (£)</label><input type="number" id="s_start" step="1" value="0" oninput="mark()"></div>
-    <div class="fld"><label>Monthly saving (£)</label><input type="number" id="s_monthly" step="1" value="0" oninput="mark()"></div>
-    <div class="fld"><label>Balance growth rate (%)</label><input type="number" id="s_growth" step="0.1" value="3" oninput="mark()"></div>
-    <div class="fld"><label>Saving increase / yr (%)</label><input type="number" id="s_contribgrowth" step="0.1" value="2.5" oninput="mark()"></div>
+  <h3>Savings Accounts <button class="btn btn-add" style="font-size:13px; padding:8px 14px; margin-left:8px;" onclick="addAcct()">+ Add account</button></h3>
+  <p class="note">Each account belongs to a member. <strong>Instant access</strong> accounts can be drawn on to cover living costs (the cap feature) and purchase deposits; non-instant accounts (e.g. fixed-term ISAs) still grow but can't be tapped. Interest can compound monthly, pay annually, or only at the end of the term.</p>
+  <div class="table-wrap">
+    <table id="acctTbl">
+      <thead><tr><th>Name</th><th>Member</th><th>Start Balance</th><th>Monthly</th><th>Increase/yr %</th><th>Start Date</th><th>End Date</th><th>APR %</th><th>Interest</th><th>Type</th><th>Instant Access</th><th></th></tr></thead>
+      <tbody><tr><td colspan="12">Loading&hellip;</td></tr></tbody>
+    </table>
   </div>
 
   <h3>Purchases <button class="btn btn-add" style="font-size:13px; padding:8px 14px; margin-left:8px;" onclick="addRow()">+ Add purchase</button></h3>
@@ -102,8 +103,10 @@
   const fmt = App.fmt;
   let settingsRow = null, purchases = [], dirty = false, deleted = [];
   let caps = [], deletedCaps = [];
+  let accounts = [], deletedAccts = [], members = [];
   const tbody = document.querySelector('#pTbl tbody');
   const capBody = document.querySelector('#capTbl tbody');
+  const acctBody = document.querySelector('#acctTbl tbody');
   const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
   function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
 
@@ -198,6 +201,58 @@
     caps.splice(i, 1); renderCaps(); setDirty();
   }
 
+  // ---- Savings accounts ----
+  function acctRowHtml(a, i) {
+    const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
+    const memOpts = members.map(m => '<option value="' + esc(m) + '"' + (a.member_name === m ? ' selected' : '') + '>' + esc(m) + '</option>').join('');
+    const freqOpts = [['monthly','Monthly'],['annually','Annually'],['end_of_term','End of term']].map(o => '<option value="' + o[0] + '"' + (a.interest_frequency === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('');
+    const typeOpts = [['compound','Compound'],['simple','Simple']].map(o => '<option value="' + o[0] + '"' + (a.interest_type === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('');
+    return '<tr data-i="' + i + '">' +
+      '<td data-label="Name"><input type="text" class="a-name" value="' + esc(a.account_name) + '" oninput="markAcct()"></td>' +
+      '<td data-label="Member"><select class="a-member" onchange="markAcct()">' + memOpts + '</select></td>' +
+      '<td data-label="Start Balance"><input type="number" class="a-start" step="1" value="' + (a.start_balance != null ? a.start_balance : 0) + '" oninput="markAcct()"></td>' +
+      '<td data-label="Monthly"><input type="number" class="a-monthly" step="1" value="' + (a.monthly_amount != null ? a.monthly_amount : 0) + '" oninput="markAcct()"></td>' +
+      '<td data-label="Increase/yr %"><input type="number" class="a-grow" step="0.1" value="' + (a.contribution_growth_rate != null ? (a.contribution_growth_rate * 100) : 0) + '" oninput="markAcct()"></td>' +
+      '<td data-label="Start Date"><input type="date" class="a-startdate" value="' + (a.start_date ? String(a.start_date).split('T')[0] : '') + '" onchange="markAcct()"></td>' +
+      '<td data-label="End Date"><input type="date" class="a-enddate" value="' + (a.end_date ? String(a.end_date).split('T')[0] : '') + '" onchange="markAcct()"></td>' +
+      '<td data-label="APR %"><input type="number" class="a-apr" step="0.1" value="' + (a.apr != null ? a.apr : 0) + '" oninput="markAcct()"></td>' +
+      '<td data-label="Interest"><select class="a-freq" onchange="markAcct()">' + freqOpts + '</select></td>' +
+      '<td data-label="Type"><select class="a-type" onchange="markAcct()">' + typeOpts + '</select></td>' +
+      '<td data-label="Instant Access" style="text-align:center;"><input type="checkbox" class="a-instant"' + (a.instant_access !== false ? ' checked' : '') + ' onchange="markAcct()"></td>' +
+      '<td><button class="del" onclick="delAcct(this)">Delete</button></td></tr>';
+  }
+  function renderAccts() {
+    acctBody.innerHTML = accounts.length ? accounts.map(acctRowHtml).join('') : '<tr><td colspan="12">No savings accounts. Use \u201cAdd account\u201d.</td></tr>';
+  }
+  function markAcct() { syncAccts(); setDirty(); }
+  function syncAccts() {
+    acctBody.querySelectorAll('tr[data-i]').forEach(tr => {
+      const i = Number(tr.dataset.i); if (!accounts[i]) return;
+      accounts[i].account_name = tr.querySelector('.a-name').value.trim();
+      accounts[i].member_name = tr.querySelector('.a-member').value;
+      accounts[i].start_balance = num(tr.querySelector('.a-start').value);
+      accounts[i].monthly_amount = num(tr.querySelector('.a-monthly').value);
+      accounts[i].contribution_growth_rate = num(tr.querySelector('.a-grow').value) / 100;
+      accounts[i].start_date = tr.querySelector('.a-startdate').value || null;
+      accounts[i].end_date = tr.querySelector('.a-enddate').value || null;
+      accounts[i].apr = num(tr.querySelector('.a-apr').value);
+      accounts[i].interest_frequency = tr.querySelector('.a-freq').value;
+      accounts[i].interest_type = tr.querySelector('.a-type').value;
+      accounts[i].instant_access = tr.querySelector('.a-instant').checked;
+    });
+  }
+  function addAcct() {
+    syncAccts();
+    accounts.push({ id: undefined, account_name: '', member_name: members[0] || '', start_balance: 0, monthly_amount: 0, contribution_growth_rate: 0, start_date: null, end_date: null, apr: 0, interest_frequency: 'monthly', interest_type: 'compound', instant_access: true });
+    renderAccts(); setDirty();
+  }
+  function delAcct(btn) {
+    syncAccts();
+    const tr = btn.closest('tr'); const i = Number(tr.dataset.i); const a = accounts[i];
+    if (a && a.id != null) deletedAccts.push(a.id);
+    accounts.splice(i, 1); renderAccts(); setDirty();
+  }
+
   async function saveAll() {
     const msg = document.getElementById('msg'); msg.style.color = '#1e3a8a'; msg.textContent = 'Saving\u2026';
     syncDom();
@@ -205,10 +260,16 @@
     syncCaps();
     for (const c of caps) if (!c.cap_name) { msg.style.color = '#c0392b'; msg.textContent = 'Every savings cap needs a name.'; return; }
     try {
-      // settings: single row — update if exists, else insert
-      const sPayload = { monthly_amount: num(document.getElementById('s_monthly').value), growth_rate: num(document.getElementById('s_growth').value) / 100, start_balance: num(document.getElementById('s_start').value), contribution_growth_rate: num(document.getElementById('s_contribgrowth').value) / 100 };
-      if (settingsRow && settingsRow.id != null) await App.write('PATCH', 'bd_cash_savings?id=eq.' + settingsRow.id, sPayload);
-      else await App.write('POST', 'bd_cash_savings', sPayload);
+      syncAccts();
+      for (const a of accounts) if (!a.account_name) { msg.style.color = '#c0392b'; msg.textContent = 'Every savings account needs a name.'; return; }
+      for (const a of accounts) if (!a.member_name) { msg.style.color = '#c0392b'; msg.textContent = 'Every savings account needs a member.'; return; }
+      // savings accounts
+      for (const id of deletedAccts) await App.write('DELETE', 'bd_savings_accounts?id=eq.' + id, undefined);
+      for (const a of accounts) {
+        const payload = { account_name: a.account_name, member_name: a.member_name, start_balance: a.start_balance, monthly_amount: a.monthly_amount, contribution_growth_rate: a.contribution_growth_rate, start_date: a.start_date, end_date: a.end_date, apr: a.apr, interest_frequency: a.interest_frequency, interest_type: a.interest_type, instant_access: a.instant_access };
+        if (a.id != null) await App.write('PATCH', 'bd_savings_accounts?id=eq.' + a.id, payload);
+        else await App.write('POST', 'bd_savings_accounts', payload);
+      }
       // purchases
       for (const id of deleted) await App.write('DELETE', 'bd_purchases?id=eq.' + id, undefined);
       for (const p of purchases) {
@@ -223,7 +284,7 @@
         if (c.id != null) await App.write('PATCH', 'bd_savings_caps?id=eq.' + c.id, payload);
         else await App.write('POST', 'bd_savings_caps', payload);
       }
-      deleted = []; deletedCaps = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
+      deleted = []; deletedCaps = []; deletedAccts = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
       msg.style.color = '#065f46'; msg.textContent = '\u2713 Saved. Reopen the dashboard to update projections.';
       await reload(true);
     } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
@@ -233,18 +294,15 @@
     if (!quiet && dirty && !confirm('Discard unsaved changes and reload?')) return;
     const status = document.getElementById('status');
     try {
-      const [sRows, pRows, mRows, memRows, capRows] = await Promise.all([
-        App.rest('bd_cash_savings?limit=1'),
+      const [acctRows, pRows, mRows, memRows, capRows] = await Promise.all([
+        App.rest('bd_savings_accounts?order=account_name.asc'),
         App.rest('bd_purchases?order=purchase_date.asc'),
         App.rest('op_modelling_parameters?member_name=eq.Graham&order=updated_at.desc&limit=1'),
         App.rest('bd_members'),
         App.rest('bd_savings_caps?order=start_date.asc')
       ]);
-      settingsRow = sRows && sRows[0] ? sRows[0] : null;
-      document.getElementById('s_start').value = settingsRow ? (settingsRow.start_balance || 0) : 0;
-      document.getElementById('s_monthly').value = settingsRow ? (settingsRow.monthly_amount || 0) : 0;
-      document.getElementById('s_growth').value = settingsRow ? ((settingsRow.growth_rate || 0) * 100) : 3;
-      document.getElementById('s_contribgrowth').value = settingsRow && settingsRow.contribution_growth_rate != null ? (settingsRow.contribution_growth_rate * 100) : 2.5;
+      members = (memRows || []).map(m => m.name).filter(Boolean);
+      accounts = acctRows || [];
       purchases = pRows || [];
       // timeline: retirement date -> latest end-of-life
       retireDate = (mRows && mRows[0] && mRows[0].retirement_date) ? new Date(mRows[0].retirement_date) : null;
@@ -252,8 +310,8 @@
       (memRows || []).forEach(m => { if (m.end_of_life_date) { const d = new Date(m.end_of_life_date); const ix = d.getFullYear()*12 + d.getMonth(); if (endIdx == null || ix > endIdx) endIdx = ix; } });
       endMonthIdx = endIdx;
       caps = capRows || [];
-      deleted = []; deletedCaps = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
-      render(); renderCaps(); drawCashChart(); status.style.display = 'none';
+      deleted = []; deletedCaps = []; deletedAccts = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
+      render(); renderCaps(); renderAccts(); drawCashChart(); status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
 
@@ -263,49 +321,80 @@
   google.charts.load('current', { packages:['corechart'] });
   google.charts.setOnLoadCallback(() => { chartsReady = true; drawCashChart(); });
 
+  // project one account's balance to a map of monthIdx -> balance, honouring dates/frequency/type
+  function projectAccount(a, startIdx, endMonthIdx) {
+    const out = {};
+    const aprM = num(a.apr) / 100 / 12;
+    const aprA = num(a.apr) / 100;
+    const monthlyAmt = num(a.monthly_amount);
+    const contribGrowth = num(a.contribution_growth_rate);   // already decimal in DB; editor stores decimal
+    const cgr = contribGrowth > 1 ? contribGrowth / 100 : contribGrowth;  // tolerate either
+    const cStart = a.start_date ? (new Date(a.start_date).getFullYear()*12 + new Date(a.start_date).getMonth()) : startIdx;
+    const cEnd = a.end_date ? (new Date(a.end_date).getFullYear()*12 + new Date(a.end_date).getMonth()) : endMonthIdx;
+    const freq = a.interest_frequency || 'monthly';
+    const simple = (a.interest_type === 'simple');
+    let bal = num(a.start_balance);
+    let accruedSimple = 0;                 // simple interest accrues on principal, paid per frequency
+    let principalBase = bal;               // for simple interest
+    for (let idx = startIdx; idx <= endMonthIdx; idx++) {
+      // contribution first (within contribution window)
+      if (idx >= cStart && idx <= cEnd && monthlyAmt) {
+        const yrsIn = Math.floor((idx - startIdx) / 12);
+        bal += monthlyAmt * Math.pow(1 + cgr, yrsIn);
+        principalBase += monthlyAmt * Math.pow(1 + cgr, yrsIn);
+      }
+      // interest
+      if (simple) {
+        accruedSimple += principalBase * aprM;          // accrue monthly on principal
+        const payNow = (freq === 'monthly') || (freq === 'annually' && (idx - startIdx + 1) % 12 === 0) || (freq === 'end_of_term' && idx === cEnd);
+        if (payNow) { bal += accruedSimple; accruedSimple = 0; }
+      } else {
+        if (freq === 'monthly') bal *= (1 + aprM);
+        else if (freq === 'annually' && (idx - startIdx + 1) % 12 === 0) bal *= (1 + aprA);
+        else if (freq === 'end_of_term' && idx === cEnd) { const yrs = Math.max(0, (cEnd - cStart + 1) / 12); bal *= Math.pow(1 + aprA, yrs); }
+      }
+      out[idx] = bal;
+    }
+    return out;
+  }
+
   function drawCashChart() {
     const box = document.getElementById('cashChart'), hint = document.getElementById('chartHint');
     if (!chartsReady) return;
-    const monthlyAmt = num(document.getElementById('s_monthly').value);
-    const startBal = num(document.getElementById('s_start').value);
-    const growthM = Math.pow(1 + num(document.getElementById('s_growth').value)/100, 1/12);
-    const contribGrowth = num(document.getElementById('s_contribgrowth').value)/100;   // annual escalation of the saving
-    if (!retireDate || endMonthIdx == null || (startBal === 0 && monthlyAmt === 0 && !purchases.length)) {
+    if (!retireDate || endMonthIdx == null || !accounts.length) {
       box.style.display = 'none'; hint.style.display = 'none'; return;
     }
     box.style.display = ''; hint.style.display = '';
     const startIdx = retireDate.getFullYear()*12 + retireDate.getMonth();
-    // precompute purchase deposit month-indices
     const deps = purchases.map(p => {
       const d = p.purchase_date ? new Date(p.purchase_date) : null;
       return d ? { idx: d.getFullYear()*12 + d.getMonth(), deposit: num(p.deposit), name: (p.purchase_name||'Purchase') } : null;
     }).filter(Boolean);
 
+    // sum all accounts' projected balances per month (single total line for now; stacked bar is the next step)
+    const perAcct = accounts.map(a => projectAccount(a, startIdx, endMonthIdx));
+
     const dt = new google.visualization.DataTable();
     dt.addColumn('string','Month');
-    dt.addColumn('number','Cash balance');
+    dt.addColumn('number','Total balance');
     dt.addColumn({ type:'string', role:'annotation' });
     dt.addColumn({ type:'string', role:'annotationText' });
 
-    let bal = startBal;
     for (let idx = startIdx; idx <= endMonthIdx; idx++) {
-      const yrsIn = Math.floor((idx - startIdx) / 12);                 // whole years since retirement
-      const thisMonthly = monthlyAmt * Math.pow(1 + contribGrowth, yrsIn);
-      bal = (bal + thisMonthly) * growthM;          // escalated saving first, then growth
+      let total = 0; perAcct.forEach(m => { total += (m[idx] || 0); });
       let depThis = 0, names = [];
       deps.forEach(d => { if (d.idx === idx) { depThis += d.deposit; names.push(d.name); } });
-      if (depThis > 0) bal -= Math.min(depThis, bal);
       const yr = Math.floor(idx/12), mo = idx%12;
       const label = MONTHS[mo] + ' ' + yr;
       const note = depThis > 0 ? '▼' : null;
       const noteText = depThis > 0 ? (names.join(', ') + ' — deposit ' + fmt(depThis)) : null;
-      dt.addRow([label, Math.round(bal), note, noteText]);
+      dt.addRow([label, Math.round(total), note, noteText]);
     }
 
     const phone = window.innerWidth <= 600;
     const months = endMonthIdx - startIdx + 1;
     new google.visualization.LineChart(box).draw(dt, {
-      title: 'Projected cash savings balance',
+      title: 'Projected total savings balance (all accounts)',
       legend: { position:'none' }, curveType:'function', lineWidth:3, colors:['#2c7a7b'],
       chartArea: phone ? { left:64, right:16, top:40, bottom:70, height:'66%' } : { left:88, right:30, top:44, bottom:70 },
       vAxis: { title: phone ? '' : 'Balance (£)', minValue:0, format:'£#,###', textStyle:{ fontSize: phone?10:12 } },
