@@ -42,14 +42,14 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: theilsen)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: gen-names)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
-    <div class="card"><h3>Graham expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
-    <div class="card"><h3>Julie expected monthly growth</h3><div id="kpiJ" class="value">£0</div></div>
+    <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span> expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
+    <div class="card" id="kpiCardP2"><h3><span class="nm-p2">Julie</span> expected monthly growth</h3><div id="kpiJ" class="value">£0</div></div>
   </div>
   <div class="filter-bar">
-    <div><label>Isolate by member</label><select id="fMember" onchange="updatePensionFilter()"><option value="All">All Members</option><option>Graham</option><option>Julie</option></select></div>
+    <div><label>Isolate by member</label><select id="fMember" onchange="updatePensionFilter()"><option value="All">All Members</option></select></div>
     <div><label>Isolate by pension</label><select id="fPension" onchange="drawCharts()"><option value="All">All Pensions</option></select></div>
   </div>
   <div class="charts"><div id="chartValue" class="chart-box"></div><div id="chartGrowth" class="chart-box"></div></div>
@@ -60,30 +60,40 @@
 
 <script>
   const fmt = App.fmt, fmtDiff = App.fmtDiff;
-  let allLogs = [], allContributions = [], grahamParams = null;
+  let allLogs = [], allContributions = [], grahamParams = null, allExceptions = [];
+  let p1Name = 'Graham', p2Name = null;
   let chartsReady = false;
   google.charts.load('current', { packages:['corechart'] });
   google.charts.setOnLoadCallback(() => { chartsReady = true; if (allLogs.length) drawCharts(); });
 
   function getExpectedContribution(log) {
-    if (log.member_name === 'Graham' && log.pension_name === 'Pru') {
-      const d = new Date(log.log_date), yr = d.getFullYear(), mo = d.getMonth() + 1;
-      if ((yr === 2025 && mo >= 10) || (yr === 2026 && mo <= 3)) return 2313;
-    }
+    const d = new Date(log.log_date);
+    const idx = d.getFullYear() * 12 + d.getMonth();
     let expectedDays = 5;
-    if (log.member_name === 'Graham' && grahamParams) {
-      const ld = new Date(log.log_date);
+    if (log.member_name === p1Name && grahamParams) {
       const d1 = grahamParams.shorter_week_date_1 ? new Date(grahamParams.shorter_week_date_1) : null;
       const d2 = grahamParams.shorter_week_date_2 ? new Date(grahamParams.shorter_week_date_2) : null;
-      if (d2 && ld >= d2) expectedDays = grahamParams.working_days_2 || 5;
-      else if (d1 && ld >= d1) expectedDays = grahamParams.working_days_1 || 5;
+      if (d2 && d >= d2) expectedDays = grahamParams.working_days_2 || 5;
+      else if (d1 && d >= d1) expectedDays = grahamParams.working_days_1 || 5;
     }
     const match = allContributions.find(c => {
       if (c.member_name !== log.member_name || c.pension_name !== log.pension_name) return false;
-      if (log.member_name === 'Graham') return Number(c.working_days) === Number(expectedDays);
+      if (log.member_name === p1Name) return Number(c.working_days) === Number(expectedDays);
       return true;
     });
-    return match ? (Number(match.monthly_contribution) || 0) : 0;
+    let normal = match ? (Number(match.monthly_contribution) || 0) : 0;
+    // contribution exceptions: override replaces; one-off adds a lump in its start month
+    let override = null, oneOff = 0;
+    (allExceptions || []).forEach(e => {
+      if (e.member_name !== log.member_name || e.pension_name !== log.pension_name) return;
+      const s = e.start_date ? new Date(e.start_date) : null;
+      const en = e.end_date ? new Date(e.end_date) : null;
+      const sIdx = s ? s.getFullYear() * 12 + s.getMonth() : null;
+      const eIdx = en ? en.getFullYear() * 12 + en.getMonth() : null;
+      if (e.one_off === true) { if (sIdx === idx) oneOff += Number(e.contribution_value) || 0; }
+      else { if (sIdx != null && idx >= sIdx && (eIdx == null || idx <= eIdx)) override = Number(e.contribution_value) || 0; }
+    });
+    return ((override != null) ? override : normal) + oneOff;
   }
 
   function monthlyBuckets(logs) {
@@ -131,7 +141,7 @@
       // Median monthly % — spike-resistant (a one-off month, e.g. a market jump,
       // can't drag it), matching the median approach used for the amount column.
       const avgPct = pcts.length ? median(pcts) : 0;
-      eTot += medAmt; if (member === 'Graham') eG += medAmt; if (member === 'Julie') eJ += medAmt;
+      eTot += medAmt; if (member === p1Name) eG += medAmt; if (p2Name && member === p2Name) eJ += medAmt;
       const cls = v => v >= 0 ? 'pos-growth' : 'neg-growth';
       html += `<tr><td>${member}</td><td>${name}</td><td style="font-weight:bold;">${fmt(Number(logs[logs.length - 1].pot_value))}</td>
         <td class="${cls(latest)}">${fmtDiff(latest)}</td><td class="${cls(medAmt)}">${fmtDiff(medAmt)}</td>
@@ -263,11 +273,19 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [logs, contribs, pRows] = await Promise.all([
+      const mn = await App.memberNames();
+      p1Name = mn.p1 || 'Graham'; p2Name = mn.p2;
+      const [logs, contribs, pRows, excRows] = await Promise.all([
         App.rest('op_pension_logs?order=log_date.desc&limit=2000'), App.rest('bd_pension_contributions'),
-        App.rest('op_modelling_parameters?member_name=eq.Graham&limit=1')
+        App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name) + '&limit=1'),
+        App.rest('bd_contribution_exceptions?order=start_date.asc')
       ]);
-      allLogs = logs; allContributions = contribs; grahamParams = pRows && pRows[0] ? pRows[0] : null;
+      allLogs = logs; allContributions = contribs; grahamParams = pRows && pRows[0] ? pRows[0] : null; allExceptions = excRows || [];
+      // member filter options + dynamic labels
+      document.getElementById('fMember').innerHTML = '<option value="All">All Members</option>' + mn.all.map(n => `<option>${n}</option>`).join('');
+      document.querySelectorAll('.nm-p1').forEach(el => el.textContent = p1Name);
+      document.querySelectorAll('.nm-p2').forEach(el => el.textContent = p2Name || '');
+      const c2 = document.getElementById('kpiCardP2'); if (c2) c2.style.display = p2Name ? '' : 'none';
       updatePensionFilter(); renderKPIs(); drawCharts();
       status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
