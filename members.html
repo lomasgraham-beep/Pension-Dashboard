@@ -63,15 +63,19 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Members</h1>
+<h1>Members <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(members build: crud1)</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
   <p class="intro">
-    These are the people the model is built around. <strong>Date of birth</strong> drives the ages used in the drawdown projection, and <strong>end-of-life date</strong> sets how many years the projection runs.
-    Each member is saved <strong>separately</strong>, and nothing is stored until you tap that member's <strong>Save</strong>. <strong>Birth year is kept in sync with the date of birth automatically</strong>, so the two can't drift apart.
-    After saving, refresh the dashboard or Scenario Lab to pick up the change.
+    These are the people the model is built around. <strong>Name</strong> identifies the member everywhere (person 1 / person 2 are derived alphabetically). <strong>Date of birth</strong> drives the ages used in the drawdown projection, and <strong>end-of-life date</strong> sets how many years the projection runs.
+    Each member is saved <strong>separately</strong>, and nothing is stored until you tap that member's <strong>Save</strong>. <strong>Birth year is kept in sync with the date of birth automatically.</strong>
+    After saving, refresh the dashboard to pick up the change.
   </p>
+  <div class="btn-row" style="margin-top:4px;">
+    <button class="btn" onclick="addMember()">+ Add member</button>
+    <span id="addMsg" style="font-weight:bold; font-size:13px; align-self:center;"></span>
+  </div>
 </div>
 
 <div id="memberContainer"></div>
@@ -81,6 +85,10 @@
   const SUPABASE_URL = "https://yavfcitgyyftpubqwddp.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
   const MEMBERS_URL = `${SUPABASE_URL}/rest/v1/bd_members`;
+  // every table that stores member_name — used for delete-guard and cascade rename.
+  // (bills, dining, crashes, purchases are household-level and deliberately excluded.)
+  const CHILD_TABLES = ['bd_pensions', 'bd_pension_contributions', 'bd_guaranteed_incomes', 'bd_savings_accounts', 'bd_contribution_exceptions', 'op_pension_logs', 'op_modelling_parameters'];
+  const childUrl = (t) => `${SUPABASE_URL}/rest/v1/${t}`;
   const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${authToken || SUPABASE_KEY}`, "Content-Type": "application/json" });
   let authToken = null;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -98,19 +106,18 @@
     return atYear - d.getFullYear();
   }
 
-  function markDirty(name) {
-    dirty[name] = true;
-    const f = document.getElementById('dirty_' + esc(name));
+  function markDirty(id) {
+    dirty[id] = true;
+    const f = document.getElementById('dirty_' + id);
     if (f) f.style.display = 'inline-block';
   }
-  function clearDirty(name) {
-    dirty[name] = false;
-    const f = document.getElementById('dirty_' + esc(name));
+  function clearDirty(id) {
+    dirty[id] = false;
+    const f = document.getElementById('dirty_' + id);
     if (f) f.style.display = 'none';
   }
 
-  function refreshDerived(name) {
-    const id = esc(name);
+  function refreshDerived(id) {
     const dob = document.getElementById('dob_' + id).value;
     const eol = document.getElementById('eol_' + id).value;
     const el = document.getElementById('derived_' + id);
@@ -124,7 +131,7 @@
       parts.push(`Birth year <b>${by}</b> (auto-synced)`);
       parts.push(`Current age <b>${curAge}</b>`);
     } else {
-      const orig = members.find(m => m.name === name);
+      const orig = members.find(m => m._k === id);
       if (orig && orig.birth_year) parts.push(`<span class="warn">No date of birth set — existing birth year ${orig.birth_year} will be kept.</span>`);
       else parts.push(`<span class="warn">No date of birth set.</span>`);
     }
@@ -139,76 +146,180 @@
 
   function renderMembers() {
     const c = document.getElementById('memberContainer');
-    if (!members.length) { c.innerHTML = '<div class="panel">No members found in the database.</div>'; return; }
+    if (!members.length) { c.innerHTML = '<div class="panel">No members yet. Use “Add member”.</div>'; return; }
     c.innerHTML = members.map(m => {
-      const id = esc(m.name);
+      const id = m._k;
       return `<div class="member-card">
-        <h2>${m.name} <span id="dirty_${id}" class="dirty-flag">Unsaved</span></h2>
+        <h2><span id="title_${id}">${m.name || 'New member'}</span> <span id="dirty_${id}" class="dirty-flag">Unsaved</span></h2>
         <div class="grid">
+          <div class="field">
+            <label>Name</label>
+            <span class="hint">Identifies this member across the model.</span>
+            <input type="text" id="name_${id}" value="${(m.name || '').replace(/"/g, '&quot;')}" oninput="onNameInput('${id}')">
+          </div>
           <div class="field">
             <label>Date of birth</label>
             <span class="hint">Drives all ages in the projection.</span>
-            <input type="date" id="dob_${id}" value="${toInputDate(m.dob)}" oninput="refreshDerived('${m.name}'); markDirty('${m.name}')">
+            <input type="date" id="dob_${id}" value="${toInputDate(m.dob)}" oninput="refreshDerived('${id}'); markDirty('${id}')">
           </div>
           <div class="field">
             <label>End-of-life date</label>
             <span class="hint">How far the projection runs.</span>
-            <input type="date" id="eol_${id}" value="${toInputDate(m.end_of_life_date)}" oninput="refreshDerived('${m.name}'); markDirty('${m.name}')">
+            <input type="date" id="eol_${id}" value="${toInputDate(m.end_of_life_date)}" oninput="refreshDerived('${id}'); markDirty('${id}')">
           </div>
         </div>
         <div class="derived" id="derived_${id}"></div>
         <div class="btn-row">
-          <button class="btn btn-save" onclick="saveMember('${m.name}')">Save ${m.name}</button>
-          <button class="btn btn-ghost" onclick="reloadMember('${m.name}')">Reload</button>
+          <button class="btn btn-save" onclick="saveMember('${id}')">Save</button>
+          <button class="btn btn-ghost" onclick="reloadMember('${id}')">Reload</button>
+          <button class="btn" style="background:#c0392b;" onclick="deleteMember('${id}')">Delete</button>
         </div>
         <div class="row-msg" id="msg_${id}"></div>
       </div>`;
     }).join('');
-    members.forEach(m => refreshDerived(m.name));
+    members.forEach(m => refreshDerived(m._k));
   }
 
-  function reloadMember(name) {
-    if (dirty[name] && !confirm(`Discard unsaved edits to ${name}?`)) return;
-    const m = members.find(x => x.name === name);
-    const id = esc(name);
+  function onNameInput(id) {
+    const v = document.getElementById('name_' + id).value;
+    const t = document.getElementById('title_' + id); if (t) t.textContent = v || 'New member';
+    markDirty(id);
+  }
+
+  function reloadMember(id) {
+    if (dirty[id] && !confirm('Discard unsaved edits?')) return;
+    const m = members.find(x => x._k === id);
+    if (!m) { renderMembers(); return; }
+    document.getElementById('name_' + id).value = m.name || '';
+    document.getElementById('title_' + id).textContent = m.name || 'New member';
     document.getElementById('dob_' + id).value = toInputDate(m.dob);
     document.getElementById('eol_' + id).value = toInputDate(m.end_of_life_date);
-    refreshDerived(name); clearDirty(name);
+    refreshDerived(id); clearDirty(id);
     document.getElementById('msg_' + id).innerHTML = '';
   }
 
-  async function saveMember(name) {
-    const id = esc(name);
+  // count this member's child rows across all per-member tables
+  async function countChildRows(name) {
+    const counts = {};
+    let total = 0;
+    for (const t of CHILD_TABLES) {
+      try {
+        const res = await fetch(`${childUrl(t)}?member_name=eq.${encodeURIComponent(name)}&select=*`, { headers: { ...getHeaders(), 'Prefer': 'count=exact', 'Range': '0-0' } });
+        const cr = res.headers.get('content-range'); // e.g. "0-0/12"
+        const n = cr && cr.indexOf('/') >= 0 ? parseInt(cr.split('/')[1]) || 0 : 0;
+        counts[t] = n; total += n;
+      } catch (e) { counts[t] = 0; }
+    }
+    return { counts, total };
+  }
+
+  async function saveMember(id) {
     const msg = document.getElementById('msg_' + id);
+    const m = members.find(x => x._k === id);
+    if (!m) return;
+    const newName = document.getElementById('name_' + id).value.trim();
     const dob = document.getElementById('dob_' + id).value;
     const eol = document.getElementById('eol_' + id).value;
+    const oldName = m.name || '';
 
-    if (dob && eol && new Date(eol) <= new Date(dob)) {
-      msg.style.color = '#c0392b'; msg.innerText = 'End-of-life date must be after the date of birth. Nothing saved.';
-      return;
+    if (!newName) { msg.style.color = '#c0392b'; msg.innerText = 'Name is required. Nothing saved.'; return; }
+    if (dob && eol && new Date(eol) <= new Date(dob)) { msg.style.color = '#c0392b'; msg.innerText = 'End-of-life date must be after the date of birth. Nothing saved.'; return; }
+
+    const renaming = newName !== oldName;
+    // guard: new name must not collide with another member
+    if (renaming && members.some(x => x._k !== id && (x.name || '').toLowerCase() === newName.toLowerCase())) {
+      msg.style.color = '#c0392b'; msg.innerText = `Another member is already called "${newName}". Pick a different name.`; return;
     }
 
-    // keep birth_year in sync with dob; if no dob, leave birth_year untouched
-    const payload = { dob: dob || null, end_of_life_date: eol || null };
-    if (dob) payload.birth_year = new Date(dob).getFullYear();
+    // if renaming an existing member that has child data, cascade — with confirmation
+    let childInfo = { total: 0, counts: {} };
+    if (renaming && oldName) {
+      msg.style.color = '#1e3a8a'; msg.innerText = 'Checking linked data…';
+      childInfo = await countChildRows(oldName);
+      if (childInfo.total > 0) {
+        const lines = Object.entries(childInfo.counts).filter(([, n]) => n > 0).map(([t, n]) => `• ${t.replace(/^(bd_|op_)/, '')}: ${n}`).join('\n');
+        if (!confirm(`Renaming "${oldName}" → "${newName}" will update ${childInfo.total} linked record(s):\n\n${lines}\n\nProceed?`)) {
+          msg.style.color = '#64748b'; msg.innerText = 'Rename cancelled.'; return;
+        }
+      }
+    }
 
     msg.style.color = '#1e3a8a'; msg.innerText = 'Saving…';
     try {
-      const res = await fetch(`${MEMBERS_URL}?name=eq.${encodeURIComponent(name)}`,
-        { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify(payload) });
-      if (!res.ok) throw new Error('PATCH → ' + res.status);
-      // re-pull this member so the card reflects what's really stored
-      const check = await fetch(`${MEMBERS_URL}?name=eq.${encodeURIComponent(name)}`, { headers: getHeaders() });
-      const rows = check.ok ? await check.json() : [];
-      if (rows.length) { const i = members.findIndex(x => x.name === name); if (i >= 0) members[i] = rows[0]; }
-      refreshDerived(name); clearDirty(name);
+      // 1) cascade child tables FIRST (so a partial failure leaves the member under the old name to retry)
+      if (renaming && oldName && childInfo.total > 0) {
+        const failed = [];
+        for (const t of CHILD_TABLES) {
+          if (!childInfo.counts[t]) continue;
+          const res = await fetch(`${childUrl(t)}?member_name=eq.${encodeURIComponent(oldName)}`,
+            { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify({ member_name: newName }) });
+          if (!res.ok) failed.push(t + ' (' + res.status + ')');
+        }
+        if (failed.length) { msg.style.color = '#c0392b'; msg.innerText = 'Rename partially failed on: ' + failed.join(', ') + '. The member was NOT renamed; please retry.'; return; }
+      }
+
+      // 2) member row last (name + dates + synced birth_year)
+      const payload = { name: newName, dob: dob || null, end_of_life_date: eol || null };
+      if (dob) payload.birth_year = new Date(dob).getFullYear();
+      const res = await fetch(`${MEMBERS_URL}?${memberAnchor(m)}`, { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error('member PATCH → ' + res.status);
+      const rows = await res.json();
+      if (rows && rows.length) { const i = members.findIndex(x => x._k === id); if (i >= 0) { rows[0]._k = id; members[i] = rows[0]; } }
+      document.getElementById('title_' + id).textContent = newName;
+      refreshDerived(id); clearDirty(id);
       msg.style.color = '#065f46';
-      msg.innerText = '✓ Saved. Refresh the dashboard or Scenario Lab to pick up the change.';
+      msg.innerText = renaming && childInfo.total > 0
+        ? `✓ Saved and ${childInfo.total} linked record(s) updated. Refresh the dashboard.`
+        : '✓ Saved. Refresh the dashboard to pick up the change.';
     } catch (e) {
       msg.style.color = '#c0392b';
-      msg.innerText = 'Save failed: ' + e.message + '. Nothing was changed.';
+      msg.innerText = 'Save failed: ' + e.message + '.';
     }
   }
+
+  async function addMember() {
+    const msg = document.getElementById('addMsg');
+    msg.style.color = '#1e3a8a'; msg.innerText = 'Adding…';
+    // generate a unique placeholder name
+    let base = 'New member', name = base, n = 1;
+    while (members.some(x => (x.name || '').toLowerCase() === name.toLowerCase())) { n++; name = base + ' ' + n; }
+    try {
+      const res = await fetch(MEMBERS_URL, { method: 'POST', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify({ name }) });
+      if (!res.ok) throw new Error('POST → ' + res.status);
+      const created = await res.json();
+      if (created && created.length) members.push(created[0]);
+      assignKeys();
+      members.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+      renderMembers();
+      msg.style.color = '#065f46'; msg.innerText = '✓ Added — set the name and dates, then Save.';
+    } catch (e) { msg.style.color = '#c0392b'; msg.innerText = 'Add failed: ' + e.message; }
+  }
+
+  async function deleteMember(id) {
+    const msg = document.getElementById('msg_' + id);
+    const m = members.find(x => x._k === id);
+    if (!m) return;
+    const name = m.name || '';
+    msg.style.color = '#1e3a8a'; msg.innerText = 'Checking linked data…';
+    const info = name ? await countChildRows(name) : { total: 0, counts: {} };
+    if (info.total > 0) {
+      const lines = Object.entries(info.counts).filter(([, n]) => n > 0).map(([t, n]) => `${t.replace(/^(bd_|op_)/, '')}: ${n}`).join(', ');
+      msg.style.color = '#c0392b';
+      msg.innerText = `Can't delete "${name}" — it still has linked data (${lines}). Remove that data first.`;
+      return;
+    }
+    if (!confirm(`Delete member "${name}"? This can't be undone.`)) { msg.innerText = ''; return; }
+    try {
+      const res = await fetch(`${MEMBERS_URL}?${memberAnchor(m)}`, { method: 'DELETE', headers: getHeaders() });
+      if (!res.ok) throw new Error('DELETE → ' + res.status);
+      members = members.filter(x => x._k !== id); clearDirty(id); renderMembers();
+    } catch (e) { msg.style.color = '#c0392b'; msg.innerText = 'Delete failed: ' + e.message; }
+  }
+
+  let _kSeq = 0;
+  function assignKeys() { members.forEach(m => { if (m._k == null) m._k = 'k' + (++_kSeq); }); }
+  // REST filter to address a member row: prefer real id, else fall back to name
+  function memberAnchor(m) { return (m.id != null) ? ('id=eq.' + encodeURIComponent(m.id)) : ('name=eq.' + encodeURIComponent(m.name || '')); }
 
   async function loadMembers() {
     const status = document.getElementById('status');
@@ -216,6 +327,7 @@
       const r = await fetch(`${MEMBERS_URL}?order=name.asc`, { headers: getHeaders() });
       if (!r.ok) throw new Error('load → ' + r.status);
       members = await r.json();
+      assignKeys();
       renderMembers();
       status.className = 'status-ok';
       status.innerText = `Loaded ${members.length} member${members.length === 1 ? '' : 's'}.`;
