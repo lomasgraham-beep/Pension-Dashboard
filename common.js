@@ -47,6 +47,19 @@
     return true;
   }
 
+  // ---- member names (alphabetical; matches the engine's person1/person2 rule) ----
+  // Returns { p1, p2, all }. p2 is null for a single-member (single-person) instance.
+  let _memberCache = null;
+  async function memberNames(force) {
+    if (_memberCache && !force) return _memberCache;
+    let rows = [];
+    try { rows = await rest("bd_members"); } catch (e) { rows = []; }
+    const sorted = (rows || []).slice().sort(function (a, b) { return String(a.name || "").localeCompare(String(b.name || "")); });
+    const all = sorted.map(function (m) { return m.name; }).filter(Boolean);
+    _memberCache = { p1: all[0] || null, p2: all[1] || null, all: all };
+    return _memberCache;
+  }
+
   // ---- formatters ----
   const fmt = (n) => "£" + Math.round(n || 0).toLocaleString("en-GB");
   const fmtDiff = (n) => (n >= 0 ? "+" : "−") + "£" + Math.abs(Math.round(n)).toLocaleString("en-GB");
@@ -185,7 +198,7 @@
   global.App = {
     sb: sb,
     getHeaders: getHeaders,
-    rest: rest, rpc: rpc, write: write,
+    rest: rest, rpc: rpc, write: write, memberNames: memberNames,
     fmt: fmt, fmtDiff: fmtDiff, parseLocalDate: parseLocalDate, toInputDate: toInputDate,
     requireLogin: requireLogin, doLogin: doLogin, doLogout: doLogout,
     token: () => authToken
