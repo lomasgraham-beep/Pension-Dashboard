@@ -197,10 +197,10 @@
   <div class="topbar">
     <h1 id="appTitle">Joint Pension Analytics</h1>
     <div class="right">
-      <div class="view-toggle">
-        <button id="vt-Joint" class="btn-toggle active-toggle" onclick="setView('Joint')">Joint</button>
-        <button id="vt-Graham" class="btn-toggle" onclick="setView('Graham')">Graham</button>
-        <button id="vt-Julie" class="btn-toggle" onclick="setView('Julie')">Julie</button>
+      <div class="view-toggle" id="viewToggle">
+        <button id="vt-joint" class="btn-toggle active-toggle" onclick="setView('Joint')">Joint</button>
+        <button id="vt-p1" class="btn-toggle" onclick="setView(p1Name)">Graham</button>
+        <button id="vt-p2" class="btn-toggle" onclick="setView(p2Name)">Julie</button>
       </div>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
@@ -238,15 +238,15 @@
     <div id="status" class="s-load">Loading…</div>
     <h2>Current Position</h2>
     <div class="card-grid">
-      <div class="card hl"><h3>Combined pot now</h3><div id="ovCombined" class="value">£0</div></div>
-      <div class="card"><h3>Graham now</h3><div id="ovGraham" class="value">£0</div></div>
-      <div class="card"><h3>Julie now</h3><div id="ovJulie" class="value">£0</div></div>
+      <div class="card hl" id="cardCombinedNow"><h3>Combined pot now</h3><div id="ovCombined" class="value">£0</div></div>
+      <div class="card" id="cardP1Now"><h3><span class="nm-p1">Graham</span> now</h3><div id="ovGraham" class="value">£0</div></div>
+      <div class="card" id="cardP2Now"><h3><span class="nm-p2">Julie</span> now</h3><div id="ovJulie" class="value">£0</div></div>
     </div>
     <h2 style="margin-top:25px;">Projected at Retirement</h2>
     <div class="card-grid">
-      <div class="card hl"><h3>Combined pot at retirement</h3><div id="ovProjCombined" class="value">£0</div></div>
-      <div class="card"><h3>Graham at retirement</h3><div id="ovProjGraham" class="value">£0</div></div>
-      <div class="card"><h3>Julie at retirement</h3><div id="ovProjJulie" class="value">£0</div></div>
+      <div class="card hl" id="cardCombinedRet"><h3>Combined pot at retirement</h3><div id="ovProjCombined" class="value">£0</div></div>
+      <div class="card" id="cardP1Ret"><h3><span class="nm-p1">Graham</span> at retirement</h3><div id="ovProjGraham" class="value">£0</div></div>
+      <div class="card" id="cardP2Ret"><h3><span class="nm-p2">Julie</span> at retirement</h3><div id="ovProjJulie" class="value">£0</div></div>
     </div>
     <p class="note" id="ovNote" style="margin-top:14px;"></p>
   </div>
@@ -357,7 +357,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-70</span>
+    <span class="build-stamp">build: LC-71</span>
   </div>
 
   <script>
@@ -369,6 +369,8 @@
     let calib = { g: 1, j: 1 };   // calibrates the JS forecast to the server's figure
     let livePots = { graham: 0, julie: 0 }; // pots at retirement for the current controls
     let currentView = 'Joint';
+    let p1Name = 'Graham', p2Name = 'Julie';   // real member names (alphabetical), set on load; p2Name null = single
+    function displayName(view) { return view === 'Joint' ? 'Joint' : view; }
     let retGran = 'year';     // Retirement table granularity: 'year' or 'month'
     let chartsReady = false;
     let zoomFrom = null, zoomTo = null;   // actual years
@@ -424,16 +426,40 @@
     // ---------- view toggle ----------
     function setView(v) {
       currentView = v;
-      ['Joint','Graham','Julie'].forEach(n => document.getElementById('vt-' + n).classList.toggle('active-toggle', n === v));
-      document.querySelectorAll('.viewlabel').forEach(el => el.textContent = v);
+      document.getElementById('vt-joint').classList.toggle('active-toggle', v === 'Joint');
+      document.getElementById('vt-p1').classList.toggle('active-toggle', v === p1Name);
+      document.getElementById('vt-p2').classList.toggle('active-toggle', v === p2Name);
+      document.querySelectorAll('.viewlabel').forEach(el => el.textContent = displayName(v));
       renderRetirementTable();
       if (chartsReady) drawCharts();
     }
 
+    // set all visible names from the members data; hide person-2 + joint/combined when single
+    function applyMemberLabels() {
+      const single = !p2Name;
+      // toggle buttons
+      document.getElementById('vt-p1').textContent = p1Name;
+      const p2btn = document.getElementById('vt-p2'), jbtn = document.getElementById('vt-joint');
+      if (single) {
+        p2btn.style.display = 'none';
+        jbtn.style.display = 'none';            // no Joint concept for one person
+        if (currentView !== p1Name) setView(p1Name);
+      } else {
+        p2btn.style.display = ''; jbtn.style.display = '';
+        p2btn.textContent = p2Name;
+      }
+      // name spans (cards, slider labels)
+      document.querySelectorAll('.nm-p1').forEach(el => el.textContent = p1Name);
+      document.querySelectorAll('.nm-p2').forEach(el => el.textContent = p2Name || '');
+      // person-2 / combined cards
+      ['cardP2Now','cardP2Ret'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = single ? 'none' : ''; });
+      ['cardCombinedNow','cardCombinedRet'].forEach(id => { const el = document.getElementById(id); if (el) { const h = el.querySelector('h3'); if (single && h) h.textContent = h.textContent.replace('Combined pot', 'Pot'); } });
+    }
+
     // ---------- per-view field pickers ----------
     function vrow(r) {
-      if (currentView === 'Graham') { const g = savedPlan.gRatio; return { dining:r.diningTotal*g, bills:r.billsTotal*g, loan:(r.cashFinance||0)*g, savToBills:(r.cashCapDraw||0)*g, tf:r.g_taxFree, tx:r.g_taxable, other:r.g_other, draw:r.g_draw, income:r.g_income, close:r.g_closing }; }
-      if (currentView === 'Julie')  { const j = 1 - savedPlan.gRatio; return { dining:r.diningTotal*j, bills:r.billsTotal*j, loan:(r.cashFinance||0)*j, savToBills:(r.cashCapDraw||0)*j, tf:r.j_taxFree, tx:r.j_taxable, other:r.j_other, draw:r.j_draw, income:r.j_income, close:r.j_closing }; }
+      if (currentView === p1Name) { const g = savedPlan.gRatio; return { dining:r.diningTotal*g, bills:r.billsTotal*g, loan:(r.cashFinance||0)*g, savToBills:(r.cashCapDraw||0)*g, tf:r.g_taxFree, tx:r.g_taxable, other:r.g_other, draw:r.g_draw, income:r.g_income, close:r.g_closing }; }
+      if (currentView === p2Name)  { const j = 1 - savedPlan.gRatio; return { dining:r.diningTotal*j, bills:r.billsTotal*j, loan:(r.cashFinance||0)*j, savToBills:(r.cashCapDraw||0)*j, tf:r.j_taxFree, tx:r.j_taxable, other:r.j_other, draw:r.j_draw, income:r.j_income, close:r.j_closing }; }
       return { dining:r.diningTotal, bills:r.billsTotal, loan:(r.cashFinance||0), savToBills:(r.cashCapDraw||0), tf:r.taxFree, tx:r.taxable, other:r.otherPensions, draw:r.drawdown, income:r.totalIncome, close:r.combinedClosing };
     }
 
@@ -608,8 +634,8 @@
 
       // total pot per month for the current view
       function potOf(r) {
-        if (currentView === 'Graham') return (r.g_taxFree || 0) + (r.g_taxable || 0);
-        if (currentView === 'Julie')  return (r.j_taxFree || 0) + (r.j_taxable || 0);
+        if (currentView === p1Name) return (r.g_taxFree || 0) + (r.g_taxable || 0);
+        if (currentView === p2Name)  return (r.j_taxFree || 0) + (r.j_taxable || 0);
         return (r.g_taxFree || 0) + (r.g_taxable || 0) + (r.j_taxFree || 0) + (r.j_taxable || 0);
       }
       // peak for scaling the shaded bands to full height
@@ -715,7 +741,7 @@
     function renderOverview() {
       const pots = PensionEngine.latestPots(data);
       let g = 0, j = 0;
-      Object.keys(pots).forEach(k => { if (k.indexOf('Graham|') === 0) g += pots[k]; if (k.indexOf('Julie|') === 0) j += pots[k]; });
+      Object.keys(pots).forEach(k => { if (k.indexOf(p1Name + '|') === 0) g += pots[k]; if (p2Name && k.indexOf(p2Name + '|') === 0) j += pots[k]; });
       document.getElementById('ovGraham').textContent = fmt(g);
       document.getElementById('ovJulie').textContent = fmt(j);
       document.getElementById('ovCombined').textContent = fmt(g + j);
@@ -797,7 +823,7 @@
       const msg = document.getElementById('m_msg');
       const c = readControls();
       const payload = {
-        member_name: 'Graham',
+        member_name: p1Name,
         shorter_week_date_1: App.toInputDate(c.phase1Date) || null,
         working_days_1: c.phase1Days,
         shorter_week_date_2: App.toInputDate(c.phase2Date) || null,
@@ -810,8 +836,8 @@
       };
       msg.style.color = '#1e3a8a'; msg.textContent = 'Saving…';
       try {
-        const existing = await App.rest('op_modelling_parameters?member_name=eq.Graham');
-        if (existing.length) await App.write('PATCH', 'op_modelling_parameters?member_name=eq.Graham', payload);
+        const existing = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name));
+        if (existing.length) await App.write('PATCH', 'op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name), payload);
         else await App.write('POST', 'op_modelling_parameters', payload);
         savedPlan = c;
         msg.style.color = '#065f46'; msg.textContent = '✓ Saved as your plan.';
@@ -908,7 +934,13 @@
         data = { members, bills, dining, guaranteed, pensions, contributions, logs,
                  purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [] };
 
-        const pRows = await App.rest('op_modelling_parameters?member_name=eq.Graham&order=updated_at.desc&limit=1');
+        // derive person names (alphabetical, matching the engine); p2Name null = single-person instance
+        const sortedM = (members || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+        p1Name = sortedM[0] ? sortedM[0].name : 'Graham';
+        p2Name = sortedM[1] ? sortedM[1].name : null;
+        applyMemberLabels();
+
+        const pRows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name) + '&order=updated_at.desc&limit=1');
         const p = (pRows && pRows.length) ? pRows[0] : {};
         savedPlan = {
           retirementDate: App.parseLocalDate(p.retirement_date),
@@ -935,7 +967,7 @@
         applyControls(savedPlan);
         recomputeAll();
         status.className = 's-ok';
-        status.textContent = 'Loaded. Move the Modelling sliders to explore live; the Joint / Graham / Julie toggle re-slices instantly.';
+        status.textContent = 'Loaded. Move the Modelling sliders to explore live; the view toggle re-slices instantly.';
       } catch (e) {
         status.className = 's-err';
         status.textContent = 'Could not load: ' + e.message + '. Check your network settings allow access to Supabase.';
