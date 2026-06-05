@@ -63,7 +63,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Members <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(members build: crud1)</span></h1>
+<h1>Members <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(members build: crud2)</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -85,9 +85,14 @@
   const SUPABASE_URL = "https://yavfcitgyyftpubqwddp.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
   const MEMBERS_URL = `${SUPABASE_URL}/rest/v1/bd_members`;
-  // every table that stores member_name — used for delete-guard and cascade rename.
-  // (bills, dining, crashes, purchases are household-level and deliberately excluded.)
-  const CHILD_TABLES = ['bd_pensions', 'bd_pension_contributions', 'bd_guaranteed_incomes', 'bd_savings_accounts', 'bd_contribution_exceptions', 'op_pension_logs', 'op_modelling_parameters'];
+  // Tables storing member_name, split by how a rename propagates:
+  //  - FK_CASCADE_TABLES have a foreign key to bd_members(name) with ON UPDATE CASCADE,
+  //    so the database updates them automatically when the member name changes.
+  //  - APP_RENAME_TABLES store member_name as plain text (no FK), so the app updates them.
+  // For DELETE-guard we check ALL of them.
+  const FK_CASCADE_TABLES = ['bd_pensions', 'bd_pension_contributions', 'op_pension_logs', 'op_modelling_parameters'];
+  const APP_RENAME_TABLES = ['bd_guaranteed_incomes', 'bd_savings_accounts', 'bd_contribution_exceptions'];
+  const CHILD_TABLES = FK_CASCADE_TABLES.concat(APP_RENAME_TABLES);
   const childUrl = (t) => `${SUPABASE_URL}/rest/v1/${t}`;
   const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${authToken || SUPABASE_KEY}`, "Content-Type": "application/json" });
   let authToken = null;
@@ -246,25 +251,27 @@
 
     msg.style.color = '#1e3a8a'; msg.innerText = 'Saving…';
     try {
-      // 1) cascade child tables FIRST (so a partial failure leaves the member under the old name to retry)
-      if (renaming && oldName && childInfo.total > 0) {
-        const failed = [];
-        for (const t of CHILD_TABLES) {
-          if (!childInfo.counts[t]) continue;
-          const res = await fetch(`${childUrl(t)}?member_name=eq.${encodeURIComponent(oldName)}`,
-            { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify({ member_name: newName }) });
-          if (!res.ok) failed.push(t + ' (' + res.status + ')');
-        }
-        if (failed.length) { msg.style.color = '#c0392b'; msg.innerText = 'Rename partially failed on: ' + failed.join(', ') + '. The member was NOT renamed; please retry.'; return; }
-      }
-
-      // 2) member row last (name + dates + synced birth_year)
+      // 1) member row FIRST. The FK tables (pensions, contributions, logs, params) have
+      //    ON UPDATE CASCADE, so the database renames their member_name atomically with this.
       const payload = { name: newName, dob: dob || null, end_of_life_date: eol || null };
       if (dob) payload.birth_year = new Date(dob).getFullYear();
       const res = await fetch(`${MEMBERS_URL}?${memberAnchor(m)}`, { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error('member PATCH → ' + res.status);
       const rows = await res.json();
       if (rows && rows.length) { const i = members.findIndex(x => x._k === id); if (i >= 0) { rows[0]._k = id; members[i] = rows[0]; } }
+
+      // 2) non-FK tables store member_name as plain text — update them in the app.
+      if (renaming && oldName) {
+        const failed = [];
+        for (const t of APP_RENAME_TABLES) {
+          if (!childInfo.counts[t]) continue;
+          const r2 = await fetch(`${childUrl(t)}?member_name=eq.${encodeURIComponent(oldName)}`,
+            { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify({ member_name: newName }) });
+          if (!r2.ok) failed.push(t + ' (' + r2.status + ')');
+        }
+        if (failed.length) { msg.style.color = '#c0392b'; msg.innerText = 'Member renamed and linked pension data updated, but these did not update: ' + failed.join(', ') + '. Re-save to retry those.'; document.getElementById('title_' + id).textContent = newName; refreshDerived(id); clearDirty(id); return; }
+      }
+
       document.getElementById('title_' + id).textContent = newName;
       refreshDerived(id); clearDirty(id);
       msg.style.color = '#065f46';
