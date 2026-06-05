@@ -357,7 +357,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-72</span>
+    <span class="build-stamp">build: LC-73</span>
   </div>
 
   <script>
@@ -515,9 +515,9 @@
       dPots.addColumn('string','Year');
       let potColors, potTitle;
       if (joint) {
-        // order bottom -> top: Julie tax-free, Graham tax-free, Julie taxable, Graham taxable
-        dPots.addColumn('number','Julie tax-free'); dPots.addColumn('number','Graham tax-free');
-        dPots.addColumn('number','Julie taxable');  dPots.addColumn('number','Graham taxable');
+        // order bottom -> top: p2 tax-free, p1 tax-free, p2 taxable, p1 taxable
+        dPots.addColumn('number', p2Name + ' tax-free'); dPots.addColumn('number', p1Name + ' tax-free');
+        dPots.addColumn('number', p2Name + ' taxable');  dPots.addColumn('number', p1Name + ' taxable');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
         yrRows.forEach(r => dPots.addRow([String(r.year),
           Math.round(r.j_taxFree), Math.round(r.g_taxFree), Math.round(r.j_taxable), Math.round(r.g_taxable),
@@ -537,9 +537,9 @@
       dInc.addColumn('string','Year');
       let incSeries, incTitle;
       if (joint) {
-        // bars bottom -> top: Julie drawdown, Graham drawdown, Julie other, Graham other; line: total drawdown
-        dInc.addColumn('number','Julie drawdown'); dInc.addColumn('number','Graham drawdown');
-        dInc.addColumn('number','Julie other income'); dInc.addColumn('number','Graham other income');
+        // bars bottom -> top: p2 drawdown, p1 drawdown, p2 other, p1 other; line: total drawdown
+        dInc.addColumn('number', p2Name + ' drawdown'); dInc.addColumn('number', p1Name + ' drawdown');
+        dInc.addColumn('number', p2Name + ' other income'); dInc.addColumn('number', p1Name + ' other income');
         dInc.addColumn('number','Total drawdown');
         dInc.addColumn({type:'string', role:'annotation'}); dInc.addColumn({type:'string', role:'annotationText'});
         yrRows.forEach(r => dInc.addRow([String(r.year),
