@@ -209,25 +209,6 @@
       return factor;
     }
 
-    // ---- Savings caps ----
-    // When enabled (cfg.savingsCap), within an active cap period any cash savings ABOVE the
-    // cap are used to cover cost of living (after guaranteed income, before drawdown), draining
-    // the pot down TO the cap but never below. Returns the lowest applicable cap, or null.
-    const savingsCaps = (data.savingsCaps || []).map(c => {
-      const s = c.start_date ? new Date(c.start_date) : null;
-      const e = c.end_date ? new Date(c.end_date) : null;
-      return {
-        startIdx: s ? s.getFullYear() * 12 + s.getMonth() : -Infinity,
-        endIdx: e ? e.getFullYear() * 12 + e.getMonth() : Infinity,
-        value: Number(c.cap_value) || 0
-      };
-    });
-    function capForMonth(idx) {
-      let cap = null;
-      for (const c of savingsCaps) if (idx >= c.startIdx && idx <= c.endIdx) cap = (cap == null) ? c.value : Math.min(cap, c.value);
-      return cap;
-    }
-
     const taperFor = (row, oldest) => {
       if (oldest >= 90) return row.taper_at_90 != null ? Number(row.taper_at_90) : 1.0;
       if (oldest >= 80) return row.taper_at_80 != null ? Number(row.taper_at_80) : 1.0;

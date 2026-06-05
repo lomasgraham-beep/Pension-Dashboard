@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=err2"></script>
-  <script src="engine.js?v=acct2"></script>
+  <script src="engine.js?v=acct3"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -278,12 +278,6 @@
             <div class="hint">% of each taxable pot's value at retirement.</div>
           </div>
         </div>
-        <div class="ctrl ctrl-wide">
-          <label class="switch"><input type="checkbox" id="m_savingscap" onchange="onParam()"><span class="track"></span><span class="switch-text">Cap savings — redirect extra to living costs</span>
-            <button type="button" class="info-btn" onclick="toggleInfo(event,'info_cap')" aria-label="What is the savings cap feature?">i</button></label>
-          <div class="info-text" id="info_cap">During a cap period (set on the Cash &amp; Purchases page), once savings reach the cap (their maximum), the monthly saving is no longer added — it's redirected to cover living costs, reducing the pension drawdown. Growth may still drift the balance slightly above the cap.</div>
-          <div id="capDiag" style="margin-top:6px; font-size:12px; color:#7c3f00; background:#fff7ed; border:1px solid #fed7aa; border-radius:6px; padding:6px 8px;">cap diagnostic loading…</div>
-        </div>
       </div>
       <div class="actions">
         <button class="pbtn pbtn-save" onclick="savePlan()">Save as my plan</button>
@@ -363,7 +357,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-68</span>
+    <span class="build-stamp">build: LC-69</span>
   </div>
 
   <script>
@@ -759,7 +753,6 @@
         spendRed: parseFloat(document.getElementById('m_spend').value) / 100,
         gRatio: parseFloat(document.getElementById('m_ratio').value) / 100,
         dynamic: document.getElementById('m_dynamic').checked,
-        savingsCap: document.getElementById('m_savingscap').checked,
         gFloorPct: (parseFloat(document.getElementById('m_gfloor').value) || 0) / 100,
         jFloorPct: (parseFloat(document.getElementById('m_jfloor').value) || 0) / 100
       };
@@ -835,28 +828,15 @@
         pots: livePots, gRatio: plan.gRatio, spendRed: plan.spendRed,
         startYear: startYr, retirementDate: plan.retirementDate,
         dynamic: plan.dynamic, gFloorPct: plan.gFloorPct, jFloorPct: plan.jFloorPct,
-        savingsCap: plan.savingsCap,
         sp: PensionEngine.baselineSP(stateNames)
       });
       renderOverview();
       renderRetirementTable();
       if (chartsReady) drawCharts();
-      // temporary diagnostic
-      try {
-        const dg = document.getElementById('capDiag');
-        if (dg) {
-          const caps = data.savingsCaps || [];
-          const totalCapDraw = drawdownRows.reduce((s, r) => s + (r.cashCapDraw || 0), 0);
-          dg.textContent = 'Diagnostic — toggle: ' + (plan.savingsCap ? 'ON' : 'OFF') +
-            ' · caps loaded: ' + caps.length +
-            (caps.length ? ' (first: £' + (caps[0].cap_value) + ', ' + (caps[0].start_date || '?') + '→' + (caps[0].end_date || '?') + ')' : '') +
-            ' · total redirected across plan: £' + Math.round(totalCapDraw);
-        }
-      } catch (e) {}
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err25';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err26';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
@@ -917,17 +897,16 @@
     async function loadEverything() {
       const status = document.getElementById('status');
       try {
-        const [members, bills, dining, guaranteed, pensions, contributions, logs, cashRows, purchases, crashes, savingsCaps, savingsAccounts] = await Promise.all([
+        const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases, crashes, savingsAccounts] = await Promise.all([
           App.rest('bd_members'), App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
           App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
           App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
-          App.rest('bd_cash_savings?limit=1'), App.rest('bd_purchases?order=purchase_date.asc'),
+          App.rest('bd_purchases?order=purchase_date.asc'),
           App.rest('bd_market_crashes?order=start_date.asc'),
-          App.rest('bd_savings_caps?order=start_date.asc'),
           App.rest('bd_savings_accounts?order=account_name.asc')
         ]);
         data = { members, bills, dining, guaranteed, pensions, contributions, logs,
-                 cashSavings: (cashRows && cashRows[0]) ? cashRows[0] : {}, purchases: purchases || [], crashes: crashes || [], savingsCaps: savingsCaps || [], savingsAccounts: savingsAccounts || [] };
+                 purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [] };
 
         const pRows = await App.rest('op_modelling_parameters?member_name=eq.Graham&order=updated_at.desc&limit=1');
         const p = (pRows && pRows.length) ? pRows[0] : {};
