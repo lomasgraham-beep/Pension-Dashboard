@@ -451,7 +451,8 @@
         totalIncome: mOther + gDraw + jDraw,
         combinedClosing: gTf + gTx + jTf + jTx, g_closing: gTf + gTx, j_closing: jTf + jTx,
         shortfall: monthShort,
-        cashBalance: cashBal, cashFinance: financeThisMonth, cashDeposit: depositThisMonth, cashShortfall: depositShortfall, cashCapDraw: capDrawFromSavings
+        cashBalance: cashBal, cashFinance: financeThisMonth, cashDeposit: depositThisMonth, cashShortfall: depositShortfall, cashCapDraw: capDrawFromSavings,
+        acctBalances: savingsAccts.map(a => ({ name: a.name, member: a.member, bal: a.bal }))
       });
 
       acc.outgoings += outM; acc.billsTotal += billsM; acc.diningTotal += diningM;
@@ -473,6 +474,7 @@
     }
     flush();
     rows.monthly = monthlyRows;
+    rows.savingsAccountList = savingsAccts.map(a => ({ name: a.name, member: a.member, instant: a.instant }));
     rows.crashWindows = crashes.map(c => ({ startIdx: c.startIdx, troughIdx: c.startIdx + c.D, endIdx: c.endIdx }));
     rows.purchaseWindows = purchases.map(p => ({ name: p.name, depositIdx: p.pIdx, payoffIdx: p.pIdx + p.term, term: p.term, deposit: p.deposit, pay: p.pay }));
     return rows;

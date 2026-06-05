@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=err2"></script>
-  <script src="engine.js?v=acct1"></script>
+  <script src="engine.js?v=acct2"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -363,7 +363,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-66</span>
+    <span class="build-stamp">build: LC-67</span>
   </div>
 
   <script>
@@ -660,50 +660,47 @@
     function drawCashModelChart() {
       const head = document.getElementById('cashModelHead'), box = document.getElementById('cashModelChart');
       const monthly = zMonths(drawdownRows.monthly || []);
-      const pw = drawdownRows.purchaseWindows || [];
-      const hasCash = monthly.some(m => (m.cashBalance || 0) > 0 || (m.cashDeposit || 0) > 0);
-      if (!chartsReady || !hasCash || !monthly.length) { head.style.display = 'none'; box.style.display = 'none'; return; }
+      const acctList = drawdownRows.savingsAccountList || [];
+      if (!chartsReady || !acctList.length || !monthly.length) { head.style.display = 'none'; box.style.display = 'none'; return; }
+
+      // which accounts belong in this view
+      const showAccts = acctList.filter(a => currentView === 'Joint' || a.member === currentView);
+      if (!showAccts.length) { head.style.display = 'none'; box.style.display = 'none'; return; }
       head.style.display = ''; box.style.display = '';
 
-      let peak = 0, payPeak = 0;
-      monthly.forEach(m => { if ((m.cashBalance || 0) > peak) peak = m.cashBalance; if ((m.cashFinance || 0) > payPeak) payPeak = m.cashFinance; });
-      const balTop = Math.ceil(Math.max(peak, 1) * 1.05 / 1000) * 1000;
-      const payTop = Math.ceil(Math.max(payPeak, 1) * 1.4 / 100) * 100;   // headroom so the band sits in the lower portion
-      function depHere(idx) { return pw.filter(w => w.depositIdx === idx); }
-      function payoffHere(idx) { return pw.filter(w => w.term > 0 && w.payoffIdx === idx); }
+      // sample one row per year (year-end: last month present for that year)
+      const byYear = {};
+      monthly.forEach(m => { byYear[m.year] = m; });   // later months overwrite, leaving year-end
+      const years = Object.keys(byYear).map(Number).sort((a, b) => a - b);
 
       const dt = new google.visualization.DataTable();
-      dt.addColumn('string', 'Month');
-      dt.addColumn('number', 'Monthly finance (£)');   // band height = stacked monthly loan payment (2nd axis)
-      dt.addColumn('number', 'Cash balance');          // the balance line (1st axis)
-      dt.addColumn({ type: 'string', role: 'annotation' });
-      dt.addColumn({ type: 'string', role: 'annotationText' });
-      monthly.forEach(m => {
-        const idx = m.year * 12 + m.month;
-        const deps = depHere(idx), pays = payoffHere(idx);
-        let note = null, noteText = null;
-        if (deps.length) { note = '▼'; noteText = deps.map(d => d.name + ' deposit ' + fmt(d.deposit)).join('; '); }
-        else if (pays.length) { note = '◆'; noteText = pays.map(d => d.name + ' paid off (£' + Math.round(d.pay) + '/mo ended)').join('; '); }
-        dt.addRow([m.label, Math.round(m.cashFinance || 0), Math.round(m.cashBalance || 0), note, noteText]);
-      });
+      dt.addColumn('string', 'Year');
+      showAccts.forEach(a => dt.addColumn('number', a.name + (currentView === 'Joint' ? ' (' + a.member + ')' : '')));
 
+      let peak = 0;
+      years.forEach(y => {
+        const row = byYear[y];
+        const balById = {};
+        (row.acctBalances || []).forEach(b => { balById[b.name + '|' + b.member] = b.bal; });
+        const cells = [String(y)];
+        let stackTotal = 0;
+        showAccts.forEach(a => { const v = Math.round(balById[a.name + '|' + a.member] || 0); cells.push(v); stackTotal += v; });
+        if (stackTotal > peak) peak = stackTotal;
+        dt.addRow(cells);
+      });
+      const top = Math.ceil(Math.max(peak, 1) * 1.05 / 1000) * 1000;
+
+      // a pleasant palette for the account segments
+      const palette = ['#2c7a7b', '#e67e22', '#6b5b95', '#0e7490', '#b7791f', '#9b2c2c', '#2f855a', '#553c9a'];
       const phone = window.innerWidth <= 600;
-      const months = monthly.length;
-      new google.visualization.ComboChart(box).draw(dt, {
-        title: 'Cash savings balance + monthly finance (overlapping loans stack the orange band)',
-        seriesType: 'line',
-        series: {
-          0: { type: 'area', color: '#e67e22', areaOpacity: 0.25, lineWidth: 1, targetAxisIndex: 1 },
-          1: { type: 'line', color: '#2c7a7b', lineWidth: 3, targetAxisIndex: 0 }
-        },
-        legend: { position: 'top', alignment: 'center' },
-        chartArea: phone ? { left: 56, right: 50, top: 60, bottom: 90, height: '58%' } : { left: 84, right: 84, top: 60, bottom: 95 },
-        vAxes: {
-          0: { minValue: 0, viewWindow: { min: 0, max: balTop }, title: phone ? '' : 'Balance (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
-          1: { minValue: 0, viewWindow: { min: 0, max: payTop }, title: phone ? '' : 'Finance £/mo', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } }
-        },
-        hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, Math.round(months / (phone ? 6 : 12))), slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: phone ? 9 : 11 } },
-        annotations: { style: 'point', textStyle: { fontSize: 11, color: '#236668', bold: true } }
+      new google.visualization.ColumnChart(box).draw(dt, {
+        title: 'Savings balance by account' + (currentView !== 'Joint' ? ' — ' + currentView : ''),
+        isStacked: true,
+        legend: { position: 'top', alignment: 'center', textStyle: { fontSize: phone ? 10 : 12 } },
+        colors: palette.slice(0, showAccts.length),
+        chartArea: phone ? { left: 60, right: 16, top: 60, bottom: 60, height: '60%' } : { left: 88, right: 30, top: 56, bottom: 60 },
+        vAxis: { minValue: 0, viewWindow: { min: 0, max: top }, title: phone ? '' : 'Balance (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
+        hAxis: { title: phone ? '' : 'Year', textStyle: { fontSize: phone ? 9 : 11 }, showTextEvery: phone ? 2 : 1 }
       });
     }
 
