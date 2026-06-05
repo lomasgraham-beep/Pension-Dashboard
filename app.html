@@ -363,7 +363,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-67</span>
+    <span class="build-stamp">build: LC-68</span>
   </div>
 
   <script>
@@ -676,6 +676,17 @@
       const dt = new google.visualization.DataTable();
       dt.addColumn('string', 'Year');
       showAccts.forEach(a => dt.addColumn('number', a.name + (currentView === 'Joint' ? ' (' + a.member + ')' : '')));
+      dt.addColumn({ type: 'string', role: 'annotation' });
+      dt.addColumn({ type: 'string', role: 'annotationText' });
+
+      // map year -> purchase deposit(s) that year, for annotations
+      const pw = drawdownRows.purchaseWindows || [];
+      const buysByYear = {};
+      pw.forEach(w => {
+        const y = Math.floor(w.depositIdx / 12);
+        const label = w.name + ' (' + fmt(w.deposit) + ')';
+        buysByYear[y] = buysByYear[y] ? (buysByYear[y] + '; ' + label) : label;
+      });
 
       let peak = 0;
       years.forEach(y => {
@@ -686,6 +697,8 @@
         let stackTotal = 0;
         showAccts.forEach(a => { const v = Math.round(balById[a.name + '|' + a.member] || 0); cells.push(v); stackTotal += v; });
         if (stackTotal > peak) peak = stackTotal;
+        cells.push(buysByYear[y] ? '▼' : null);                              // annotation marker
+        cells.push(buysByYear[y] ? ('Purchase: ' + buysByYear[y]) : null);   // tooltip text
         dt.addRow(cells);
       });
       const top = Math.ceil(Math.max(peak, 1) * 1.05 / 1000) * 1000;
@@ -700,7 +713,8 @@
         colors: palette.slice(0, showAccts.length),
         chartArea: phone ? { left: 60, right: 16, top: 60, bottom: 60, height: '60%' } : { left: 88, right: 30, top: 56, bottom: 60 },
         vAxis: { minValue: 0, viewWindow: { min: 0, max: top }, title: phone ? '' : 'Balance (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
-        hAxis: { title: phone ? '' : 'Year', textStyle: { fontSize: phone ? 9 : 11 }, showTextEvery: phone ? 2 : 1 }
+        hAxis: { title: phone ? '' : 'Year', textStyle: { fontSize: phone ? 9 : 11 }, showTextEvery: phone ? 2 : 1 },
+        annotations: { alwaysOutside: true, textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } }
       });
     }
 
