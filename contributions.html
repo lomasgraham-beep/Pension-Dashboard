@@ -46,6 +46,8 @@
   .logout-bar { display:flex; justify-content:flex-end; align-items:center; gap:12px; font-size:13px; color:#64748b; margin-bottom:10px; }
   .logout-bar a { color:#3498db; font-weight:bold; cursor:pointer; text-decoration:none; }
   .logout-bar a:hover { text-decoration:underline; }
+  .chk { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:normal; cursor:pointer; }
+  .chk input { width:18px; height:18px; }
 </style>
 </head>
 <body>
@@ -70,7 +72,7 @@
 
 <div class="panel">
   <p class="intro">
-    The monthly amounts paid into each pension. For Graham, contributions vary by <strong>working-days tier</strong> (5-, 4- or 3-day week) and the model picks the row matching his current phase &mdash; so each tier is shown clearly.
+    The monthly amounts paid into each pension. Where a member's hours vary, contributions can differ by <strong>working-days tier</strong> (5-, 4- or 3-day week) and the model picks the row matching their current phase &mdash; so each tier is shown clearly.
     Each row is saved <strong>separately</strong>; nothing is stored until you tap its <strong>Save</strong>, and <strong>Reload</strong> discards edits.
     <br><br>
     <strong>August increase</strong> is entered as a friendly percentage (e.g. <code>3</code> for 3%) &mdash; the model applies it once each August to grow the contribution over time.
@@ -78,6 +80,21 @@
 </div>
 
 <div id="container"></div>
+
+<div class="panel" style="margin-top:28px;">
+  <h2 style="margin-top:0;">Contribution Exceptions</h2>
+  <p class="intro">
+    Adjust contributions for a period without changing the standard rows above. Each exception has a member, pension, date range and value.
+    <br><br>
+    <strong>One-off</strong> (ticked): a lump sum (e.g. a bonus) added <em>on top</em> of the normal contribution, applied once at the start date.
+    <strong>Override</strong> (unticked): replaces the normal monthly contribution with this value for every month from start to end.
+  </p>
+  <div style="margin:10px 0;">
+    <button class="btn" onclick="addException()">+ Add exception</button>
+    <span id="excMsg" style="font-weight:bold; font-size:14px; margin-left:10px;"></span>
+  </div>
+  <div id="excContainer"></div>
+</div>
 </div><!-- /appWrap -->
 
 <script>
@@ -211,6 +228,7 @@
       if (!r.ok) throw new Error('load → ' + r.status);
       rows = await r.json();
       render();
+      loadExceptions();
       status.className = 'status-ok';
       status.innerText = `Loaded ${rows.length} contribution row${rows.length === 1 ? '' : 's'}.`;
     } catch (e) {
@@ -219,7 +237,144 @@
     }
   }
 
-  window.addEventListener('beforeunload', (e) => { if (Object.values(dirty).some(Boolean)) { e.preventDefault(); e.returnValue = ''; } });
+  // ================= Contribution Exceptions =================
+  const EXC_URL = `${SUPABASE_URL}/rest/v1/bd_contribution_exceptions`;
+  const MEMBERS_URL = `${SUPABASE_URL}/rest/v1/bd_members`;
+  let exceptions = [], excMembers = [], excPensions = [];
+  const excDirty = {};
+
+  function excMarkDirty(id) { excDirty[id] = true; const f = document.getElementById('excdirty_' + id); if (f) f.style.display = 'inline-block'; }
+  function excClearDirty(id) { excDirty[id] = false; const f = document.getElementById('excdirty_' + id); if (f) f.style.display = 'none'; }
+
+  function renderExceptions() {
+    const c = document.getElementById('excContainer');
+    if (!exceptions.length) { c.innerHTML = '<div class="panel" style="padding:14px;">No exceptions yet. Use “Add exception” for bonuses or temporary changes.</div>'; return; }
+    const memOpts = (sel) => excMembers.map(m => `<option ${m === sel ? 'selected' : ''}>${m}</option>`).join('');
+    const penOpts = (sel) => {
+      const known = [...new Set(excPensions.concat(sel ? [sel] : []))].filter(Boolean).sort();
+      return known.map(p => `<option ${p === sel ? 'selected' : ''}>${p}</option>`).join('');
+    };
+    let html = '';
+    exceptions.forEach(r => {
+      const id = r.id;
+      const oneOff = r.one_off === true;
+      html += `<div class="card">
+        <div class="card-top">
+          <span class="tier-badge ${oneOff ? '' : 'na'}">${oneOff ? 'One-off (added on top)' : 'Override (replaces)'}</span>
+          <span id="excdirty_${id}" class="dirty-flag">Unsaved</span>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label>Member</label>
+            <span class="hint">Whose pension this applies to.</span>
+            <select id="excmem_${id}" onchange="excMarkDirty('${id}')">${memOpts(r.member_name)}</select>
+          </div>
+          <div class="field">
+            <label>Pension</label>
+            <span class="hint">Which pension/account.</span>
+            <select id="excpen_${id}" onchange="excMarkDirty('${id}')">${penOpts(r.pension_name)}</select>
+          </div>
+          <div class="field">
+            <label>Value (£)</label>
+            <span class="hint">Monthly amount (override) or lump sum (one-off).</span>
+            <input type="number" step="0.01" id="excval_${id}" value="${r.contribution_value != null ? r.contribution_value : ''}" oninput="excMarkDirty('${id}')">
+          </div>
+          <div class="field">
+            <label>Start date</label>
+            <span class="hint">One-off applies on this date.</span>
+            <input type="date" id="excstart_${id}" value="${r.start_date ? String(r.start_date).split('T')[0] : ''}" onchange="excMarkDirty('${id}')">
+          </div>
+          <div class="field">
+            <label>End date</label>
+            <span class="hint">Override applies through this month. (Ignored for one-off.)</span>
+            <input type="date" id="excend_${id}" value="${r.end_date ? String(r.end_date).split('T')[0] : ''}" onchange="excMarkDirty('${id}')">
+          </div>
+          <div class="field">
+            <label>One-off?</label>
+            <span class="hint">Tick = bonus on top. Untick = override.</span>
+            <label class="chk"><input type="checkbox" id="excone_${id}" ${oneOff ? 'checked' : ''} onchange="excMarkDirty('${id}')"> One-off contribution</label>
+          </div>
+        </div>
+        <div class="meta">id: ${id}</div>
+        <div class="btn-row">
+          <button class="btn btn-save" onclick="saveException('${id}')">Save</button>
+          <button class="btn btn-ghost" onclick="deleteException('${id}')">Delete</button>
+        </div>
+        <div class="row-msg" id="excmsg_${id}"></div>
+      </div>`;
+    });
+    c.innerHTML = html;
+  }
+
+  async function addException() {
+    const msg = document.getElementById('excMsg');
+    const payload = { member_name: excMembers[0] || '', pension_name: excPensions[0] || '', contribution_value: 0, one_off: false, start_date: null, end_date: null };
+    msg.style.color = '#1e3a8a'; msg.textContent = 'Adding…';
+    try {
+      const res = await fetch(EXC_URL, { method: 'POST', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error('POST → ' + res.status);
+      const created = await res.json();
+      if (created && created.length) exceptions.push(created[0]);
+      renderExceptions(); msg.style.color = '#065f46'; msg.textContent = '✓ Added — set the details and Save.';
+    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Add failed: ' + e.message; }
+  }
+
+  async function saveException(id) {
+    const msg = document.getElementById('excmsg_' + id);
+    const valRaw = document.getElementById('excval_' + id).value;
+    const val = valRaw === '' ? 0 : Number(valRaw);
+    if (isNaN(val) || val < 0) { msg.style.color = '#c0392b'; msg.innerText = 'Value must be a positive number. Nothing saved.'; return; }
+    const startRaw = document.getElementById('excstart_' + id).value || null;
+    const oneOff = document.getElementById('excone_' + id).checked;
+    if (!startRaw) { msg.style.color = '#c0392b'; msg.innerText = 'A start date is required. Nothing saved.'; return; }
+    const payload = {
+      member_name: document.getElementById('excmem_' + id).value,
+      pension_name: document.getElementById('excpen_' + id).value,
+      contribution_value: val,
+      one_off: oneOff,
+      start_date: startRaw,
+      end_date: document.getElementById('excend_' + id).value || null
+    };
+    msg.style.color = '#1e3a8a'; msg.innerText = 'Saving…';
+    try {
+      const res = await fetch(`${EXC_URL}?id=eq.${id}`, { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error('PATCH → ' + res.status);
+      const fresh = await res.json();
+      if (fresh && fresh.length) { const i = exceptions.findIndex(x => x.id === id); if (i >= 0) exceptions[i] = fresh[0]; }
+      excClearDirty(id); renderExceptions();
+      const m2 = document.getElementById('excmsg_' + id); if (m2) { m2.style.color = '#065f46'; m2.innerText = '✓ Saved. Refresh the dashboard to pick up the change.'; }
+    } catch (e) { msg.style.color = '#c0392b'; msg.innerText = 'Save failed: ' + e.message + '. Nothing was changed.'; }
+  }
+
+  async function deleteException(id) {
+    if (!confirm('Delete this exception?')) return;
+    const msg = document.getElementById('excmsg_' + id);
+    try {
+      const res = await fetch(`${EXC_URL}?id=eq.${id}`, { method: 'DELETE', headers: getHeaders() });
+      if (!res.ok) throw new Error('DELETE → ' + res.status);
+      exceptions = exceptions.filter(x => x.id !== id); excClearDirty(id); renderExceptions();
+    } catch (e) { if (msg) { msg.style.color = '#c0392b'; msg.innerText = 'Delete failed: ' + e.message; } }
+  }
+
+  async function loadExceptions() {
+    try {
+      const [exR, memR] = await Promise.all([
+        fetch(`${EXC_URL}?order=start_date.asc`, { headers: getHeaders() }),
+        fetch(`${MEMBERS_URL}?order=name.asc`, { headers: getHeaders() })
+      ]);
+      exceptions = exR.ok ? await exR.json() : [];
+      const mems = memR.ok ? await memR.json() : [];
+      excMembers = mems.map(m => m.name).filter(Boolean);
+      if (!excMembers.length) excMembers = [...new Set(rows.map(r => r.member_name).filter(Boolean))].sort();
+      excPensions = [...new Set(rows.map(r => r.pension_name).filter(Boolean))].sort();
+      renderExceptions();
+    } catch (e) {
+      const c = document.getElementById('excContainer');
+      if (c) c.innerHTML = '<div class="panel" style="padding:14px; color:#c0392b;">Could not load exceptions: ' + e.message + '</div>';
+    }
+  }
+
+  window.addEventListener('beforeunload', (e) => { if (Object.values(dirty).some(Boolean) || Object.values(excDirty).some(Boolean)) { e.preventDefault(); e.returnValue = ''; } });
 
   // ---------- Auth gate ----------
   let started = false;
