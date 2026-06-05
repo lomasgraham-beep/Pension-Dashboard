@@ -69,10 +69,36 @@
     let maxG = sumMember(data, pots, fp1);
     let maxJ = fp2 ? sumMember(data, pots, fp2) : 0;
 
+    // ---- Contribution exceptions ----
+    // override (one_off=false): replaces the normal monthly contribution for months in [start,end].
+    // one-off (one_off=true): a lump added on top of the normal contribution, once, in the start month.
+    const fExceptions = (data.contributionExceptions || []).map(e => {
+      const s = e.start_date ? new Date(e.start_date) : null;
+      const en = e.end_date ? new Date(e.end_date) : null;
+      return {
+        member: e.member_name, pension: e.pension_name,
+        value: Number(e.contribution_value) || 0,
+        oneOff: e.one_off === true,
+        startIdx: s ? s.getFullYear() * 12 + s.getMonth() : null,
+        endIdx: en ? en.getFullYear() * 12 + en.getMonth() : null
+      };
+    });
+    // returns { override: number|null, oneOff: number } for a member+pension at month index idx
+    function exceptionFor(member, pension, idx) {
+      let override = null, oneOff = 0;
+      for (const e of fExceptions) {
+        if (e.member !== member || e.pension !== pension) continue;
+        if (e.oneOff) { if (e.startIdx === idx) oneOff += e.value; }
+        else { if (e.startIdx != null && idx >= e.startIdx && (e.endIdx == null || idx <= e.endIdx)) override = e.value; }
+      }
+      return { override, oneOff };
+    }
+
     let guard = 0;
     while (cur < retire && guard < 1200) {
       guard++;
       cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+      const curIdx = cur.getFullYear() * 12 + cur.getMonth();
 
       let gDays = 5;
       if (plan.phase2Date && cur >= plan.phase2Date) gDays = plan.phase2Days;
@@ -83,13 +109,23 @@
       (data.contributions || []).forEach(c => {
         if (c.member_name === fp1 && Number(c.working_days) === Number(gDays)) {
           const k = fp1 + '|' + c.pension_name;
-          if (k in pots) pots[k] += (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), augusts);
+          if (k in pots) {
+            const ex = exceptionFor(fp1, c.pension_name, curIdx);
+            const normal = (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), augusts);
+            const base = (ex.override != null) ? ex.override * contribMult : normal;
+            pots[k] += base + ex.oneOff * contribMult;
+          }
         }
       });
       if (fp2) (data.contributions || []).forEach(c => {
         if (c.member_name === fp2) {
           const k = fp2 + '|' + c.pension_name;
-          if (k in pots) pots[k] += (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), augusts);
+          if (k in pots) {
+            const ex = exceptionFor(fp2, c.pension_name, curIdx);
+            const normal = (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), augusts);
+            const base = (ex.override != null) ? ex.override * contribMult : normal;
+            pots[k] += base + ex.oneOff * contribMult;
+          }
         }
       });
 
