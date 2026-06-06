@@ -67,7 +67,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: addrows)</span></h1>
+<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: incmonth)</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -75,7 +75,7 @@
     The monthly amounts paid into each pension. Where a member's hours vary, contributions can differ by <strong>working-days tier</strong> (5-, 4- or 3-day week) and the model picks the row matching their current phase &mdash; so each tier is shown clearly.
     Each row is saved <strong>separately</strong>; nothing is stored until you tap its <strong>Save</strong>, and <strong>Reload</strong> discards edits.
     <br><br>
-    <strong>August increase</strong> is entered as a friendly percentage (e.g. <code>3</code> for 3%) &mdash; the model applies it once each August to grow the contribution over time.
+    <strong>Annual increase</strong> is entered as a friendly percentage (e.g. <code>3</code> for 3%) &mdash; the model applies it once a year, in the <strong>increase month</strong> you choose per row, to grow the contribution over time.
   </p>
 </div>
 
@@ -137,6 +137,12 @@
   const toPct = (dec) => dec == null ? '' : +(Number(dec) * 100).toFixed(4);
   const toDec = (pct) => pct === '' || pct == null ? null : Number(pct) / 100;
 
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  function MONTH_OPTS(sel) {
+    const s = (sel == null) ? 8 : Number(sel);   // default August
+    return MONTH_NAMES.map((nm, i) => `<option value="${i + 1}" ${(i + 1) === s ? 'selected' : ''}>${nm}</option>`).join('');
+  }
+
   function tierLabel(wd) {
     if (wd == null) return { txt: 'All / n/a', cls: 'na' };
     return { txt: wd + '-day week', cls: '' };
@@ -180,9 +186,16 @@
                 </select>
               </div>
               <div class="field">
-                <label>August increase (%)</label>
-                <span class="hint">Annual rise applied each August.</span>
+                <label>Annual increase (%)</label>
+                <span class="hint">Annual rise, applied once a year.</span>
                 <input type="number" step="0.01" id="aug_${id}" value="${toPct(r.august_increase_pct)}" oninput="markDirty('${id}')">
+              </div>
+              <div class="field">
+                <label>Increase month</label>
+                <span class="hint">Which month the rise is applied.</span>
+                <select id="incm_${id}" onchange="markDirty('${id}')">
+                  ${MONTH_OPTS(r.increase_month)}
+                </select>
               </div>
             </div>
             <div class="meta">id: ${id}</div>
@@ -206,6 +219,7 @@
     document.getElementById('amt_' + id).value = r.monthly_contribution != null ? r.monthly_contribution : '';
     document.getElementById('wd_' + id).value = r.working_days == null ? '' : String(r.working_days);
     document.getElementById('aug_' + id).value = toPct(r.august_increase_pct);
+    document.getElementById('incm_' + id).value = String(r.increase_month == null ? 8 : r.increase_month);
     clearDirty(id);
     document.getElementById('msg_' + id).innerHTML = '';
   }
@@ -219,12 +233,13 @@
     const amt = amtRaw === '' ? null : Number(amtRaw);
     if (amt != null && (isNaN(amt) || amt < 0)) { msg.style.color = '#c0392b'; msg.innerText = 'Monthly contribution must be a positive number. Nothing saved.'; return; }
     const augPct = augRaw === '' ? null : Number(augRaw);
-    if (augPct != null && (isNaN(augPct) || augPct < 0 || augPct > 100)) { msg.style.color = '#c0392b'; msg.innerText = 'August increase looks wrong — enter a percentage like 3 (not 0.03). Nothing saved.'; return; }
+    if (augPct != null && (isNaN(augPct) || augPct < 0 || augPct > 100)) { msg.style.color = '#c0392b'; msg.innerText = 'Annual increase looks wrong — enter a percentage like 3 (not 0.03). Nothing saved.'; return; }
 
     const payload = {
       monthly_contribution: amt,
       working_days: wdRaw === '' ? null : parseInt(wdRaw),
-      august_increase_pct: toDec(augRaw)
+      august_increase_pct: toDec(augRaw),
+      increase_month: parseInt(document.getElementById('incm_' + id).value) || 8
     };
 
     msg.style.color = '#1e3a8a'; msg.innerText = 'Saving…';
@@ -262,7 +277,7 @@
       ((r.working_days == null && (tier === '' || tier == null)) || Number(r.working_days) === Number(tier)));
     if (dup) { statusEl.style.color = '#c0392b'; statusEl.innerText = `A ${tier ? tier + '-day' : 'non-tier-specific'} row already exists for ${member} · ${pension}.`; return; }
     statusEl.style.color = '#1e3a8a'; statusEl.innerText = 'Adding…';
-    const payload = { member_name: member, pension_name: pension, working_days: (tier === '' || tier == null) ? null : parseInt(tier), monthly_contribution: 0, august_increase_pct: 0 };
+    const payload = { member_name: member, pension_name: pension, working_days: (tier === '' || tier == null) ? null : parseInt(tier), monthly_contribution: 0, august_increase_pct: 0, increase_month: 8 };
     try {
       const res = await fetch(CONTRIB_URL, { method: 'POST', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error('POST → ' + res.status);

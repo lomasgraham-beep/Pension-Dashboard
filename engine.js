@@ -59,7 +59,21 @@
       ? new Date(plan.retirementDate.getFullYear(), plan.retirementDate.getMonth(), 1)
       : new Date(cur.getFullYear() + 5, cur.getMonth(), 1);
     const monthlyGrowth = (plan.growthRate != null ? plan.growthRate : 0.05) / 12;
-    let augusts = 0;
+
+    // count how many times a given calendar month (1=Jan..12=Dec) has occurred strictly
+    // after `fromDate` up to and including `toDate` — i.e. how many annual rises have applied.
+    function risesElapsed(fromDate, toDate, incMonth) {
+      const m = ((Number(incMonth) || 8) - 1);   // 0-indexed; default August
+      let count = 0;
+      // walk by year: for each year in range, the increase month occurs once
+      const fy = fromDate.getFullYear(), ty = toDate.getFullYear();
+      for (let y = fy; y <= ty; y++) {
+        const occ = new Date(y, m, 1);
+        if (occ > fromDate && occ <= toDate) count++;
+      }
+      return count;
+    }
+    const loopStart = new Date(cur.getFullYear(), cur.getMonth(), 1);
 
     // person 1 / person 2 alphabetically; person 1 carries the shorter-week phasing.
     const fMembers = (data.members || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
@@ -112,14 +126,13 @@
         else if (p2p.phase1Date && cur >= p2p.phase1Date) jDays = p2p.phase1Days;
       }
 
-      if (cur.getMonth() === 7) augusts++; // August
-
       (data.contributions || []).forEach(c => {
         if (c.member_name === fp1 && Number(c.working_days) === Number(gDays)) {
           const k = fp1 + '|' + c.pension_name;
           if (k in pots) {
             const ex = exceptionFor(fp1, c.pension_name, curIdx);
-            const normal = (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), augusts);
+            const rises = risesElapsed(loopStart, cur, c.increase_month);
+            const normal = (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), rises);
             const base = (ex.override != null) ? ex.override * contribMult : normal;
             pots[k] += base + ex.oneOff * contribMult;
           }
@@ -134,7 +147,8 @@
           const k = fp2 + '|' + c.pension_name;
           if (k in pots) {
             const ex = exceptionFor(fp2, c.pension_name, curIdx);
-            const normal = (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), augusts);
+            const rises = risesElapsed(loopStart, cur, c.increase_month);
+            const normal = (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), rises);
             const base = (ex.override != null) ? ex.override * contribMult : normal;
             pots[k] += base + ex.oneOff * contribMult;
           }
