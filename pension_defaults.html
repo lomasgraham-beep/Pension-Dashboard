@@ -83,7 +83,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: tiers-ui)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
+<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: stageA)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -101,48 +101,11 @@
 </div>
 
 <div class="panel">
-  <h2>Retirement Timing — <span class="nm-p1">Graham</span></h2>
-  <div class="field">
-    <label><span class="nm-p1">Graham</span> drops to a 4-day week on</label>
-    <span class="hint">When <span class="nm-p1">Graham</span> first reduces hours. Leave blank if not planned.</span>
-    <div class="phase-row">
-      <input type="date" id="d_p1date" oninput="markDirty()">
-      <div><div class="sub">Days</div><select id="d_p1days" onchange="markDirty()"><option value="5">5</option><option value="4">4</option><option value="3">3</option></select></div>
-    </div>
-  </div>
-  <div class="field">
-    <label><span class="nm-p1">Graham</span> drops to a 3-day week on</label>
-    <span class="hint">A later, further reduction. This should be <em>after</em> the 4-day date above.</span>
-    <div class="phase-row">
-      <input type="date" id="d_p2date" oninput="markDirty()">
-      <div><div class="sub">Days</div><select id="d_p2days" onchange="markDirty()"><option value="5">5</option><option value="4">4</option><option value="3">3</option></select></div>
-    </div>
-  </div>
+  <h2>Retirement</h2>
   <div class="field">
     <label>Fully retire on</label>
-    <span class="hint">The point contributions stop and drawdown begins (applies to the household).</span>
+    <span class="hint">The point contributions stop and drawdown begins. (Working patterns are set in the Working-days tiers panel above.)</span>
     <input type="date" id="d_retire" oninput="markDirty()">
-  </div>
-</div>
-
-<div class="panel" id="p2PhasePanel" style="display:none;">
-  <h2>Working-days schedule — <span class="nm-p2">Julie</span></h2>
-  <p class="intro" style="margin-top:0;"><span class="nm-p2">Julie</span> can phase down hours independently. Leave blank if not planned — contributions then stay at the standard (5-day) rows.</p>
-  <div class="field">
-    <label><span class="nm-p2">Julie</span> drops to a 4-day week on</label>
-    <span class="hint">When <span class="nm-p2">Julie</span> first reduces hours.</span>
-    <div class="phase-row">
-      <input type="date" id="d_jp1date" oninput="markDirty()">
-      <div><div class="sub">Days</div><select id="d_jp1days" onchange="markDirty()"><option value="5">5</option><option value="4">4</option><option value="3">3</option></select></div>
-    </div>
-  </div>
-  <div class="field">
-    <label><span class="nm-p2">Julie</span> drops to a 3-day week on</label>
-    <span class="hint">A later, further reduction — <em>after</em> the 4-day date above.</span>
-    <div class="phase-row">
-      <input type="date" id="d_jp2date" oninput="markDirty()">
-      <div><div class="sub">Days</div><select id="d_jp2days" onchange="markDirty()"><option value="5">5</option><option value="4">4</option><option value="3">3</option></select></div>
-    </div>
   </div>
 </div>
 
@@ -203,9 +166,6 @@
     // a single person has no drawdown split — hide the ratio field
     const ratioField = document.getElementById('d_ratio') ? document.getElementById('d_ratio').closest('.field') : null;
     if (ratioField) ratioField.style.display = p2Name ? '' : 'none';
-    // person 2's working-days panel only applies with two members
-    const p2panel = document.getElementById('p2PhasePanel');
-    if (p2panel) p2panel.style.display = p2Name ? '' : 'none';
     updateRatioHint();
   }
 
@@ -219,18 +179,13 @@
     if (!loadedRow) { document.getElementById('currentSummary').innerHTML = 'No saved parameter row yet — saving will create one.'; return; }
     const r = loadedRow;
     document.getElementById('currentSummary').innerHTML =
-      `<b>Currently saved:</b> 4-day week from <b>${fmtDate(r.shorter_week_date_1)}</b> (${r.working_days_1 ?? '—'}d), ` +
-      `3-day week from <b>${fmtDate(r.shorter_week_date_2)}</b> (${r.working_days_2 ?? '—'}d), ` +
-      `retire <b>${fmtDate(r.retirement_date)}</b>, ` +
+      `<b>Currently saved:</b> retire <b>${fmtDate(r.retirement_date)}</b>, ` +
       `spend <b>${Math.round((r.spending_reduction_pct ?? 1) * 100)}%</b>, ` +
-      `${p1Name} ratio <b>${Math.round((r.drawdown_ratio_graham ?? 0.5) * 100)}%</b>.`;
+      `${p1Name} ratio <b>${Math.round((r.drawdown_ratio_graham ?? 0.5) * 100)}%</b>. ` +
+      `(Working patterns are managed in the Working-days tiers panel.)`;
   }
 
   function populate(r) {
-    setVal('d_p1date', toInputDate(r.shorter_week_date_1));
-    setVal('d_p1days', String(r.working_days_1 || 4));
-    setVal('d_p2date', toInputDate(r.shorter_week_date_2));
-    setVal('d_p2days', String(r.working_days_2 || 3));
     setVal('d_retire', toInputDate(r.retirement_date));
     const spend = Math.round((r.spending_reduction_pct != null ? r.spending_reduction_pct : 1) * 100);
     setVal('d_spend', spend); document.getElementById('v_spend').innerText = spend + '%';
@@ -238,12 +193,7 @@
     setVal('d_ratio', ratio); updateRatioHint();
   }
 
-  function populateP2(r) {
-    setVal('d_jp1date', r ? toInputDate(r.shorter_week_date_1) : '');
-    setVal('d_jp1days', String((r && r.working_days_1) || 4));
-    setVal('d_jp2date', r ? toInputDate(r.shorter_week_date_2) : '');
-    setVal('d_jp2days', String((r && r.working_days_2) || 3));
-  }
+  function populateP2() { /* per-person phasing now lives in the Working-days tiers panel */ }
 
   async function loadDefaults(isReload) {
     const status = document.getElementById('status');
@@ -442,18 +392,17 @@
 
   async function saveDefaults() {
     const msg = document.getElementById('saveMsg');
-    const d1 = val('d_p1date'), d2 = val('d_p2date');
-    if (d1 && d2 && new Date(d2) < new Date(d1)) {
-      if (!confirm('Your 3-day-week date is earlier than your 4-day-week date, which is unusual. Save anyway?')) return;
-    }
     msg.style.color = '#1e3a8a'; msg.innerText = 'Saving…';
 
+    // The working-days phasing columns are no longer edited here (the Working-days tiers panel
+    // owns that now), but the engine still reads them until the tier engine ships — so PRESERVE
+    // whatever is already stored rather than wiping it.
     const payload = {
       member_name: p1Name,
-      shorter_week_date_1: d1 || null,
-      working_days_1: parseInt(val('d_p1days')),
-      shorter_week_date_2: d2 || null,
-      working_days_2: parseInt(val('d_p2days')),
+      shorter_week_date_1: (loadedRow && loadedRow.shorter_week_date_1) || null,
+      working_days_1: (loadedRow && loadedRow.working_days_1) || null,
+      shorter_week_date_2: (loadedRow && loadedRow.shorter_week_date_2) || null,
+      working_days_2: (loadedRow && loadedRow.working_days_2) || null,
       retirement_date: val('d_retire') || null,
       spending_reduction_pct: parseFloat(val('d_spend')) / 100,
       drawdown_ratio_graham: parseFloat(val('d_ratio')) / 100,
@@ -467,25 +416,6 @@
       const url = existing.length ? `${PARAMS_URL}?member_name=eq.${encodeURIComponent(p1Name)}` : PARAMS_URL;
       const res = await fetch(url, { method, headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error(method + ' → ' + res.status);
-
-      // person 2's working-days schedule → their own params row (full symmetry)
-      if (p2Name) {
-        const jd1 = val('d_jp1date'), jd2 = val('d_jp2date');
-        const p2payload = {
-          member_name: p2Name,
-          shorter_week_date_1: jd1 || null,
-          working_days_1: parseInt(val('d_jp1days')),
-          shorter_week_date_2: jd2 || null,
-          working_days_2: parseInt(val('d_jp2days')),
-          updated_at: new Date().toISOString()
-        };
-        const check2 = await fetch(`${PARAMS_URL}?member_name=eq.${encodeURIComponent(p2Name)}`, { headers: getHeaders() });
-        const existing2 = check2.ok ? await check2.json() : [];
-        const method2 = existing2.length ? 'PATCH' : 'POST';
-        const url2 = existing2.length ? `${PARAMS_URL}?member_name=eq.${encodeURIComponent(p2Name)}` : PARAMS_URL;
-        const res2 = await fetch(url2, { method: method2, headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify(p2payload) });
-        if (!res2.ok) throw new Error('person 2 schedule ' + method2 + ' → ' + res2.status);
-      }
 
       msg.style.color = '#065f46';
       msg.innerText = '✓ Saved. Refresh the dashboard or Scenario Lab to pick up the new baseline.';
