@@ -61,7 +61,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Pensions</h1>
+<h1>Pensions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(pensions build: wp-flag)</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -126,6 +126,13 @@
               <label>Owner</label>
               <select id="owner_${id}" onchange="markDirty('${id}')">${optionList(memberNames, p.member_name)}</select>
             </div>
+            <div class="field">
+              <label>Pension kind</label>
+              <select id="wp_${id}" onchange="markDirty('${id}')">
+                <option value="workplace" ${p.is_workplace !== false ? 'selected' : ''}>Workplace (employer / tied to job)</option>
+                <option value="private" ${p.is_workplace === false ? 'selected' : ''}>Private (your own)</option>
+              </select>
+            </div>
           </div>
           <div class="meta">id: ${id}</div>
           <div class="btn-row">
@@ -145,6 +152,7 @@
     document.getElementById('name_' + id).value = p.pension_name || '';
     document.getElementById('type_' + id).value = p.pension_type;
     document.getElementById('owner_' + id).value = p.member_name;
+    document.getElementById('wp_' + id).value = (p.is_workplace === false) ? 'private' : 'workplace';
     clearDirty(id);
     document.getElementById('msg_' + id).innerHTML = '';
   }
@@ -154,6 +162,7 @@
     const name = document.getElementById('name_' + id).value.trim();
     const type = document.getElementById('type_' + id).value;
     const owner = document.getElementById('owner_' + id).value;
+    const isWorkplace = document.getElementById('wp_' + id).value === 'workplace';
 
     if (!name) { msg.style.color = '#c0392b'; msg.innerText = 'Pension name can\'t be empty. Nothing saved.'; return; }
 
@@ -165,7 +174,7 @@
       }
     }
 
-    const payload = { pension_name: name, pension_type: type, member_name: owner };
+    const payload = { pension_name: name, pension_type: type, member_name: owner, is_workplace: isWorkplace };
     msg.style.color = '#1e3a8a'; msg.innerText = 'Saving…';
     try {
       const res = await fetch(`${PENS_URL}?id=eq.${id}`,

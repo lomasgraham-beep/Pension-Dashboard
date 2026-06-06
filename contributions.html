@@ -67,7 +67,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: deletefix)</span></h1>
+<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: wp-label)</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -158,7 +158,11 @@
       html += `<div class="owner-head">${owner}</div>`;
       const pensionsForOwner = [...new Set(rows.filter(r => (r.member_name || 'Unassigned') === owner).map(r => r.pension_name))].sort();
       pensionsForOwner.forEach(pen => {
-        html += `<div class="pension-head">${pen}</div>`;
+        const isWp = workplaceByKey[owner + '|' + pen];
+        const badge = (isWp === false)
+          ? '<span style="font-size:12px;font-weight:600;color:#6b46c1;background:#ede9fe;padding:3px 9px;border-radius:999px;margin-left:8px;">Private</span>'
+          : '<span style="font-size:12px;font-weight:600;color:#2c7a7b;background:#e6fffa;padding:3px 9px;border-radius:999px;margin-left:8px;">Workplace</span>';
+        html += `<div class="pension-head">${pen} ${badge}</div>`;
         rows.filter(r => (r.member_name || 'Unassigned') === owner && r.pension_name === pen)
             .sort((a, b) => (b.working_days || 0) - (a.working_days || 0))
             .forEach(r => {
@@ -261,6 +265,7 @@
 
   // ---- Add / delete contribution rows ----
   let allMembers = [], allPensionNames = [];
+  let workplaceByKey = {};
 
   function populatePickers() {
     const memSel = document.getElementById('newMember');
@@ -331,6 +336,9 @@
         const penRows = pr.ok ? await pr.json() : [];
         // pension names from bd_pensions, plus any already used in contributions
         allPensionNames = [...new Set(penRows.map(p => p.pension_name).concat(rows.map(r2 => r2.pension_name)).filter(Boolean))].sort();
+        // workplace/private flag keyed by member|pension
+        workplaceByKey = {};
+        penRows.forEach(p => { workplaceByKey[(p.member_name || '') + '|' + p.pension_name] = (p.is_workplace !== false); });
       } catch (e) { allMembers = [...new Set(rows.map(r2 => r2.member_name).filter(Boolean))]; allPensionNames = [...new Set(rows.map(r2 => r2.pension_name).filter(Boolean))].sort(); }
       render();
       populatePickers();
