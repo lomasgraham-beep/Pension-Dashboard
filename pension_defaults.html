@@ -6,21 +6,36 @@
 <title>Pension Defaults</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; color: #333; max-width: 820px; margin: 0 auto; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; color: #333; max-width: 820px; margin: 0 auto; font-size:16px; }
   h1 { color: #2c3e50; }
-  h2 { color: #2c3e50; margin-top: 0; padding-bottom: 5px; border-bottom: 2px solid #e2e8f0; font-size:18px; }
+  h2 { color: #2c3e50; margin-top: 0; padding-bottom: 5px; border-bottom: 2px solid #e2e8f0; font-size:20px; }
   .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin-bottom:20px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
-  .intro { font-size:14px; color:#475569; line-height:1.5; }
-  .field { margin-bottom:18px; }
-  label { display:block; font-weight:bold; margin-bottom:6px; color:#2c3e50; }
-  .hint { font-weight:normal; font-size:12px; color:#64748b; display:block; margin-bottom:8px; }
-  input[type="date"], select { padding:9px; border:1px solid #ccc; border-radius:4px; font-family:inherit; box-sizing:border-box; }
-  input[type="date"] { width:100%; max-width:240px; }
-  input[type="range"] { width:100%; max-width:360px; cursor:pointer; }
+  .intro { font-size:15px; color:#475569; line-height:1.55; }
+  .field { margin-bottom:20px; }
+  label { display:block; font-weight:bold; margin-bottom:6px; color:#2c3e50; font-size:16px; }
+  .hint { font-weight:normal; font-size:14px; color:#64748b; display:block; margin-bottom:8px; }
+  input[type="date"], select, input[type="number"], input[type="text"] { padding:12px 14px; border:1px solid #ccc; border-radius:6px; font-family:inherit; font-size:16px; box-sizing:border-box; min-height:48px; }
+  input[type="date"] { width:100%; max-width:260px; }
+  input[type="range"] { width:100%; max-width:360px; cursor:pointer; height:30px; }
   .slider-val { color:#3498db; font-size:18px; font-weight:bold; margin-left:8px; }
+  .tier-member { margin-bottom:22px; }
+  .tier-member h3 { font-size:17px; color:#2c3e50; margin:0 0 4px; }
+  .tier-card { border:1px solid #d7dde3; border-radius:8px; padding:14px 16px; margin-bottom:12px; background:#fcfdfe; }
+  .tier-top { display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px; }
+  .tier-top .col { display:flex; flex-direction:column; }
+  .tier-top .col .sub { font-size:13px; color:#64748b; margin-bottom:4px; }
+  .tier-start { font-size:13px; background:#eef2f7; color:#475569; padding:6px 12px; border-radius:999px; align-self:center; }
+  .tier-del { margin-left:auto; background:#fff; color:#c0392b; border:1px solid #f0c4c4; border-radius:8px; min-height:48px; padding:10px 16px; font-size:15px; font-weight:bold; cursor:pointer; }
+  .tier-pens { border-top:1px solid #e2e8f0; padding-top:12px; }
+  .tier-pens .lbl { font-size:13px; color:#64748b; margin-bottom:8px; }
+  .pen-chk { display:inline-flex; align-items:center; gap:8px; margin:0 20px 8px 0; font-size:16px; font-weight:normal; cursor:pointer; }
+  .pen-chk input { width:22px; height:22px; }
+  .tier-add { background:#fff; color:#2c7a7b; border:1px solid #b2dfdb; border-radius:8px; min-height:48px; padding:10px 18px; font-size:15px; font-weight:bold; cursor:pointer; }
+  .tier-warn { color:#b45309; background:#fef3c7; border:1px solid #fcd34d; border-radius:6px; padding:8px 12px; font-size:14px; margin:8px 0; }
+  .tier-msg { font-size:14px; font-weight:bold; margin-top:8px; min-height:18px; }
   .phase-row { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
-  .phase-row .sub { font-size:12px; color:#64748b; margin-bottom:6px; }
-  .btn { background:#3498db; color:#fff; border:none; padding:11px 22px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:15px; }
+  .phase-row .sub { font-size:14px; color:#64748b; margin-bottom:6px; }
+  .btn { background:#3498db; color:#fff; border:none; padding:14px 24px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:16px; min-height:48px; }
   .btn:hover { background:#2980b9; }
   .btn-save { background:#27ae60; }
   .btn-save:hover { background:#219150; }
@@ -68,7 +83,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Pension Defaults <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
+<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: tiers-ui)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -77,6 +92,12 @@
     Changes here are <strong>not stored until you tap Save</strong>. <strong>Reload</strong> discards any unsaved edits and pulls the current values back from the database.
     After saving, refresh the dashboard or Scenario Lab to see the new baseline.
   </p>
+</div>
+
+<div class="panel" id="tiersPanel">
+  <h2>Working-days tiers</h2>
+  <p class="intro" style="margin-top:0;">Each tier sets a working pattern from a date. Tick the pensions it applies to &mdash; that creates a contribution row (set the amount on the Contributions page). The active tier in any month is the latest start-date reached; before the earliest tier there's no contribution.</p>
+  <div id="tiersContainer"><p class="hint">Loading&hellip;</p></div>
 </div>
 
 <div class="panel">
@@ -155,7 +176,11 @@
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
   const PARAMS_URL = `${SUPABASE_URL}/rest/v1/op_modelling_parameters`;
   const MEMBERS_URL = `${SUPABASE_URL}/rest/v1/bd_members`;
+  const TIERS_URL = `${SUPABASE_URL}/rest/v1/bd_working_tiers`;
+  const PENSIONS_URL = `${SUPABASE_URL}/rest/v1/bd_pensions`;
+  const CONTRIB_URL = `${SUPABASE_URL}/rest/v1/bd_pension_contributions`;
   let p1Name = 'Graham', p2Name = null;
+  let tiers = [], pensionsByMember = {}, contribRows = [], allMemberNames = [];
   const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${authToken || SUPABASE_KEY}`, "Content-Type": "application/json" });
   let authToken = null;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -227,9 +252,10 @@
       // derive person names (alphabetical) and apply to labels/hints
       try {
         const mr = await fetch(`${MEMBERS_URL}?order=name.asc`, { headers: getHeaders() });
-        if (mr.ok) { const ms = (await mr.json()).map(m => m.name).filter(Boolean); if (ms.length) { p1Name = ms[0]; p2Name = ms[1] || null; } }
+        if (mr.ok) { const ms = (await mr.json()).map(m => m.name).filter(Boolean); if (ms.length) { p1Name = ms[0]; p2Name = ms[1] || null; allMemberNames = ms; } }
       } catch (e) {}
       applyNames();
+      loadTiers();
       const r = await fetch(`${PARAMS_URL}?member_name=eq.${encodeURIComponent(p1Name)}&order=updated_at.desc&limit=1`, { headers: getHeaders() });
       if (!r.ok) throw new Error('load → ' + r.status);
       const rows = await r.json();
@@ -253,6 +279,165 @@
       status.className = 'status-err';
       status.innerText = 'Could not load: ' + e.message + '. Check your network settings allow access to Supabase.';
     }
+  }
+
+  // ================= Working-days tiers =================
+  const TIER_DAYS = [5, 4, 3, 2];
+  function dayLabel(d) { return d + '-day week'; }
+
+  async function loadTiers() {
+    const c = document.getElementById('tiersContainer');
+    try {
+      const [tr, pr, cr] = await Promise.all([
+        fetch(`${TIERS_URL}?order=member_name.asc,from_date.asc`, { headers: getHeaders() }),
+        fetch(`${PENSIONS_URL}?order=member_name.asc,pension_name.asc`, { headers: getHeaders() }),
+        fetch(`${CONTRIB_URL}?order=member_name.asc`, { headers: getHeaders() })
+      ]);
+      tiers = tr.ok ? await tr.json() : [];
+      const pens = pr.ok ? await pr.json() : [];
+      contribRows = cr.ok ? await cr.json() : [];
+      pensionsByMember = {};
+      pens.forEach(p => { if (!pensionsByMember[p.member_name]) pensionsByMember[p.member_name] = []; pensionsByMember[p.member_name].push(p.pension_name); });
+      renderTiers();
+    } catch (e) {
+      c.innerHTML = '<p class="tier-warn">Could not load tiers: ' + e.message + '</p>';
+    }
+  }
+
+  // does a contribution row exist for this member+pension+days?
+  function hasContrib(member, pension, days) {
+    return contribRows.some(r => r.member_name === member && r.pension_name === pension && Number(r.working_days) === Number(days));
+  }
+
+  function renderTiers() {
+    const c = document.getElementById('tiersContainer');
+    const names = allMemberNames.length ? allMemberNames : [...new Set(tiers.map(t => t.member_name))];
+    if (!names.length) { c.innerHTML = '<p class="hint">No members found.</p>'; return; }
+    let html = '';
+    names.forEach(member => {
+      const myTiers = tiers.filter(t => t.member_name === member).sort((a, b) => new Date(a.from_date) - new Date(b.from_date));
+      const earliestId = myTiers.length ? myTiers[0].id : null;
+      const myPensions = pensionsByMember[member] || [];
+      html += `<div class="tier-member">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <h3>${member}</h3>
+          <button class="tier-add" onclick="addTier('${member.replace(/'/g, "\\'")}')">+ Add tier</button>
+        </div>`;
+      // descending-days warning
+      if (!tierDatesDescend(myTiers)) html += `<div class="tier-warn">Heads up: these tiers don't reduce days as dates advance. The model uses whichever tier's date was most recently reached — double-check the dates are what you intend.</div>`;
+      if (!myTiers.length) html += `<p class="hint">No tiers yet. Add one to set ${member}'s starting working pattern.</p>`;
+      myTiers.forEach(t => {
+        const isStart = t.id === earliestId;
+        html += `<div class="tier-card">
+          <div class="tier-top">
+            <div class="col"><span class="sub">Working pattern</span>
+              <select id="td_${t.id}" onchange="markTier()">${TIER_DAYS.map(d => `<option value="${d}" ${Number(t.days) === d ? 'selected' : ''}>${dayLabel(d)}</option>`).join('')}</select>
+            </div>
+            <div class="col"><span class="sub">From date</span>
+              <input type="date" id="tf_${t.id}" value="${t.from_date ? String(t.from_date).split('T')[0] : ''}" onchange="markTier()">
+            </div>
+            ${isStart ? '<span class="tier-start">starting tier (earliest)</span>' : ''}
+            <button class="tier-del" onclick="deleteTier('${t.id}')">Delete</button>
+          </div>
+          <div class="tier-pens">
+            <div class="lbl">Applies to pensions (ticking creates a contribution row to fill in):</div>
+            ${myPensions.length ? myPensions.map(pn => `<label class="pen-chk"><input type="checkbox" ${hasContrib(member, pn, t.days) ? 'checked' : ''} onchange="togglePension('${member.replace(/'/g, "\\'")}','${pn.replace(/'/g, "\\'")}',${t.days},this)"> ${pn}</label>`).join('') : '<span class="hint">No pensions for this member yet — add them on the Pensions tab.</span>'}
+          </div>
+          <div class="tier-msg" id="tmsg_${t.id}"></div>
+          <div style="margin-top:8px;"><button class="btn" style="background:#27ae60;" onclick="saveTier('${t.id}')">Save tier date/pattern</button></div>
+        </div>`;
+      });
+      html += '</div>';
+    });
+    c.innerHTML = html;
+  }
+
+  function tierDatesDescend(sorted) {
+    // sorted by date ascending; days should be non-increasing as dates advance
+    for (let i = 1; i < sorted.length; i++) { if (Number(sorted[i].days) > Number(sorted[i - 1].days)) return false; }
+    return true;
+  }
+
+  function markTier() { /* per-tier save is explicit; no global dirty needed */ }
+
+  async function addTier(member) {
+    // default new tier: a sensible next-lower pattern, dated today
+    const myTiers = tiers.filter(t => t.member_name === member);
+    const used = new Set(myTiers.map(t => Number(t.days)));
+    const days = [5, 4, 3, 2].find(d => !used.has(d)) || 4;
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      const res = await fetch(TIERS_URL, { method: 'POST', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify({ member_name: member, days, from_date: today }) });
+      if (!res.ok) throw new Error('POST → ' + res.status);
+      const created = await res.json();
+      if (created && created.length) tiers.push(created[0]);
+      renderTiers();
+    } catch (e) { alert('Could not add tier: ' + e.message); }
+  }
+
+  async function saveTier(id) {
+    const msg = document.getElementById('tmsg_' + id);
+    const days = parseInt(document.getElementById('td_' + id).value);
+    const from = document.getElementById('tf_' + id).value;
+    if (!from) { msg.style.color = '#c0392b'; msg.innerText = 'A from-date is required.'; return; }
+    msg.style.color = '#1e3a8a'; msg.innerText = 'Saving…';
+    try {
+      const res = await fetch(`${TIERS_URL}?id=eq.${id}`, { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify({ days, from_date: from }) });
+      if (!res.ok) throw new Error('PATCH → ' + res.status);
+      const fresh = await res.json();
+      if (fresh && fresh.length) { const i = tiers.findIndex(t => t.id === id); if (i >= 0) tiers[i] = fresh[0]; }
+      renderTiers();
+      const m2 = document.getElementById('tmsg_' + id); if (m2) { m2.style.color = '#065f46'; m2.innerText = '✓ Saved. Refresh the dashboard to apply.'; }
+    } catch (e) { msg.style.color = '#c0392b'; msg.innerText = 'Save failed: ' + e.message; }
+  }
+
+  async function deleteTier(id) {
+    const t = tiers.find(x => x.id === id);
+    if (!t) return;
+    // find contribution rows that would be affected
+    const affected = contribRows.filter(r => r.member_name === t.member_name && Number(r.working_days) === Number(t.days));
+    const detail = affected.length ? `\n\nThis will also delete ${affected.length} contribution row(s) for ${t.member_name}'s ${dayLabel(t.days)}: ${affected.map(r => r.pension_name).join(', ')}.` : '';
+    if (!confirm(`Delete the ${dayLabel(t.days)} tier for ${t.member_name}?${detail}\n\nThis can't be undone.`)) return;
+    try {
+      // delete the contribution rows for this member+days first
+      for (const r of affected) {
+        const dr = await fetch(`${CONTRIB_URL}?id=eq.${r.id}`, { method: 'DELETE', headers: { ...getHeaders(), 'Prefer': 'return=representation' } });
+        if (!dr.ok) throw new Error('contribution DELETE → ' + dr.status);
+      }
+      contribRows = contribRows.filter(r => !(r.member_name === t.member_name && Number(r.working_days) === Number(t.days)));
+      // then the tier
+      const res = await fetch(`${TIERS_URL}?id=eq.${id}`, { method: 'DELETE', headers: { ...getHeaders(), 'Prefer': 'return=representation' } });
+      if (!res.ok) throw new Error('tier DELETE → ' + res.status);
+      const removed = await res.json().catch(() => []);
+      if (!Array.isArray(removed) || removed.length === 0) throw new Error('the database reported no tier was deleted (check the DELETE policy on bd_working_tiers).');
+      tiers = tiers.filter(x => x.id !== id);
+      renderTiers();
+    } catch (e) { alert('Delete failed: ' + e.message); }
+  }
+
+  async function togglePension(member, pension, days, el) {
+    const checked = el.checked;
+    el.disabled = true;
+    try {
+      if (checked) {
+        // create a £0 contribution row for this tier×pension
+        const payload = { member_name: member, pension_name: pension, working_days: days, monthly_contribution: 0, august_increase_pct: 0, increase_month: 8 };
+        const res = await fetch(CONTRIB_URL, { method: 'POST', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify(payload) });
+        if (!res.ok) throw new Error('POST → ' + res.status);
+        const created = await res.json();
+        if (created && created.length) contribRows.push(created[0]);
+      } else {
+        // delete the contribution row(s) for this tier×pension — warn first
+        const affected = contribRows.filter(r => r.member_name === member && r.pension_name === pension && Number(r.working_days) === Number(days));
+        if (!confirm(`Remove ${pension} from this tier? This deletes its ${dayLabel(days)} contribution row${affected.length > 1 ? 's' : ''} for ${member}.`)) { el.checked = true; el.disabled = false; return; }
+        for (const r of affected) {
+          const dr = await fetch(`${CONTRIB_URL}?id=eq.${r.id}`, { method: 'DELETE', headers: { ...getHeaders(), 'Prefer': 'return=representation' } });
+          if (!dr.ok) throw new Error('DELETE → ' + dr.status);
+        }
+        contribRows = contribRows.filter(r => !(r.member_name === member && r.pension_name === pension && Number(r.working_days) === Number(days)));
+      }
+    } catch (e) { alert('Could not update pension: ' + e.message); el.checked = !checked; }
+    el.disabled = false;
   }
 
   async function saveDefaults() {
