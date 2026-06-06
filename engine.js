@@ -104,6 +104,14 @@
       if (plan.phase2Date && cur >= plan.phase2Date) gDays = plan.phase2Days;
       else if (plan.phase1Date && cur >= plan.phase1Date) gDays = plan.phase1Days;
 
+      // person 2's own working-days schedule (full symmetry); defaults to 5-day (no phasing) if absent
+      let jDays = 5;
+      const p2p = plan.p2phase;
+      if (p2p) {
+        if (p2p.phase2Date && cur >= p2p.phase2Date) jDays = p2p.phase2Days;
+        else if (p2p.phase1Date && cur >= p2p.phase1Date) jDays = p2p.phase1Days;
+      }
+
       if (cur.getMonth() === 7) augusts++; // August
 
       (data.contributions || []).forEach(c => {
@@ -118,7 +126,11 @@
         }
       });
       if (fp2) (data.contributions || []).forEach(c => {
-        if (c.member_name === fp2) {
+        // person 2 now honours working-days tiers too: a row applies if it's not
+        // tier-specific (working_days null) OR it matches person 2's current tier.
+        const wd = c.working_days;
+        const tierMatch = (wd == null || wd === '') ? true : Number(wd) === Number(jDays);
+        if (c.member_name === fp2 && tierMatch) {
           const k = fp2 + '|' + c.pension_name;
           if (k in pots) {
             const ex = exceptionFor(fp2, c.pension_name, curIdx);

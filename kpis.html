@@ -42,7 +42,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: gen-names)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: p2days)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
     <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span> expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
@@ -61,6 +61,7 @@
 <script>
   const fmt = App.fmt, fmtDiff = App.fmtDiff;
   let allLogs = [], allContributions = [], grahamParams = null, allExceptions = [];
+  let paramsByMember = {};
   let p1Name = 'Graham', p2Name = null;
   let chartsReady = false;
   google.charts.load('current', { packages:['corechart'] });
@@ -69,17 +70,19 @@
   function getExpectedContribution(log) {
     const d = new Date(log.log_date);
     const idx = d.getFullYear() * 12 + d.getMonth();
+    const prm = paramsByMember[log.member_name] || null;
     let expectedDays = 5;
-    if (log.member_name === p1Name && grahamParams) {
-      const d1 = grahamParams.shorter_week_date_1 ? new Date(grahamParams.shorter_week_date_1) : null;
-      const d2 = grahamParams.shorter_week_date_2 ? new Date(grahamParams.shorter_week_date_2) : null;
-      if (d2 && d >= d2) expectedDays = grahamParams.working_days_2 || 5;
-      else if (d1 && d >= d1) expectedDays = grahamParams.working_days_1 || 5;
+    if (prm) {
+      const d1 = prm.shorter_week_date_1 ? new Date(prm.shorter_week_date_1) : null;
+      const d2 = prm.shorter_week_date_2 ? new Date(prm.shorter_week_date_2) : null;
+      if (d2 && d >= d2) expectedDays = prm.working_days_2 || 5;
+      else if (d1 && d >= d1) expectedDays = prm.working_days_1 || 5;
     }
     const match = allContributions.find(c => {
       if (c.member_name !== log.member_name || c.pension_name !== log.pension_name) return false;
-      if (log.member_name === p1Name) return Number(c.working_days) === Number(expectedDays);
-      return true;
+      const wd = c.working_days;
+      if (wd == null || wd === '') return true;
+      return Number(wd) === Number(expectedDays);
     });
     let normal = match ? (Number(match.monthly_contribution) || 0) : 0;
     // contribution exceptions: override replaces; one-off adds a lump in its start month
@@ -275,12 +278,15 @@
     try {
       const mn = await App.memberNames();
       p1Name = mn.p1 || 'Graham'; p2Name = mn.p2;
-      const [logs, contribs, pRows, excRows] = await Promise.all([
+      const [logs, contribs, allParams, excRows] = await Promise.all([
         App.rest('op_pension_logs?order=log_date.desc&limit=2000'), App.rest('bd_pension_contributions'),
-        App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name) + '&limit=1'),
+        App.rest('op_modelling_parameters'),
         App.rest('bd_contribution_exceptions?order=start_date.asc')
       ]);
-      allLogs = logs; allContributions = contribs; grahamParams = pRows && pRows[0] ? pRows[0] : null; allExceptions = excRows || [];
+      allLogs = logs; allContributions = contribs; allExceptions = excRows || [];
+      paramsByMember = {};
+      (allParams || []).forEach(r => { if (r.member_name) paramsByMember[r.member_name] = r; });
+      grahamParams = paramsByMember[p1Name] || null;
       // member filter options + dynamic labels
       document.getElementById('fMember').innerHTML = '<option value="All">All Members</option>' + mn.all.map(n => `<option>${n}</option>`).join('');
       document.querySelectorAll('.nm-p1').forEach(el => el.textContent = p1Name);

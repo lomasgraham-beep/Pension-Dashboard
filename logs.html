@@ -53,7 +53,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
 
-  <h2>Log New Balances <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(logs build: exceptions)</span></h2>
+  <h2>Log New Balances <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(logs build: p2days)</span></h2>
   <div class="form-group"><label>Whose accounts are you updating?</label><select id="logMember" onchange="renderInputs()"></select></div>
   <div class="form-group"><label>Date</label><input type="date" id="entryDate"></div>
   <div id="inputs"></div>
@@ -72,20 +72,30 @@
 <script>
   const fmt = App.fmt;
   let userPensions = [], allLogs = [], allContributions = [], grahamParams = null, allExceptions = [];
+  let paramsByMember = {};
   let p1Name = 'Graham', p2Name = null;
 
   function getExpectedContribution(log) {
     const d = new Date(log.log_date);
     const idx = d.getFullYear() * 12 + d.getMonth();
-    // normal contribution for this member/pension (person 1 honours working-days tier)
+    // determine this member's working-days tier for the log month, from their own schedule
+    const prm = paramsByMember[log.member_name] || null;
     let days = 5;
-    if (log.member_name === p1Name && grahamParams) {
-      const d1 = grahamParams.shorter_week_date_1 ? new Date(grahamParams.shorter_week_date_1) : null;
-      const d2 = grahamParams.shorter_week_date_2 ? new Date(grahamParams.shorter_week_date_2) : null;
-      if (d2 && d >= d2) days = grahamParams.working_days_2 || 5;
-      else if (d1 && d >= d1) days = grahamParams.working_days_1 || 5;
+    let memberPhases = false;
+    if (prm) {
+      const d1 = prm.shorter_week_date_1 ? new Date(prm.shorter_week_date_1) : null;
+      const d2 = prm.shorter_week_date_2 ? new Date(prm.shorter_week_date_2) : null;
+      if (d1 || d2) memberPhases = true;
+      if (d2 && d >= d2) days = prm.working_days_2 || 5;
+      else if (d1 && d >= d1) days = prm.working_days_1 || 5;
     }
-    const m = allContributions.find(c => c.member_name === log.member_name && c.pension_name === log.pension_name && (log.member_name !== p1Name || Number(c.working_days) === Number(days)));
+    // a contribution row applies if it's not tier-specific, or matches this member's current tier
+    const m = allContributions.find(c => {
+      if (c.member_name !== log.member_name || c.pension_name !== log.pension_name) return false;
+      const wd = c.working_days;
+      if (wd == null || wd === '') return true;            // not tier-specific
+      return Number(wd) === Number(days);
+    });
     let normal = m ? (Number(m.monthly_contribution) || 0) : 0;
     // apply exceptions: override replaces normal for months in range; one-off adds a lump in its start month
     let override = null, oneOff = 0;
@@ -154,12 +164,16 @@
     try {
       const mn = await App.memberNames();
       p1Name = mn.p1 || 'Graham'; p2Name = mn.p2;
-      const [pensions, logs, contribs, pRows, excRows] = await Promise.all([
+      const [pensions, logs, contribs, allParams, excRows] = await Promise.all([
         App.rest('bd_pensions'), App.rest('op_pension_logs?order=log_date.desc'),
-        App.rest('bd_pension_contributions'), App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name) + '&limit=1'),
+        App.rest('bd_pension_contributions'), App.rest('op_modelling_parameters'),
         App.rest('bd_contribution_exceptions?order=start_date.asc')
       ]);
-      userPensions = pensions; allLogs = logs; allContributions = contribs; grahamParams = pRows && pRows[0] ? pRows[0] : null; allExceptions = excRows || [];
+      userPensions = pensions; allLogs = logs; allContributions = contribs; allExceptions = excRows || [];
+      // map each member to their params row (for per-person working-days tier)
+      paramsByMember = {};
+      (allParams || []).forEach(r => { if (r.member_name) paramsByMember[r.member_name] = r; });
+      grahamParams = paramsByMember[p1Name] || null;
       // populate member pickers from the members table
       const memOpts = mn.all.map(n => `<option>${n}</option>`).join('');
       document.getElementById('logMember').innerHTML = memOpts;

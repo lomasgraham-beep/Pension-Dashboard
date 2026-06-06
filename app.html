@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=err2"></script>
-  <script src="engine.js?v=gen2"></script>
+  <script src="engine.js?v=p2days"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -357,7 +357,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-80</span>
+    <span class="build-stamp">build: LC-81</span>
   </div>
 
   <script>
@@ -778,6 +778,7 @@
         phase1Days: segValue('m_p1days'),
         phase2Date: idxToDate(document.getElementById('m_p2date').value),
         phase2Days: segValue('m_p2days'),
+        p2phase: savedPlan ? savedPlan.p2phase : null,
         spendRed: parseFloat(document.getElementById('m_spend').value) / 100,
         gRatio: p2Name ? (parseFloat(document.getElementById('m_ratio').value) / 100) : 1,
         dynamic: document.getElementById('m_dynamic').checked,
@@ -864,7 +865,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err33';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err34';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
@@ -945,11 +946,22 @@
 
         const pRows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name) + '&order=updated_at.desc&limit=1');
         const p = (pRows && pRows.length) ? pRows[0] : {};
+        // person 2's own working-days schedule (full symmetry) from their params row
+        let p2phase = null;
+        if (p2Name) {
+          const p2Rows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p2Name) + '&order=updated_at.desc&limit=1');
+          const p2 = (p2Rows && p2Rows.length) ? p2Rows[0] : null;
+          if (p2) p2phase = {
+            phase1Date: App.parseLocalDate(p2.shorter_week_date_1), phase1Days: p2.working_days_1 ? Number(p2.working_days_1) : 5,
+            phase2Date: App.parseLocalDate(p2.shorter_week_date_2), phase2Days: p2.working_days_2 ? Number(p2.working_days_2) : 5
+          };
+        }
         savedPlan = {
           retirementDate: App.parseLocalDate(p.retirement_date),
           growthRate: p.pension_growth_rate != null ? Number(p.pension_growth_rate) : 0.05,
           phase1Date: App.parseLocalDate(p.shorter_week_date_1), phase1Days: p.working_days_1 ? Number(p.working_days_1) : 5,
           phase2Date: App.parseLocalDate(p.shorter_week_date_2), phase2Days: p.working_days_2 ? Number(p.working_days_2) : 5,
+          p2phase: p2phase,
           spendRed: p.spending_reduction_pct != null ? Number(p.spending_reduction_pct) : 1.0,
           gRatio: p.drawdown_ratio_graham != null ? Number(p.drawdown_ratio_graham) : 0.5
         };

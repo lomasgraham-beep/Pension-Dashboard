@@ -80,9 +80,9 @@
 </div>
 
 <div class="panel">
-  <h2>Retirement Timing</h2>
+  <h2>Retirement Timing — <span class="nm-p1">Graham</span></h2>
   <div class="field">
-    <label>Drop to a 4-day week on</label>
+    <label><span class="nm-p1">Graham</span> drops to a 4-day week on</label>
     <span class="hint">When <span class="nm-p1">Graham</span> first reduces hours. Leave blank if not planned.</span>
     <div class="phase-row">
       <input type="date" id="d_p1date" oninput="markDirty()">
@@ -90,7 +90,7 @@
     </div>
   </div>
   <div class="field">
-    <label>Drop to a 3-day week on</label>
+    <label><span class="nm-p1">Graham</span> drops to a 3-day week on</label>
     <span class="hint">A later, further reduction. This should be <em>after</em> the 4-day date above.</span>
     <div class="phase-row">
       <input type="date" id="d_p2date" oninput="markDirty()">
@@ -99,8 +99,29 @@
   </div>
   <div class="field">
     <label>Fully retire on</label>
-    <span class="hint">The point contributions stop and drawdown begins.</span>
+    <span class="hint">The point contributions stop and drawdown begins (applies to the household).</span>
     <input type="date" id="d_retire" oninput="markDirty()">
+  </div>
+</div>
+
+<div class="panel" id="p2PhasePanel" style="display:none;">
+  <h2>Working-days schedule — <span class="nm-p2">Julie</span></h2>
+  <p class="intro" style="margin-top:0;"><span class="nm-p2">Julie</span> can phase down hours independently. Leave blank if not planned — contributions then stay at the standard (5-day) rows.</p>
+  <div class="field">
+    <label><span class="nm-p2">Julie</span> drops to a 4-day week on</label>
+    <span class="hint">When <span class="nm-p2">Julie</span> first reduces hours.</span>
+    <div class="phase-row">
+      <input type="date" id="d_jp1date" oninput="markDirty()">
+      <div><div class="sub">Days</div><select id="d_jp1days" onchange="markDirty()"><option value="5">5</option><option value="4">4</option><option value="3">3</option></select></div>
+    </div>
+  </div>
+  <div class="field">
+    <label><span class="nm-p2">Julie</span> drops to a 3-day week on</label>
+    <span class="hint">A later, further reduction — <em>after</em> the 4-day date above.</span>
+    <div class="phase-row">
+      <input type="date" id="d_jp2date" oninput="markDirty()">
+      <div><div class="sub">Days</div><select id="d_jp2days" onchange="markDirty()"><option value="5">5</option><option value="4">4</option><option value="3">3</option></select></div>
+    </div>
   </div>
 </div>
 
@@ -145,6 +166,7 @@
   const fmtDate = (ds) => ds ? toInputDate(ds) : "—";
 
   let loadedRow = null;
+  let loadedP2Row = null;
   let dirty = false;
 
   function markDirty() { dirty = true; document.getElementById('dirtyFlag').style.display = 'inline-block'; }
@@ -156,6 +178,9 @@
     // a single person has no drawdown split — hide the ratio field
     const ratioField = document.getElementById('d_ratio') ? document.getElementById('d_ratio').closest('.field') : null;
     if (ratioField) ratioField.style.display = p2Name ? '' : 'none';
+    // person 2's working-days panel only applies with two members
+    const p2panel = document.getElementById('p2PhasePanel');
+    if (p2panel) p2panel.style.display = p2Name ? '' : 'none';
     updateRatioHint();
   }
 
@@ -188,6 +213,13 @@
     setVal('d_ratio', ratio); updateRatioHint();
   }
 
+  function populateP2(r) {
+    setVal('d_jp1date', r ? toInputDate(r.shorter_week_date_1) : '');
+    setVal('d_jp1days', String((r && r.working_days_1) || 4));
+    setVal('d_jp2date', r ? toInputDate(r.shorter_week_date_2) : '');
+    setVal('d_jp2days', String((r && r.working_days_2) || 3));
+  }
+
   async function loadDefaults(isReload) {
     const status = document.getElementById('status');
     if (isReload && dirty && !confirm('Discard your unsaved edits and reload the saved values?')) return;
@@ -203,6 +235,15 @@
       const rows = await r.json();
       loadedRow = (rows && rows.length) ? rows[0] : null;
       if (loadedRow) populate(loadedRow);
+      // person 2's working-days schedule from their own params row
+      loadedP2Row = null;
+      if (p2Name) {
+        try {
+          const r2 = await fetch(`${PARAMS_URL}?member_name=eq.${encodeURIComponent(p2Name)}&order=updated_at.desc&limit=1`, { headers: getHeaders() });
+          if (r2.ok) { const rows2 = await r2.json(); loadedP2Row = (rows2 && rows2.length) ? rows2[0] : null; }
+        } catch (e) {}
+        populateP2(loadedP2Row);
+      }
       refreshSummary();
       clearDirty();
       document.getElementById('saveMsg').innerHTML = '';
@@ -241,6 +282,26 @@
       const url = existing.length ? `${PARAMS_URL}?member_name=eq.${encodeURIComponent(p1Name)}` : PARAMS_URL;
       const res = await fetch(url, { method, headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error(method + ' → ' + res.status);
+
+      // person 2's working-days schedule → their own params row (full symmetry)
+      if (p2Name) {
+        const jd1 = val('d_jp1date'), jd2 = val('d_jp2date');
+        const p2payload = {
+          member_name: p2Name,
+          shorter_week_date_1: jd1 || null,
+          working_days_1: parseInt(val('d_jp1days')),
+          shorter_week_date_2: jd2 || null,
+          working_days_2: parseInt(val('d_jp2days')),
+          updated_at: new Date().toISOString()
+        };
+        const check2 = await fetch(`${PARAMS_URL}?member_name=eq.${encodeURIComponent(p2Name)}`, { headers: getHeaders() });
+        const existing2 = check2.ok ? await check2.json() : [];
+        const method2 = existing2.length ? 'PATCH' : 'POST';
+        const url2 = existing2.length ? `${PARAMS_URL}?member_name=eq.${encodeURIComponent(p2Name)}` : PARAMS_URL;
+        const res2 = await fetch(url2, { method: method2, headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify(p2payload) });
+        if (!res2.ok) throw new Error('person 2 schedule ' + method2 + ' → ' + res2.status);
+      }
+
       msg.style.color = '#065f46';
       msg.innerText = '✓ Saved. Refresh the dashboard or Scenario Lab to pick up the new baseline.';
       await loadDefaults(false); // re-pull so the summary reflects what's really stored
