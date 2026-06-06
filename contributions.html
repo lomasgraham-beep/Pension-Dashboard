@@ -67,7 +67,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: incmonth)</span></h1>
+<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: deletefix)</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -305,8 +305,12 @@
     if (!r) return;
     if (!confirm(`Delete the ${tierLabel(r.working_days).txt} row for ${r.member_name} · ${r.pension_name}?`)) return;
     try {
-      const res = await fetch(`${CONTRIB_URL}?id=eq.${id}`, { method: 'DELETE', headers: getHeaders() });
+      const res = await fetch(`${CONTRIB_URL}?id=eq.${id}`, { method: 'DELETE', headers: { ...getHeaders(), 'Prefer': 'return=representation' } });
       if (!res.ok) throw new Error('DELETE → ' + res.status);
+      const removed = await res.json().catch(() => []);
+      if (!Array.isArray(removed) || removed.length === 0) {
+        throw new Error('the database reported no row was deleted (this usually means the table is missing a DELETE policy in Supabase).');
+      }
       rows = rows.filter(x => x.id !== id); clearDirty(id); render(); populatePickers();
     } catch (e) { if (msg) { msg.style.color = '#c0392b'; msg.innerText = 'Delete failed: ' + e.message; } }
   }
