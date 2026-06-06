@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=err2"></script>
-  <script src="engine.js?v=incmonth"></script>
+  <script src="engine.js?v=stageB"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -357,7 +357,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-86</span>
+    <span class="build-stamp">build: LC-87</span>
   </div>
 
   <script>
@@ -773,6 +773,9 @@
     function readControls() {
       return {
         retirementDate: idxToDate(document.getElementById('m_retire').value),
+        // If the live slider matches the saved baseline, keep per-member dates; if the user has
+        // dragged it, treat it as a single shared date for live exploration (override per-member).
+        retireByMember: (savedPlan && savedPlan.retirementDate && idxToDate(document.getElementById('m_retire').value) && idxToDate(document.getElementById('m_retire').value).getTime() === savedPlan.retirementDate.getTime()) ? savedPlan.retireByMember : null,
         growthRate: parseFloat(document.getElementById('m_growth').value) / 100,
         phase1Date: idxToDate(document.getElementById('m_p1date').value),
         phase1Days: segValue('m_p1days'),
@@ -865,7 +868,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err39';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err40';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
@@ -946,18 +949,27 @@
 
         const pRows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name) + '&order=updated_at.desc&limit=1');
         const p = (pRows && pRows.length) ? pRows[0] : {};
-        // person 2's own working-days schedule (full symmetry) from their params row
-        let p2phase = null;
+        // person 2's own params (working-days schedule + their retirement date)
+        let p2phase = null, p2row = null;
         if (p2Name) {
           const p2Rows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p2Name) + '&order=updated_at.desc&limit=1');
-          const p2 = (p2Rows && p2Rows.length) ? p2Rows[0] : null;
-          if (p2) p2phase = {
-            phase1Date: App.parseLocalDate(p2.shorter_week_date_1), phase1Days: p2.working_days_1 ? Number(p2.working_days_1) : 5,
-            phase2Date: App.parseLocalDate(p2.shorter_week_date_2), phase2Days: p2.working_days_2 ? Number(p2.working_days_2) : 5
+          p2row = (p2Rows && p2Rows.length) ? p2Rows[0] : null;
+          if (p2row) p2phase = {
+            phase1Date: App.parseLocalDate(p2row.shorter_week_date_1), phase1Days: p2row.working_days_1 ? Number(p2row.working_days_1) : 5,
+            phase2Date: App.parseLocalDate(p2row.shorter_week_date_2), phase2Days: p2row.working_days_2 ? Number(p2row.working_days_2) : 5
           };
         }
+        // per-member retirement dates (Stage B). p1 from their row, p2 from theirs; fall back to p1's.
+        const p1Retire = App.parseLocalDate(p.retirement_date);
+        const p2Retire = (p2row && p2row.retirement_date) ? App.parseLocalDate(p2row.retirement_date) : p1Retire;
+        const retireByMember = {};
+        if (p1Name && p1Retire) retireByMember[p1Name] = p1Retire;
+        if (p2Name && p2Retire) retireByMember[p2Name] = p2Retire;
+        // drawdown stays single-date until Stage F: use the LATEST member date
+        const latestRetire = [p1Retire, p2Retire].filter(Boolean).sort((a, b) => b - a)[0] || p1Retire;
         savedPlan = {
-          retirementDate: App.parseLocalDate(p.retirement_date),
+          retirementDate: latestRetire,
+          retireByMember: retireByMember,
           growthRate: p.pension_growth_rate != null ? Number(p.pension_growth_rate) : 0.05,
           phase1Date: App.parseLocalDate(p.shorter_week_date_1), phase1Days: p.working_days_1 ? Number(p.working_days_1) : 5,
           phase2Date: App.parseLocalDate(p.shorter_week_date_2), phase2Days: p.working_days_2 ? Number(p.working_days_2) : 5,

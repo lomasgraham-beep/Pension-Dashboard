@@ -83,7 +83,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: stageA)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
+<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: stageB)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -103,9 +103,14 @@
 <div class="panel">
   <h2>Retirement</h2>
   <div class="field">
-    <label>Fully retire on</label>
-    <span class="hint">The point contributions stop and drawdown begins. (Working patterns are set in the Working-days tiers panel above.)</span>
+    <label><span class="nm-p1">Graham</span> fully retires on</label>
+    <span class="hint">The point <span class="nm-p1">Graham</span>'s contributions stop. (Working patterns are set in the Working-days tiers panel above.)</span>
     <input type="date" id="d_retire" oninput="markDirty()">
+  </div>
+  <div class="field" id="p2RetireField" style="display:none;">
+    <label><span class="nm-p2">Julie</span> fully retires on</label>
+    <span class="hint">The point <span class="nm-p2">Julie</span>'s contributions stop. Can differ from <span class="nm-p1">Graham</span>'s.</span>
+    <input type="date" id="d_retire_p2" oninput="markDirty()">
   </div>
 </div>
 
@@ -166,6 +171,8 @@
     // a single person has no drawdown split — hide the ratio field
     const ratioField = document.getElementById('d_ratio') ? document.getElementById('d_ratio').closest('.field') : null;
     if (ratioField) ratioField.style.display = p2Name ? '' : 'none';
+    const p2rf = document.getElementById('p2RetireField');
+    if (p2rf) p2rf.style.display = p2Name ? '' : 'none';
     updateRatioHint();
   }
 
@@ -219,6 +226,7 @@
           if (r2.ok) { const rows2 = await r2.json(); loadedP2Row = (rows2 && rows2.length) ? rows2[0] : null; }
         } catch (e) {}
         populateP2(loadedP2Row);
+        setVal('d_retire_p2', loadedP2Row ? toInputDate(loadedP2Row.retirement_date) : '');
       }
       refreshSummary();
       clearDirty();
@@ -416,6 +424,25 @@
       const url = existing.length ? `${PARAMS_URL}?member_name=eq.${encodeURIComponent(p1Name)}` : PARAMS_URL;
       const res = await fetch(url, { method, headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error(method + ' → ' + res.status);
+
+      // person 2's retirement date → their own params row (preserve their other columns)
+      if (p2Name) {
+        const p2payload = {
+          member_name: p2Name,
+          retirement_date: val('d_retire_p2') || null,
+          shorter_week_date_1: (loadedP2Row && loadedP2Row.shorter_week_date_1) || null,
+          working_days_1: (loadedP2Row && loadedP2Row.working_days_1) || null,
+          shorter_week_date_2: (loadedP2Row && loadedP2Row.shorter_week_date_2) || null,
+          working_days_2: (loadedP2Row && loadedP2Row.working_days_2) || null,
+          updated_at: new Date().toISOString()
+        };
+        const c2 = await fetch(`${PARAMS_URL}?member_name=eq.${encodeURIComponent(p2Name)}`, { headers: getHeaders() });
+        const ex2 = c2.ok ? await c2.json() : [];
+        const m2 = ex2.length ? 'PATCH' : 'POST';
+        const u2 = ex2.length ? `${PARAMS_URL}?member_name=eq.${encodeURIComponent(p2Name)}` : PARAMS_URL;
+        const r2 = await fetch(u2, { method: m2, headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify(p2payload) });
+        if (!r2.ok) throw new Error('person 2 retirement ' + m2 + ' → ' + r2.status);
+      }
 
       msg.style.color = '#065f46';
       msg.innerText = '✓ Saved. Refresh the dashboard or Scenario Lab to pick up the new baseline.';

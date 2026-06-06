@@ -55,9 +55,16 @@
     const pots = latestPots(data);
     const now = new Date();
     let cur = new Date(now.getFullYear(), now.getMonth() + 1, 1); // first of next month
-    const retire = plan.retirementDate
+    // Per-person retirement (accumulation cutoff). Each person contributes until THEIR date.
+    // The loop runs to the latest of the two so a still-working person keeps contributing
+    // after the other stops. Falls back to the shared plan.retirementDate, then +5y.
+    const fallbackRetire = plan.retirementDate
       ? new Date(plan.retirementDate.getFullYear(), plan.retirementDate.getMonth(), 1)
       : new Date(cur.getFullYear() + 5, cur.getMonth(), 1);
+    function personRetire(name) {
+      const pr = plan.retireByMember && name && plan.retireByMember[name];
+      return pr ? new Date(pr.getFullYear(), pr.getMonth(), 1) : fallbackRetire;
+    }
     const monthlyGrowth = (plan.growthRate != null ? plan.growthRate : 0.05) / 12;
 
     // count how many times a given calendar month (1=Jan..12=Dec) has occurred strictly
@@ -79,6 +86,9 @@
     const fMembers = (data.members || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const fp1 = fMembers[0] ? fMembers[0].name : 'Graham';
     const fp2 = fMembers[1] ? fMembers[1].name : null;
+    const fp1Retire = personRetire(fp1);
+    const fp2Retire = fp2 ? personRetire(fp2) : fallbackRetire;
+    const retire = new Date(Math.max(fp1Retire.getTime(), fp2Retire.getTime()));
 
     let maxG = sumMember(data, pots, fp1);
     let maxJ = fp2 ? sumMember(data, pots, fp2) : 0;
@@ -126,7 +136,7 @@
         else if (p2p.phase1Date && cur >= p2p.phase1Date) jDays = p2p.phase1Days;
       }
 
-      (data.contributions || []).forEach(c => {
+      if (cur <= fp1Retire) (data.contributions || []).forEach(c => {
         if (c.member_name === fp1 && Number(c.working_days) === Number(gDays)) {
           const k = fp1 + '|' + c.pension_name;
           if (k in pots) {
@@ -138,7 +148,7 @@
           }
         }
       });
-      if (fp2) (data.contributions || []).forEach(c => {
+      if (fp2 && cur <= fp2Retire) (data.contributions || []).forEach(c => {
         // person 2 now honours working-days tiers too: a row applies if it's not
         // tier-specific (working_days null) OR it matches person 2's current tier.
         const wd = c.working_days;
