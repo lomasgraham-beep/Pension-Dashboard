@@ -83,7 +83,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: stageB)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
+<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: tierfix)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -262,6 +262,13 @@
     }
   }
 
+  async function refreshContribRows() {
+    try {
+      const cr = await fetch(`${CONTRIB_URL}?order=member_name.asc`, { headers: getHeaders() });
+      contribRows = cr.ok ? await cr.json() : contribRows;
+    } catch (e) { /* keep existing on failure */ }
+  }
+
   // does a contribution row exist for this member+pension+days?
   function hasContrib(member, pension, days) {
     return contribRows.some(r => r.member_name === member && r.pension_name === pension && Number(r.working_days) === Number(days));
@@ -286,23 +293,27 @@
       if (!myTiers.length) html += `<p class="hint">No tiers yet. Add one to set ${member}'s starting working pattern.</p>`;
       myTiers.forEach(t => {
         const isStart = t.id === earliestId;
+        const dirty = tierDirty[t.id];
         html += `<div class="tier-card">
           <div class="tier-top">
             <div class="col"><span class="sub">Working pattern</span>
-              <select id="td_${t.id}" onchange="markTier()">${TIER_DAYS.map(d => `<option value="${d}" ${Number(t.days) === d ? 'selected' : ''}>${dayLabel(d)}</option>`).join('')}</select>
+              <select id="td_${t.id}" onchange="markTier('${t.id}')">${TIER_DAYS.map(d => `<option value="${d}" ${Number(t.days) === d ? 'selected' : ''}>${dayLabel(d)}</option>`).join('')}</select>
             </div>
             <div class="col"><span class="sub">From date</span>
-              <input type="date" id="tf_${t.id}" value="${t.from_date ? String(t.from_date).split('T')[0] : ''}" onchange="markTier()">
+              <input type="date" id="tf_${t.id}" value="${t.from_date ? String(t.from_date).split('T')[0] : ''}" onchange="markTier('${t.id}')">
             </div>
             ${isStart ? '<span class="tier-start">starting tier (earliest)</span>' : ''}
             <button class="tier-del" onclick="deleteTier('${t.id}')">Delete</button>
           </div>
+          <div style="margin-top:8px;"><button class="btn" style="background:#27ae60;" onclick="saveTier('${t.id}')">Save tier date/pattern</button></div>
+          <div class="tier-msg" id="tmsg_${t.id}"></div>
           <div class="tier-pens">
             <div class="lbl">Applies to pensions (ticking creates a contribution row to fill in):</div>
-            ${myPensions.length ? myPensions.map(pn => `<label class="pen-chk"><input type="checkbox" ${hasContrib(member, pn, t.days) ? 'checked' : ''} onchange="togglePension('${member.replace(/'/g, "\\'")}','${pn.replace(/'/g, "\\'")}',${t.days},this)"> ${pn}</label>`).join('') : '<span class="hint">No pensions for this member yet — add them on the Pensions tab.</span>'}
+            <div id="penwarn_${t.id}" class="tier-warn" style="display:${dirty ? 'block' : 'none'};">Save the tier's date/pattern above before choosing pensions.</div>
+            <div id="penbox_${t.id}" style="${dirty ? 'opacity:0.4;' : ''}">
+            ${myPensions.length ? myPensions.map(pn => `<label class="pen-chk"><input type="checkbox" ${dirty ? 'disabled' : ''} ${hasContrib(member, pn, t.days) ? 'checked' : ''} onchange="togglePension('${member.replace(/'/g, "\\'")}','${pn.replace(/'/g, "\\'")}',${t.days},this)"> ${pn}</label>`).join('') : '<span class="hint">No pensions for this member yet — add them on the Pensions tab.</span>'}
+            </div>
           </div>
-          <div class="tier-msg" id="tmsg_${t.id}"></div>
-          <div style="margin-top:8px;"><button class="btn" style="background:#27ae60;" onclick="saveTier('${t.id}')">Save tier date/pattern</button></div>
         </div>`;
       });
       html += '</div>';
@@ -316,7 +327,8 @@
     return true;
   }
 
-  function markTier() { /* per-tier save is explicit; no global dirty needed */ }
+  const tierDirty = {};   // tier id -> true when its days/date edited but not yet saved
+  function markTier(id) { if (id) { tierDirty[id] = true; const box = document.getElementById('penbox_' + id); if (box) { box.style.opacity = '0.4'; box.querySelectorAll('input').forEach(i => i.disabled = true); } const w = document.getElementById('penwarn_' + id); if (w) w.style.display = 'block'; } }
 
   async function addTier(member) {
     // default new tier: a sensible next-lower pattern, dated today
@@ -328,7 +340,7 @@
       const res = await fetch(TIERS_URL, { method: 'POST', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify({ member_name: member, days, from_date: today }) });
       if (!res.ok) throw new Error('POST → ' + res.status);
       const created = await res.json();
-      if (created && created.length) tiers.push(created[0]);
+      if (created && created.length) { tiers.push(created[0]); tierDirty[created[0].id] = true; }
       renderTiers();
     } catch (e) { alert('Could not add tier: ' + e.message); }
   }
@@ -344,8 +356,10 @@
       if (!res.ok) throw new Error('PATCH → ' + res.status);
       const fresh = await res.json();
       if (fresh && fresh.length) { const i = tiers.findIndex(t => t.id === id); if (i >= 0) tiers[i] = fresh[0]; }
+      tierDirty[id] = false;
+      await refreshContribRows();
       renderTiers();
-      const m2 = document.getElementById('tmsg_' + id); if (m2) { m2.style.color = '#065f46'; m2.innerText = '✓ Saved. Refresh the dashboard to apply.'; }
+      const m2 = document.getElementById('tmsg_' + id); if (m2) { m2.style.color = '#065f46'; m2.innerText = '✓ Saved — now choose the pensions below. Refresh the dashboard to apply.'; }
     } catch (e) { msg.style.color = '#c0392b'; msg.innerText = 'Save failed: ' + e.message; }
   }
 
