@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=err2"></script>
-  <script src="engine.js?v=stageD2"></script>
+  <script src="engine.js?v=fcast"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -357,7 +357,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-91</span>
+    <span class="build-stamp">build: LC-92</span>
   </div>
 
   <script>
@@ -868,7 +868,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err44';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err45';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
@@ -979,18 +979,11 @@
           gRatio: p.drawdown_ratio_graham != null ? Number(p.drawdown_ratio_graham) : 0.5
         };
 
-        // Starting pots: use the server forecast as the source of truth (matches the old dashboard exactly)
-        const f = await App.rpc('generate_monthly_pension_forecast', {});
-        serverPots = {
-          graham: Math.max(0, ...f.map(r => Number(r.graham_total) || 0)),
-          julie:  Math.max(0, ...f.map(r => Number(r.julie_total)  || 0))
-        };
-
-        // Calibrate the JS forecast so the saved plan reproduces the server figure exactly;
-        // any control change then scales accurately from that anchor.
+        // The browser engine is the single source of truth — no server RPC, no calibration.
         const js0 = PensionEngine.forecast(data, savedPlan, 1);
-        calib.g = js0.graham > 0 ? serverPots.graham / js0.graham : 1;
-        calib.j = js0.julie  > 0 ? serverPots.julie  / js0.julie  : 1;
+        serverPots = { graham: Math.max(0, js0.graham || 0), julie: Math.max(0, js0.julie || 0) };
+        calib.g = 1;
+        calib.j = 1;
 
         applyControls(savedPlan);
         recomputeAll();

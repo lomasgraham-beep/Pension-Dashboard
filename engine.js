@@ -94,6 +94,8 @@
 
     let maxG = sumMember(data, pots, fp1);
     let maxJ = fp2 ? sumMember(data, pots, fp2) : 0;
+    // Monthly trajectory for the forecast page: start from the current month's pots.
+    const series = [{ year: cur.getFullYear(), month: cur.getMonth(), g: maxG, j: maxJ }];
 
     // ---- Contribution exceptions ----
     // override (one_off=false): replaces the normal monthly contribution for months in [start,end].
@@ -168,10 +170,11 @@
 
       const g = sumMember(data, pots, fp1);
       const j = fp2 ? sumMember(data, pots, fp2) : 0;
+      series.push({ year: cur.getFullYear(), month: cur.getMonth(), g: g, j: j });
       if (g > maxG) maxG = g;
       if (j > maxJ) maxJ = j;
     }
-    return { graham: maxG, julie: maxJ };
+    return { graham: maxG, julie: maxJ, series: series, p1Name: fp1, p2Name: fp2 };
   }
 
   // ---- DRAWDOWN: monthly engine, aggregated to yearly rows ----

@@ -4,8 +4,8 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monthly Forecast</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=err27"></script>
-<script src="engine.js?v=style9"></script>
+<script src="common.js?v=err45"></script>
+<script src="engine.js?v=fcast"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:#333; }
   h2 { color:#2c3e50; margin-top:0; }
@@ -32,7 +32,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pre-Retirement Monthly Forecast</h2>
-  <p class="note">Projected pot growth to your retirement date, computed in your browser. Adjust the plan on the Modelling tab. <span style="color:#94a3b8;">(forecast build: gen-names)</span></p>
+  <p class="note">Projected pot growth to each person's retirement date, computed in your browser from your tiers and contributions. <span style="color:#94a3b8;">(forecast build: engine)</span></p>
   <table id="fTable">
     <thead><tr><th>Month</th><th><span class="nm-p1">Graham</span>'s Tracked Total</th><th class="col-p2"><span class="nm-p2">Julie</span>'s Tracked Total</th><th>Joint Trajectory</th></tr></thead>
     <tbody><tr><td colspan="4">Computing…</td></tr></tbody>
@@ -46,18 +46,50 @@
     const status = document.getElementById('status');
     try {
       const mn = await App.memberNames();
-      document.querySelectorAll('.nm-p1').forEach(el => el.textContent = mn.p1 || 'Graham');
-      document.querySelectorAll('.nm-p2').forEach(el => el.textContent = mn.p2 || '');
-      // Server forecast is the source of truth for the monthly trajectory (matches old dashboard exactly).
-      const f = await App.rpc('generate_monthly_pension_forecast', {});
-      const rows = (f || []).map(r => {
-        const d = new Date(r.forecast_month);
-        return { label: MONTHS[d.getMonth()] + ' ' + d.getFullYear(), g: Number(r.graham_total) || 0, j: Number(r.julie_total) || 0 };
-      });
+      const p1Name = mn.p1 || 'Graham', p2Name = mn.p2 || null;
+      document.querySelectorAll('.nm-p1').forEach(el => el.textContent = p1Name);
+      document.querySelectorAll('.nm-p2').forEach(el => el.textContent = p2Name || '');
+      // hide person-2 column when single member
+      if (!p2Name) document.querySelectorAll('.col-p2').forEach(el => el.style.display = 'none');
+
+      // Pull the same data the dashboard engine uses.
+      const [members, pensions, contributions, logs, contributionExceptions, workingTiers, p1ParamsArr, p2ParamsArr] = await Promise.all([
+        App.rest('bd_members'),
+        App.rest('bd_pensions'),
+        App.rest('bd_pension_contributions'),
+        App.rest('op_pension_logs?order=log_date.desc'),
+        App.rest('bd_contribution_exceptions?order=start_date.asc'),
+        App.rest('bd_working_tiers?order=from_date.asc'),
+        App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name) + '&order=updated_at.desc&limit=1'),
+        p2Name ? App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p2Name) + '&order=updated_at.desc&limit=1') : Promise.resolve([])
+      ]);
+
+      const data = { members, pensions, contributions, logs,
+                     contributionExceptions: contributionExceptions || [],
+                     workingTiers: workingTiers || [], crashes: [], savingsAccounts: [] };
+
+      const p = (p1ParamsArr && p1ParamsArr.length) ? p1ParamsArr[0] : {};
+      const p2 = (p2ParamsArr && p2ParamsArr.length) ? p2ParamsArr[0] : null;
+      const p1Retire = App.parseLocalDate(p.retirement_date);
+      const p2Retire = (p2 && p2.retirement_date) ? App.parseLocalDate(p2.retirement_date) : p1Retire;
+      const retireByMember = {};
+      if (p1Name && p1Retire) retireByMember[p1Name] = p1Retire;
+      if (p2Name && p2Retire) retireByMember[p2Name] = p2Retire;
+
+      const plan = {
+        retirementDate: [p1Retire, p2Retire].filter(Boolean).sort((a, b) => b - a)[0] || p1Retire,
+        retireByMember: retireByMember,
+        growthRate: p.pension_growth_rate != null ? Number(p.pension_growth_rate) : 0.05
+      };
+
+      const res = PensionEngine.forecast(data, plan, 1);
+      const series = res.series || [];
       const tb = document.querySelector('#fTable tbody');
-      tb.innerHTML = rows.length ? rows.map(r =>
-        `<tr><td>${r.label}</td><td>${fmt(r.g)}</td><td>${fmt(r.j)}</td><td style="font-weight:bold;">${fmt(r.g + r.j)}</td></tr>`
-      ).join('') : '<tr><td colspan="4">No forecast rows.</td></tr>';
+      tb.innerHTML = series.length ? series.map(r => {
+        const label = MONTHS[r.month] + ' ' + r.year;
+        const p2cell = p2Name ? `<td>${fmt(r.j)}</td>` : '';
+        return `<tr><td>${label}</td><td>${fmt(r.g)}</td>${p2cell}<td style="font-weight:bold;">${fmt(r.g + (p2Name ? r.j : 0))}</td></tr>`;
+      }).join('') : '<tr><td colspan="4">No forecast rows — check your tiers and contributions are set.</td></tr>';
       status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
