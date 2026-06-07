@@ -67,7 +67,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: wp-label)</span></h1>
+<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: stageD2)</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -80,24 +80,7 @@
 </div>
 
 <div class="panel" style="margin-bottom:18px;">
-  <h2 style="margin-top:0;">Add a contribution row</h2>
-  <p class="intro" style="margin-top:0;">Create a new monthly contribution for a member's pension and working-days tier. Useful for giving a member their 5-, 4- and 3-day rows, or starting a brand-new member.</p>
-  <div class="grid">
-    <div class="field"><label>Member</label><select id="newMember"></select></div>
-    <div class="field"><label>Pension</label><select id="newPension"></select></div>
-    <div class="field"><label>Working-days tier</label>
-      <select id="newTier">
-        <option value="">Not tier-specific</option>
-        <option value="5">5-day week</option>
-        <option value="4">4-day week</option>
-        <option value="3">3-day week</option>
-      </select>
-    </div>
-  </div>
-  <div class="btn-row" style="margin-top:4px;">
-    <button class="btn" onclick="addRowFromPicker()">+ Add row</button>
-    <span id="addRowMsg" style="font-weight:bold; font-size:13px; align-self:center;"></span>
-  </div>
+  <p class="intro" style="margin:0;">These are your pension contributions, one row per working-days tier. The rows come from the tiers you set on the <strong>Defaults</strong> page — to add or remove one, tick or untick the pension on a tier there. Here you set each row's <strong>amount</strong>, its <strong>annual increase</strong>, and the <strong>month</strong> the rise applies. Contributions stop at retirement.</p>
 </div>
 
 <div id="container"></div>
@@ -158,11 +141,7 @@
       html += `<div class="owner-head">${owner}</div>`;
       const pensionsForOwner = [...new Set(rows.filter(r => (r.member_name || 'Unassigned') === owner).map(r => r.pension_name))].sort();
       pensionsForOwner.forEach(pen => {
-        const isWp = workplaceByKey[owner + '|' + pen];
-        const badge = (isWp === false)
-          ? '<span style="font-size:12px;font-weight:600;color:#6b46c1;background:#ede9fe;padding:3px 9px;border-radius:999px;margin-left:8px;">Private</span>'
-          : '<span style="font-size:12px;font-weight:600;color:#2c7a7b;background:#e6fffa;padding:3px 9px;border-radius:999px;margin-left:8px;">Workplace</span>';
-        html += `<div class="pension-head">${pen} ${badge}</div>`;
+        html += `<div class="pension-head">${pen}</div>`;
         rows.filter(r => (r.member_name || 'Unassigned') === owner && r.pension_name === pen)
             .sort((a, b) => (b.working_days || 0) - (a.working_days || 0))
             .forEach(r => {
@@ -180,16 +159,6 @@
                 <input type="number" step="0.01" id="amt_${id}" value="${r.monthly_contribution != null ? r.monthly_contribution : ''}" oninput="markDirty('${id}')">
               </div>
               <div class="field">
-                <label>Working-days tier</label>
-                <span class="hint">Which week pattern this row applies to.</span>
-                <select id="wd_${id}" onchange="markDirty('${id}')">
-                  <option value="" ${r.working_days == null ? 'selected' : ''}>Not tier-specific</option>
-                  <option value="5" ${r.working_days === 5 ? 'selected' : ''}>5-day week</option>
-                  <option value="4" ${r.working_days === 4 ? 'selected' : ''}>4-day week</option>
-                  <option value="3" ${r.working_days === 3 ? 'selected' : ''}>3-day week</option>
-                </select>
-              </div>
-              <div class="field">
                 <label>Annual increase (%)</label>
                 <span class="hint">Annual rise, applied once a year.</span>
                 <input type="number" step="0.01" id="aug_${id}" value="${toPct(r.august_increase_pct)}" oninput="markDirty('${id}')">
@@ -202,16 +171,13 @@
                 </select>
               </div>
             </div>
-            <div class="meta">id: ${id}</div>
             <div class="btn-row">
               <button class="btn btn-save" onclick="saveRow('${id}')">Save</button>
               <button class="btn btn-ghost" onclick="reloadRow('${id}')">Reload</button>
-              <button class="btn" style="background:#c0392b;" onclick="deleteRow('${id}')">Delete</button>
             </div>
             <div class="row-msg" id="msg_${id}"></div>
           </div>`;
         });
-        html += `<div style="margin:4px 0 18px;"><button class="btn" style="font-size:13px;padding:8px 14px;" onclick="addRow('${owner.replace(/'/g, "\\'")}','${pen.replace(/'/g, "\\'")}')">+ Add tier row for ${owner} · ${pen}</button></div>`;
       });
     });
     c.innerHTML = html;
@@ -221,7 +187,6 @@
     if (dirty[id] && !confirm('Discard unsaved edits to this row?')) return;
     const r = rows.find(x => x.id === id);
     document.getElementById('amt_' + id).value = r.monthly_contribution != null ? r.monthly_contribution : '';
-    document.getElementById('wd_' + id).value = r.working_days == null ? '' : String(r.working_days);
     document.getElementById('aug_' + id).value = toPct(r.august_increase_pct);
     document.getElementById('incm_' + id).value = String(r.increase_month == null ? 8 : r.increase_month);
     clearDirty(id);
@@ -231,7 +196,6 @@
   async function saveRow(id) {
     const msg = document.getElementById('msg_' + id);
     const amtRaw = document.getElementById('amt_' + id).value;
-    const wdRaw = document.getElementById('wd_' + id).value;
     const augRaw = document.getElementById('aug_' + id).value;
 
     const amt = amtRaw === '' ? null : Number(amtRaw);
@@ -239,9 +203,9 @@
     const augPct = augRaw === '' ? null : Number(augRaw);
     if (augPct != null && (isNaN(augPct) || augPct < 0 || augPct > 100)) { msg.style.color = '#c0392b'; msg.innerText = 'Annual increase looks wrong — enter a percentage like 3 (not 0.03). Nothing saved.'; return; }
 
+    // working_days is fixed by the tier this row belongs to (managed on Defaults) — preserve it.
     const payload = {
       monthly_contribution: amt,
-      working_days: wdRaw === '' ? null : parseInt(wdRaw),
       august_increase_pct: toDec(augRaw),
       increase_month: parseInt(document.getElementById('incm_' + id).value) || 8
     };
@@ -264,84 +228,13 @@
   }
 
   // ---- Add / delete contribution rows ----
-  let allMembers = [], allPensionNames = [];
-  let workplaceByKey = {};
-
-  function populatePickers() {
-    const memSel = document.getElementById('newMember');
-    const penSel = document.getElementById('newPension');
-    if (memSel) memSel.innerHTML = allMembers.map(m => `<option>${m}</option>`).join('');
-    if (penSel) penSel.innerHTML = allPensionNames.map(p => `<option>${p}</option>`).join('');
-  }
-
-  async function createRow(member, pension, tier, statusEl) {
-    if (!member) { statusEl.style.color = '#c0392b'; statusEl.innerText = 'Pick a member.'; return; }
-    if (!pension) { statusEl.style.color = '#c0392b'; statusEl.innerText = 'Pick a pension.'; return; }
-    // guard against a duplicate tier for the same member+pension
-    const dup = rows.some(r => r.member_name === member && r.pension_name === pension &&
-      ((r.working_days == null && (tier === '' || tier == null)) || Number(r.working_days) === Number(tier)));
-    if (dup) { statusEl.style.color = '#c0392b'; statusEl.innerText = `A ${tier ? tier + '-day' : 'non-tier-specific'} row already exists for ${member} · ${pension}.`; return; }
-    statusEl.style.color = '#1e3a8a'; statusEl.innerText = 'Adding…';
-    const payload = { member_name: member, pension_name: pension, working_days: (tier === '' || tier == null) ? null : parseInt(tier), monthly_contribution: 0, august_increase_pct: 0, increase_month: 8 };
-    try {
-      const res = await fetch(CONTRIB_URL, { method: 'POST', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify(payload) });
-      if (!res.ok) throw new Error('POST → ' + res.status);
-      const created = await res.json();
-      if (created && created.length) rows.push(created[0]);
-      render(); populatePickers();
-      statusEl.style.color = '#065f46'; statusEl.innerText = `✓ Added ${tier ? tier + '-day' : 'non-tier-specific'} row for ${member} · ${pension}. Set the amount and Save.`;
-    } catch (e) { statusEl.style.color = '#c0392b'; statusEl.innerText = 'Add failed: ' + e.message; }
-  }
-
-  function addRow(member, pension) {
-    // per-pension button: default to a tier not already present (prefer 5,4,3 in that order)
-    const present = new Set(rows.filter(r => r.member_name === member && r.pension_name === pension).map(r => r.working_days));
-    const tier = [5, 4, 3].find(t => !present.has(t));
-    createRow(member, pension, tier == null ? '' : String(tier), document.getElementById('addRowMsg'));
-  }
-
-  function addRowFromPicker() {
-    createRow(document.getElementById('newMember').value, document.getElementById('newPension').value, document.getElementById('newTier').value, document.getElementById('addRowMsg'));
-  }
-
-  async function deleteRow(id) {
-    const msg = document.getElementById('msg_' + id);
-    const r = rows.find(x => x.id === id);
-    if (!r) return;
-    if (!confirm(`Delete the ${tierLabel(r.working_days).txt} row for ${r.member_name} · ${r.pension_name}?`)) return;
-    try {
-      const res = await fetch(`${CONTRIB_URL}?id=eq.${id}`, { method: 'DELETE', headers: { ...getHeaders(), 'Prefer': 'return=representation' } });
-      if (!res.ok) throw new Error('DELETE → ' + res.status);
-      const removed = await res.json().catch(() => []);
-      if (!Array.isArray(removed) || removed.length === 0) {
-        throw new Error('the database reported no row was deleted (this usually means the table is missing a DELETE policy in Supabase).');
-      }
-      rows = rows.filter(x => x.id !== id); clearDirty(id); render(); populatePickers();
-    } catch (e) { if (msg) { msg.style.color = '#c0392b'; msg.innerText = 'Delete failed: ' + e.message; } }
-  }
-
   async function loadAll() {
     const status = document.getElementById('status');
     try {
       const r = await fetch(`${CONTRIB_URL}?order=member_name.asc,pension_name.asc`, { headers: getHeaders() });
       if (!r.ok) throw new Error('load → ' + r.status);
       rows = await r.json();
-      // members + pension names for the add-row pickers
-      try {
-        const [mr, pr] = await Promise.all([
-          fetch(`${MEMBERS_URL}?order=name.asc`, { headers: getHeaders() }),
-          fetch(`${SUPABASE_URL}/rest/v1/bd_pensions?order=pension_name.asc`, { headers: getHeaders() })
-        ]);
-        allMembers = mr.ok ? (await mr.json()).map(m => m.name).filter(Boolean) : [];
-        const penRows = pr.ok ? await pr.json() : [];
-        // pension names from bd_pensions, plus any already used in contributions
-        allPensionNames = [...new Set(penRows.map(p => p.pension_name).concat(rows.map(r2 => r2.pension_name)).filter(Boolean))].sort();
-        // workplace/private flag keyed by member|pension
-        workplaceByKey = {};
-        penRows.forEach(p => { workplaceByKey[(p.member_name || '') + '|' + p.pension_name] = (p.is_workplace !== false); });
-      } catch (e) { allMembers = [...new Set(rows.map(r2 => r2.member_name).filter(Boolean))]; allPensionNames = [...new Set(rows.map(r2 => r2.pension_name).filter(Boolean))].sort(); }
       render();
-      populatePickers();
       loadExceptions();
       status.className = 'status-ok';
       status.innerText = `Loaded ${rows.length} contribution row${rows.length === 1 ? '' : 's'}.`;

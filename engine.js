@@ -87,8 +87,10 @@
     const fp1 = fMembers[0] ? fMembers[0].name : 'Graham';
     const fp2 = fMembers[1] ? fMembers[1].name : null;
     const fp1Retire = personRetire(fp1);
-    const fp2Retire = fp2 ? personRetire(fp2) : fallbackRetire;
-    const retire = new Date(Math.max(fp1Retire.getTime(), fp2Retire.getTime()));
+    const fp2Retire = fp2 ? personRetire(fp2) : null;
+    const retire = fp2Retire
+      ? new Date(Math.max(fp1Retire.getTime(), fp2Retire.getTime()))
+      : fp1Retire;
 
     let maxG = sumMember(data, pots, fp1);
     let maxJ = fp2 ? sumMember(data, pots, fp2) : 0;
@@ -118,52 +120,49 @@
       return { override, oneOff };
     }
 
+    // ---- Stage D: working-days tiers + workplace/private rules ----
+    // Active tier for a person at date `d` = the tier with the latest from_date that is <= d.
+    // Before the earliest tier, returns null (no workplace contribution yet).
+    const fTiers = (data.workingTiers || []).map(t => ({
+      member: t.member_name, days: Number(t.days),
+      from: t.from_date ? new Date(t.from_date) : null
+    })).filter(t => t.from);
+    function activeTierDays(member, d) {
+      let best = null;
+      for (const t of fTiers) {
+        if (t.member !== member) continue;
+        if (t.from <= d && (!best || t.from > best.from)) best = t;
+      }
+      return best ? best.days : null;
+    }
+    // Apply one member's contributions for the current month into pots.
+    // All pensions are tier-driven and stop at the member's retirement date.
+    function applyContribs(member, memberRetire) {
+      const curIdx = cur.getFullYear() * 12 + cur.getMonth();
+      if (cur > memberRetire) return;            // contributions stop at retirement
+      const tierDays = activeTierDays(member, cur);
+      if (tierDays == null) return;              // no tier reached yet → no contribution
+      (data.contributions || []).forEach(c => {
+        if (c.member_name !== member) return;
+        const k = member + '|' + c.pension_name;
+        if (!(k in pots)) return;
+        if (Number(c.working_days) !== Number(tierDays)) return;   // row must match the active tier
+        const ex = exceptionFor(member, c.pension_name, curIdx);
+        const rises = risesElapsed(loopStart, cur, c.increase_month);
+        const normal = (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), rises);
+        const base = (ex.override != null) ? ex.override * contribMult : normal;
+        pots[k] += base + ex.oneOff * contribMult;
+      });
+    }
+
     let guard = 0;
     while (cur < retire && guard < 1200) {
       guard++;
       cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
       const curIdx = cur.getFullYear() * 12 + cur.getMonth();
 
-      let gDays = 5;
-      if (plan.phase2Date && cur >= plan.phase2Date) gDays = plan.phase2Days;
-      else if (plan.phase1Date && cur >= plan.phase1Date) gDays = plan.phase1Days;
-
-      // person 2's own working-days schedule (full symmetry); defaults to 5-day (no phasing) if absent
-      let jDays = 5;
-      const p2p = plan.p2phase;
-      if (p2p) {
-        if (p2p.phase2Date && cur >= p2p.phase2Date) jDays = p2p.phase2Days;
-        else if (p2p.phase1Date && cur >= p2p.phase1Date) jDays = p2p.phase1Days;
-      }
-
-      if (cur <= fp1Retire) (data.contributions || []).forEach(c => {
-        if (c.member_name === fp1 && Number(c.working_days) === Number(gDays)) {
-          const k = fp1 + '|' + c.pension_name;
-          if (k in pots) {
-            const ex = exceptionFor(fp1, c.pension_name, curIdx);
-            const rises = risesElapsed(loopStart, cur, c.increase_month);
-            const normal = (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), rises);
-            const base = (ex.override != null) ? ex.override * contribMult : normal;
-            pots[k] += base + ex.oneOff * contribMult;
-          }
-        }
-      });
-      if (fp2 && cur <= fp2Retire) (data.contributions || []).forEach(c => {
-        // person 2 now honours working-days tiers too: a row applies if it's not
-        // tier-specific (working_days null) OR it matches person 2's current tier.
-        const wd = c.working_days;
-        const tierMatch = (wd == null || wd === '') ? true : Number(wd) === Number(jDays);
-        if (c.member_name === fp2 && tierMatch) {
-          const k = fp2 + '|' + c.pension_name;
-          if (k in pots) {
-            const ex = exceptionFor(fp2, c.pension_name, curIdx);
-            const rises = risesElapsed(loopStart, cur, c.increase_month);
-            const normal = (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), rises);
-            const base = (ex.override != null) ? ex.override * contribMult : normal;
-            pots[k] += base + ex.oneOff * contribMult;
-          }
-        }
-      });
+      applyContribs(fp1, fp1Retire);
+      if (fp2) applyContribs(fp2, fp2Retire);
 
       Object.keys(pots).forEach(k => pots[k] *= (1 + monthlyGrowth));
 
