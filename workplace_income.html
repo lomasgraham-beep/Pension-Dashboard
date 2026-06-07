@@ -44,7 +44,7 @@
 
   <div id="appWrap" style="display:none;">
     <div class="topbar">Signed in as <span id="whoami"></span> &nbsp;<a onclick="doLogout()">Log out</a></div>
-    <h1>Workplace Income <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(income build: stageE)</span></h1>
+    <h1>Workplace Income <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(income build: autorefresh)</span></h1>
     <div id="status" class="s-load">Loading…</div>
     <div class="panel">
       <p class="intro" style="margin:0;">Net (take-home) monthly pay for each working pattern, at today's value &mdash; get figures from the <strong>Salary Calculator UK</strong> site. The award increase grows it over time (set per source on the Defaults page). Income sources and which tiers they apply to are set on the <strong>Defaults</strong> page; here you fill in the amounts.</p>
@@ -53,6 +53,20 @@
   </div>
 
 <script>
+  (function(){
+    const _f = window.fetch;
+    window.fetch = async function(u, o){
+      const r = await _f(u, o);
+      try {
+        const m = (o && o.method || 'GET').toUpperCase();
+        if (r.ok && (m==='POST'||m==='PATCH'||m==='DELETE'||m==='PUT') && String(u).indexOf('/rest/v1/')>=0) {
+          if (window.parent && window.parent !== window) window.parent.postMessage('data-saved','*');
+        }
+      } catch(e){}
+      return r;
+    };
+  })();
+
   const SUPABASE_URL = "https://yavfcitgyyftpubqwddp.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
   const INCSRC_URL = `${SUPABASE_URL}/rest/v1/bd_income_sources`;

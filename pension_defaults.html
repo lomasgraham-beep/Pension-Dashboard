@@ -90,7 +90,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: stageE2)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
+<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: autorefresh)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -147,6 +147,20 @@
 </div><!-- /appWrap -->
 
 <script>
+  (function(){
+    const _f = window.fetch;
+    window.fetch = async function(u, o){
+      const r = await _f(u, o);
+      try {
+        const m = (o && o.method || 'GET').toUpperCase();
+        if (r.ok && (m==='POST'||m==='PATCH'||m==='DELETE'||m==='PUT') && String(u).indexOf('/rest/v1/')>=0) {
+          if (window.parent && window.parent !== window) window.parent.postMessage('data-saved','*');
+        }
+      } catch(e){}
+      return r;
+    };
+  })();
+
   const SUPABASE_URL = "https://yavfcitgyyftpubqwddp.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
   const PARAMS_URL = `${SUPABASE_URL}/rest/v1/op_modelling_parameters`;

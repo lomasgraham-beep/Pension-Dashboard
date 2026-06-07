@@ -52,6 +52,20 @@
   <div class="grand" id="grand"></div>
 
 <script>
+  (function(){
+    const _f = window.fetch;
+    window.fetch = async function(u, o){
+      const r = await _f(u, o);
+      try {
+        const m = (o && o.method || 'GET').toUpperCase();
+        if (r.ok && (m==='POST'||m==='PATCH'||m==='DELETE'||m==='PUT') && String(u).indexOf('/rest/v1/')>=0) {
+          if (window.parent && window.parent !== window) window.parent.postMessage('data-saved','*');
+        }
+      } catch(e){}
+      return r;
+    };
+  })();
+
   const DAYS = [['mon','Mon'],['tue','Tue'],['wed','Wed'],['thu','Thu'],['fri','Fri'],['sat','Sat'],['sun','Sun']];
   let rows = [], dirty = false, deleted = [];
   const fmt = App.fmt;

@@ -359,7 +359,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-95</span>
+    <span class="build-stamp">build: LC-96</span>
   </div>
 
   <script>
@@ -870,7 +870,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err48';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err49';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
@@ -886,6 +886,18 @@
       });
     }
     function ensureFrame(id, src) { const f = document.getElementById(id); if (f && !f.getAttribute('src')) { hookFrame(f); f.setAttribute('src', src); f.__loadedOnce = true; return; } }
+
+    // When a Basic Data editor saves, it posts 'data-saved' up to here. Re-pull the dashboard
+    // data and recompute in place — no browser reload, so the current tab/scroll is kept.
+    let __refreshTimer = null;
+    window.addEventListener('message', function (ev) {
+      const msg = ev && ev.data;
+      if (msg === 'data-saved') {
+        // debounce: several saves in quick succession trigger one refresh
+        if (__refreshTimer) clearTimeout(__refreshTimer);
+        __refreshTimer = setTimeout(() => { if (typeof loadEverything === 'function') loadEverything(); }, 400);
+      }
+    });
     function pingFrame(id) {
       const f = document.getElementById(id);
       // only ask for a refresh if the frame was already loaded on a previous open
