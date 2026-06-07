@@ -5,7 +5,7 @@
 <title>Monthly Forecast</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=err45"></script>
-<script src="engine.js?v=fcast2"></script>
+<script src="engine.js?v=fcast3"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:#333; }
   h2 { color:#2c3e50; margin-top:0; }
@@ -20,7 +20,10 @@
   #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
   tr.tier-change td { background:#fffbeb; border-top:2px solid #f59e0b; }
+  tr.retire-row td { background:#eef2ff; border-top:2px solid #6366f1; }
   .tier-badge { display:inline-block; font-size:11px; font-weight:600; color:#92400e; background:#fde68a; padding:2px 8px; border-radius:999px; margin-left:8px; white-space:nowrap; }
+  .status-mixed { color:#4338ca; font-weight:600; }
+  th.det, td.det { background:#f8fafc; color:#64748b; font-size:12px; }
 
   @media (max-width: 600px) {
     body { padding:12px; }
@@ -34,11 +37,16 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pre-Retirement Monthly Forecast</h2>
-  <p class="note">Projected pot growth to each person's retirement date, computed in your browser from your tiers and contributions. <span style="color:#94a3b8;">(forecast build: tiermarks)</span></p>
+  <p class="note">Projected pot growth to each person's retirement date, computed in your browser from your tiers and contributions. <span style="color:#94a3b8;">(forecast build: validation)</span></p>
+  <label style="display:inline-flex; align-items:center; gap:8px; font-size:14px; margin-bottom:12px; cursor:pointer;">
+    <input type="checkbox" id="detailToggle" onchange="toggleDetail()"> Show contributions &amp; growth per pot
+  </label>
+  <div style="overflow-x:auto;">
   <table id="fTable">
-    <thead><tr><th>Month</th><th><span class="nm-p1">Graham</span>'s Tracked Total</th><th class="col-p2"><span class="nm-p2">Julie</span>'s Tracked Total</th><th>Joint Trajectory</th></tr></thead>
-    <tbody><tr><td colspan="4">Computing…</td></tr></tbody>
+    <thead><tr><th>Month</th></tr></thead>
+    <tbody><tr><td>Computing…</td></tr></tbody>
   </table>
+  </div>
 
 <script>
   const fmt = App.fmt;
@@ -86,25 +94,73 @@
 
       const res = PensionEngine.forecast(data, plan, 1);
       const series = res.series || [];
-      const tb = document.querySelector('#fTable tbody');
-      const dayLabel = d => (d == null ? 'not working' : d + '-day week');
-      tb.innerHTML = series.length ? series.map((r, i) => {
-        const label = MONTHS[r.month] + ' ' + r.year;
-        const prev = i > 0 ? series[i - 1] : null;
-        // detect tier changes vs the previous row
-        const notes = [];
-        if (prev && r.gDays !== prev.gDays) notes.push(`${p1Name} → ${dayLabel(r.gDays)}`);
-        if (p2Name && prev && r.jDays !== prev.jDays) notes.push(`${p2Name} → ${dayLabel(r.jDays)}`);
-        const changed = notes.length > 0;
-        const badge = changed
-          ? ` <span class="tier-badge">${notes.join(' · ')}</span>`
-          : '';
-        const p2cell = p2Name ? `<td>${fmt(r.j)}</td>` : '';
-        return `<tr${changed ? ' class="tier-change"' : ''}><td>${label}${badge}</td><td>${fmt(r.g)}</td>${p2cell}<td style="font-weight:bold;">${fmt(r.g + (p2Name ? r.j : 0))}</td></tr>`;
-      }).join('') : '<tr><td colspan="4">No forecast rows — check your tiers and contributions are set.</td></tr>';
+      const potKeys = res.potKeys || [];
+      window.__fc = { series, potKeys, p1Name, p2Name, fmt };
+      renderForecast(false);
       status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
+
+  const MONTHS_FULL = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dayLabel = d => (d == null ? 'not working' : d + '-day week');
+  function potLabel(k) { const i = k.indexOf('|'); return i >= 0 ? k.slice(0, i) + ' ' + k.slice(i + 1) : k; }
+
+  function renderForecast(showDetail) {
+    const fc = window.__fc; if (!fc) return;
+    const { series, potKeys, p1Name, p2Name, fmt } = fc;
+    const tbl = document.getElementById('fTable');
+    // header
+    let head = '<tr><th>Month</th><th>Status</th>';
+    potKeys.forEach(k => {
+      head += `<th>${potLabel(k)}</th>`;
+      if (showDetail) head += `<th class="det">+contrib</th><th class="det">+growth</th>`;
+    });
+    head += '<th>Joint total</th></tr>';
+    tbl.querySelector('thead').innerHTML = head;
+
+    const colCount = 2 + potKeys.length * (showDetail ? 3 : 1) + 1;
+    const body = series.length ? series.map((r, i) => {
+      const label = MONTHS_FULL[r.month] + ' ' + r.year;
+      const prev = i > 0 ? series[i - 1] : null;
+      // tier-change + retirement detection vs previous row
+      const notes = [];
+      if (prev && r.gDays !== prev.gDays) notes.push(`${p1Name} → ${dayLabel(r.gDays)}`);
+      if (p2Name && prev && r.jDays !== prev.jDays) notes.push(`${p2Name} → ${dayLabel(r.jDays)}`);
+      const gJustRetired = prev && r.gRetired && !prev.gRetired;
+      const jJustRetired = p2Name && prev && r.jRetired && !prev.jRetired;
+      if (gJustRetired) notes.push(`${p1Name} retires`);
+      if (jJustRetired) notes.push(`${p2Name} retires`);
+      const tierChanged = notes.length > 0;
+      const retireRow = gJustRetired || jJustRetired;
+      const badge = notes.length ? ` <span class="tier-badge">${notes.join(' · ')}</span>` : '';
+      // status column
+      let status;
+      if (!p2Name) status = r.gRetired ? 'retired' : 'working';
+      else {
+        const gs = r.gRetired ? 'retired' : 'working';
+        const js = r.jRetired ? 'retired' : 'working';
+        status = (gs === js) ? (gs === 'working' ? 'both working' : 'both retired') : `${p1Name} ${gs}, ${p2Name} ${js}`;
+      }
+      const mixed = p2Name && (r.gRetired !== r.jRetired);
+      let joint = 0;
+      let cells = '';
+      potKeys.forEach(k => {
+        const d = r.pots[k] || { value: 0, contrib: 0, growth: 0 };
+        joint += d.value;
+        cells += `<td>${fmt(d.value)}</td>`;
+        if (showDetail) cells += `<td class="det">${d.contrib ? fmt(d.contrib) : '—'}</td><td class="det">${fmt(d.growth)}</td>`;
+      });
+      const cls = [retireRow ? 'retire-row' : '', tierChanged && !retireRow ? 'tier-change' : ''].filter(Boolean).join(' ');
+      return `<tr${cls ? ` class="${cls}"` : ''}><td>${label}${badge}</td><td class="${mixed ? 'status-mixed' : ''}">${status}</td>${cells}<td style="font-weight:bold;">${fmt(joint)}</td></tr>`;
+    }).join('') : `<tr><td colspan="${colCount}">No forecast rows — check your tiers and contributions are set.</td></tr>`;
+    tbl.querySelector('tbody').innerHTML = body;
+  }
+
+  function toggleDetail() {
+    const cb = document.getElementById('detailToggle');
+    renderForecast(cb.checked);
+  }
+
   App.requireLogin(load, { title: 'Monthly Forecast' });
 </script>
 </body>

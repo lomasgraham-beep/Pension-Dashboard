@@ -110,9 +110,12 @@
     let maxG = sumMember(data, pots, fp1);
     let maxJ = fp2 ? sumMember(data, pots, fp2) : 0;
     // Monthly trajectory for the forecast page: start from the current month's pots.
-    // gDaysSeries/jDaysSeries record the active working-days tier so the page can mark transitions.
+    const startDetail = {};
+    Object.keys(pots).forEach(k => { startDetail[k] = { value: pots[k], contrib: 0, growth: 0 }; });
     const series = [{ year: cur.getFullYear(), month: cur.getMonth(), g: maxG, j: maxJ,
-                      gDays: activeTierDays(fp1, cur), jDays: fp2 ? activeTierDays(fp2, cur) : null }];
+                      gDays: activeTierDays(fp1, cur), jDays: fp2 ? activeTierDays(fp2, cur) : null,
+                      gRetired: cur > fp1Retire, jRetired: fp2 ? cur > fp2Retire : false,
+                      pots: startDetail }];
 
     // ---- Contribution exceptions ----
     // override (one_off=false): replaces the normal monthly contribution for months in [start,end].
@@ -142,7 +145,7 @@
     // ---- Stage D: working-days tiers + workplace/private rules ----
     // Apply one member's contributions for the current month into pots.
     // All pensions are tier-driven and stop at the member's retirement date.
-    function applyContribs(member, memberRetire) {
+    function applyContribs(member, memberRetire, contribOut) {
       const curIdx = cur.getFullYear() * 12 + cur.getMonth();
       if (cur > memberRetire) return;            // contributions stop at retirement
       const tierDays = activeTierDays(member, cur);
@@ -156,29 +159,41 @@
         const rises = risesElapsed(loopStart, cur, c.increase_month);
         const normal = (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), rises);
         const base = (ex.override != null) ? ex.override * contribMult : normal;
-        pots[k] += base + ex.oneOff * contribMult;
+        const added = base + ex.oneOff * contribMult;
+        pots[k] += added;
+        if (contribOut) contribOut[k] = (contribOut[k] || 0) + added;
       });
     }
 
     let guard = 0;
+    const potKeys = Object.keys(pots).slice();   // stable list of pot keys (member|pension)
     while (cur < retire && guard < 1200) {
       guard++;
       cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
       const curIdx = cur.getFullYear() * 12 + cur.getMonth();
 
-      applyContribs(fp1, fp1Retire);
-      if (fp2) applyContribs(fp2, fp2Retire);
+      const contribOut = {};
+      applyContribs(fp1, fp1Retire, contribOut);
+      if (fp2) applyContribs(fp2, fp2Retire, contribOut);
 
-      Object.keys(pots).forEach(k => pots[k] *= (1 + monthlyGrowth));
+      // record growth per pot, then apply it
+      const growthOut = {};
+      Object.keys(pots).forEach(k => { const before = pots[k]; const after = before * (1 + monthlyGrowth); growthOut[k] = after - before; pots[k] = after; });
 
       const g = sumMember(data, pots, fp1);
       const j = fp2 ? sumMember(data, pots, fp2) : 0;
+      // per-pot detail for the validation table
+      const potDetail = {};
+      potKeys.forEach(k => { potDetail[k] = { value: pots[k], contrib: contribOut[k] || 0, growth: growthOut[k] || 0 }; });
       series.push({ year: cur.getFullYear(), month: cur.getMonth(), g: g, j: j,
-                    gDays: activeTierDays(fp1, cur), jDays: fp2 ? activeTierDays(fp2, cur) : null });
+                    gDays: activeTierDays(fp1, cur), jDays: fp2 ? activeTierDays(fp2, cur) : null,
+                    gRetired: cur > fp1Retire, jRetired: fp2 ? cur > fp2Retire : false,
+                    pots: potDetail });
       if (g > maxG) maxG = g;
       if (j > maxJ) maxJ = j;
     }
-    return { graham: maxG, julie: maxJ, series: series, p1Name: fp1, p2Name: fp2 };
+    return { graham: maxG, julie: maxJ, series: series, p1Name: fp1, p2Name: fp2,
+             potKeys: potKeys, fp1Retire: fp1Retire, fp2Retire: fp2Retire };
   }
 
   // ---- DRAWDOWN: monthly engine, aggregated to yearly rows ----

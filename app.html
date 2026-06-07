@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=err2"></script>
-  <script src="engine.js?v=fcast2"></script>
+  <script src="engine.js?v=fcast3"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -359,7 +359,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-97</span>
+    <span class="build-stamp">build: LC-98</span>
   </div>
 
   <script>
@@ -870,7 +870,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err50';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err51';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
