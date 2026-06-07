@@ -44,7 +44,7 @@
 
   <div id="appWrap" style="display:none;">
     <div class="topbar">Signed in as <span id="whoami"></span> &nbsp;<a onclick="doLogout()">Log out</a></div>
-    <h1>Workplace Income <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(income build: autorefresh)</span></h1>
+    <h1>Workplace Income <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(income build: siblingsync)</span></h1>
     <div id="status" class="s-load">Loading…</div>
     <div class="panel">
       <p class="intro" style="margin:0;">Net (take-home) monthly pay for each working pattern, at today's value &mdash; get figures from the <strong>Salary Calculator UK</strong> site. The award increase grows it over time (set per source on the Defaults page). Income sources and which tiers they apply to are set on the <strong>Defaults</strong> page; here you fill in the amounts.</p>
@@ -53,6 +53,19 @@
   </div>
 
 <script>
+  (function(){
+    window.addEventListener('message', function(ev){
+      if (ev && ev.data === 'refresh-data') {
+        try {
+          if (typeof loadAll === 'function') return loadAll();
+          if (typeof loadMembers === 'function') return loadMembers();
+          if (typeof reload === 'function') return reload();
+          if (typeof loadDefaults === 'function') { loadDefaults(false); if (typeof loadTiers === 'function') loadTiers(); return; }
+        } catch(e){}
+      }
+    });
+  })();
+
   (function(){
     const _f = window.fetch;
     window.fetch = async function(u, o){

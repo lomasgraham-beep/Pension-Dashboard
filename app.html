@@ -359,7 +359,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-96</span>
+    <span class="build-stamp">build: LC-97</span>
   </div>
 
   <script>
@@ -870,7 +870,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err49';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err50';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
@@ -895,7 +895,13 @@
       if (msg === 'data-saved') {
         // debounce: several saves in quick succession trigger one refresh
         if (__refreshTimer) clearTimeout(__refreshTimer);
-        __refreshTimer = setTimeout(() => { if (typeof loadEverything === 'function') loadEverything(); }, 400);
+        __refreshTimer = setTimeout(() => {
+          if (typeof loadEverything === 'function') loadEverything();
+          // relay to every framed editor so siblings re-pull (e.g. Defaults ↔ Workplace Income)
+          document.querySelectorAll('iframe.app-frame').forEach(f => {
+            try { if (f.contentWindow) f.contentWindow.postMessage('refresh-data', '*'); } catch (e) {}
+          });
+        }, 400);
       }
     });
     function pingFrame(id) {

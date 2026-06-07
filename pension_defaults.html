@@ -90,7 +90,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: autorefresh)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
+<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: siblingsync)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -147,6 +147,19 @@
 </div><!-- /appWrap -->
 
 <script>
+  (function(){
+    window.addEventListener('message', function(ev){
+      if (ev && ev.data === 'refresh-data') {
+        try {
+          if (typeof loadAll === 'function') return loadAll();
+          if (typeof loadMembers === 'function') return loadMembers();
+          if (typeof reload === 'function') return reload();
+          if (typeof loadDefaults === 'function') { loadDefaults(false); if (typeof loadTiers === 'function') loadTiers(); return; }
+        } catch(e){}
+      }
+    });
+  })();
+
   (function(){
     const _f = window.fetch;
     window.fetch = async function(u, o){
