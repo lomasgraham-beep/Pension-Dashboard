@@ -5,7 +5,7 @@
 <title>Monthly Forecast</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=err45"></script>
-<script src="engine.js?v=fcast3"></script>
+<script src="engine.js?v=fcast4"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:#333; }
   h2 { color:#2c3e50; margin-top:0; }
@@ -24,6 +24,10 @@
   .tier-badge { display:inline-block; font-size:11px; font-weight:600; color:#92400e; background:#fde68a; padding:2px 8px; border-radius:999px; margin-left:8px; white-space:nowrap; }
   .status-mixed { color:#4338ca; font-weight:600; }
   th.det, td.det { background:#f8fafc; color:#64748b; font-size:12px; }
+  .toggle-switch { appearance:none; -webkit-appearance:none; width:48px; height:28px; background:#cbd5e1; border-radius:999px; position:relative; cursor:pointer; outline:none; transition:background 0.2s; flex:none; vertical-align:middle; }
+  .toggle-switch:checked { background:#27ae60; }
+  .toggle-switch::after { content:''; position:absolute; top:3px; left:3px; width:22px; height:22px; background:#fff; border-radius:50%; transition:left 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
+  .toggle-switch:checked::after { left:23px; }
 
   @media (max-width: 600px) {
     body { padding:12px; }
@@ -37,9 +41,9 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pre-Retirement Monthly Forecast</h2>
-  <p class="note">Projected pot growth to each person's retirement date, computed in your browser from your tiers and contributions. <span style="color:#94a3b8;">(forecast build: validation)</span></p>
-  <label style="display:inline-flex; align-items:center; gap:8px; font-size:14px; margin-bottom:12px; cursor:pointer;">
-    <input type="checkbox" id="detailToggle" onchange="toggleDetail()"> Show contributions &amp; growth per pot
+  <p class="note">Projected pot growth to each person's retirement date, computed in your browser from your tiers and contributions. <span style="color:#94a3b8;">(forecast build: validation2)</span></p>
+  <label style="display:inline-flex; align-items:center; gap:10px; font-size:15px; margin-bottom:12px; cursor:pointer;">
+    <input type="checkbox" id="detailToggle" class="toggle-switch" onchange="toggleDetail()"> <span>Show contributions &amp; growth per pot</span>
   </label>
   <div style="overflow-x:auto;">
   <table id="fTable">

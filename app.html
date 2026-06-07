@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=err2"></script>
-  <script src="engine.js?v=fcast3"></script>
+  <script src="engine.js?v=fcast4"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -61,6 +61,10 @@
 
     .chart-box { width:100%; height:400px; margin-bottom:20px; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
+    .toggle-switch { appearance:none; -webkit-appearance:none; width:48px; height:28px; background:#cbd5e1; border-radius:999px; position:relative; cursor:pointer; outline:none; transition:background 0.2s; flex:none; vertical-align:middle; }
+    .toggle-switch:checked { background:#27ae60; }
+    .toggle-switch::after { content:''; position:absolute; top:3px; left:3px; width:22px; height:22px; background:#fff; border-radius:50%; transition:left 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
+    .toggle-switch:checked::after { left:23px; }
     #rTable { width:auto; }
     #rTable th { white-space:normal; vertical-align:bottom; line-height:1.2; text-align:center; }
     #rTable td { white-space:nowrap; }
@@ -313,10 +317,13 @@
       <label style="margin-right:16px; cursor:pointer;"><input type="radio" name="retGran" value="year" checked onchange="setRetGran('year')"> Annual</label>
       <label style="cursor:pointer;"><input type="radio" name="retGran" value="month" onchange="setRetGran('month')"> Monthly</label>
     </div>
+    <div style="margin:0 0 12px; font-size:14px;">
+      <label style="cursor:pointer; display:inline-flex; align-items:center; gap:8px;"><input type="checkbox" id="retGrowthToggle" class="toggle-switch" onchange="toggleRetGrowth()"> <span>Show investment growth on each pot</span></label>
+    </div>
     <div class="table-wrap">
       <table id="rTable">
-        <thead><tr><th id="rThPeriod">Year</th><th>Tax-Free Pot</th><th>Taxable Pot</th><th>Cash Savings</th><th>Other Incomes</th><th>Savings to Bills</th><th>Bills</th><th>Dining</th><th>Loan Payment</th><th>Drawdown required</th><th>Total Gross Income</th></tr></thead>
-        <tbody><tr><td colspan="11">Calculating…</td></tr></tbody>
+        <thead><tr><th id="rThPeriod">Year</th><th>Tax-Free Pot</th><th class="grow-col" style="display:none;">TF Growth</th><th>Taxable Pot</th><th class="grow-col" style="display:none;">Tx Growth</th><th>Cash Savings</th><th>Other Incomes</th><th>Savings to Bills</th><th>Bills</th><th>Dining</th><th>Loan Payment</th><th>Drawdown required</th><th>Total Gross Income</th></tr></thead>
+        <tbody><tr><td colspan="13">Calculating…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -359,7 +366,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-98</span>
+    <span class="build-stamp">build: LC-99</span>
   </div>
 
   <script>
@@ -462,23 +469,29 @@
 
     // ---------- per-view field pickers ----------
     function vrow(r) {
-      if (currentView === p1Name) { const g = savedPlan.gRatio; return { dining:r.diningTotal*g, bills:r.billsTotal*g, loan:(r.cashFinance||0)*g, savToBills:(r.cashCapDraw||0)*g, tf:r.g_taxFree, tx:r.g_taxable, other:r.g_other, draw:r.g_draw, income:r.g_income, close:r.g_closing }; }
-      if (currentView === p2Name)  { const j = 1 - savedPlan.gRatio; return { dining:r.diningTotal*j, bills:r.billsTotal*j, loan:(r.cashFinance||0)*j, savToBills:(r.cashCapDraw||0)*j, tf:r.j_taxFree, tx:r.j_taxable, other:r.j_other, draw:r.j_draw, income:r.j_income, close:r.j_closing }; }
-      return { dining:r.diningTotal, bills:r.billsTotal, loan:(r.cashFinance||0), savToBills:(r.cashCapDraw||0), tf:r.taxFree, tx:r.taxable, other:r.otherPensions, draw:r.drawdown, income:r.totalIncome, close:r.combinedClosing };
+      if (currentView === p1Name) { const g = savedPlan.gRatio; return { dining:r.diningTotal*g, bills:r.billsTotal*g, loan:(r.cashFinance||0)*g, savToBills:(r.cashCapDraw||0)*g, tf:r.g_taxFree, tx:r.g_taxable, tfG:r.g_tfGrowth||0, txG:r.g_txGrowth||0, other:r.g_other, draw:r.g_draw, income:r.g_income, close:r.g_closing }; }
+      if (currentView === p2Name)  { const j = 1 - savedPlan.gRatio; return { dining:r.diningTotal*j, bills:r.billsTotal*j, loan:(r.cashFinance||0)*j, savToBills:(r.cashCapDraw||0)*j, tf:r.j_taxFree, tx:r.j_taxable, tfG:r.j_tfGrowth||0, txG:r.j_txGrowth||0, other:r.j_other, draw:r.j_draw, income:r.j_income, close:r.j_closing }; }
+      return { dining:r.diningTotal, bills:r.billsTotal, loan:(r.cashFinance||0), savToBills:(r.cashCapDraw||0), tf:r.taxFree, tx:r.taxable, tfG:r.tfGrowth||0, txG:r.txGrowth||0, other:r.otherPensions, draw:r.drawdown, income:r.totalIncome, close:r.combinedClosing };
     }
 
     function setRetGran(g) { retGran = g; document.getElementById('rThPeriod').textContent = (g === 'month') ? 'Month' : 'Year'; renderRetirementTable(); }
 
+    let retShowGrowth = false;
+    function toggleRetGrowth() { retShowGrowth = document.getElementById('retGrowthToggle').checked; renderRetirementTable(); }
     function renderRetirementTable() {
       const tb = document.querySelector('#rTable tbody');
       const rowsToShow = (retGran === 'month') ? (drawdownRows.monthly || []) : drawdownRows;
-      if (!rowsToShow.length) { tb.innerHTML = '<tr><td colspan="11">No rows.</td></tr>'; return; }
+      // show/hide the growth column headers
+      document.querySelectorAll('#rTable .grow-col').forEach(el => el.style.display = retShowGrowth ? '' : 'none');
+      if (!rowsToShow.length) { tb.innerHTML = '<tr><td colspan="13">No rows.</td></tr>'; return; }
       tb.innerHTML = rowsToShow.map(r => {
         const v = vrow(r);
         const period = (retGran === 'month') ? r.label : r.year;
+        const tfGrow = retShowGrowth ? `<td class="grow-col" style="color:#16a34a;font-size:0.92em;">${fmt(v.tfG)}</td>` : '';
+        const txGrow = retShowGrowth ? `<td class="grow-col" style="color:#16a34a;font-size:0.92em;">${fmt(v.txG)}</td>` : '';
         return `<tr class="${r.shortfall ? 'shortfall' : ''}">
           <td>${period}</td>
-          <td>${fmt(v.tf)}</td><td>${fmt(v.tx)}</td>
+          <td>${fmt(v.tf)}</td>${tfGrow}<td>${fmt(v.tx)}</td>${txGrow}
           <td style="color:#2c7a7b;">${fmt(r.cashBalance || 0)}</td>
           <td>${fmt(v.other)}</td>
           <td style="font-weight:bold;color:#2c7a7b;">${fmt(v.savToBills)}</td>
@@ -870,7 +883,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err51';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err52';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }

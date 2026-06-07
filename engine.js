@@ -416,6 +416,7 @@
           outgoings: 0, billsTotal: 0, diningTotal: 0, gTarget: 0, jTarget: 0,
           taxFree: gTf + jTf, taxable: gTx + jTx,
           g_taxFree: gTf, g_taxable: gTx, j_taxFree: jTf, j_taxable: jTx,
+          g_tfGrowth: 0, g_txGrowth: 0, j_tfGrowth: 0, j_txGrowth: 0, tfGrowth: 0, txGrowth: 0,
           stateGross: 0, otherPensions: 0, drawdown: 0,
           g_other: 0, j_other: 0, g_draw: 0, j_draw: 0, g_income: 0, j_income: 0, totalIncome: 0,
           combinedClosing: 0, g_closing: 0, j_closing: 0, shortfall: false,
@@ -516,6 +517,8 @@
       // monthly growth on what remains — overridden by a crash trajectory if one is active
       const cf = crashFactor(idx);
       const gm = (cf != null) ? cf : mGrow;
+      const gTfGrowth = gTf * (gm - 1), gTxGrowth = gTx * (gm - 1);
+      const jTfGrowth = jTf * (gm - 1), jTxGrowth = jTx * (gm - 1);
       gTf *= gm; gTx *= gm; jTf *= gm; jTx *= gm;
 
       const gDraw = gRes.drawTf + gRes.drawGross, jDraw = jRes.drawTf + jRes.drawGross;
@@ -529,6 +532,8 @@
         outgoings: outM, billsTotal: billsM, diningTotal: diningM, gTarget: gTargetM, jTarget: jTargetM,
         taxFree: oGTf + oJTf, taxable: oGTx + oJTx,
         g_taxFree: oGTf, g_taxable: oGTx, j_taxFree: oJTf, j_taxable: oJTx,
+        g_tfGrowth: gTfGrowth, g_txGrowth: gTxGrowth, j_tfGrowth: jTfGrowth, j_txGrowth: jTxGrowth,
+        tfGrowth: gTfGrowth + jTfGrowth, txGrowth: gTxGrowth + jTxGrowth,
         stateGross: mState, otherPensions: mOther, drawdown: gDraw + jDraw,
         g_other: gRes.inc.total, j_other: jRes.inc.total, g_draw: gDraw, j_draw: jDraw,
         g_income: gRes.inc.total + gDraw, j_income: jRes.inc.total + jDraw,
@@ -545,6 +550,8 @@
       acc.g_other += gRes.inc.total; acc.j_other += jRes.inc.total;
       acc.otherPensions += gRes.inc.total + jRes.inc.total;
       acc.g_draw += gDraw; acc.j_draw += jDraw; acc.drawdown += gDraw + jDraw;
+      acc.g_tfGrowth += gTfGrowth; acc.g_txGrowth += gTxGrowth; acc.j_tfGrowth += jTfGrowth; acc.j_txGrowth += jTxGrowth;
+      acc.tfGrowth += gTfGrowth + jTfGrowth; acc.txGrowth += gTxGrowth + jTxGrowth;
       acc.g_income += gRes.inc.total + gDraw; acc.j_income += jRes.inc.total + jDraw;
       acc.totalIncome += gRes.inc.total + jRes.inc.total + gDraw + jDraw;
       acc.combinedClosing = gTf + gTx + jTf + jTx;
