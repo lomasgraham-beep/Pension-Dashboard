@@ -92,10 +92,27 @@
       ? new Date(Math.max(fp1Retire.getTime(), fp2Retire.getTime()))
       : fp1Retire;
 
+    // Active tier for a person at date `d` = the tier with the latest from_date that is <= d.
+    // Before the earliest tier, returns null (not yet contributing / not yet working).
+    const fTiers = (data.workingTiers || []).map(t => ({
+      member: t.member_name, days: Number(t.days),
+      from: t.from_date ? new Date(t.from_date) : null
+    })).filter(t => t.from);
+    function activeTierDays(member, d) {
+      let best = null;
+      for (const t of fTiers) {
+        if (t.member !== member) continue;
+        if (t.from <= d && (!best || t.from > best.from)) best = t;
+      }
+      return best ? best.days : null;
+    }
+
     let maxG = sumMember(data, pots, fp1);
     let maxJ = fp2 ? sumMember(data, pots, fp2) : 0;
     // Monthly trajectory for the forecast page: start from the current month's pots.
-    const series = [{ year: cur.getFullYear(), month: cur.getMonth(), g: maxG, j: maxJ }];
+    // gDaysSeries/jDaysSeries record the active working-days tier so the page can mark transitions.
+    const series = [{ year: cur.getFullYear(), month: cur.getMonth(), g: maxG, j: maxJ,
+                      gDays: activeTierDays(fp1, cur), jDays: fp2 ? activeTierDays(fp2, cur) : null }];
 
     // ---- Contribution exceptions ----
     // override (one_off=false): replaces the normal monthly contribution for months in [start,end].
@@ -123,20 +140,6 @@
     }
 
     // ---- Stage D: working-days tiers + workplace/private rules ----
-    // Active tier for a person at date `d` = the tier with the latest from_date that is <= d.
-    // Before the earliest tier, returns null (no workplace contribution yet).
-    const fTiers = (data.workingTiers || []).map(t => ({
-      member: t.member_name, days: Number(t.days),
-      from: t.from_date ? new Date(t.from_date) : null
-    })).filter(t => t.from);
-    function activeTierDays(member, d) {
-      let best = null;
-      for (const t of fTiers) {
-        if (t.member !== member) continue;
-        if (t.from <= d && (!best || t.from > best.from)) best = t;
-      }
-      return best ? best.days : null;
-    }
     // Apply one member's contributions for the current month into pots.
     // All pensions are tier-driven and stop at the member's retirement date.
     function applyContribs(member, memberRetire) {
@@ -170,7 +173,8 @@
 
       const g = sumMember(data, pots, fp1);
       const j = fp2 ? sumMember(data, pots, fp2) : 0;
-      series.push({ year: cur.getFullYear(), month: cur.getMonth(), g: g, j: j });
+      series.push({ year: cur.getFullYear(), month: cur.getMonth(), g: g, j: j,
+                    gDays: activeTierDays(fp1, cur), jDays: fp2 ? activeTierDays(fp2, cur) : null });
       if (g > maxG) maxG = g;
       if (j > maxJ) maxJ = j;
     }
