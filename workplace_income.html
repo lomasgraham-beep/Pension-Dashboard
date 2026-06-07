@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workplace Income</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:820px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; }
+  h2 { color:#2c3e50; margin:0 0 4px; font-size:18px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  .intro { font-size:15px; color:#475569; line-height:1.55; }
+  .src-desc { font-size:14px; color:#64748b; margin:0 0 14px; }
+  .tier-block { border:1px solid #d7dde3; border-radius:8px; padding:12px 14px; margin-bottom:10px; background:#fcfdfe; }
+  .tier-pill { font-size:13px; font-weight:600; color:#1e40af; background:#dbeafe; padding:3px 10px; border-radius:999px; }
+  .hint60 { font-size:13px; color:#64748b; margin-left:10px; }
+  label.fld { font-size:14px; color:#475569; display:block; margin:8px 0 4px; }
+  input[type="number"] { padding:12px 14px; border:1px solid #ccc; border-radius:6px; font-size:16px; min-height:48px; width:200px; box-sizing:border-box; }
+  .btn { background:#3498db; color:#fff; border:none; padding:14px 24px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:16px; min-height:48px; }
+  .btn-ghost { background:#64748b; }
+  .row-msg { font-size:14px; font-weight:bold; margin-top:8px; min-height:18px; }
+  .btn-row { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; }
+  .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#e6ffed; color:#065f46; }
+  .topbar { text-align:right; font-size:14px; color:#475569; margin-bottom:8px; }
+  .topbar a { color:#3498db; font-weight:bold; cursor:pointer; }
+  /* login */
+  #loginOverlay { position:fixed; inset:0; background:#f4f7f6; display:flex; align-items:center; justify-content:center; }
+  .login-card { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:28px; width:320px; box-shadow:0 4px 14px rgba(0,0,0,0.08); }
+  .login-card input { width:100%; padding:12px; margin:8px 0; border:1px solid #ccc; border-radius:6px; font-size:16px; box-sizing:border-box; }
+  .login-err { color:#c0392b; font-size:14px; min-height:18px; }
+</style>
+</head>
+<body>
+  <div id="loginOverlay">
+    <div class="login-card">
+      <h2>Sign in</h2>
+      <input type="email" id="loginEmail" placeholder="Email" autocomplete="username">
+      <input type="password" id="loginPass" placeholder="Password" autocomplete="current-password">
+      <div class="login-err" id="loginErr"></div>
+      <button class="btn" id="loginBtn" onclick="doLogin()" style="width:100%;">Sign in</button>
+    </div>
+  </div>
+
+  <div id="appWrap" style="display:none;">
+    <div class="topbar">Signed in as <span id="whoami"></span> &nbsp;<a onclick="doLogout()">Log out</a></div>
+    <h1>Workplace Income <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(income build: stageE)</span></h1>
+    <div id="status" class="s-load">Loading…</div>
+    <div class="panel">
+      <p class="intro" style="margin:0;">Net (take-home) monthly pay for each working pattern, at today's value &mdash; get figures from the <strong>Salary Calculator UK</strong> site. The award increase grows it over time (set per source on the Defaults page). Income sources and which tiers they apply to are set on the <strong>Defaults</strong> page; here you fill in the amounts.</p>
+    </div>
+    <div id="container"></div>
+  </div>
+
+<script>
+  const SUPABASE_URL = "https://yavfcitgyyftpubqwddp.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
+  const INCSRC_URL = `${SUPABASE_URL}/rest/v1/bd_income_sources`;
+  const INCAMT_URL = `${SUPABASE_URL}/rest/v1/bd_income_amounts`;
+  let authToken = null;
+  const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${authToken || SUPABASE_KEY}`, "Content-Type": "application/json" });
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const fmt = (n) => "£" + Number(n || 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dayLabel = (d) => (d == null ? 'not working' : d + '-day week');
+
+  let sources = [], amounts = [];
+  const dirty = {};
+  function markDirty(id) { dirty[id] = true; const f = document.getElementById('msg_' + id); if (f) { f.style.color = '#92400e'; f.innerText = 'Unsaved'; } }
+
+  async function loadAll() {
+    const status = document.getElementById('status');
+    try {
+      const [sr, ar] = await Promise.all([
+        fetch(`${INCSRC_URL}?order=member_name.asc,source_name.asc`, { headers: getHeaders() }),
+        fetch(`${INCAMT_URL}?order=member_name.asc`, { headers: getHeaders() })
+      ]);
+      if (!sr.ok) throw new Error('sources → ' + sr.status);
+      sources = await sr.json();
+      amounts = ar.ok ? await ar.json() : [];
+      render();
+      status.style.display = 'none';
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  function render() {
+    const c = document.getElementById('container');
+    if (!sources.length) {
+      c.innerHTML = '<div class="panel"><p class="hint" style="margin:0;color:#64748b;">No income sources yet. Add them on the Defaults page (in the Working-days tiers panel), tick the tiers they apply to, then come back here to fill in the amounts.</p></div>';
+      return;
+    }
+    let html = '';
+    sources.forEach(s => {
+      // the per-tier amount rows for this source, ordered 5,4,3,2 then nulls
+      const rows = amounts.filter(a => a.member_name === s.member_name && a.source_name === s.source_name)
+        .sort((a, b) => (Number(b.working_days) || 0) - (Number(a.working_days) || 0));
+      // 5-day net for the "x% would be" hint
+      const fiveRow = rows.find(r => Number(r.working_days) === 5);
+      const fiveNet = fiveRow ? Number(fiveRow.net_monthly) || 0 : 0;
+      const awardPct = (Number(s.award_pct) * 100);
+      html += `<div class="panel">
+        <h2>${s.member_name} — ${s.source_name}</h2>
+        <p class="src-desc">Award increase ${awardPct % 1 ? awardPct.toFixed(1) : awardPct}% each ${MONTH_NAMES[(Number(s.award_month) || 4) - 1]}. (Edit the award on the Defaults page.)</p>`;
+      if (!rows.length) {
+        html += '<p class="hint" style="color:#64748b;">No tiers ticked for this source yet — tick the tiers it applies to on the Defaults page.</p>';
+      } else {
+        rows.forEach(r => {
+          const days = r.working_days;
+          // proportional hint for reduced tiers, based on the 5-day figure
+          let hint = '';
+          if (days != null && Number(days) !== 5 && fiveNet > 0) {
+            const pct = Math.round((Number(days) / 5) * 100);
+            const sugg = Math.round(fiveNet * (Number(days) / 5));
+            hint = `<span class="hint60">${days}-day at ${pct}% of 5-day would be ${fmt(sugg)}</span>`;
+          }
+          html += `<div class="tier-block">
+            <div><span class="tier-pill">${dayLabel(days)}</span>${hint}</div>
+            <label class="fld" for="amt_${r.id}">Net monthly (£)</label>
+            <input type="number" step="0.01" id="amt_${r.id}" value="${r.net_monthly != null ? r.net_monthly : ''}" oninput="markDirty('${r.id}')">
+            <div class="btn-row">
+              <button class="btn" onclick="saveAmt('${r.id}')">Save</button>
+              <button class="btn btn-ghost" onclick="reloadAmt('${r.id}')">Reload</button>
+            </div>
+            <div class="row-msg" id="msg_${r.id}"></div>
+          </div>`;
+        });
+      }
+      html += `</div>`;
+    });
+    c.innerHTML = html;
+  }
+
+  async function saveAmt(id) {
+    const msg = document.getElementById('msg_' + id);
+    const raw = document.getElementById('amt_' + id).value;
+    const val = raw === '' ? 0 : Number(raw);
+    if (isNaN(val) || val < 0) { msg.style.color = '#c0392b'; msg.innerText = 'Enter a positive number. Nothing saved.'; return; }
+    msg.style.color = '#1e3a8a'; msg.innerText = 'Saving…';
+    try {
+      const res = await fetch(`${INCAMT_URL}?id=eq.${id}`, { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify({ net_monthly: val }) });
+      if (!res.ok) throw new Error('PATCH → ' + res.status);
+      const fresh = await res.json();
+      if (fresh && fresh.length) { const i = amounts.findIndex(a => a.id === id); if (i >= 0) amounts[i] = fresh[0]; }
+      dirty[id] = false;
+      msg.style.color = '#065f46'; msg.innerText = '✓ Saved. Refresh the dashboard to apply.';
+      render();
+    } catch (e) { msg.style.color = '#c0392b'; msg.innerText = 'Save failed: ' + e.message; }
+  }
+
+  function reloadAmt(id) {
+    const a = amounts.find(x => x.id === id);
+    if (!a) return;
+    document.getElementById('amt_' + id).value = a.net_monthly != null ? a.net_monthly : '';
+    dirty[id] = false;
+    const msg = document.getElementById('msg_' + id); if (msg) msg.innerText = '';
+  }
+
+  window.addEventListener('beforeunload', (e) => { if (Object.values(dirty).some(Boolean)) { e.preventDefault(); e.returnValue = ''; } });
+
+  // ---------- Auth gate ----------
+  let started = false;
+  function startApp(session) {
+    authToken = session.access_token;
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.getElementById('appWrap').style.display = 'block';
+    document.getElementById('whoami').textContent = session.user && session.user.email ? session.user.email : '';
+    if (!started) { started = true; loadAll(); }
+  }
+  async function doLogin() {
+    const btn = document.getElementById('loginBtn');
+    const err = document.getElementById('loginErr');
+    err.textContent = '';
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPass').value;
+    if (!email || !password) { err.textContent = 'Enter your email and password.'; return; }
+    btn.disabled = true; btn.textContent = 'Signing in…';
+    try {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      startApp(data.session);
+    } catch (e) {
+      err.textContent = (e && e.message) ? e.message : 'Sign in failed.';
+      btn.disabled = false; btn.textContent = 'Sign in';
+    }
+  }
+  async function doLogout() { await sb.auth.signOut(); location.reload(); }
+  document.getElementById('loginPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+  (async () => { const { data } = await sb.auth.getSession(); if (data && data.session) startApp(data.session); })();
+</script>
+</body>
+</html>

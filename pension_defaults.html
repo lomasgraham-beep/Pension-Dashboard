@@ -33,6 +33,13 @@
   .tier-add { background:#fff; color:#2c7a7b; border:1px solid #b2dfdb; border-radius:8px; min-height:48px; padding:10px 18px; font-size:15px; font-weight:bold; cursor:pointer; }
   .tier-warn { color:#b45309; background:#fef3c7; border:1px solid #fcd34d; border-radius:6px; padding:8px 12px; font-size:14px; margin:8px 0; }
   .tier-msg { font-size:14px; font-weight:bold; margin-top:8px; min-height:18px; }
+  .inc-mgr { border-top:1px dashed #cbd5e1; margin-top:14px; padding-top:14px; }
+  .inc-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:8px 0; border-bottom:1px solid #f1f5f9; }
+  .inc-name { font-weight:600; color:#2c3e50; font-size:15px; }
+  .inc-meta { font-size:13px; color:#64748b; }
+  .inc-edit { margin-left:auto; background:#fff; color:#2c7a7b; border:1px solid #b2dfdb; border-radius:8px; min-height:40px; padding:6px 12px; font-size:14px; font-weight:600; cursor:pointer; }
+  .inc-del { background:#fff; color:#c0392b; border:1px solid #f0c4c4; border-radius:8px; min-height:40px; padding:6px 12px; font-size:14px; font-weight:600; cursor:pointer; }
+  .inc-add { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px; }
   .phase-row { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
   .phase-row .sub { font-size:14px; color:#64748b; margin-bottom:6px; }
   .btn { background:#3498db; color:#fff; border:none; padding:14px 24px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:16px; min-height:48px; }
@@ -83,7 +90,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: tierfix)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
+<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: stageE)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -147,8 +154,11 @@
   const TIERS_URL = `${SUPABASE_URL}/rest/v1/bd_working_tiers`;
   const PENSIONS_URL = `${SUPABASE_URL}/rest/v1/bd_pensions`;
   const CONTRIB_URL = `${SUPABASE_URL}/rest/v1/bd_pension_contributions`;
+  const INCSRC_URL = `${SUPABASE_URL}/rest/v1/bd_income_sources`;
+  const INCAMT_URL = `${SUPABASE_URL}/rest/v1/bd_income_amounts`;
   let p1Name = 'Graham', p2Name = null;
   let tiers = [], pensionsByMember = {}, contribRows = [], allMemberNames = [];
+  let incomeSources = [], incomeAmounts = [];
   const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${authToken || SUPABASE_KEY}`, "Content-Type": "application/json" });
   let authToken = null;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -246,14 +256,18 @@
   async function loadTiers() {
     const c = document.getElementById('tiersContainer');
     try {
-      const [tr, pr, cr] = await Promise.all([
+      const [tr, pr, cr, isr, iar] = await Promise.all([
         fetch(`${TIERS_URL}?order=member_name.asc,from_date.asc`, { headers: getHeaders() }),
         fetch(`${PENSIONS_URL}?order=member_name.asc,pension_name.asc`, { headers: getHeaders() }),
-        fetch(`${CONTRIB_URL}?order=member_name.asc`, { headers: getHeaders() })
+        fetch(`${CONTRIB_URL}?order=member_name.asc`, { headers: getHeaders() }),
+        fetch(`${INCSRC_URL}?order=member_name.asc,source_name.asc`, { headers: getHeaders() }),
+        fetch(`${INCAMT_URL}?order=member_name.asc`, { headers: getHeaders() })
       ]);
       tiers = tr.ok ? await tr.json() : [];
       const pens = pr.ok ? await pr.json() : [];
       contribRows = cr.ok ? await cr.json() : [];
+      incomeSources = isr.ok ? await isr.json() : [];
+      incomeAmounts = iar.ok ? await iar.json() : [];
       pensionsByMember = {};
       pens.forEach(p => { if (!pensionsByMember[p.member_name]) pensionsByMember[p.member_name] = []; pensionsByMember[p.member_name].push(p.pension_name); });
       renderTiers();
@@ -264,14 +278,22 @@
 
   async function refreshContribRows() {
     try {
-      const cr = await fetch(`${CONTRIB_URL}?order=member_name.asc`, { headers: getHeaders() });
-      contribRows = cr.ok ? await cr.json() : contribRows;
+      const [cr, iar] = await Promise.all([
+        fetch(`${CONTRIB_URL}?order=member_name.asc`, { headers: getHeaders() }),
+        fetch(`${INCAMT_URL}?order=member_name.asc`, { headers: getHeaders() })
+      ]);
+      if (cr.ok) contribRows = await cr.json();
+      if (iar.ok) incomeAmounts = await iar.json();
     } catch (e) { /* keep existing on failure */ }
   }
 
   // does a contribution row exist for this member+pension+days?
   function hasContrib(member, pension, days) {
     return contribRows.some(r => r.member_name === member && r.pension_name === pension && Number(r.working_days) === Number(days));
+  }
+  // does a salary row exist for this member+source+days?
+  function hasIncome(member, source, days) {
+    return incomeAmounts.some(r => r.member_name === member && r.source_name === source && Number(r.working_days) === Number(days));
   }
 
   function renderTiers() {
@@ -283,6 +305,7 @@
       const myTiers = tiers.filter(t => t.member_name === member).sort((a, b) => new Date(a.from_date) - new Date(b.from_date));
       const earliestId = myTiers.length ? myTiers[0].id : null;
       const myPensions = pensionsByMember[member] || [];
+      const mySources = (incomeSources || []).filter(s => s.member_name === member).map(s => s.source_name);
       html += `<div class="tier-member">
         <div style="display:flex; align-items:center; justify-content:space-between;">
           <h3>${member}</h3>
@@ -314,8 +337,30 @@
             ${myPensions.length ? myPensions.map(pn => `<label class="pen-chk"><input type="checkbox" ${dirty ? 'disabled' : ''} ${hasContrib(member, pn, t.days) ? 'checked' : ''} onchange="togglePension('${member.replace(/'/g, "\\'")}','${pn.replace(/'/g, "\\'")}',${t.days},this)"> ${pn}</label>`).join('') : '<span class="hint">No pensions for this member yet — add them on the Pensions tab.</span>'}
             </div>
           </div>
+          <div class="tier-pens">
+            <div class="lbl">Income sources active on this tier (ticking creates a salary row to fill in on the Workplace Income page):</div>
+            <div id="incwarn_${t.id}" class="tier-warn" style="display:${dirty ? 'block' : 'none'};">Save the tier's date/pattern above before choosing income sources.</div>
+            <div id="incbox_${t.id}" style="${dirty ? 'opacity:0.4;' : ''}">
+            ${mySources.length ? mySources.map(sn => `<label class="pen-chk"><input type="checkbox" ${dirty ? 'disabled' : ''} ${hasIncome(member, sn, t.days) ? 'checked' : ''} onchange="toggleIncome('${member.replace(/'/g, "\\'")}','${sn.replace(/'/g, "\\'")}',${t.days},this)"> ${sn}</label>`).join('') : '<span class="hint">No income sources yet — add one below.</span>'}
+            </div>
+          </div>
         </div>`;
       });
+      // income-source management for this member (define name + award %/month)
+      const memSources = (incomeSources || []).filter(s => s.member_name === member);
+      html += `<div class="inc-mgr">
+        <div class="lbl" style="font-weight:600; margin-bottom:8px;">Income sources for ${member}</div>
+        ${memSources.length ? memSources.map(s => `<div class="inc-row">
+            <span class="inc-name">${s.source_name}</span>
+            <span class="inc-meta">award ${(Number(s.award_pct) * 100).toFixed(s.award_pct * 100 % 1 ? 1 : 0)}% in ${MONTH_NAMES[(Number(s.award_month) || 4) - 1]}</span>
+            <button class="inc-edit" onclick="editIncomeSource('${s.id}')">Edit award</button>
+            <button class="inc-del" onclick="deleteIncomeSource('${s.id}','${(s.source_name || '').replace(/'/g, "\\'")}','${member.replace(/'/g, "\\'")}')">Delete</button>
+          </div>`).join('') : '<p class="hint" style="margin:4px 0;">None yet.</p>'}
+        <div class="inc-add">
+          <input type="text" id="newsrc_${member.replace(/[^a-zA-Z0-9]/g, '')}" placeholder="New income source name (e.g. Main salary)" style="min-width:240px;">
+          <button class="tier-add" onclick="addIncomeSource('${member.replace(/'/g, "\\'")}')">+ Add income source</button>
+        </div>
+      </div>`;
       html += '</div>';
     });
     c.innerHTML = html;
@@ -328,7 +373,7 @@
   }
 
   const tierDirty = {};   // tier id -> true when its days/date edited but not yet saved
-  function markTier(id) { if (id) { tierDirty[id] = true; const box = document.getElementById('penbox_' + id); if (box) { box.style.opacity = '0.4'; box.querySelectorAll('input').forEach(i => i.disabled = true); } const w = document.getElementById('penwarn_' + id); if (w) w.style.display = 'block'; } }
+  function markTier(id) { if (id) { tierDirty[id] = true; ['penbox_', 'incbox_'].forEach(pfx => { const box = document.getElementById(pfx + id); if (box) { box.style.opacity = '0.4'; box.querySelectorAll('input').forEach(i => i.disabled = true); } }); ['penwarn_', 'incwarn_'].forEach(pfx => { const w = document.getElementById(pfx + id); if (w) w.style.display = 'block'; }); } }
 
   async function addTier(member) {
     // default new tier: a sensible next-lower pattern, dated today
@@ -409,6 +454,84 @@
         contribRows = contribRows.filter(r => !(r.member_name === member && r.pension_name === pension && Number(r.working_days) === Number(days)));
       }
     } catch (e) { alert('Could not update pension: ' + e.message); el.checked = !checked; }
+    el.disabled = false;
+  }
+
+  // ---- Income sources (define name + award) ----
+  async function addIncomeSource(member) {
+    const key = member.replace(/[^a-zA-Z0-9]/g, '');
+    const input = document.getElementById('newsrc_' + key);
+    const name = (input && input.value || '').trim();
+    if (!name) { alert('Enter a name for the income source.'); return; }
+    if ((incomeSources || []).some(s => s.member_name === member && s.source_name.toLowerCase() === name.toLowerCase())) { alert('That income source already exists for ' + member + '.'); return; }
+    try {
+      const res = await fetch(INCSRC_URL, { method: 'POST', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify({ member_name: member, source_name: name, award_pct: 0.03, award_month: 4 }) });
+      if (!res.ok) throw new Error('POST → ' + res.status);
+      const created = await res.json();
+      if (created && created.length) incomeSources.push(created[0]);
+      renderTiers();
+    } catch (e) { alert('Could not add income source: ' + e.message); }
+  }
+
+  async function editIncomeSource(id) {
+    const s = incomeSources.find(x => x.id === id);
+    if (!s) return;
+    const pctStr = prompt(`Annual award increase for "${s.source_name}" as a percentage (e.g. 3 for 3%):`, String((Number(s.award_pct) * 100)));
+    if (pctStr === null) return;
+    const pct = parseFloat(pctStr);
+    if (isNaN(pct) || pct < 0 || pct > 100) { alert('Enter a percentage like 3.'); return; }
+    const moStr = prompt('Which month does the award apply? (1 = January … 12 = December):', String(s.award_month || 4));
+    if (moStr === null) return;
+    const mo = parseInt(moStr);
+    if (isNaN(mo) || mo < 1 || mo > 12) { alert('Enter a month number 1–12.'); return; }
+    try {
+      const res = await fetch(`${INCSRC_URL}?id=eq.${id}`, { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify({ award_pct: pct / 100, award_month: mo }) });
+      if (!res.ok) throw new Error('PATCH → ' + res.status);
+      const fresh = await res.json();
+      if (fresh && fresh.length) { const i = incomeSources.findIndex(x => x.id === id); if (i >= 0) incomeSources[i] = fresh[0]; }
+      renderTiers();
+    } catch (e) { alert('Could not update award: ' + e.message); }
+  }
+
+  async function deleteIncomeSource(id, name, member) {
+    const amts = incomeAmounts.filter(r => r.member_name === member && r.source_name === name);
+    const detail = amts.length ? `\n\nThis also deletes ${amts.length} salary row(s) for it.` : '';
+    if (!confirm(`Delete income source "${name}" for ${member}?${detail}\n\nThis can't be undone.`)) return;
+    try {
+      for (const r of amts) {
+        const dr = await fetch(`${INCAMT_URL}?id=eq.${r.id}`, { method: 'DELETE', headers: { ...getHeaders(), 'Prefer': 'return=representation' } });
+        if (!dr.ok) throw new Error('amount DELETE → ' + dr.status);
+      }
+      incomeAmounts = incomeAmounts.filter(r => !(r.member_name === member && r.source_name === name));
+      const res = await fetch(`${INCSRC_URL}?id=eq.${id}`, { method: 'DELETE', headers: { ...getHeaders(), 'Prefer': 'return=representation' } });
+      if (!res.ok) throw new Error('source DELETE → ' + res.status);
+      const removed = await res.json().catch(() => []);
+      if (!Array.isArray(removed) || removed.length === 0) throw new Error('the database reported no source was deleted (check the DELETE policy on bd_income_sources).');
+      incomeSources = incomeSources.filter(x => x.id !== id);
+      renderTiers();
+    } catch (e) { alert('Delete failed: ' + e.message); }
+  }
+
+  async function toggleIncome(member, source, days, el) {
+    const checked = el.checked;
+    el.disabled = true;
+    try {
+      if (checked) {
+        const payload = { member_name: member, source_name: source, working_days: days, net_monthly: 0 };
+        const res = await fetch(INCAMT_URL, { method: 'POST', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify(payload) });
+        if (!res.ok) throw new Error('POST → ' + res.status);
+        const created = await res.json();
+        if (created && created.length) incomeAmounts.push(created[0]);
+      } else {
+        const affected = incomeAmounts.filter(r => r.member_name === member && r.source_name === source && Number(r.working_days) === Number(days));
+        if (!confirm(`Remove ${source} from this tier? This deletes its ${dayLabel(days)} salary row for ${member}.`)) { el.checked = true; el.disabled = false; return; }
+        for (const r of affected) {
+          const dr = await fetch(`${INCAMT_URL}?id=eq.${r.id}`, { method: 'DELETE', headers: { ...getHeaders(), 'Prefer': 'return=representation' } });
+          if (!dr.ok) throw new Error('DELETE → ' + dr.status);
+        }
+        incomeAmounts = incomeAmounts.filter(r => !(r.member_name === member && r.source_name === source && Number(r.working_days) === Number(days)));
+      }
+    } catch (e) { alert('Could not update income source: ' + e.message); el.checked = !checked; }
     el.disabled = false;
   }
 

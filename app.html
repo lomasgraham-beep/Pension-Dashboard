@@ -343,6 +343,7 @@
       <button id="subbtn-Members" class="subtab-link active-sub" onclick="showSub(event,'Members')">Members</button>
       <button id="subbtn-Pensions" class="subtab-link" onclick="showSub(event,'Pensions')">Pensions</button>
       <button id="subbtn-Contributions" class="subtab-link" onclick="showSub(event,'Contributions')">Contributions</button>
+      <button id="subbtn-Income" class="subtab-link" onclick="showSub(event,'Income')">Workplace Income</button>
       <button id="subbtn-Guaranteed" class="subtab-link" onclick="showSub(event,'Guaranteed')">Guaranteed Incomes</button>
       <button id="subbtn-Defaults" class="subtab-link" onclick="showSub(event,'Defaults')">Defaults</button>
     </div>
@@ -350,6 +351,7 @@
     <div id="sub-Members" class="subtabcontent"><iframe id="frame-Members" class="app-frame" title="Members"></iframe></div>
     <div id="sub-Pensions" class="subtabcontent"><iframe id="frame-Pensions" class="app-frame" title="Pensions"></iframe></div>
     <div id="sub-Contributions" class="subtabcontent"><iframe id="frame-Contributions" class="app-frame" title="Contributions"></iframe></div>
+    <div id="sub-Income" class="subtabcontent"><iframe id="frame-Income" class="app-frame" title="Workplace Income"></iframe></div>
     <div id="sub-Guaranteed" class="subtabcontent"><iframe id="frame-Guaranteed" class="app-frame" title="Guaranteed Incomes"></iframe></div>
     <div id="sub-Defaults" class="subtabcontent"><iframe id="frame-Defaults" class="app-frame" title="Defaults"></iframe></div>
   </div>
@@ -357,7 +359,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-93</span>
+    <span class="build-stamp">build: LC-94</span>
   </div>
 
   <script>
@@ -868,8 +870,8 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err46';   // frame-file cache-buster: bump when any framed page changes
-    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
+    const FV = '?v=err47';   // frame-file cache-buster: bump when any framed page changes
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
       catch (e) { f.style.height = '1200px'; }
