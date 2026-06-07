@@ -90,7 +90,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: stageE)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
+<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: stageE2)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -251,6 +251,7 @@
 
   // ================= Working-days tiers =================
   const TIER_DAYS = [5, 4, 3, 2];
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   function dayLabel(d) { return d + '-day week'; }
 
   async function loadTiers() {
