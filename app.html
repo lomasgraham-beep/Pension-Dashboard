@@ -203,8 +203,18 @@
   
   /* ---- Automatic dark mode (follows device setting) ---- */
   @media (prefers-color-scheme: dark) {
-    html, body { background:#0f172a !important; color:#e2e8f0 !important; }
+    :root {
+      --accent:#5eead4; --accent-dark:#2dd4bf; --accent-soft:#134e4a; --accent-border:#334155;
+      --page:#0f172a; --surface:#1e293b; --surface-2:#162132;
+      --ink:#e2e8f0; --ink-soft:#94a3b8; --line:#334155; --line-strong:#475569;
+    }
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
     h1, h2, h3, h4 { color:#f1f5f9 !important; }
+    /* sliders: light track, bright thumb */
+    .params input[type=range] { background:#475569 !important; }
+    .params input[type=range]::-webkit-slider-thumb { border-color:#1e293b !important; }
+    .params .seg button { background:#1e293b !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    .params .switch .track { background:#475569 !important; }
     .panel, .tier-card, .tier-block, .login-card, .inc-mgr,
     [style*="background:#fff"], [style*="background: #fff"],
     [style*="background:#fcfdfe"], [style*="background:#fcffff"] {
@@ -221,22 +231,19 @@
     input::placeholder { color:#64748b !important; }
     table { color:#e2e8f0 !important; }
     th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
-    td { border-color:#334155 !important; color:#e2e8f0 !important; }
-    #rTable td, #rTable th, #rTable td * { color:#f1f5f9 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    #rTable td, #rTable th { color:#cbd5e1 !important; }
     /* re-apply accent colours on top, at higher specificity so they still show */
     #rTable td[style*="color:#2c7a7b"] { color:#5eead4 !important; }
     #rTable td[style*="color:#c0392b"] { color:#f87171 !important; }
     #rTable td[style*="color:#e67e22"] { color:#fbbf24 !important; }
-    #rTable td[style*="color:#2563eb"] { color:#60a5fa !important; }
+    #rTable td[style*="color:#2563eb"] { color:#7dd3fc !important; }
     #rTable td[style*="color:#27ae60"] { color:#4ade80 !important; }
     #rTable td[style*="color:#16a34a"] { color:#4ade80 !important; }
     tr:nth-child(even) td { background:rgba(255,255,255,0.02) !important; }
     th.det, td.det { background:#162132 !important; color:#94a3b8 !important; }
-    /* status / highlight rows — soft tints that keep text readable */
-    tr.tier-change td { background:#2a2410 !important; }
-    tr.retire-row td { background:#1a1d38 !important; }
-    tr.crash-row td { background:#2a1515 !important; }
-    tr.shortfall td { background:#2a1515 !important; }
+    /* in dark mode, don't tint highlight rows — the info icon flags crashes, keep rows uniform */
+    tr.tier-change td, tr.retire-row td, tr.crash-row td, tr.shortfall td { background:transparent !important; border-top-color:#334155 !important; }
     /* brighten ALL the meaningful accent figures so they read on dark */
     [style*="color:#2563eb"] { color:#60a5fa !important; }   /* loan - blue */
     [style*="color:#1e40af"], .tier-pill { color:#93c5fd !important; }
@@ -424,7 +431,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-106 (dark3)</span>
+    <span class="build-stamp">build: LC-107 (dark4)</span>
   </div>
 
   <script>
@@ -970,7 +977,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err56';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err57';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }

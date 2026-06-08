@@ -45,34 +45,34 @@
 
   /* ---- Automatic dark mode (follows device setting) ---- */
   @media (prefers-color-scheme: dark) {
-    html, body { background:#0f172a !important; color:#e2e8f0 !important; }
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
     h1, h2, h3, h4 { color:#f1f5f9 !important; }
-    .panel, .tier-card, .tier-block, .login-card, .inc-mgr,
+    .panel, .card, .login-box, .login-card, .tier-card, .tier-block,
+    .summary, .pot-card, .member-card, .filter-bar, .derived, .inc-mgr,
     [style*="background:#fff"], [style*="background: #fff"],
+    [style*="background:#f8fafc"], [style*="background:#f4f7f6"],
     [style*="background:#fcfdfe"], [style*="background:#fcffff"] {
       background:#1e293b !important; border-color:#334155 !important;
       box-shadow:0 2px 4px rgba(0,0,0,0.4) !important;
     }
-    .intro, .hint, .src-desc, .note, .sub, .inc-meta, .meta, .lbl,
+    .intro, .hint, .src-desc, .note, .sub, .subtitle, .inc-meta, .meta, .lbl,
     [style*="color:#64748b"], [style*="color:#475569"], [style*="color:#94a3b8"] { color:#94a3b8 !important; }
-    [style*="color:#2c3e50"], [style*="color:#1e3a8a"], [style*="color:#2c3e50"] { color:#e2e8f0 !important; }
+    [style*="color:#2c3e50"], [style*="color:#1e3a8a"] { color:#e2e8f0 !important; }
     label { color:#cbd5e1 !important; }
     input, select, textarea {
       background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important;
     }
     input::placeholder { color:#64748b !important; }
-    table { color:#e2e8f0 !important; }
+    table { color:#cbd5e1 !important; }
     th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
-    td { border-color:#334155 !important; color:#e2e8f0 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
     tr:nth-child(even) td { background:rgba(255,255,255,0.02) !important; }
     th.det, td.det { background:#162132 !important; color:#94a3b8 !important; }
-    /* status / highlight rows, kept tinted but dark */
-    tr.tier-change td { background:#2a2410 !important; }
-    tr.retire-row td { background:#1a1d38 !important; }
-    tr.crash-row td { background:#2a1515 !important; }
-    tr.shortfall td { background:#2a1515 !important; }
-    /* keep meaningful accent text readable on dark */
-    [style*="color:#2563eb"] { color:#60a5fa !important; }
+    .status-mixed { color:#a5b4fc !important; }
+    /* uniform rows in dark — info icons flag crashes, no row tint needed */
+    tr.tier-change td, tr.retire-row td, tr.crash-row td, tr.shortfall td { background:transparent !important; border-top-color:#334155 !important; }
+    /* brighten meaningful accent figures so they read on dark */
+    [style*="color:#2563eb"] { color:#7dd3fc !important; }
     [style*="color:#1e40af"], .tier-pill { color:#93c5fd !important; }
     [style*="color:#2c7a7b"] { color:#5eead4 !important; }
     [style*="color:#c0392b"] { color:#f87171 !important; }
@@ -80,9 +80,11 @@
     [style*="color:#27ae60"], [style*="color:#16a34a"] { color:#4ade80 !important; }
     #status.s-load, .s-load { background:#1e293b !important; color:#93c5fd !important; }
     #crashTip { background:#020617 !important; }
+    .crash-info { background:#dc2626 !important; color:#fff !important; }
     .topbar { color:#94a3b8 !important; }
     a, .topbar a { color:#60a5fa !important; }
   }
+
 
 </style>
 </head>
