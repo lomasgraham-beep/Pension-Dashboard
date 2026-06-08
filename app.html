@@ -221,19 +221,26 @@
     input::placeholder { color:#64748b !important; }
     table { color:#e2e8f0 !important; }
     th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
-    td { border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#e2e8f0 !important; }
     tr:nth-child(even) td { background:rgba(255,255,255,0.02) !important; }
     th.det, td.det { background:#162132 !important; color:#94a3b8 !important; }
-    /* status / highlight rows, kept tinted but dark */
-    tr.tier-change td { background:#3a2e12 !important; }
-    tr.retire-row td { background:#1e2147 !important; }
-    tr.crash-row td { background:#3a1a1a !important; }
-    tr.shortfall td { background:#3a1a1a !important; }
-    /* keep meaningful accent text readable on dark */
-    [style*="color:#2563eb"] { color:#60a5fa !important; }
+    /* status / highlight rows — soft tints that keep text readable */
+    tr.tier-change td { background:#2a2410 !important; }
+    tr.retire-row td { background:#1a1d38 !important; }
+    tr.crash-row td { background:#2a1515 !important; }
+    tr.shortfall td { background:#2a1515 !important; }
+    /* brighten ALL the meaningful accent figures so they read on dark */
+    [style*="color:#2563eb"] { color:#60a5fa !important; }   /* loan - blue */
     [style*="color:#1e40af"], .tier-pill { color:#93c5fd !important; }
+    [style*="color:#2c7a7b"] { color:#5eead4 !important; }   /* cash/savings - teal */
+    [style*="color:#c0392b"] { color:#f87171 !important; }   /* bills - red */
+    [style*="color:#e67e22"] { color:#fbbf24 !important; }   /* dining - amber */
+    [style*="color:#27ae60"], [style*="color:#16a34a"] { color:#4ade80 !important; } /* income/growth - green */
+    /* muted row text (the dim greys) lifted so months/labels stand out */
+    [style*="color:#94a3b8"], .muted, .dim { color:#cbd5e1 !important; }
     #status.s-load, .s-load { background:#1e293b !important; color:#93c5fd !important; }
     #crashTip { background:#020617 !important; }
+    .crash-info { background:#dc2626 !important; }
     .topbar { color:#94a3b8 !important; }
     a, .topbar a { color:#60a5fa !important; }
   }
@@ -409,7 +416,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-104 (dark)</span>
+    <span class="build-stamp">build: LC-105 (dark2)</span>
   </div>
 
   <script>
@@ -955,7 +962,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err55';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err56';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
