@@ -200,7 +200,45 @@
       /* let the action buttons share a row compactly */
       .params .actions .pbtn { flex:1 1 auto; }
     }
-  </style>
+  
+  /* ---- Automatic dark mode (follows device setting) ---- */
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#e2e8f0 !important; }
+    h1, h2, h3, h4 { color:#f1f5f9 !important; }
+    .panel, .tier-card, .tier-block, .login-card, .inc-mgr,
+    [style*="background:#fff"], [style*="background: #fff"],
+    [style*="background:#fcfdfe"], [style*="background:#fcffff"] {
+      background:#1e293b !important; border-color:#334155 !important;
+      box-shadow:0 2px 4px rgba(0,0,0,0.4) !important;
+    }
+    .intro, .hint, .src-desc, .note, .sub, .inc-meta, .meta, .lbl,
+    [style*="color:#64748b"], [style*="color:#475569"], [style*="color:#94a3b8"] { color:#94a3b8 !important; }
+    [style*="color:#2c3e50"], [style*="color:#1e3a8a"], [style*="color:#2c3e50"] { color:#e2e8f0 !important; }
+    label { color:#cbd5e1 !important; }
+    input, select, textarea {
+      background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important;
+    }
+    input::placeholder { color:#64748b !important; }
+    table { color:#e2e8f0 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; }
+    tr:nth-child(even) td { background:rgba(255,255,255,0.02) !important; }
+    th.det, td.det { background:#162132 !important; color:#94a3b8 !important; }
+    /* status / highlight rows, kept tinted but dark */
+    tr.tier-change td { background:#3a2e12 !important; }
+    tr.retire-row td { background:#1e2147 !important; }
+    tr.crash-row td { background:#3a1a1a !important; }
+    tr.shortfall td { background:#3a1a1a !important; }
+    /* keep meaningful accent text readable on dark */
+    [style*="color:#2563eb"] { color:#60a5fa !important; }
+    [style*="color:#1e40af"], .tier-pill { color:#93c5fd !important; }
+    #status.s-load, .s-load { background:#1e293b !important; color:#93c5fd !important; }
+    #crashTip { background:#020617 !important; }
+    .topbar { color:#94a3b8 !important; }
+    a, .topbar a { color:#60a5fa !important; }
+  }
+
+</style>
 </head>
 <body>
   <div class="topbar">
@@ -371,7 +409,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-103</span>
+    <span class="build-stamp">build: LC-104 (dark)</span>
   </div>
 
   <script>
@@ -917,7 +955,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err54';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err55';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
