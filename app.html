@@ -366,7 +366,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-99</span>
+    <span class="build-stamp">build: LC-100</span>
   </div>
 
   <script>
@@ -487,8 +487,8 @@
       tb.innerHTML = rowsToShow.map(r => {
         const v = vrow(r);
         const period = (retGran === 'month') ? r.label : r.year;
-        const tfGrow = retShowGrowth ? `<td class="grow-col" style="color:#16a34a;font-size:0.92em;">${fmt(v.tfG)}</td>` : '';
-        const txGrow = retShowGrowth ? `<td class="grow-col" style="color:#16a34a;font-size:0.92em;">${fmt(v.txG)}</td>` : '';
+        const tfGrow = retShowGrowth ? `<td class="grow-col" style="color:${v.tfG < 0 ? '#c0392b' : '#16a34a'};font-size:0.92em;">${fmt(v.tfG)}</td>` : '';
+        const txGrow = retShowGrowth ? `<td class="grow-col" style="color:${v.txG < 0 ? '#c0392b' : '#16a34a'};font-size:0.92em;">${fmt(v.txG)}</td>` : '';
         return `<tr class="${r.shortfall ? 'shortfall' : ''}">
           <td>${period}</td>
           <td>${fmt(v.tf)}</td>${tfGrow}<td>${fmt(v.tx)}</td>${txGrow}
