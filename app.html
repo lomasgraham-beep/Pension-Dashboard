@@ -66,7 +66,9 @@
     .toggle-switch::after { content:''; position:absolute; top:3px; left:3px; width:22px; height:22px; background:#fff; border-radius:50%; transition:left 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
     .toggle-switch:checked::after { left:23px; }
     tr.crash-row td { background:#fef2f2; }
-    .crash-info { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#dc2626; color:#fff; font-size:11px; font-weight:700; font-style:italic; font-family:Georgia,serif; margin-left:6px; cursor:help; vertical-align:middle; }
+    .crash-info { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; min-width:26px; border:none; border-radius:50%; background:#dc2626; color:#fff; font-size:14px; font-weight:700; font-style:italic; font-family:Georgia,serif; margin-left:6px; cursor:pointer; vertical-align:middle; padding:0; -webkit-tap-highlight-color:transparent; }
+    .crash-info:active { background:#991b1b; }
+    #crashTip { position:absolute; display:none; z-index:9999; background:#1e293b; color:#fff; font-size:13px; line-height:1.4; padding:10px 12px; border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,0.25); pointer-events:none; }
     #rTable th:first-child, #rTable td:first-child { white-space:nowrap; }
     #rTable { width:auto; }
     #rTable th { white-space:normal; vertical-align:bottom; line-height:1.2; text-align:center; }
@@ -369,7 +371,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-102</span>
+    <span class="build-stamp">build: LC-103</span>
   </div>
 
   <script>
@@ -480,6 +482,26 @@
     function setRetGran(g) { retGran = g; document.getElementById('rThPeriod').textContent = (g === 'month') ? 'Month' : 'Year'; renderRetirementTable(); }
 
     let retShowGrowth = false;
+    function showCrashTip(ev, text) {
+      ev.stopPropagation();
+      let tip = document.getElementById('crashTip');
+      if (!tip) { tip = document.createElement('div'); tip.id = 'crashTip'; document.body.appendChild(tip); }
+      tip.textContent = text;
+      tip.style.display = 'block';
+      const r = ev.currentTarget.getBoundingClientRect();
+      // position below the icon, kept within the viewport
+      const tw = Math.min(280, window.innerWidth - 20);
+      tip.style.maxWidth = tw + 'px';
+      let left = r.left + window.scrollX;
+      if (left + tw > window.scrollX + window.innerWidth - 10) left = window.scrollX + window.innerWidth - tw - 10;
+      tip.style.left = Math.max(window.scrollX + 10, left) + 'px';
+      tip.style.top = (r.bottom + window.scrollY + 6) + 'px';
+    }
+    function hideCrashTip() { const tip = document.getElementById('crashTip'); if (tip) tip.style.display = 'none'; }
+    // tapping anywhere else dismisses the popup (touch-friendly)
+    document.addEventListener('click', function (e) {
+      if (!e.target.classList || !e.target.classList.contains('crash-info')) hideCrashTip();
+    });
     function toggleRetGrowth() { retShowGrowth = document.getElementById('retGrowthToggle').checked; renderRetirementTable(); }
     function renderRetirementTable() {
       const tb = document.querySelector('#rTable tbody');
@@ -496,7 +518,8 @@
             : r.crash.phase === 'recovering' ? 'recovering'
             : 'falling';
           const tip = `Market crash — started ${r.crash.startLabel}; this ${retGran === 'month' ? 'month' : 'year'} the pots are ${phase}.`;
-          crashIcon = ` <span class="crash-info" tabindex="0" role="img" aria-label="${tip}" title="${tip}">i</span>`;
+          const safe = tip.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          crashIcon = ` <button type="button" class="crash-info" aria-label="${tip}" onclick="showCrashTip(event,'${safe}')" onmouseenter="showCrashTip(event,'${safe}')" onmouseleave="hideCrashTip()">i</button>`;
         }
         const tfGrow = retShowGrowth ? `<td class="grow-col" style="color:${v.tfG < 0 ? '#c0392b' : '#16a34a'};font-size:0.92em;">${fmt(v.tfG)}</td>` : '';
         const txGrow = retShowGrowth ? `<td class="grow-col" style="color:${v.txG < 0 ? '#c0392b' : '#16a34a'};font-size:0.92em;">${fmt(v.txG)}</td>` : '';
