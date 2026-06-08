@@ -311,11 +311,14 @@
       }
       return factor;
     }
-    // returns { name, phase } if a crash is active this month, else null
+    // returns { name, phase, startLabel } if a crash is active this month, else null
     function crashInfo(idx) {
       for (const c of crashes) {
-        if (idx >= c.startIdx && idx < c.startIdx + c.D) return { name: c.name, phase: 'falling' };
-        if (idx >= c.startIdx + c.D && idx < c.endIdx) return { name: c.name, phase: 'recovering' };
+        const troughIdx = c.startIdx + c.D;
+        const startLabel = MONTH_NAMES[c.startIdx % 12] + ' ' + Math.floor(c.startIdx / 12);
+        if (idx >= c.startIdx && idx < troughIdx - 1) return { name: c.name, phase: 'falling', startLabel: startLabel };
+        if (idx === troughIdx - 1) return { name: c.name, phase: 'trough', startLabel: startLabel };
+        if (idx >= troughIdx && idx < c.endIdx) return { name: c.name, phase: 'recovering', startLabel: startLabel };
       }
       return null;
     }
