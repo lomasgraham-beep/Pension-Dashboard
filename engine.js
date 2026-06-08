@@ -300,7 +300,7 @@
       const R = Math.max(1, Math.round(Number(c.recovery_months) || 1));
       const fallStep = Math.pow(1 - F, 1 / D);            // compounded over D months = (1-F)
       const recoverStep = F < 1 ? Math.pow(1 / (1 - F), 1 / R) : 1; // climbs (1-F) back to 1.0 over R months
-      return { startIdx, D, R, fallStep, recoverStep, endIdx: startIdx + D + R };
+      return { name: c.crash_name || 'Market crash', startIdx, D, R, fallStep, recoverStep, endIdx: startIdx + D + R };
     }).filter(Boolean);
     // returns the growth factor to use THIS month if a crash is active, else null (use normal growth)
     function crashFactor(idx) {
@@ -310,6 +310,14 @@
         else if (idx >= c.startIdx + c.D && idx < c.endIdx) { factor = (factor == null ? 1 : factor) * c.recoverStep; }
       }
       return factor;
+    }
+    // returns { name, phase } if a crash is active this month, else null
+    function crashInfo(idx) {
+      for (const c of crashes) {
+        if (idx >= c.startIdx && idx < c.startIdx + c.D) return { name: c.name, phase: 'falling' };
+        if (idx >= c.startIdx + c.D && idx < c.endIdx) return { name: c.name, phase: 'recovering' };
+      }
+      return null;
     }
 
     const taperFor = (row, oldest) => {
@@ -416,7 +424,7 @@
           outgoings: 0, billsTotal: 0, diningTotal: 0, gTarget: 0, jTarget: 0,
           taxFree: gTf + jTf, taxable: gTx + jTx,
           g_taxFree: gTf, g_taxable: gTx, j_taxFree: jTf, j_taxable: jTx,
-          g_tfGrowth: 0, g_txGrowth: 0, j_tfGrowth: 0, j_txGrowth: 0, tfGrowth: 0, txGrowth: 0,
+          g_tfGrowth: 0, g_txGrowth: 0, j_tfGrowth: 0, j_txGrowth: 0, tfGrowth: 0, txGrowth: 0, crash: null,
           stateGross: 0, otherPensions: 0, drawdown: 0,
           g_other: 0, j_other: 0, g_draw: 0, j_draw: 0, g_income: 0, j_income: 0, totalIncome: 0,
           combinedClosing: 0, g_closing: 0, j_closing: 0, shortfall: false,
@@ -534,6 +542,7 @@
         g_taxFree: oGTf, g_taxable: oGTx, j_taxFree: oJTf, j_taxable: oJTx,
         g_tfGrowth: gTfGrowth, g_txGrowth: gTxGrowth, j_tfGrowth: jTfGrowth, j_txGrowth: jTxGrowth,
         tfGrowth: gTfGrowth + jTfGrowth, txGrowth: gTxGrowth + jTxGrowth,
+        crash: crashInfo(idx),
         stateGross: mState, otherPensions: mOther, drawdown: gDraw + jDraw,
         g_other: gRes.inc.total, j_other: jRes.inc.total, g_draw: gDraw, j_draw: jDraw,
         g_income: gRes.inc.total + gDraw, j_income: jRes.inc.total + jDraw,
@@ -552,6 +561,7 @@
       acc.g_draw += gDraw; acc.j_draw += jDraw; acc.drawdown += gDraw + jDraw;
       acc.g_tfGrowth += gTfGrowth; acc.g_txGrowth += gTxGrowth; acc.j_tfGrowth += jTfGrowth; acc.j_txGrowth += jTxGrowth;
       acc.tfGrowth += gTfGrowth + jTfGrowth; acc.txGrowth += gTxGrowth + jTxGrowth;
+      { const ci = crashInfo(idx); if (ci && !acc.crash) acc.crash = ci; }
       acc.g_income += gRes.inc.total + gDraw; acc.j_income += jRes.inc.total + jDraw;
       acc.totalIncome += gRes.inc.total + jRes.inc.total + gDraw + jDraw;
       acc.combinedClosing = gTf + gTx + jTf + jTx;

@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=err2"></script>
-  <script src="engine.js?v=fcast4"></script>
+  <script src="engine.js?v=fcast5"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -65,6 +65,8 @@
     .toggle-switch:checked { background:#27ae60; }
     .toggle-switch::after { content:''; position:absolute; top:3px; left:3px; width:22px; height:22px; background:#fff; border-radius:50%; transition:left 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
     .toggle-switch:checked::after { left:23px; }
+    tr.crash-row td { background:#fef2f2; }
+    .crash-badge { display:inline-block; font-size:11px; font-weight:600; color:#991b1b; background:#fee2e2; padding:2px 8px; border-radius:999px; margin-left:8px; white-space:nowrap; }
     #rTable { width:auto; }
     #rTable th { white-space:normal; vertical-align:bottom; line-height:1.2; text-align:center; }
     #rTable td { white-space:nowrap; }
@@ -366,7 +368,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-100</span>
+    <span class="build-stamp">build: LC-101</span>
   </div>
 
   <script>
@@ -487,10 +489,11 @@
       tb.innerHTML = rowsToShow.map(r => {
         const v = vrow(r);
         const period = (retGran === 'month') ? r.label : r.year;
+        const crashBadge = r.crash ? ` <span class="crash-badge">${r.crash.name}${r.crash.phase === 'recovering' ? ' (recovering)' : ''}</span>` : '';
         const tfGrow = retShowGrowth ? `<td class="grow-col" style="color:${v.tfG < 0 ? '#c0392b' : '#16a34a'};font-size:0.92em;">${fmt(v.tfG)}</td>` : '';
         const txGrow = retShowGrowth ? `<td class="grow-col" style="color:${v.txG < 0 ? '#c0392b' : '#16a34a'};font-size:0.92em;">${fmt(v.txG)}</td>` : '';
-        return `<tr class="${r.shortfall ? 'shortfall' : ''}">
-          <td>${period}</td>
+        return `<tr class="${r.shortfall ? 'shortfall' : ''}${r.crash ? ' crash-row' : ''}">
+          <td>${period}${crashBadge}</td>
           <td>${fmt(v.tf)}</td>${tfGrow}<td>${fmt(v.tx)}</td>${txGrow}
           <td style="color:#2c7a7b;">${fmt(r.cashBalance || 0)}</td>
           <td>${fmt(v.other)}</td>
@@ -883,7 +886,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err52';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err53';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
