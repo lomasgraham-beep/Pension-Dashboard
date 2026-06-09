@@ -118,6 +118,7 @@
     .params .ctrl > label { min-height:2.6em; }   /* reserve 2 lines so sliders align even when a label wraps */
     .params .ctrl > label.switch { min-height:0; }
     .params .ctrl-note { justify-content:center; }
+    .sp-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px 26px; }
     .params .ctrl-note > label { min-height:0; }
     .params .ctrl-note .note { font-size:13px; color:var(--ink-soft); line-height:1.4; }
     .params .sv { color:var(--accent); font-weight:bold; font-size:15px; }
@@ -347,10 +348,12 @@
         </div>
         <div class="ctrl ctrl-wide" style="border-top:1px solid var(--line); padding-top:14px; margin-top:4px;">
           <label style="font-weight:bold; color:var(--ink); display:block; margin-bottom:10px;">State Pension Risk <span style="font-weight:normal; font-size:12px; color:var(--ink-soft);">— what-if only, never saved</span></label>
-          <div class="ctrl"><label>Uprating rate (triple lock) <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
-            <div class="hint">Annual rise on the State Pension. Default 2.5%. Drag down for the triple lock weakened, capped, or frozen (0%).</div></div>
-          <div class="ctrl"><label>Claim delay <span id="m_spdelay_v" class="sv">0 yrs</span></label><input type="range" id="m_spdelay" min="0" max="10" step="1" value="0" oninput="onParam()">
-            <div class="hint">Years the State Pension age rises, delaying both of you equally.</div></div>
+          <div class="sp-grid">
+            <div class="ctrl"><label>Uprating rate (triple lock) <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
+              <div class="hint">Annual rise on the State Pension. Default 2.5%. Drag down for the triple lock weakened, capped, or frozen (0%).</div></div>
+            <div class="ctrl"><label>Claim delay <span id="m_spdelay_v" class="sv">0 yrs</span></label><input type="range" id="m_spdelay" min="0" max="10" step="1" value="0" oninput="onParam()">
+              <div class="hint">Years the State Pension age rises, delaying both of you equally.</div></div>
+          </div>
         </div>
       </div>
       <div class="actions">
@@ -434,7 +437,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-121 (sp-sliders)</span>
+    <span class="build-stamp">build: LC-122</span>
   </div>
 
   <script>
