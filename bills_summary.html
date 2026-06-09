@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Summary of Household Bills</title>
-<script src="common.js?v=err65"></script>
+<script src="common.js?v=err66"></script>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:980px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
@@ -37,7 +37,7 @@
 </head>
 <body>
   <h1>Summary of Household Bills</h1>
-  <p class="note">Bills grouped by category, and the monthly cost spread across a typical year. Monthly bills spread evenly; weekly bills as ~4.33&times; per month; annual bills land fully in their chosen month. <span style="color:#94a3b8;">(summary build: v1)</span></p>
+  <p class="note">Bills grouped by category, and the monthly cost spread across a typical year. Monthly bills spread evenly; weekly bills as ~4.33&times; per month; annual bills land fully in their chosen month. <span style="color:#94a3b8;">(summary build: v2)</span></p>
   <div id="status">Loading…</div>
 
   <div class="panel" id="chartPanel" style="display:none;">
@@ -57,8 +57,12 @@
   const PALETTE = ['#3498db','#27ae60','#e67e22','#9b59b6','#e74c3c','#1abc9c','#f1c40f','#34495e','#e84393','#00cec9','#6c5ce7','#fab1a0'];
 
   let chartsLib = false;
-  google.charts.load('current', { packages: ['corechart'] });
-  google.charts.setOnLoadCallback(() => { chartsLib = true; });
+  try {
+    if (window.google && google.charts) {
+      google.charts.load('current', { packages: ['corechart'] });
+      google.charts.setOnLoadCallback(() => { chartsLib = true; });
+    }
+  } catch (e) { /* charts unavailable — the table still renders */ }
 
   function annualOf(premium, frequency) {
     const p = Number(premium) || 0;
@@ -105,10 +109,13 @@
       });
 
       renderTable(cats, annualByCat, grandAnnual, colorFor);
-      renderChart(cats, monthCat, colorFor);
       status.style.display = 'none';
-      document.getElementById('chartPanel').style.display = 'block';
       document.getElementById('tablePanel').style.display = 'block';
+      // chart is best-effort: never let it block the page
+      try {
+        document.getElementById('chartPanel').style.display = 'block';
+        renderChart(cats, monthCat, colorFor, 0);
+      } catch (e) { document.getElementById('chartPanel').style.display = 'none'; }
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
 
@@ -124,8 +131,11 @@
       '<tr class="total-row"><td>Total</td><td>' + fmt(grand) + '</td><td>' + fmt(grand / 12) + '</td><td>100%</td></tr>';
   }
 
-  function renderChart(cats, monthCat, colorFor) {
-    if (!chartsLib) { setTimeout(() => renderChart(cats, monthCat, colorFor), 200); return; }
+  function renderChart(cats, monthCat, colorFor, tries) {
+    if (!chartsLib) {
+      if ((tries || 0) > 25) { document.getElementById('chartPanel').style.display = 'none'; return; }   // give up after ~5s
+      setTimeout(() => renderChart(cats, monthCat, colorFor, (tries || 0) + 1), 200); return;
+    }
     const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const header = ['Month'].concat(cats);
     const rows = MONTHS.map((mn, i) => [mn].concat(cats.map(c => Math.round(monthCat[i][c]))));
