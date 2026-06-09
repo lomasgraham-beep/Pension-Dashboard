@@ -310,8 +310,9 @@
         principalBase: Number(a.start_balance) || 0      // base for simple interest
       };
     });
-    function totalCash() { return savingsAccts.reduce((s, a) => s + a.bal, 0); }
-    function instantCash() { return savingsAccts.reduce((s, a) => s + (a.instant ? a.bal : 0), 0); }
+    let gapSurplusPot = 0;   // Stage F: holds gap surplus when there are no instant-access accounts to receive it
+    function totalCash() { return savingsAccts.reduce((s, a) => s + a.bal, 0) + gapSurplusPot; }
+    function instantCash() { return savingsAccts.reduce((s, a) => s + (a.instant ? a.bal : 0), 0) + gapSurplusPot; }
     let cashBal = totalCash();   // kept for compatibility with existing per-row reporting
     // precompute purchases: month index of deposit, the deposit, and the monthly payment over its term
     const purchases = (data.purchases || []).map(p => {
@@ -566,6 +567,24 @@
         gTargetM = 0; jTargetM = shortfall;                     // retired p2 draws only the shortfall
       } else {
         gTargetM = 0; jTargetM = 0;                             // neither retired (shouldn't occur)
+      }
+
+      // Stage F: surplus salary (pay above household costs) flows into instant-access savings.
+      if (gapSurplus > 0) {
+        const instAvail = savingsAccts.reduce((s, a) => s + (a.instant ? a.bal : 0), 0);
+        const instAccts = savingsAccts.filter(a => a.instant);
+        if (instAccts.length > 0 && instAvail > 0) {
+          // proportional to current instant balances
+          for (const a of instAccts) { a.bal += gapSurplus * (a.bal / instAvail); a.principalBase += gapSurplus * (a.bal / instAvail); }
+        } else if (instAccts.length > 0) {
+          // instant accounts exist but all empty -> split evenly
+          const each = gapSurplus / instAccts.length;
+          for (const a of instAccts) { a.bal += each; a.principalBase += each; }
+        } else {
+          // no instant-access account -> hold in the fallback pot so it isn't lost
+          gapSurplusPot += gapSurplus;
+        }
+        cashBal = totalCash();   // reflect the deposit in the reported balance
       }
 
       // opening pots for THIS month (before drawdown)
