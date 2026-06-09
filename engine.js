@@ -224,6 +224,33 @@
     const rd = cfg.retirementDate || new Date(cfg.startYear, 0, 1);
     const startIdx = rd.getFullYear() * 12 + rd.getMonth();
 
+    // ---- Stage F groundwork: per-member retirement dates + salary data ----
+    // Per-member retirement month-indices. Fall back to the single `rd` (equal-date case),
+    // so when both retire together these equal startIdx and nothing below changes.
+    const rbm = cfg.retireByMember || {};
+    const p1RetIdx = (p1Name && rbm[p1Name]) ? (rbm[p1Name].getFullYear() * 12 + rbm[p1Name].getMonth()) : startIdx;
+    const p2RetIdx = (p2Name && rbm[p2Name]) ? (rbm[p2Name].getFullYear() * 12 + rbm[p2Name].getMonth()) : startIdx;
+    // Earliest retirement (where the drawdown era will eventually begin once F is active).
+    const earliestRetIdx = Math.min(p1RetIdx, p2RetIdx);
+    // Salary lookup: net monthly for a member at a given working-days tier, grown by award % since now.
+    const fIncomeSources = data.incomeSources || [];
+    const fIncomeAmounts = data.incomeAmounts || [];
+    function salaryFor(member, tierDays, idx) {
+      if (member == null || tierDays == null) return 0;
+      const amt = fIncomeAmounts.find(a => a.member_name === member && Number(a.working_days) === Number(tierDays));
+      if (!amt) return 0;
+      const src = fIncomeSources.find(s => s.member_name === member && s.source_name === amt.source_name);
+      const awardPct = src ? (Number(src.award_pct) || 0) : 0;
+      const awardMonth = src ? (Number(src.award_month) || 4) : 4;
+      // count award anniversaries between now and idx
+      let rises = 0;
+      const nm = new Date(); const startCount = nm.getFullYear() * 12 + nm.getMonth();
+      for (let k = startCount + 1; k <= idx; k++) { if ((k % 12) === ((awardMonth - 1) % 12)) rises++; }
+      return (Number(amt.net_monthly) || 0) * Math.pow(1 + awardPct, rises);
+    }
+    // NOTE: p1RetIdx/p2RetIdx/earliestRetIdx/salaryFor are not yet used to change behaviour.
+    // F-increment 2+ will start the loop at earliestRetIdx and apply gap logic.
+
     // The state pension figure is stored as TODAY'S value, so it must be grown from
     // now all the way to the claim date — i.e. an extra span on top of "elapsed since
     // retirement". This is that head-start span, in years, from this month to retirement.
