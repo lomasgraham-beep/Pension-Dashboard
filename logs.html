@@ -28,6 +28,13 @@
   th,td { padding:9px 10px; border-bottom:1px solid #e2e8f0; text-align:left; }
   th { background:#f8fafc; color:#2c3e50; }
   .contrib-badge { display:inline-block; background:#dbeafe; color:#1e40af; font-size:11px; font-weight:bold; padding:2px 7px; border-radius:10px; margin-left:6px; }
+  .log-edit, .log-del { border:none; border-radius:6px; padding:7px 12px; font-size:13px; font-weight:bold; cursor:pointer; min-height:36px; }
+  .log-edit { background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; }
+  .log-del { background:#fff5f5; color:#c0392b; border:1px solid #f5c6cb; }
+  @media (prefers-color-scheme: dark) {
+    .log-edit { background:#1e293b !important; color:#93c5fd !important; border-color:#334155 !important; }
+    .log-del { background:#3a1a1a !important; color:#f87171 !important; border-color:#7f1d1d !important; }
+  }
   .msg { font-weight:bold; margin-top:12px; }
   #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
@@ -97,7 +104,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
 
-  <h2>Log New Balances <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(logs build: tiers)</span></h2>
+  <h2>Log New Balances <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(logs build: edit)</span></h2>
   <div class="form-group"><label>Whose accounts are you updating?</label><select id="logMember" onchange="renderInputs()"></select></div>
   <div class="form-group"><label>Date</label><input type="date" id="entryDate"></div>
   <div id="inputs"></div>
@@ -111,7 +118,7 @@
     <div><label>Specific Date</label><input type="date" id="hDate" onchange="renderHistory()"></div>
     <button class="btn btn-clear" onclick="clearFilters()">Clear Filters</button>
   </div>
-  <table id="hTable"><thead><tr><th>Date</th><th>Member</th><th>Pension Name</th><th>Logged Value</th></tr></thead><tbody><tr><td colspan="4">Loading…</td></tr></tbody></table>
+  <table id="hTable"><thead><tr><th>Date</th><th>Member</th><th>Pension Name</th><th>Logged Value</th><th></th></tr></thead><tbody><tr><td colspan="5">Loading…</td></tr></tbody></table>
 
 <script>
   const fmt = App.fmt;
@@ -180,7 +187,7 @@
     try {
       await App.write('POST', 'op_pension_logs', payloads);
       msg.style.color = '#065f46'; msg.textContent = '✓ Saved ' + payloads.length + ' balance(s).';
-      allLogs = await App.rest('op_pension_logs?order=log_date.desc'); renderHistory();
+      allLogs = await App.rest('op_pension_logs?order=log_date.desc'); renderHistory(); notifyParent();
     } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
   }
 
@@ -189,13 +196,43 @@
     const mf = document.getElementById('hMember').value, pf = document.getElementById('hPension').value, df = document.getElementById('hDate').value;
     let data = allLogs.filter(l => (mf === 'All' || l.member_name === mf) && (pf === 'All' || l.pension_name === pf) && (!df || l.log_date === df));
     data = data.slice().sort((a, b) => new Date(b.log_date) - new Date(a.log_date));
-    if (!data.length) { tbody.innerHTML = '<tr><td colspan="4">No logs match.</td></tr>'; return; }
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="5">No logs match.</td></tr>'; return; }
     tbody.innerHTML = data.map(l => {
       const d = new Date(l.log_date), uk = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
       let badge = '';
       if (l.contribution_applied) { const c = getExpectedContribution(l); badge = c > 0 ? `<span class="contrib-badge">+${fmt(c)} contrib</span>` : '<span class="contrib-badge">+ contrib</span>'; }
-      return `<tr><td>${uk}</td><td>${l.member_name}</td><td>${l.pension_name}</td><td style="font-weight:bold;">${fmt(l.pot_value)} ${badge}</td></tr>`;
+      return `<tr><td>${uk}</td><td>${l.member_name}</td><td>${l.pension_name}</td><td style="font-weight:bold;">${fmt(l.pot_value)} ${badge}</td>` +
+        `<td style="text-align:right; white-space:nowrap;"><button class="log-edit" onclick="editLog('${l.id}')">Edit</button> <button class="log-del" onclick="deleteLog('${l.id}')">Delete</button></td></tr>`;
     }).join('');
+  }
+
+  function notifyParent() { try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {} }
+
+  async function editLog(id) {
+    const l = allLogs.find(x => String(x.id) === String(id));
+    if (!l) return;
+    const cur = l.pot_value != null ? l.pot_value : 0;
+    const entry = prompt(`Edit ${l.member_name} — ${l.pension_name} value (£):`, cur);
+    if (entry === null) return;                       // cancelled
+    const val = parseFloat(String(entry).replace(/[,£\s]/g, ''));
+    if (isNaN(val) || val < 0) { alert('Please enter a valid number.'); return; }
+    try {
+      await App.write('PATCH', 'op_pension_logs?id=eq.' + encodeURIComponent(id), { pot_value: val });
+      allLogs = await App.rest('op_pension_logs?order=log_date.desc');
+      renderHistory(); notifyParent();
+    } catch (e) { alert('Could not save the change: ' + e.message); }
+  }
+
+  async function deleteLog(id) {
+    const l = allLogs.find(x => String(x.id) === String(id));
+    if (!l) return;
+    const d = new Date(l.log_date), uk = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
+    if (!confirm(`Delete this log?\n\n${l.member_name} — ${l.pension_name}\n${fmt(l.pot_value)} on ${uk}\n\nThis cannot be undone.`)) return;
+    try {
+      await App.write('DELETE', 'op_pension_logs?id=eq.' + encodeURIComponent(id));
+      allLogs = await App.rest('op_pension_logs?order=log_date.desc');
+      renderHistory(); notifyParent();
+    } catch (e) { alert('Could not delete: ' + e.message); }
   }
 
   function clearFilters() { document.getElementById('hMember').value = 'All'; document.getElementById('hPension').value = 'All'; document.getElementById('hDate').value = ''; renderHistory(); }
