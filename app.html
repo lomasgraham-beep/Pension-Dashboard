@@ -333,10 +333,10 @@
           <div class="hint">Annual rise on the State Pension. Default 2.5%. Drag down for the triple lock weakened, capped, or frozen (0%). <span style="color:var(--ink-soft);">What-if only, never saved.</span></div></div>
         <!-- Row 2 -->
         <div class="ctrl"><label>Spending in retirement <span id="m_spend_v" class="sv">100%</span></label><input type="range" id="m_spend" min="25" max="100" step="1" value="100" oninput="onParam()"></div>
+        <div class="ctrl" id="ctrlRatio"><label><span class="nm-p1">Graham</span> drawdown ratio <span id="m_ratio_v" class="sv">50%</span></label><input type="range" id="m_ratio" min="0" max="100" step="1" value="50" oninput="onParam()"></div>
         <div class="ctrl phone-hide"><label>Drop to 4-day week <span id="m_p1date_v" class="sv">—</span></label><input type="range" id="m_p1date" min="0" max="120" step="1" value="0" oninput="onParam()">
           <div class="seg" id="m_p1days_seg" data-target="m_p1days"><button type="button" data-v="5">5 days</button><button type="button" data-v="4">4 days</button><button type="button" data-v="3">3 days</button></div>
           <input type="hidden" id="m_p1days" value="4"></div>
-        <div class="ctrl" id="ctrlRatio"><label><span class="nm-p1">Graham</span> drawdown ratio <span id="m_ratio_v" class="sv">50%</span></label><input type="range" id="m_ratio" min="0" max="100" step="1" value="50" oninput="onParam()"></div>
         <div class="ctrl"><label>Delay state pension <span id="m_spdelay_v" class="sv">0 yrs</span></label><input type="range" id="m_spdelay" min="0" max="10" step="1" value="0" oninput="onParam()">
           <div class="hint">Years the State Pension age rises, delaying both of you equally.</div></div>
         <!-- Dynamic model mode (full width, floors on one line) -->
@@ -432,7 +432,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-125</span>
+    <span class="build-stamp">build: LC-126</span>
   </div>
 
   <script>
