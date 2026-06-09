@@ -286,7 +286,6 @@
     <option value="Retirement">Retirement</option>
     <option value="Logs">Log Entry</option>
     <option value="LivingCosts">Living Costs</option>
-    <option value="ScenarioLab">Scenario Lab</option>
     <option value="BasicData">Basic Data</option>
   </select>
   <div class="tab-buttons">
@@ -299,7 +298,6 @@
     <button class="tab-link" onclick="showTab(event,'Retirement')">Retirement</button>
     <button class="tab-link" onclick="showTab(event,'Logs')">Log Entry</button>
     <button class="tab-link" onclick="showTab(event,'LivingCosts')">Living Costs</button>
-    <button class="tab-link" onclick="showTab(event,'ScenarioLab')">Scenario Lab</button>
     <button class="tab-link" onclick="showTab(event,'BasicData')">Basic Data</button>
   </div>
 
@@ -346,6 +344,13 @@
             <div class="ctrl" id="ctrlJFloor"><label><span class="nm-p2">Julie</span> floor <span id="m_jfloor_v" class="sv">20%</span></label><input type="range" id="m_jfloor" min="0" max="90" step="1" value="20" oninput="onParam()"></div>
             <div class="hint">% of each taxable pot's value at retirement.</div>
           </div>
+        </div>
+        <div class="ctrl ctrl-wide" style="border-top:1px solid var(--line); padding-top:14px; margin-top:4px;">
+          <label style="font-weight:bold; color:var(--ink); display:block; margin-bottom:10px;">State Pension Risk <span style="font-weight:normal; font-size:12px; color:var(--ink-soft);">— what-if only, never saved</span></label>
+          <div class="ctrl"><label>Uprating rate (triple lock) <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
+            <div class="hint">Annual rise on the State Pension. Default 2.5%. Drag down for the triple lock weakened, capped, or frozen (0%).</div></div>
+          <div class="ctrl"><label>Claim delay <span id="m_spdelay_v" class="sv">0 yrs</span></label><input type="range" id="m_spdelay" min="0" max="10" step="1" value="0" oninput="onParam()">
+            <div class="hint">Years the State Pension age rises, delaying both of you equally.</div></div>
         </div>
       </div>
       <div class="actions">
@@ -407,10 +412,6 @@
     <div id="sub-Dining" class="subtabcontent"><iframe id="frame-Dining" class="app-frame" title="Dining"></iframe></div>
   </div>
 
-  <div id="ScenarioLab" class="tabcontent">
-    <p class="note">Live what-if modelling — nothing here is saved. Use the tabs above to return.</p>
-    <iframe id="frame-lab" class="app-frame" title="Scenario Lab"></iframe>
-  </div>
 
   <div id="BasicData" class="tabcontent">
     <div class="subtab-buttons">
@@ -433,7 +434,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-120</span>
+    <span class="build-stamp">build: LC-121 (sp-sliders)</span>
   </div>
 
   <script>
@@ -897,7 +898,9 @@
         gRatio: p2Name ? (parseFloat(document.getElementById('m_ratio').value) / 100) : 1,
         dynamic: document.getElementById('m_dynamic').checked,
         gFloorPct: (parseFloat(document.getElementById('m_gfloor').value) || 0) / 100,
-        jFloorPct: (parseFloat(document.getElementById('m_jfloor').value) || 0) / 100
+        jFloorPct: (parseFloat(document.getElementById('m_jfloor').value) || 0) / 100,
+        spRate: parseFloat(document.getElementById('m_sprate').value) / 100,
+        spDelay: parseInt(document.getElementById('m_spdelay').value) || 0
       };
     }
     function applyControls(plan) {
@@ -911,6 +914,9 @@
       document.getElementById('m_ratio').value = Math.round(plan.gRatio * 100);
       document.getElementById('m_gfloor').value = Math.round((plan.gFloorPct != null ? plan.gFloorPct : 0.25) * 100);
       document.getElementById('m_jfloor').value = Math.round((plan.jFloorPct != null ? plan.jFloorPct : 0.20) * 100);
+      // State Pension Risk sliders are what-if only — always reset to baseline (2.5% uprating, 0 delay)
+      document.getElementById('m_sprate').value = 2.5;
+      document.getElementById('m_spdelay').value = 0;
       syncLabels();
     }
     function syncLabels() {
@@ -922,6 +928,9 @@
       document.getElementById('m_ratio_v').textContent = document.getElementById('m_ratio').value + '%';
       document.getElementById('m_gfloor_v').textContent = document.getElementById('m_gfloor').value + '%';
       document.getElementById('m_jfloor_v').textContent = document.getElementById('m_jfloor').value + '%';
+      document.getElementById('m_sprate_v').textContent = parseFloat(document.getElementById('m_sprate').value).toFixed(1) + '%';
+      const dly = parseInt(document.getElementById('m_spdelay').value) || 0;
+      document.getElementById('m_spdelay_v').textContent = dly + (dly === 1 ? ' yr' : ' yrs');
     }
     function toggleInfo(evt, id) { evt.preventDefault(); const el = document.getElementById(id); if (el) el.classList.toggle('show'); }
     function onParam() { syncLabels(); document.getElementById('m_floors').classList.toggle('show', document.getElementById('m_dynamic').checked); recomputeAll(); }
@@ -972,13 +981,19 @@
         ? { graham: js.potsAtOwnRetire.p1 * calib.g, julie: js.potsAtOwnRetire.p2 * calib.j }
         : livePots;
       const startYr = plan.retirementDate ? plan.retirementDate.getFullYear() : new Date().getFullYear();
+      const sp = PensionEngine.baselineSP(stateNames);
+      if (plan.spRate != null) sp.spRate = plan.spRate;
+      const dly = plan.spDelay || 0;
+      sp.spDelay = {};
+      if (p1Name) sp.spDelay[p1Name] = dly;
+      if (p2Name) sp.spDelay[p2Name] = dly;
       drawdownRows = PensionEngine.drawdown(data, {
         pots: livePots, potsAtOwnRetire: ownRetirePots,
         gRatio: plan.gRatio, spendRed: plan.spendRed,
         startYear: startYr, retirementDate: plan.retirementDate,
         retireByMember: plan.retireByMember || null,
         dynamic: plan.dynamic, gFloorPct: plan.gFloorPct, jFloorPct: plan.jFloorPct,
-        sp: PensionEngine.baselineSP(stateNames)
+        sp: sp
       });
       renderOverview();
       renderRetirementTable();
@@ -1055,7 +1070,6 @@
       if (id === 'Forecast') { ensureFrame('frame-forecast', 'forecast.html' + FV); pingFrame('frame-forecast'); }
       if (id === 'Logs') ensureFrame('frame-logs', 'logs.html' + FV);
       if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Bills'); }
-      if (id === 'ScenarioLab') ensureFrame('frame-lab', 'state_pension_scenario_lab.html' + FV);
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
     }
 
