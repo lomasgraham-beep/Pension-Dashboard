@@ -5,7 +5,7 @@
 <title>Summary of Household Bills</title>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=err69"></script>
+<script src="common.js?v=err70"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:980px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin-bottom:2px; }
@@ -21,6 +21,10 @@
   #chart { width:100%; height:460px; }
   #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
   .s-err { background:#fdecea !important; color:#c0392b !important; }
+  .seg-control { display:inline-flex; border:1px solid #cbd5e1; border-radius:10px; overflow:hidden; margin-bottom:18px; }
+  .seg-btn { border:none; background:#fff; color:#475569; font-size:15px; font-weight:600; padding:12px 22px; min-height:48px; cursor:pointer; border-right:1px solid #e2e8f0; }
+  .seg-btn:last-child { border-right:none; }
+  .seg-btn.active { background:#3498db; color:#fff; }
 
   /* ---- Automatic dark mode (follows device setting) ---- */
   @media (prefers-color-scheme: dark) {
@@ -33,13 +37,23 @@
     td { border-color:#334155 !important; color:#cbd5e1 !important; }
     tr.total-row td { color:#f1f5f9 !important; border-top-color:#475569 !important; }
     #status { background:#1e293b !important; color:#93c5fd !important; }
+    .seg-control { border-color:#334155 !important; }
+    .seg-btn { background:#1e293b !important; color:#cbd5e1 !important; border-right-color:#334155 !important; }
+    .seg-btn.active { background:#2563eb !important; color:#fff !important; }
   }
 </style>
 </head>
 <body>
   <h1>Summary of Household Bills</h1>
-  <p class="note">Bills grouped by category, and the monthly cost spread across a typical year. Monthly bills spread evenly; weekly bills as ~4.33&times; per month; annual bills land fully in their chosen month. <span style="color:#94a3b8;">(summary build: v5)</span></p>
+  <p class="note">Bills grouped by category, and the monthly cost spread across a typical year. Monthly bills spread evenly; weekly bills as ~4.33&times; per month; annual bills land fully in their chosen month. <span style="color:#94a3b8;">(summary build: v6)</span></p>
   <div id="status">Loading…</div>
+
+  <div id="ageBar" class="seg-control" style="display:none;">
+    <button class="seg-btn active" data-age="0" onclick="setAge(0,this)">Now</button>
+    <button class="seg-btn" data-age="70" onclick="setAge(70,this)">At 70</button>
+    <button class="seg-btn" data-age="80" onclick="setAge(80,this)">At 80</button>
+    <button class="seg-btn" data-age="90" onclick="setAge(90,this)">At 90</button>
+  </div>
 
   <div class="panel" id="chartPanel" style="display:none;">
     <h2>Monthly cost by category</h2>
@@ -65,6 +79,17 @@
     }
   } catch (e) { /* charts unavailable — the table still renders */ }
 
+  let allBills = [];
+  let currentAge = 0;   // 0 = Now; 70/80/90 = taper ages
+
+  // taper factor for a bill at the selected age — matches the engine's taperFor
+  function taperFor(bill, age) {
+    if (age >= 90) return bill.taper_at_90 != null ? Number(bill.taper_at_90) : 1.0;
+    if (age >= 80) return bill.taper_at_80 != null ? Number(bill.taper_at_80) : 1.0;
+    if (age >= 70) return bill.taper_at_70 != null ? Number(bill.taper_at_70) : 1.0;
+    return 1.0;   // "Now" — no taper
+  }
+
   function annualOf(premium, frequency) {
     const p = Number(premium) || 0;
     if (frequency === 'Weekly') return p * 52;
@@ -73,9 +98,10 @@
     return p * 12;
   }
 
-  // monthly amount this bill contributes to a given calendar month (1-12)
-  function monthlyContribution(bill, month) {
-    const p = Number(bill.premium) || 0;
+  // monthly amount this bill contributes to a given calendar month (1-12), tapered for the age
+  function monthlyContribution(bill, month, age) {
+    const t = taperFor(bill, age);
+    const p = (Number(bill.premium) || 0) * t;
     if (bill.frequency === 'Monthly') return p;                 // every month
     if (bill.frequency === 'Weekly') return p * 52 / 12;        // ~4.33 weeks/month
     if (bill.frequency === 'Annual') {
@@ -87,38 +113,46 @@
     return p;   // fallback treat as monthly
   }
 
+  function setAge(age, btn) {
+    currentAge = age;
+    document.querySelectorAll('#ageBar .seg-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    rebuild();
+  }
+
+  function rebuild() {
+    const bills = allBills;
+    if (!bills.length) return;
+    const cats = [...new Set(bills.map(b => b.category_code || 'Uncategorised'))].sort();
+    const colorFor = {}; cats.forEach((c, i) => colorFor[c] = PALETTE[i % PALETTE.length]);
+
+    // annual totals per category (tapered)
+    const annualByCat = {}; cats.forEach(c => annualByCat[c] = 0);
+    bills.forEach(b => { annualByCat[(b.category_code || 'Uncategorised')] += annualOf(b.premium, b.frequency) * taperFor(b, currentAge); });
+    const grandAnnual = Object.values(annualByCat).reduce((s, v) => s + v, 0);
+
+    // monthly matrix: month x category (tapered)
+    const monthCat = MONTHS.map(() => { const o = {}; cats.forEach(c => o[c] = 0); return o; });
+    bills.forEach(b => {
+      const cat = b.category_code || 'Uncategorised';
+      for (let m = 1; m <= 12; m++) monthCat[m - 1][cat] += monthlyContribution(b, m, currentAge);
+    });
+
+    renderTable(cats, annualByCat, grandAnnual, colorFor);
+    try { document.getElementById('chartPanel').style.display = 'block'; renderChart(cats, monthCat, colorFor, 0); }
+    catch (e) { document.getElementById('chartPanel').style.display = 'none'; }
+  }
+
   async function load() {
     const status = document.getElementById('status');
     try {
       status.textContent = 'Loading… (fetching bills)';
-      const bills = await App.rest('bd_household_bills?order=bill_name.asc');
-      status.textContent = 'Loading… (got ' + (bills ? bills.length : 0) + ' bills, building summary)';
-      if (!bills || !bills.length) { status.textContent = 'No bills found. Add some on the Household Bills tab.'; return; }
-
-      // categories (stable order)
-      const cats = [...new Set(bills.map(b => b.category_code || 'Uncategorised'))].sort();
-      const colorFor = {}; cats.forEach((c, i) => colorFor[c] = PALETTE[i % PALETTE.length]);
-
-      // annual totals per category
-      const annualByCat = {}; cats.forEach(c => annualByCat[c] = 0);
-      bills.forEach(b => { annualByCat[(b.category_code || 'Uncategorised')] += annualOf(b.premium, b.frequency); });
-      const grandAnnual = Object.values(annualByCat).reduce((s, v) => s + v, 0);
-
-      // monthly matrix: month x category
-      const monthCat = MONTHS.map(() => { const o = {}; cats.forEach(c => o[c] = 0); return o; });
-      bills.forEach(b => {
-        const cat = b.category_code || 'Uncategorised';
-        for (let m = 1; m <= 12; m++) monthCat[m - 1][cat] += monthlyContribution(b, m);
-      });
-
-      renderTable(cats, annualByCat, grandAnnual, colorFor);
+      allBills = await App.rest('bd_household_bills?order=bill_name.asc');
+      if (!allBills || !allBills.length) { status.textContent = 'No bills found. Add some on the Household Bills tab.'; return; }
       status.style.display = 'none';
+      document.getElementById('ageBar').style.display = 'inline-flex';
       document.getElementById('tablePanel').style.display = 'block';
-      // chart is best-effort: never let it block the page
-      try {
-        document.getElementById('chartPanel').style.display = 'block';
-        renderChart(cats, monthCat, colorFor, 0);
-      } catch (e) { document.getElementById('chartPanel').style.display = 'none'; }
+      rebuild();
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
 
