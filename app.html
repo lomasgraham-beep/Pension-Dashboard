@@ -108,11 +108,11 @@
       .tab-buttons button.active-btn { border-bottom:none; background:var(--accent); color:#fff; }
       .tab-buttons button.active-btn:hover { background:var(--accent-dark); color:#fff; }
       .shell .tabcontent { flex:1 1 auto; min-width:0; border-radius:var(--radius); border:1px solid var(--line); border-top:1px solid var(--line); }
-      .params .grid { grid-template-columns:repeat(4, 1fr); }
     }
     .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
     .params { background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:16px 18px; margin:0 0 14px; }
     .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:18px 26px; }
+    @media (min-width: 1000px) { .params .grid { grid-template-columns:repeat(4, 1fr); } }
     .params .ctrl-wide { grid-column:1 / -1; }
     .params label { display:block; font-weight:bold; font-size:14px; color:var(--ink); margin-bottom:8px; }
     .params .ctrl { display:flex; flex-direction:column; }
@@ -432,7 +432,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-124 (modelling-layout)</span>
+    <span class="build-stamp">build: LC-125</span>
   </div>
 
   <script>
