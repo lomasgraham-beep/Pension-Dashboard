@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bill Categories</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err70"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:760px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  .addbar { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:8px; }
+  .addbar label { display:block; font-weight:bold; font-size:13px; color:#475569; margin-bottom:5px; }
+  input[type=text] { padding:11px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:15px; box-sizing:border-box; }
+  .btn { border:none; border-radius:8px; padding:12px 18px; font-size:15px; font-weight:bold; cursor:pointer; min-height:48px; }
+  .btn-add { background:#27ae60; color:#fff; }
+  .btn-del { background:#fff5f5; color:#c0392b; border:1px solid #f5c6cb; padding:8px 14px; min-height:0; font-size:14px; }
+  table { border-collapse:collapse; width:100%; margin-top:6px; }
+  th, td { padding:10px 12px; border-bottom:1px solid #e2e8f0; text-align:left; }
+  th { background:#f8fafc; color:#475569; font-size:14px; }
+  .inuse { color:#64748b; font-size:13px; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+  .s-ok { background:#d1fae5 !important; color:#065f46 !important; }
+
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1, h2, h3 { color:#f1f5f9 !important; }
+    .panel { background:#1e293b !important; border-color:#334155 !important; box-shadow:0 2px 4px rgba(0,0,0,0.4) !important; }
+    .note, .inuse { color:#94a3b8 !important; }
+    .addbar label { color:#cbd5e1 !important; }
+    input[type=text] { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    .btn-del { background:#3a1a1a !important; color:#f87171 !important; border-color:#7f1d1d !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Bill Categories</h1>
+  <p class="note">Manage the category codes used by Household Bills. Add a category here first, then it becomes available in the bills dropdown. <span style="color:#94a3b8;">(categories build: v1)</span></p>
+  <div id="status">Loading…</div>
+
+  <div class="panel" id="panel" style="display:none;">
+    <div class="addbar">
+      <div style="flex:1; min-width:140px;">
+        <label>New category code</label>
+        <input type="text" id="newCode" placeholder="e.g. TRAVEL" style="width:100%;" maxlength="40">
+      </div>
+      <div style="flex:2; min-width:180px;">
+        <label>Description</label>
+        <input type="text" id="newDesc" placeholder="e.g. Holidays &amp; travel" style="width:100%;" maxlength="120">
+      </div>
+      <button class="btn btn-add" onclick="addCat()">+ Add category</button>
+    </div>
+    <p class="inuse" id="addHint">Short codes work best (they appear in the bills table and summary). The description is a friendly label.</p>
+    <table id="catTable"><thead><tr><th>Code</th><th>Description</th><th>In use by</th><th></th></tr></thead><tbody></tbody></table>
+  </div>
+
+<script>
+  let cats = [], usage = {};
+
+  function notify() { try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {} }
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      const [catRows, bills] = await Promise.all([
+        App.rest('bd_bill_category?order=code.asc'),
+        App.rest('bd_household_bills?select=category_code')
+      ]);
+      cats = (catRows || []).map(c => ({ code: c.code, description: c.description || '' }));
+      usage = {};
+      (bills || []).forEach(b => { if (b.category_code) usage[b.category_code] = (usage[b.category_code] || 0) + 1; });
+      status.style.display = 'none';
+      document.getElementById('panel').style.display = 'block';
+      renderRows();
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  function renderRows() {
+    const tb = document.querySelector('#catTable tbody');
+    if (!cats.length) { tb.innerHTML = '<tr><td colspan="4" style="color:#94a3b8;">No categories yet — add one above.</td></tr>'; return; }
+    tb.innerHTML = cats.map(c => {
+      const code = c.code;
+      const n = usage[code] || 0;
+      const useText = n === 0 ? 'not used' : n + (n === 1 ? ' bill' : ' bills');
+      const delBtn = n === 0
+        ? '<button class="btn-del" onclick="delCat(\'' + encodeURIComponent(code) + '\')">Delete</button>'
+        : '<span class="inuse">in use — can\'t delete</span>';
+      return '<tr><td><strong>' + code + '</strong></td><td>' + (c.description || '') + '</td><td class="inuse">' + useText + '</td><td style="text-align:right;">' + delBtn + '</td></tr>';
+    }).join('');
+  }
+
+  async function addCat() {
+    const status = document.getElementById('status');
+    const box = document.getElementById('newCode');
+    const descBox = document.getElementById('newDesc');
+    const code = (box.value || '').trim();
+    const desc = (descBox.value || '').trim();
+    if (!code) { box.focus(); return; }
+    if (!desc) { status.style.display = 'block'; status.className = 's-err'; status.textContent = 'Please enter a description.'; descBox.focus(); return; }
+    if (cats.some(c => c.code.toLowerCase() === code.toLowerCase())) { status.style.display = 'block'; status.className = 's-err'; status.textContent = 'That category already exists.'; return; }
+    try {
+      await App.write('POST', 'bd_bill_category', { code: code, description: desc });
+      box.value = ''; descBox.value = '';
+      status.style.display = 'block'; status.className = 's-ok'; status.textContent = '✓ Added “' + code + '”.';
+      notify();
+      await load();
+    } catch (e) { status.style.display = 'block'; status.className = 's-err'; status.textContent = 'Add failed: ' + e.message; }
+  }
+
+  async function delCat(encCode) {
+    const code = decodeURIComponent(encCode);
+    if (!confirm('Delete category “' + code + '”?')) return;
+    const status = document.getElementById('status');
+    try {
+      await App.write('DELETE', 'bd_bill_category?code=eq.' + encodeURIComponent(code));
+      status.style.display = 'block'; status.className = 's-ok'; status.textContent = '✓ Deleted “' + code + '”.';
+      notify();
+      await load();
+    } catch (e) { status.style.display = 'block'; status.className = 's-err'; status.textContent = 'Delete failed: ' + e.message; }
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  App.requireLogin(load, { title: 'Bill Categories' });
+</script>
+</body>
+</html>

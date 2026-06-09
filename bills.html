@@ -75,7 +75,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: month)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: cats)</span></p>
   <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -121,7 +121,7 @@
     };
   })();
 
-  let rows = [], dirty = false, deleted = [];
+  let rows = [], dirty = false, deleted = [], categoryCodes = [];
   const tbody = document.querySelector('#tbl tbody');
   const fmt = App.fmt;
   const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
@@ -135,16 +135,17 @@
     return 0;
   }
 
-  // Build the <option>s for a row's category dropdown from the live category list.
+  // Build the <option>s for a row's category dropdown from the category table.
   function catOptions(selected) {
     const cats = allCategories();
     let opts = cats.map(c => '<option' + (c === selected ? ' selected' : '') + '>' + c.replace(/"/g, '&quot;') + '</option>').join('');
     // if the row's current category isn't in the known list (legacy/odd value), include it so it isn't lost
     if (selected && cats.indexOf(selected) < 0) opts = '<option selected>' + selected.replace(/"/g, '&quot;') + '</option>' + opts;
-    opts += '<option value="__new__">+ New category\u2026</option>';
     return opts;
   }
   function allCategories() {
+    // prefer the managed category table; fall back to codes already used on bills
+    if (categoryCodes && categoryCodes.length) return categoryCodes.slice().sort();
     return [...new Set(rows.map(r => r.category_code).filter(c => c))].sort();
   }
 
@@ -155,8 +156,7 @@
     const monthOpt = m => '<option value="">\u2014</option>' + MONTHS.map((nm, k) => '<option value="' + (k + 1) + '"' + (Number(r.bill_month) === (k + 1) ? ' selected' : '') + '>' + nm + '</option>').join('');
     return '<tr data-i="' + i + '">' +
       '<td><input type="text" class="f-name" value="' + esc(r.bill_name) + '" oninput="mark()"></td>' +
-      '<td><select class="f-cat" onchange="catChanged(this)" style="min-width:120px;">' + catOptions(r.category_code) + '</select>' +
-        '<input type="text" class="f-cat-new" placeholder="New category" style="display:none; margin-top:5px; min-width:120px;" oninput="mark()"></td>' +
+      '<td><select class="f-cat" onchange="mark()" style="min-width:120px;">' + catOptions(r.category_code) + '</select></td>' +
       '<td><input type="number" class="f-premium" step="1" value="' + (r.premium != null ? r.premium : 0) + '" oninput="rowCalc(this)"></td>' +
       '<td><select class="f-freq" onchange="rowCalc(this)">' + freqOpt(r.frequency) + '</select></td>' +
       '<td class="annual-cell" style="font-weight:bold; color:var(--accent-dark);">' + fmt(annualOf(r.premium, r.frequency)) + '</td>' +
@@ -166,14 +166,6 @@
       '<td><input type="number" class="f-t80 taper" step="0.05" min="0" max="1" value="' + (r.taper_at_80 != null ? r.taper_at_80 : 1) + '" oninput="mark()"></td>' +
       '<td><input type="number" class="f-t90 taper" step="0.05" min="0" max="1" value="' + (r.taper_at_90 != null ? r.taper_at_90 : 1) + '" oninput="mark()"></td>' +
       '<td><button class="del" onclick="delRow(this)">Delete</button></td></tr>';
-  }
-
-  // Show/hide the "new category" textbox when the dropdown is set to "+ New category…"
-  function catChanged(sel) {
-    const newBox = sel.parentElement.querySelector('.f-cat-new');
-    if (sel.value === '__new__') { newBox.style.display = 'block'; newBox.focus(); }
-    else { newBox.style.display = 'none'; }
-    mark();
   }
 
   // Live-update one row's annual cell when premium/frequency changes (no full re-render → keeps focus).
@@ -189,9 +181,7 @@
     tbody.querySelectorAll('tr[data-i]').forEach(tr => {
       const i = Number(tr.dataset.i); if (!rows[i]) return;
       rows[i].bill_name = tr.querySelector('.f-name').value.trim();
-      const catSel = tr.querySelector('.f-cat');
-      if (catSel.value === '__new__') { rows[i].category_code = tr.querySelector('.f-cat-new').value.trim() || null; }
-      else { rows[i].category_code = catSel.value.trim() || null; }
+      rows[i].category_code = tr.querySelector('.f-cat').value.trim() || null;
       rows[i].premium = Math.round(parseFloat(tr.querySelector('.f-premium').value) || 0);
       rows[i].frequency = tr.querySelector('.f-freq').value;
       const mv = tr.querySelector('.f-month').value;
@@ -266,6 +256,7 @@
     const status = document.getElementById('status');
     try {
       rows = await App.rest('bd_household_bills?order=category_code.asc,bill_name.asc');
+      try { const cc = await App.rest('bd_bill_category?order=code.asc'); categoryCodes = (cc || []).map(c => c.code); } catch (e) { categoryCodes = []; }
       deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
       populateCatFilter(); render(); status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
