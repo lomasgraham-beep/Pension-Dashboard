@@ -399,9 +399,11 @@
   <div id="LivingCosts" class="tabcontent">
     <div class="subtab-buttons">
       <button id="subbtn-Bills" class="subtab-link active-sub" onclick="showSub(event,'Bills')">Household Bills</button>
+      <button id="subbtn-BillsSummary" class="subtab-link" onclick="showSub(event,'BillsSummary')">Summary of Household Bills</button>
       <button id="subbtn-Dining" class="subtab-link" onclick="showSub(event,'Dining')">Dining</button>
     </div>
     <div id="sub-Bills" class="subtabcontent"><iframe id="frame-Bills" class="app-frame" title="Household Bills"></iframe></div>
+    <div id="sub-BillsSummary" class="subtabcontent"><iframe id="frame-BillsSummary" class="app-frame" title="Summary of Household Bills"></iframe></div>
     <div id="sub-Dining" class="subtabcontent"><iframe id="frame-Dining" class="app-frame" title="Dining"></iframe></div>
   </div>
 
@@ -431,7 +433,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-114 (F-done)</span>
+    <span class="build-stamp">build: LC-115 (bills-summary)</span>
   </div>
 
   <script>
@@ -984,8 +986,8 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err64';   // frame-file cache-buster: bump when any framed page changes
-    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
+    const FV = '?v=err65';   // frame-file cache-buster: bump when any framed page changes
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', BillsSummary:'bills_summary.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
       catch (e) { f.style.height = '1200px'; }

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Summary of Household Bills</title>
+<script src="common.js?v=err65"></script>
+<script src="https://www.gstatic.com/charts/loader.js"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:980px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  h2 { color:#2c3e50; font-size:18px; margin:0 0 12px; }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:9px 14px; border-bottom:1px solid #e2e8f0; text-align:right; }
+  th:first-child, td:first-child { text-align:left; }
+  th { background:#f8fafc; color:#475569; font-size:14px; }
+  tr.total-row td { font-weight:bold; border-top:2px solid #cbd5e1; color:#2c3e50; }
+  .swatch { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:8px; vertical-align:middle; }
+  #chart { width:100%; height:460px; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+
+  /* ---- Automatic dark mode (follows device setting) ---- */
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1, h2, h3, h4 { color:#f1f5f9 !important; }
+    .panel { background:#1e293b !important; border-color:#334155 !important; box-shadow:0 2px 4px rgba(0,0,0,0.4) !important; }
+    .note { color:#94a3b8 !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    tr.total-row td { color:#f1f5f9 !important; border-top-color:#475569 !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Summary of Household Bills</h1>
+  <p class="note">Bills grouped by category, and the monthly cost spread across a typical year. Monthly bills spread evenly; weekly bills as ~4.33&times; per month; annual bills land fully in their chosen month. <span style="color:#94a3b8;">(summary build: v1)</span></p>
+  <div id="status">Loading…</div>
+
+  <div class="panel" id="chartPanel" style="display:none;">
+    <h2>Monthly cost by category</h2>
+    <div id="chart"></div>
+  </div>
+
+  <div class="panel" id="tablePanel" style="display:none;">
+    <h2>Annual cost by category</h2>
+    <table id="catTable"><thead><tr><th>Category</th><th>Annual £</th><th>Monthly avg £</th><th>% of total</th></tr></thead><tbody></tbody></table>
+  </div>
+
+<script>
+  const fmt = App.fmt;
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // a steady palette; categories beyond this cycle round
+  const PALETTE = ['#3498db','#27ae60','#e67e22','#9b59b6','#e74c3c','#1abc9c','#f1c40f','#34495e','#e84393','#00cec9','#6c5ce7','#fab1a0'];
+
+  let chartsLib = false;
+  google.charts.load('current', { packages: ['corechart'] });
+  google.charts.setOnLoadCallback(() => { chartsLib = true; });
+
+  function annualOf(premium, frequency) {
+    const p = Number(premium) || 0;
+    if (frequency === 'Weekly') return p * 52;
+    if (frequency === 'Monthly') return p * 12;
+    if (frequency === 'Annual') return p * 1;
+    return p * 12;
+  }
+
+  // monthly amount this bill contributes to a given calendar month (1-12)
+  function monthlyContribution(bill, month) {
+    const p = Number(bill.premium) || 0;
+    if (bill.frequency === 'Monthly') return p;                 // every month
+    if (bill.frequency === 'Weekly') return p * 52 / 12;        // ~4.33 weeks/month
+    if (bill.frequency === 'Annual') {
+      const m = Number(bill.bill_month);
+      // if no month set, spread the annual cost evenly so it isn't hidden
+      if (!m || m < 1 || m > 12) return (p) / 12;
+      return month === m ? p : 0;
+    }
+    return p;   // fallback treat as monthly
+  }
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      const bills = await App.rest('bd_household_bills?order=category_code.asc');
+      if (!bills || !bills.length) { status.textContent = 'No bills found. Add some on the Household Bills tab.'; return; }
+
+      // categories (stable order)
+      const cats = [...new Set(bills.map(b => b.category_code || 'Uncategorised'))].sort();
+      const colorFor = {}; cats.forEach((c, i) => colorFor[c] = PALETTE[i % PALETTE.length]);
+
+      // annual totals per category
+      const annualByCat = {}; cats.forEach(c => annualByCat[c] = 0);
+      bills.forEach(b => { annualByCat[(b.category_code || 'Uncategorised')] += annualOf(b.premium, b.frequency); });
+      const grandAnnual = Object.values(annualByCat).reduce((s, v) => s + v, 0);
+
+      // monthly matrix: month x category
+      const monthCat = MONTHS.map(() => { const o = {}; cats.forEach(c => o[c] = 0); return o; });
+      bills.forEach(b => {
+        const cat = b.category_code || 'Uncategorised';
+        for (let m = 1; m <= 12; m++) monthCat[m - 1][cat] += monthlyContribution(b, m);
+      });
+
+      renderTable(cats, annualByCat, grandAnnual, colorFor);
+      renderChart(cats, monthCat, colorFor);
+      status.style.display = 'none';
+      document.getElementById('chartPanel').style.display = 'block';
+      document.getElementById('tablePanel').style.display = 'block';
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  function renderTable(cats, annualByCat, grand, colorFor) {
+    const tb = document.querySelector('#catTable tbody');
+    const ordered = cats.slice().sort((a, b) => annualByCat[b] - annualByCat[a]);
+    tb.innerHTML = ordered.map(c => {
+      const a = annualByCat[c];
+      const pct = grand > 0 ? (a / grand * 100) : 0;
+      return '<tr><td><span class="swatch" style="background:' + colorFor[c] + '"></span>' + c + '</td>' +
+        '<td>' + fmt(a) + '</td><td>' + fmt(a / 12) + '</td><td>' + pct.toFixed(1) + '%</td></tr>';
+    }).join('') +
+      '<tr class="total-row"><td>Total</td><td>' + fmt(grand) + '</td><td>' + fmt(grand / 12) + '</td><td>100%</td></tr>';
+  }
+
+  function renderChart(cats, monthCat, colorFor) {
+    if (!chartsLib) { setTimeout(() => renderChart(cats, monthCat, colorFor), 200); return; }
+    const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const header = ['Month'].concat(cats);
+    const rows = MONTHS.map((mn, i) => [mn].concat(cats.map(c => Math.round(monthCat[i][c]))));
+    const dt = google.visualization.arrayToDataTable([header].concat(rows));
+    const colors = cats.map(c => colorFor[c]);
+    const txt = dark ? '#cbd5e1' : '#333';
+    const grid = dark ? '#334155' : '#e2e8f0';
+    new google.visualization.ColumnChart(document.getElementById('chart')).draw(dt, {
+      isStacked: true,
+      colors: colors,
+      backgroundColor: 'transparent',
+      legend: { position: 'top', maxLines: 3, textStyle: { color: txt, fontSize: 12 } },
+      chartArea: { left: 70, top: 60, width: '85%', height: '70%' },
+      hAxis: { textStyle: { color: txt }, gridlines: { color: grid } },
+      vAxis: { textStyle: { color: txt }, gridlines: { color: grid }, format: '£#,###', title: 'Cost per month (£)', titleTextStyle: { color: txt } },
+      tooltip: { isHtml: false }
+    });
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  App.requireLogin(load, { title: 'Summary of Household Bills' });
+</script>
+</body>
+</html>

@@ -75,7 +75,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: edit-4)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: month)</span></p>
   <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -88,7 +88,7 @@
     <select id="filterCat" onchange="render()" style="padding:8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px;"><option value="All">All categories</option></select>
   </div>
   <table id="tbl">
-    <thead><tr><th>Bill Name</th><th>Category</th><th>Premium &pound;</th><th>Frequency</th><th>Annual &pound;</th><th>Reduce?</th><th>Taper 70</th><th>Taper 80</th><th>Taper 90</th><th></th></tr></thead>
+    <thead><tr><th>Bill Name</th><th>Category</th><th>Premium &pound;</th><th>Frequency</th><th>Annual &pound;</th><th>Month<br><span style="font-weight:normal;font-size:11px;">(annual only)</span></th><th>Reduce?</th><th>Taper 70</th><th>Taper 80</th><th>Taper 90</th><th></th></tr></thead>
     <tbody><tr><td colspan="10">Loading&hellip;</td></tr></tbody>
   </table>
   <div class="proj" id="proj"></div>
@@ -151,6 +151,8 @@
   function rowHtml(r, i) {
     const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
     const freqOpt = f => ['Annual', 'Monthly', 'Weekly'].map(o => '<option' + (r.frequency === o ? ' selected' : '') + '>' + o + '</option>').join('');
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const monthOpt = m => '<option value="">\u2014</option>' + MONTHS.map((nm, k) => '<option value="' + (k + 1) + '"' + (Number(r.bill_month) === (k + 1) ? ' selected' : '') + '>' + nm + '</option>').join('');
     return '<tr data-i="' + i + '">' +
       '<td><input type="text" class="f-name" value="' + esc(r.bill_name) + '" oninput="mark()"></td>' +
       '<td><select class="f-cat" onchange="catChanged(this)" style="min-width:120px;">' + catOptions(r.category_code) + '</select>' +
@@ -158,6 +160,7 @@
       '<td><input type="number" class="f-premium" step="1" value="' + (r.premium != null ? r.premium : 0) + '" oninput="rowCalc(this)"></td>' +
       '<td><select class="f-freq" onchange="rowCalc(this)">' + freqOpt(r.frequency) + '</select></td>' +
       '<td class="annual-cell" style="font-weight:bold; color:var(--accent-dark);">' + fmt(annualOf(r.premium, r.frequency)) + '</td>' +
+      '<td><select class="f-month" onchange="mark()" title="Month an annual bill is paid">' + monthOpt(r.bill_month) + '</select></td>' +
       '<td style="text-align:center;"><input type="checkbox" class="f-red" ' + (r.spend_reduction ? 'checked' : '') + ' onchange="mark()" style="width:auto;"></td>' +
       '<td><input type="number" class="f-t70 taper" step="0.05" min="0" max="1" value="' + (r.taper_at_70 != null ? r.taper_at_70 : 1) + '" oninput="mark()"></td>' +
       '<td><input type="number" class="f-t80 taper" step="0.05" min="0" max="1" value="' + (r.taper_at_80 != null ? r.taper_at_80 : 1) + '" oninput="mark()"></td>' +
@@ -191,6 +194,8 @@
       else { rows[i].category_code = catSel.value.trim() || null; }
       rows[i].premium = Math.round(parseFloat(tr.querySelector('.f-premium').value) || 0);
       rows[i].frequency = tr.querySelector('.f-freq').value;
+      const mv = tr.querySelector('.f-month').value;
+      rows[i].bill_month = mv === '' ? null : parseInt(mv);
       rows[i].spend_reduction = tr.querySelector('.f-red').checked;
       rows[i].taper_at_70 = parseFloat(tr.querySelector('.f-t70').value);
       rows[i].taper_at_80 = parseFloat(tr.querySelector('.f-t80').value);
@@ -246,7 +251,7 @@
       for (const id of deleted) await App.write('DELETE', 'bd_household_bills?id=eq.' + id, undefined);
       for (const r of rows) {
         // total_annual is a GENERATED column — never write it; the DB computes it from premium + frequency
-        const payload = { bill_name: r.bill_name, category_code: r.category_code, premium: r.premium, frequency: r.frequency, spend_reduction: r.spend_reduction, taper_at_70: r.taper_at_70, taper_at_80: r.taper_at_80, taper_at_90: r.taper_at_90 };
+        const payload = { bill_name: r.bill_name, category_code: r.category_code, premium: r.premium, frequency: r.frequency, bill_month: r.bill_month != null ? r.bill_month : null, spend_reduction: r.spend_reduction, taper_at_70: r.taper_at_70, taper_at_80: r.taper_at_80, taper_at_90: r.taper_at_90 };
         if (r.id != null) await App.write('PATCH', 'bd_household_bills?id=eq.' + r.id, payload);
         else await App.write('POST', 'bd_household_bills', payload);
       }
