@@ -118,6 +118,7 @@
     .params .ctrl > label { min-height:2.6em; }   /* reserve 2 lines so sliders align even when a label wraps */
     .params .ctrl > label.switch { min-height:0; }
     .params .ctrl-note { justify-content:center; }
+    .sp-block { grid-column:span 2; }
     .sp-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px 26px; }
     .params .ctrl-note > label { min-height:0; }
     .params .ctrl-note .note { font-size:13px; color:var(--ink-soft); line-height:1.4; }
@@ -336,6 +337,15 @@
         <div class="ctrl"><label>Spending in retirement <span id="m_spend_v" class="sv">100%</span></label><input type="range" id="m_spend" min="25" max="100" step="1" value="100" oninput="onParam()"></div>
         <div class="ctrl" id="ctrlRatio"><label><span class="nm-p1">Graham</span> drawdown ratio <span id="m_ratio_v" class="sv">50%</span></label><input type="range" id="m_ratio" min="0" max="100" step="1" value="50" oninput="onParam()"></div>
         <div class="ctrl ctrl-note"><p class="note" style="margin:0;">Drag any control and the whole dashboard updates instantly — nothing is saved until you tap <strong>Save</strong>.</p></div>
+        <div class="ctrl sp-block">
+          <label style="font-weight:bold; color:var(--ink); display:block; margin-bottom:10px;">State Pension Risk <span style="font-weight:normal; font-size:12px; color:var(--ink-soft);">— what-if only, never saved</span></label>
+          <div class="sp-grid">
+            <div class="ctrl"><label>Uprating rate (triple lock) <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
+              <div class="hint">Annual rise on the State Pension. Default 2.5%. Drag down for the triple lock weakened, capped, or frozen (0%).</div></div>
+            <div class="ctrl"><label>Claim delay <span id="m_spdelay_v" class="sv">0 yrs</span></label><input type="range" id="m_spdelay" min="0" max="10" step="1" value="0" oninput="onParam()">
+              <div class="hint">Years the State Pension age rises, delaying both of you equally.</div></div>
+          </div>
+        </div>
         <div class="ctrl ctrl-wide">
           <label class="switch"><input type="checkbox" id="m_dynamic" onchange="onParam()"><span class="track"></span><span class="switch-text">Dynamic model mode</span>
             <button type="button" class="info-btn" onclick="toggleInfo(event,'info_dyn')" aria-label="What is dynamic model mode?">i</button></label>
@@ -344,15 +354,6 @@
             <div class="ctrl" id="ctrlGFloor"><label><span class="nm-p1">Graham</span> floor <span id="m_gfloor_v" class="sv">25%</span></label><input type="range" id="m_gfloor" min="0" max="90" step="1" value="25" oninput="onParam()"></div>
             <div class="ctrl" id="ctrlJFloor"><label><span class="nm-p2">Julie</span> floor <span id="m_jfloor_v" class="sv">20%</span></label><input type="range" id="m_jfloor" min="0" max="90" step="1" value="20" oninput="onParam()"></div>
             <div class="hint">% of each taxable pot's value at retirement.</div>
-          </div>
-        </div>
-        <div class="ctrl ctrl-wide" style="border-top:1px solid var(--line); padding-top:14px; margin-top:4px;">
-          <label style="font-weight:bold; color:var(--ink); display:block; margin-bottom:10px;">State Pension Risk <span style="font-weight:normal; font-size:12px; color:var(--ink-soft);">— what-if only, never saved</span></label>
-          <div class="sp-grid">
-            <div class="ctrl"><label>Uprating rate (triple lock) <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
-              <div class="hint">Annual rise on the State Pension. Default 2.5%. Drag down for the triple lock weakened, capped, or frozen (0%).</div></div>
-            <div class="ctrl"><label>Claim delay <span id="m_spdelay_v" class="sv">0 yrs</span></label><input type="range" id="m_spdelay" min="0" max="10" step="1" value="0" oninput="onParam()">
-              <div class="hint">Years the State Pension age rises, delaying both of you equally.</div></div>
           </div>
         </div>
       </div>
@@ -437,7 +438,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-122</span>
+    <span class="build-stamp">build: LC-123</span>
   </div>
 
   <script>
