@@ -529,7 +529,21 @@
         outM -= capDrawFromSavings;
       }
 
-      const gTargetM = outM * gRatio, jTargetM = outM * jRatio;
+      // ---- Stage F: who is retired this month? ----
+      // Ratio split applies only once BOTH are retired. During the gap, the retired person
+      // carries the whole household cost from their pot (salary offset arrives in increment 3).
+      const p1Retired = idx >= p1RetIdx;
+      const p2Retired = p2Name ? (idx >= p2RetIdx) : true;  // single-member: treat p2 as n/a
+      let gTargetM, jTargetM;
+      if (p1Retired && p2Retired) {
+        gTargetM = outM * gRatio; jTargetM = outM * jRatio;     // normal (equal-date case is always here)
+      } else if (p1Retired && !p2Retired) {
+        gTargetM = outM; jTargetM = 0;                          // gap: p1 retired, p2 still working
+      } else if (!p1Retired && p2Retired) {
+        gTargetM = 0; jTargetM = outM;                          // gap: p2 retired, p1 still working
+      } else {
+        gTargetM = 0; jTargetM = 0;                             // neither retired (shouldn't occur)
+      }
 
       // opening pots for THIS month (before drawdown)
       const oGTf = gTf, oGTx = gTx, oJTf = jTf, oJTx = jTx;
