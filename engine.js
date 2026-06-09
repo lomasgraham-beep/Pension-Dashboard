@@ -235,6 +235,19 @@
     // Salary lookup: net monthly for a member at a given working-days tier, grown by award % since now.
     const fIncomeSources = data.incomeSources || [];
     const fIncomeAmounts = data.incomeAmounts || [];
+    // active working-days tier for a member at a month index (latest from_date <= that month)
+    const fDrawTiers = (data.workingTiers || []).map(t => ({
+      member: t.member_name, days: Number(t.days),
+      fromIdx: t.from_date ? (new Date(t.from_date).getFullYear() * 12 + new Date(t.from_date).getMonth()) : null
+    })).filter(t => t.fromIdx != null);
+    function activeTierDaysAt(member, idx) {
+      let best = null;
+      for (const t of fDrawTiers) {
+        if (t.member !== member) continue;
+        if (t.fromIdx <= idx && (!best || t.fromIdx > best.fromIdx)) best = t;
+      }
+      return best ? best.days : null;
+    }
     function salaryFor(member, tierDays, idx) {
       if (member == null || tierDays == null) return 0;
       const amt = fIncomeAmounts.find(a => a.member_name === member && Number(a.working_days) === Number(tierDays));
@@ -530,17 +543,27 @@
       }
 
       // ---- Stage F: who is retired this month? ----
-      // Ratio split applies only once BOTH are retired. During the gap, the retired person
-      // carries the whole household cost from their pot (salary offset arrives in increment 3).
+      // Ratio split applies only once BOTH are retired. During the gap, the WORKING person's
+      // net salary covers the household cost first; only the shortfall is drawn from the
+      // RETIRED person's pot. (Surplus salary -> savings is increment 4.)
       const p1Retired = idx >= p1RetIdx;
       const p2Retired = p2Name ? (idx >= p2RetIdx) : true;  // single-member: treat p2 as n/a
       let gTargetM, jTargetM;
+      let gapSalary = 0, gapSurplus = 0;
       if (p1Retired && p2Retired) {
         gTargetM = outM * gRatio; jTargetM = outM * jRatio;     // normal (equal-date case is always here)
       } else if (p1Retired && !p2Retired) {
-        gTargetM = outM; jTargetM = 0;                          // gap: p1 retired, p2 still working
+        // gap: p1 retired, p2 (Julie-side) still working — p2's salary covers costs first
+        gapSalary = salaryFor(p2Name, activeTierDaysAt(p2Name, idx), idx);
+        const shortfall = Math.max(0, outM - gapSalary);
+        gapSurplus = Math.max(0, gapSalary - outM);
+        gTargetM = shortfall; jTargetM = 0;                     // retired p1 draws only the shortfall
       } else if (!p1Retired && p2Retired) {
-        gTargetM = 0; jTargetM = outM;                          // gap: p2 retired, p1 still working
+        // gap: p2 retired, p1 (Graham-side) still working — p1's salary covers costs first
+        gapSalary = salaryFor(p1Name, activeTierDaysAt(p1Name, idx), idx);
+        const shortfall = Math.max(0, outM - gapSalary);
+        gapSurplus = Math.max(0, gapSalary - outM);
+        gTargetM = 0; jTargetM = shortfall;                     // retired p2 draws only the shortfall
       } else {
         gTargetM = 0; jTargetM = 0;                             // neither retired (shouldn't occur)
       }
