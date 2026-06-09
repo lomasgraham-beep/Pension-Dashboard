@@ -167,6 +167,13 @@
 
     let guard = 0;
     const potKeys = Object.keys(pots).slice();   // stable list of pot keys (member|pension)
+    // Stage F 4b: capture each person's pot total AT THEIR OWN retirement month, so drawdown
+    // can seed pots at the earliest-retire handover and not double-count gap growth.
+    const fp1RetIdx = fp1Retire.getFullYear() * 12 + fp1Retire.getMonth();
+    const fp2RetIdx = fp2Retire ? (fp2Retire.getFullYear() * 12 + fp2Retire.getMonth()) : null;
+    let p1AtRetire = sumMember(data, pots, fp1);   // value now (covers the case retirement is immediate)
+    let p2AtRetire = fp2 ? sumMember(data, pots, fp2) : 0;
+    let p1Captured = false, p2Captured = false;
     while (cur < retire && guard < 1200) {
       guard++;
       cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
@@ -182,6 +189,9 @@
 
       const g = sumMember(data, pots, fp1);
       const j = fp2 ? sumMember(data, pots, fp2) : 0;
+      // capture each person's pot the month they reach their own retirement
+      if (!p1Captured && curIdx >= fp1RetIdx) { p1AtRetire = g; p1Captured = true; }
+      if (fp2 && !p2Captured && fp2RetIdx != null && curIdx >= fp2RetIdx) { p2AtRetire = j; p2Captured = true; }
       // per-pot detail for the validation table
       const potDetail = {};
       potKeys.forEach(k => { potDetail[k] = { value: pots[k], contrib: contribOut[k] || 0, growth: growthOut[k] || 0 }; });
@@ -193,7 +203,8 @@
       if (j > maxJ) maxJ = j;
     }
     return { graham: maxG, julie: maxJ, series: series, p1Name: fp1, p2Name: fp2,
-             potKeys: potKeys, fp1Retire: fp1Retire, fp2Retire: fp2Retire };
+             potKeys: potKeys, fp1Retire: fp1Retire, fp2Retire: fp2Retire,
+             potsAtOwnRetire: { p1: p1AtRetire, p2: p2AtRetire } };
   }
 
   // ---- DRAWDOWN: monthly engine, aggregated to yearly rows ----
@@ -279,8 +290,11 @@
     if (jEol) endIdx = Math.max(endIdx, jEol.getFullYear() * 12 + jEol.getMonth());
     if (!isFinite(endIdx) || endIdx < startIdx) endIdx = startIdx + 30 * 12;
 
-    let gTf = cfg.pots.graham * 0.25, gTx = cfg.pots.graham * 0.75;
-    let jTf = cfg.pots.julie * 0.25,  jTx = cfg.pots.julie * 0.75;
+    // Stage F 4b: seed each pot at that person's OWN retirement value (the handover at the
+    // earliest-retire start). For equal dates these equal cfg.pots, so the seeding is unchanged.
+    const seedPots = cfg.potsAtOwnRetire || cfg.pots;
+    let gTf = seedPots.graham * 0.25, gTx = seedPots.graham * 0.75;
+    let jTf = seedPots.julie * 0.25,  jTx = seedPots.julie * 0.75;
 
     // ---- Cash savings pot (separate from pensions) ----
     // Seeds at start_balance at retirement; each month adds the saving then grows;
@@ -608,12 +622,17 @@
 
       gTf = gRes.tfAfter; gTx = gRes.txAfter; jTf = jRes.tfAfter; jTx = jRes.txAfter;
 
-      // monthly growth on what remains — overridden by a crash trajectory if one is active
+      // monthly growth on what remains — overridden by a crash trajectory if one is active.
+      // Stage F 4b: a person's pot only grows once they've retired; during the gap the still-working
+      // person's pot is frozen (forecast already valued it at their own retirement). For equal dates
+      // both are retired from the start, so both grow normally — unchanged.
       const cf = crashFactor(idx);
       const gm = (cf != null) ? cf : mGrow;
-      const gTfGrowth = gTf * (gm - 1), gTxGrowth = gTx * (gm - 1);
-      const jTfGrowth = jTf * (gm - 1), jTxGrowth = jTx * (gm - 1);
-      gTf *= gm; gTx *= gm; jTf *= gm; jTx *= gm;
+      const gGm = p1Retired ? gm : 1;   // frozen (factor 1) while still working
+      const jGm = p2Retired ? gm : 1;
+      const gTfGrowth = gTf * (gGm - 1), gTxGrowth = gTx * (gGm - 1);
+      const jTfGrowth = jTf * (jGm - 1), jTxGrowth = jTx * (jGm - 1);
+      gTf *= gGm; gTx *= gGm; jTf *= jGm; jTx *= jGm;
 
       const gDraw = gRes.drawTf + gRes.drawGross, jDraw = jRes.drawTf + jRes.drawGross;
       const mState = gRes.inc.stateGross + jRes.inc.stateGross;

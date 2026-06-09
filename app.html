@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=err2"></script>
-  <script src="engine.js?v=fF4a"></script>
+  <script src="engine.js?v=fF4b"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -431,7 +431,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-113 (F4a)</span>
+    <span class="build-stamp">build: LC-114 (F-done)</span>
   </div>
 
   <script>
@@ -964,9 +964,15 @@
       const stateNames = new Set((data.guaranteed || []).map(x => x.income_name).filter(n => n && n.toLowerCase().indexOf('state') >= 0));
       const js = PensionEngine.forecast(data, plan, 1);
       livePots = { graham: js.graham * calib.g, julie: js.julie * calib.j };
+      // Stage F 4b: pots valued at each person's OWN retirement (for the staggered gap handoff).
+      // For equal dates these equal the peak, so this is a no-op for the equal-date case.
+      const ownRetirePots = js.potsAtOwnRetire
+        ? { graham: js.potsAtOwnRetire.p1 * calib.g, julie: js.potsAtOwnRetire.p2 * calib.j }
+        : livePots;
       const startYr = plan.retirementDate ? plan.retirementDate.getFullYear() : new Date().getFullYear();
       drawdownRows = PensionEngine.drawdown(data, {
-        pots: livePots, gRatio: plan.gRatio, spendRed: plan.spendRed,
+        pots: livePots, potsAtOwnRetire: ownRetirePots,
+        gRatio: plan.gRatio, spendRed: plan.spendRed,
         startYear: startYr, retirementDate: plan.retirementDate,
         retireByMember: plan.retireByMember || null,
         dynamic: plan.dynamic, gFloorPct: plan.gFloorPct, jFloorPct: plan.jFloorPct,
@@ -978,7 +984,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err63';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=err64';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', Bills:'bills.html', Dining:'dining.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
