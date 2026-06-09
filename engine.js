@@ -439,9 +439,9 @@
     let acc = null, accYear = null;
     function flush() { if (acc) rows.push(acc); }
 
-    for (let idx = startIdx; idx <= endIdx; idx++) {
+    for (let idx = earliestRetIdx; idx <= endIdx; idx++) {
       const yr = Math.floor(idx / 12);
-      const elapsed = (idx - startIdx) / 12; // years since retirement (for inflation/growth)
+      const elapsed = (idx - earliestRetIdx) / 12; // years since the FIRST retirement (drives cost inflation)
       const gAge = ageAt(gDob, idx), jAge = ageAt(jDob, idx);
       const oldest = Math.max(gAge, jAge);
 
@@ -487,12 +487,12 @@
         if (a.simple) {
           a.accruedSimple += a.principalBase * a.aprM;
           const payNow = (a.freq === 'monthly') ||
-                         (a.freq === 'annually' && (idx - startIdx + 1) % 12 === 0) ||
+                         (a.freq === 'annually' && (idx - earliestRetIdx + 1) % 12 === 0) ||
                          (a.freq === 'end_of_term' && idx === a.cEndIdx);
           if (payNow) { a.bal += a.accruedSimple; a.accruedSimple = 0; }
         } else {
           if (a.freq === 'monthly') a.bal *= (1 + a.aprM);
-          else if (a.freq === 'annually' && (idx - startIdx + 1) % 12 === 0) a.bal *= (1 + a.aprA);
+          else if (a.freq === 'annually' && (idx - earliestRetIdx + 1) % 12 === 0) a.bal *= (1 + a.aprA);
           else if (a.freq === 'end_of_term' && idx === a.cEndIdx) { const yrs = Math.max(0, (a.cEndIdx - a.cStartIdx + 1) / 12); a.bal *= Math.pow(1 + a.aprA, yrs); }
         }
       }
