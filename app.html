@@ -108,6 +108,7 @@
       .tab-buttons button.active-btn { border-bottom:none; background:var(--accent); color:#fff; }
       .tab-buttons button.active-btn:hover { background:var(--accent-dark); color:#fff; }
       .shell .tabcontent { flex:1 1 auto; min-width:0; border-radius:var(--radius); border:1px solid var(--line); border-top:1px solid var(--line); }
+      .params .grid { grid-template-columns:repeat(4, 1fr); }
     }
     .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
     .params { background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:16px 18px; margin:0 0 14px; }
@@ -117,11 +118,6 @@
     .params .ctrl { display:flex; flex-direction:column; }
     .params .ctrl > label { min-height:2.6em; }   /* reserve 2 lines so sliders align even when a label wraps */
     .params .ctrl > label.switch { min-height:0; }
-    .params .ctrl-note { justify-content:center; }
-    .sp-block { grid-column:span 2; }
-    .sp-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px 26px; }
-    .params .ctrl-note > label { min-height:0; }
-    .params .ctrl-note .note { font-size:13px; color:var(--ink-soft); line-height:1.4; }
     .params .sv { color:var(--accent); font-weight:bold; font-size:15px; }
     .params .hint { font-size:12px; color:#94a3b8; margin-top:4px; }
 
@@ -161,7 +157,8 @@
     .range-slider input[type=range]::-webkit-slider-runnable-track { background:none; }
     .range-slider input[type=range]::-moz-range-track { background:none; }
     .floors-panel { display:none; margin-top:10px; }
-    .floors-panel.show { display:block; }
+    .floors-panel.show { display:grid; grid-template-columns:1fr 1fr; gap:14px 26px; align-items:start; }
+    .floors-panel .hint { grid-column:1 / -1; }
     .info-btn { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; margin-left:10px; border:none; border-radius:50%; background:var(--accent); color:#fff; font-style:italic; font-weight:bold; font-size:12px; font-family:Georgia, serif; cursor:pointer; flex:0 0 auto; }
     .info-btn:hover { background:var(--accent-dark); }
     .info-text { display:none; margin-top:8px; font-size:12px; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:8px 10px; }
@@ -326,26 +323,23 @@
   <div id="Modelling" class="tabcontent">
     <div class="params">
       <div class="grid">
+        <!-- Row 1 -->
         <div class="ctrl"><label>Fully retire <span id="m_retire_v" class="sv">—</span></label><input type="range" id="m_retire" min="0" max="120" step="1" value="60" oninput="onParam()"></div>
-        <div class="ctrl phone-hide"><label>Growth until retirement <span id="m_growth_v" class="sv">5.0%</span></label><input type="range" id="m_growth" min="0" max="10" step="0.25" value="5" oninput="onParam()"></div>
+        <div class="ctrl phone-hide"><label>Pension growth <span id="m_growth_v" class="sv">5.0%</span></label><input type="range" id="m_growth" min="0" max="10" step="0.25" value="5" oninput="onParam()"></div>
         <div class="ctrl phone-hide"><label>Drop to 3-day week <span id="m_p2date_v" class="sv">—</span></label><input type="range" id="m_p2date" min="0" max="120" step="1" value="0" oninput="onParam()">
           <div class="seg" id="m_p2days_seg" data-target="m_p2days"><button type="button" data-v="5">5 days</button><button type="button" data-v="4">4 days</button><button type="button" data-v="3">3 days</button></div>
           <input type="hidden" id="m_p2days" value="3"></div>
+        <div class="ctrl"><label>State pension growth <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
+          <div class="hint">Annual rise on the State Pension. Default 2.5%. Drag down for the triple lock weakened, capped, or frozen (0%). <span style="color:var(--ink-soft);">What-if only, never saved.</span></div></div>
+        <!-- Row 2 -->
+        <div class="ctrl"><label>Spending in retirement <span id="m_spend_v" class="sv">100%</span></label><input type="range" id="m_spend" min="25" max="100" step="1" value="100" oninput="onParam()"></div>
         <div class="ctrl phone-hide"><label>Drop to 4-day week <span id="m_p1date_v" class="sv">—</span></label><input type="range" id="m_p1date" min="0" max="120" step="1" value="0" oninput="onParam()">
           <div class="seg" id="m_p1days_seg" data-target="m_p1days"><button type="button" data-v="5">5 days</button><button type="button" data-v="4">4 days</button><button type="button" data-v="3">3 days</button></div>
           <input type="hidden" id="m_p1days" value="4"></div>
-        <div class="ctrl"><label>Spending in retirement <span id="m_spend_v" class="sv">100%</span></label><input type="range" id="m_spend" min="25" max="100" step="1" value="100" oninput="onParam()"></div>
         <div class="ctrl" id="ctrlRatio"><label><span class="nm-p1">Graham</span> drawdown ratio <span id="m_ratio_v" class="sv">50%</span></label><input type="range" id="m_ratio" min="0" max="100" step="1" value="50" oninput="onParam()"></div>
-        <div class="ctrl ctrl-note"><p class="note" style="margin:0;">Drag any control and the whole dashboard updates instantly — nothing is saved until you tap <strong>Save</strong>.</p></div>
-        <div class="ctrl sp-block">
-          <label style="font-weight:bold; color:var(--ink); display:block; margin-bottom:10px;">State Pension Risk <span style="font-weight:normal; font-size:12px; color:var(--ink-soft);">— what-if only, never saved</span></label>
-          <div class="sp-grid">
-            <div class="ctrl"><label>Uprating rate (triple lock) <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
-              <div class="hint">Annual rise on the State Pension. Default 2.5%. Drag down for the triple lock weakened, capped, or frozen (0%).</div></div>
-            <div class="ctrl"><label>Claim delay <span id="m_spdelay_v" class="sv">0 yrs</span></label><input type="range" id="m_spdelay" min="0" max="10" step="1" value="0" oninput="onParam()">
-              <div class="hint">Years the State Pension age rises, delaying both of you equally.</div></div>
-          </div>
-        </div>
+        <div class="ctrl"><label>Delay state pension <span id="m_spdelay_v" class="sv">0 yrs</span></label><input type="range" id="m_spdelay" min="0" max="10" step="1" value="0" oninput="onParam()">
+          <div class="hint">Years the State Pension age rises, delaying both of you equally.</div></div>
+        <!-- Dynamic model mode (full width, floors on one line) -->
         <div class="ctrl ctrl-wide">
           <label class="switch"><input type="checkbox" id="m_dynamic" onchange="onParam()"><span class="track"></span><span class="switch-text">Dynamic model mode</span>
             <button type="button" class="info-btn" onclick="toggleInfo(event,'info_dyn')" aria-label="What is dynamic model mode?">i</button></label>
@@ -438,7 +432,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-123</span>
+    <span class="build-stamp">build: LC-124 (modelling-layout)</span>
   </div>
 
   <script>
