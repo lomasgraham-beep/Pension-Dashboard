@@ -75,7 +75,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: payer)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: cc)</span></p>
   <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -154,7 +154,7 @@
     const freqOpt = f => ['Annual', 'Monthly', 'Weekly'].map(o => '<option' + (r.frequency === o ? ' selected' : '') + '>' + o + '</option>').join('');
     const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const monthOpt = m => '<option value="">\u2014</option>' + MONTHS.map((nm, k) => '<option value="' + (k + 1) + '"' + (Number(r.bill_month) === (k + 1) ? ' selected' : '') + '>' + nm + '</option>').join('');
-    const payerOpt = sel => '<option value="">\u2014</option>' + (memberNames || []).map(n => '<option' + (n === sel ? ' selected' : '') + '>' + n.replace(/"/g, '&quot;') + '</option>').join('');
+    const payerOpt = sel => '<option value="">\u2014</option>' + (memberNames || []).map(n => '<option' + (n === sel ? ' selected' : '') + '>' + n.replace(/"/g, '&quot;') + '</option>').join('') + '<option' + (sel === 'Credit card' ? ' selected' : '') + '>Credit card</option>';
     return '<tr data-i="' + i + '">' +
       '<td><input type="text" class="f-name" value="' + esc(r.bill_name) + '" oninput="mark()"></td>' +
       '<td><select class="f-cat" onchange="mark()" style="min-width:120px;">' + catOptions(r.category_code) + '</select></td>' +

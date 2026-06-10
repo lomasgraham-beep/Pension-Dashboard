@@ -39,7 +39,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v2)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v3)</span></p>
   <div id="status">Loading…</div>
   <div class="cols" id="cols" style="display:none;"></div>
   <div class="panel" id="pensionPanel" style="display:none; max-width:430px;"></div>
@@ -81,13 +81,16 @@
 
       const cols = document.getElementById('cols');
       const avails = {};
-      cols.innerHTML = names.map(name => {
+      let cardsHtml = names.map(name => {
         const r = personBlock(name, bills || [], tiers || [], incAmts || [], otherInc || []);
         avails[name] = r.avail;
         return r.html;
       }).join('');
+      const cc = creditBlock(bills || []);
+      cardsHtml += cc.html;
+      cols.innerHTML = cardsHtml;
       cols.style.display = 'grid';
-      renderFooter(names, tiers || [], pensContribs || [], avails);
+      renderFooter(names, tiers || [], pensContribs || [], avails, cc.total);
       status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
@@ -139,7 +142,32 @@
     return { html: html, avail: avail };
   }
 
-  function renderFooter(names, tiers, pensContribs, avails) {
+  function creditBlock(bills) {
+    const mine = bills.filter(b => b.paid_by === 'Credit card');
+    if (!mine.length) return { html: '', total: 0 };
+    const byAcct = {};
+    mine.forEach(b => { const a = (b.paid_account || '\u2014'); (byAcct[a] = byAcct[a] || []).push(b); });
+    let outRows = '', total = 0;
+    Object.keys(byAcct).sort().forEach(acct => {
+      let acctTotal = 0;
+      const rowsHtml = byAcct[acct].map(b => {
+        const m = annualToMonthly(b.premium, b.frequency); acctTotal += m; total += m;
+        return '<tr><td>' + (b.bill_name || '') + '</td><td class="amt">' + fmt(m) + '</td></tr>';
+      }).join('');
+      const head = (Object.keys(byAcct).length > 1 || acct !== '\u2014')
+        ? '<tr class="acct-head"><td>' + (acct === '\u2014' ? 'Card' : acct) + '</td><td class="amt">' + fmt(acctTotal) + '</td></tr>'
+        : '';
+      outRows += head + rowsHtml;
+    });
+    const html = '<div class="person">' +
+      '<div class="blocktitle">Credit Card</div>' +
+      '<div class="subtitle">Out</div><table><tbody>' + outRows +
+        '<tr class="total"><td>Total on cards</td><td class="amt">' + fmt(total) + '</td></tr></tbody></table>' +
+      '</div>';
+    return { html: html, total: total };
+  }
+
+  function renderFooter(names, tiers, pensContribs, avails, creditTotal) {
     // current-tier monthly pension contribution per person
     let pensRows = '', totalPens = 0;
     names.forEach(name => {
@@ -148,6 +176,8 @@
       mine.forEach(p => {
         // pick the row matching the current tier; if working_days is null treat as always-on
         if (p.working_days != null && days != null && Number(p.working_days) !== Number(days)) return;
+        // exclude the workplace pension (Aegon) from the budget footer
+        if (/aegon/i.test(p.pension_name || '')) return;
         const v = Number(p.monthly_contribution) || 0;
         if (v === 0) return;
         totalPens += v;
@@ -155,13 +185,16 @@
       });
     });
     const sumAvail = names.reduce((s, n) => s + (avails[n] || 0), 0);
-    const totalCash = sumAvail - totalPens;
+    const cc = Number(creditTotal) || 0;
+    const totalCash = sumAvail - totalPens - cc;
+    const ccRow = cc > 0 ? '<tr class="total"><td>Less credit card spending</td><td class="amt">\u2212' + fmt(cc) + '</td></tr>' : '';
     const panel = document.getElementById('pensionPanel');
     panel.innerHTML = '<div class="blocktitle">Cash Summary</div>' +
       '<div class="subtitle" style="border-top:none;">Pensions</div>' +
       '<table><tbody>' + (pensRows || '<tr><td colspan="2" style="color:#94a3b8;">No pension contributions at the current tier</td></tr>') +
         '<tr class="total"><td>Total pension contributions</td><td class="amt">' + fmt(totalPens) + '</td></tr>' +
         '<tr class="total"><td>Sum of available (both)</td><td class="amt">' + fmt(sumAvail) + '</td></tr>' +
+        ccRow +
         '<tr class="avail"><td>Total cash available</td><td class="amt">' + fmt(totalCash) + '</td></tr></tbody></table>';
     panel.style.display = 'block';
   }
