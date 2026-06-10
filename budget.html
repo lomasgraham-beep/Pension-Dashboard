@@ -39,7 +39,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v3)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v4)</span></p>
   <div id="status">Loading…</div>
   <div class="cols" id="cols" style="display:none;"></div>
   <div class="panel" id="pensionPanel" style="display:none; max-width:430px;"></div>
@@ -68,13 +68,14 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, tiers, incAmts, otherInc, pensContribs] = await Promise.all([
+      const [members, bills, tiers, incAmts, otherInc, pensContribs, billCats] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_working_tiers?order=from_date.asc'),
         App.rest('bd_income_amounts?order=member_name.asc'),
         App.rest('bd_other_income?order=member_name.asc'),
-        App.rest('bd_pension_contributions?order=member_name.asc')
+        App.rest('bd_pension_contributions?order=member_name.asc'),
+        App.rest('bd_bill_category?order=code.asc')
       ]);
       const names = (members || []).map(m => m.name).filter(Boolean);
       if (!names.length) { status.textContent = 'No members found.'; return; }
@@ -86,7 +87,7 @@
         avails[name] = r.avail;
         return r.html;
       }).join('');
-      const cc = creditBlock(bills || []);
+      const cc = creditBlock(bills || [], billCats || []);
       cardsHtml += cc.html;
       cols.innerHTML = cardsHtml;
       cols.style.display = 'grid';
@@ -142,26 +143,26 @@
     return { html: html, avail: avail };
   }
 
-  function creditBlock(bills) {
+  function creditBlock(bills, billCats) {
     const mine = bills.filter(b => b.paid_by === 'Credit card');
     if (!mine.length) return { html: '', total: 0 };
-    const byAcct = {};
-    mine.forEach(b => { const a = (b.paid_account || '\u2014'); (byAcct[a] = byAcct[a] || []).push(b); });
-    let outRows = '', total = 0;
-    Object.keys(byAcct).sort().forEach(acct => {
-      let acctTotal = 0;
-      const rowsHtml = byAcct[acct].map(b => {
-        const m = annualToMonthly(b.premium, b.frequency); acctTotal += m; total += m;
-        return '<tr><td>' + (b.bill_name || '') + '</td><td class="amt">' + fmt(m) + '</td></tr>';
-      }).join('');
-      const head = (Object.keys(byAcct).length > 1 || acct !== '\u2014')
-        ? '<tr class="acct-head"><td>' + (acct === '\u2014' ? 'Card' : acct) + '</td><td class="amt">' + fmt(acctTotal) + '</td></tr>'
-        : '';
-      outRows += head + rowsHtml;
+    const catLabel = {};
+    (billCats || []).forEach(c => { catLabel[c.code] = c.description || c.code; });
+    const byCat = {};
+    let total = 0;
+    mine.forEach(b => {
+      const code = b.category_code || '\u2014';
+      const m = annualToMonthly(b.premium, b.frequency);
+      byCat[code] = (byCat[code] || 0) + m;
+      total += m;
     });
+    const rows = Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a]).map(code => {
+      const label = code === '\u2014' ? 'Uncategorised' : (catLabel[code] || code);
+      return '<tr><td>' + label + '</td><td class="amt">' + fmt(byCat[code]) + '</td></tr>';
+    }).join('');
     const html = '<div class="person">' +
       '<div class="blocktitle">Credit Card</div>' +
-      '<div class="subtitle">Out</div><table><tbody>' + outRows +
+      '<div class="subtitle">By category</div><table><tbody>' + rows +
         '<tr class="total"><td>Total on cards</td><td class="amt">' + fmt(total) + '</td></tr></tbody></table>' +
       '</div>';
     return { html: html, total: total };
