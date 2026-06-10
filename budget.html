@@ -58,7 +58,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v13)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v14)</span></p>
   <div id="status">Loading…</div>
   <div class="cols" id="cols" style="display:none;">
     <div id="colGraham"></div>
@@ -187,16 +187,21 @@
     bills.filter(b => b.paid_by === name).forEach(b => {
       add(b.paid_account, b.bill_name || '', annualToMonthly(b.premium, b.frequency));
     });
-    // pension contributions whose paying account is held by this person (your actual cost = ÷1.25 for private, exclude Aegon)
+    // pension contributions whose paying account is held by this person.
+    // NOTE: the contribution may belong to a DIFFERENT member (e.g. Julie's pension paid from your account),
+    // so the tier check must use the contribution OWNER's tier, not this card-holder's.
     (pensContribs || []).forEach(p => {
       if (!p.paid_account || !myAccounts[p.paid_account]) return;
-      const pDays = (selectedTier[name] !== undefined) ? selectedTier[name] : currentTierDays(name, tiers);
-      if (p.working_days != null && pDays != null && Number(p.working_days) !== Number(pDays)) return;
+      const owner = p.member_name;
+      const ownerDays = (selectedTier[owner] !== undefined) ? selectedTier[owner] : currentTierDays(owner, tiers);
+      if (p.working_days != null && ownerDays != null && Number(p.working_days) !== Number(ownerDays)) return;
       const isWorkplace = /aegon/i.test(p.pension_name || '');
       const gross = Number(p.monthly_contribution) || 0;
       const cost = isWorkplace ? gross : gross / 1.25;
       if (cost === 0) return;
-      add(p.paid_account, (p.pension_name || 'Pension') + ' (pension)', cost);
+      // label shows whose pension it is when it's not the account holder's own
+      const whose = (owner && owner !== name) ? owner + ' ' : '';
+      add(p.paid_account, whose + (p.pension_name || 'Pension') + ' (pension)', cost);
     });
 
     let outRows = '', totalOut = 0;

@@ -75,7 +75,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: acctlist2)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: acctsel)</span></p>
   <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -87,7 +87,6 @@
     <label style="font-size:13px; font-weight:bold; color:var(--ink-soft);">Filter by category:</label>
     <select id="filterCat" onchange="render()" style="padding:8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px;"><option value="All">All categories</option></select>
   </div>
-  <datalist id="acctList"></datalist>
   <table id="tbl">
     <thead><tr><th>Bill Name</th><th>Category</th><th>Paid by</th><th>Account</th><th>Premium &pound;</th><th>Frequency</th><th>Annual &pound;</th><th>Month<br><span style="font-weight:normal;font-size:11px;">(annual only)</span></th><th>Reduce?</th><th>Taper 70</th><th>Taper 80</th><th>Taper 90</th><th></th></tr></thead>
     <tbody><tr><td colspan="10">Loading&hellip;</td></tr></tbody>
@@ -149,6 +148,14 @@
     if (categoryCodes && categoryCodes.length) return categoryCodes.slice().sort();
     return [...new Set(rows.map(r => r.category_code).filter(c => c))].sort();
   }
+  // Account dropdown options from the Bank Accounts table; preserves a legacy free-text value if not in the list.
+  function acctOptions(selected) {
+    const esc2 = s => String(s).replace(/"/g, '&quot;');
+    let opts = '<option value="">\u2014</option>';
+    opts += (bankAccounts || []).map(a => '<option' + (a === selected ? ' selected' : '') + '>' + esc2(a) + '</option>').join('');
+    if (selected && (bankAccounts || []).indexOf(selected) < 0) opts += '<option selected>' + esc2(selected) + '</option>';
+    return opts;
+  }
 
   function rowHtml(r, i) {
     const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
@@ -160,7 +167,7 @@
       '<td><input type="text" class="f-name" value="' + esc(r.bill_name) + '" oninput="mark()"></td>' +
       '<td><select class="f-cat" onchange="mark()" style="min-width:120px;">' + catOptions(r.category_code) + '</select></td>' +
       '<td><select class="f-paidby" onchange="mark()" style="min-width:90px;">' + payerOpt(r.paid_by) + '</select></td>' +
-      '<td><input type="text" class="f-account" list="acctList" value="' + esc(r.paid_account) + '" placeholder="acct (optional)" style="min-width:110px;" oninput="mark()"></td>' +
+      '<td><select class="f-account" onchange="mark()" style="min-width:120px;">' + acctOptions(r.paid_account) + '</select></td>' +
       '<td><input type="number" class="f-premium" step="1" value="' + (r.premium != null ? r.premium : 0) + '" oninput="rowCalc(this)"></td>' +
       '<td><select class="f-freq" onchange="rowCalc(this)">' + freqOpt(r.frequency) + '</select></td>' +
       '<td class="annual-cell" style="font-weight:bold; color:var(--accent-dark);">' + fmt(annualOf(r.premium, r.frequency)) + '</td>' +
@@ -213,8 +220,6 @@
       .filter(x => cat === 'All' || (x.r.category_code || '') === cat)
       .map(x => rowHtml(x.r, x.i)).join('');
     tbody.innerHTML = html || '<tr><td colspan="10">No bills in this view. Use \u201cAdd bill\u201d or change the filter.</td></tr>';
-    const dl = document.getElementById('acctList');
-    if (dl) dl.innerHTML = bankAccounts.map(a => '<option value="' + String(a).replace(/"/g, '&quot;') + '"></option>').join('');
     updateProj();
   }
   function mark() { syncDom(); setDirty(); updateProj(); }
