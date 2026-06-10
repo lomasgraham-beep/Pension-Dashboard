@@ -94,10 +94,13 @@
 
     // Active tier for a person at date `d` = the tier with the latest from_date that is <= d.
     // Before the earliest tier, returns null (not yet contributing / not yet working).
-    const fTiers = (data.workingTiers || []).map(t => ({
-      member: t.member_name, days: Number(t.days),
-      from: t.from_date ? new Date(t.from_date) : null
-    })).filter(t => t.from);
+    // plan.tierDateOverrides (optional, keyed "member|days") shifts WHEN a tier starts — what-if only.
+    const tierOv = plan.tierDateOverrides || {};
+    const fTiers = (data.workingTiers || []).map(t => {
+      const key = t.member_name + '|' + Number(t.days);
+      const from = tierOv[key] ? new Date(tierOv[key]) : (t.from_date ? new Date(t.from_date) : null);
+      return { member: t.member_name, days: Number(t.days), from: from };
+    }).filter(t => t.from);
     function activeTierDays(member, d) {
       let best = null;
       for (const t of fTiers) {
@@ -247,10 +250,13 @@
     const fIncomeSources = data.incomeSources || [];
     const fIncomeAmounts = data.incomeAmounts || [];
     // active working-days tier for a member at a month index (latest from_date <= that month)
-    const fDrawTiers = (data.workingTiers || []).map(t => ({
-      member: t.member_name, days: Number(t.days),
-      fromIdx: t.from_date ? (new Date(t.from_date).getFullYear() * 12 + new Date(t.from_date).getMonth()) : null
-    })).filter(t => t.fromIdx != null);
+    // cfg.tierDateOverrides (keyed "member|days") shifts a tier's start — what-if only.
+    const dTierOv = cfg.tierDateOverrides || {};
+    const fDrawTiers = (data.workingTiers || []).map(t => {
+      const key = t.member_name + '|' + Number(t.days);
+      const src = dTierOv[key] ? new Date(dTierOv[key]) : (t.from_date ? new Date(t.from_date) : null);
+      return { member: t.member_name, days: Number(t.days), fromIdx: src ? (src.getFullYear() * 12 + src.getMonth()) : null };
+    }).filter(t => t.fromIdx != null);
     function activeTierDaysAt(member, idx) {
       let best = null;
       for (const t of fDrawTiers) {

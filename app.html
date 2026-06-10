@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=err2"></script>
-  <script src="engine.js?v=fF4b"></script>
+  <script src="engine.js?v=fTier"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -326,6 +326,7 @@
         <!-- Row 1 -->
         <div class="ctrl"><label>Fully retire <span id="m_retire_v" class="sv">—</span></label><input type="range" id="m_retire" min="0" max="120" step="1" value="60" oninput="onParam()"></div>
         <div class="ctrl phone-hide"><label>Pension growth <span id="m_growth_v" class="sv">5.0%</span></label><input type="range" id="m_growth" min="0" max="10" step="0.25" value="5" oninput="onParam()"></div>
+        <div id="tierSliders" style="display:contents;"></div>
         <div class="ctrl"><label>State pension growth <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
           <div class="hint">Annual rise on the State Pension. Default 2.5%. Drag down for the triple lock weakened, capped, or frozen (0%). <span style="color:var(--ink-soft);">What-if only, never saved.</span></div></div>
         <!-- Row 2 -->
@@ -428,7 +429,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-130 (rm-phasing)</span>
+    <span class="build-stamp">build: LC-131 (tier-sliders)</span>
   </div>
 
   <script>
@@ -876,6 +877,53 @@
       if (seg) seg.querySelectorAll('button').forEach(b => b.classList.toggle('seg-on', Number(b.dataset.v) === Number(v)));
     }
 
+    // ---- What-if tier-change sliders, generated from the real bd_working_tiers ----
+    // One slider per tier AFTER the person's first (each = the transition INTO that tier).
+    // Lets you drag WHEN the change happens; what-if only, resets on reload.
+    let tierKeys = [];   // [{key, member, days, baseIdx}]
+    function buildTierSliders() {
+      const host = document.getElementById('tierSliders');
+      if (!host) return;
+      tierKeys = [];
+      const tiers = (data.workingTiers || []).filter(t => t.from_date)
+        .map(t => ({ member: t.member_name, days: Number(t.days), idx: dateToIdx(App.parseLocalDate(t.from_date)) }))
+        .sort((a, b) => a.member.localeCompare(b.member) || a.idx - b.idx);
+      // group by member; the first tier per member is the starting point (no slider), the rest get sliders
+      const byMember = {};
+      tiers.forEach(t => { (byMember[t.member] = byMember[t.member] || []).push(t); });
+      let html = '';
+      Object.keys(byMember).forEach(member => {
+        const list = byMember[member];
+        for (let i = 1; i < list.length; i++) {
+          const t = list[i];
+          const key = member + '|' + t.days;
+          const sid = 'm_tier_' + key.replace(/[^a-zA-Z0-9]/g, '_');
+          tierKeys.push({ key, sid, member, days: t.days, baseIdx: t.idx });
+          const who = (p2Name && member === p2Name) ? member : member;
+          html += '<div class="ctrl phone-hide"><label>' + who + ' \u2192 ' + t.days + '-day week <span id="' + sid + '_v" class="sv">\u2014</span></label>' +
+            '<input type="range" id="' + sid + '" min="0" max="120" step="1" value="' + t.idx + '" oninput="onParam()">' +
+            '<div class="hint">When ' + who + ' drops to ' + t.days + ' days. What-if only.</div></div>';
+        }
+      });
+      host.innerHTML = html;
+    }
+    function readTierOverrides() {
+      const ov = {};
+      tierKeys.forEach(tk => {
+        const el = document.getElementById(tk.sid);
+        if (!el) return;
+        const idx = parseInt(el.value);
+        if (idx !== tk.baseIdx) ov[tk.key] = idxToDate(idx);   // only override if moved
+      });
+      return ov;
+    }
+    function resetTierSliders() {
+      tierKeys.forEach(tk => { const el = document.getElementById(tk.sid); if (el) el.value = tk.baseIdx; });
+    }
+    function syncTierLabels() {
+      tierKeys.forEach(tk => { const el = document.getElementById(tk.sid), lab = document.getElementById(tk.sid + '_v'); if (el && lab) lab.textContent = monthLabel(idxToDate(el.value)); });
+    }
+
     function readControls() {
       return {
         retirementDate: idxToDate(document.getElementById('m_retire').value),
@@ -890,7 +938,8 @@
         gFloorPct: (parseFloat(document.getElementById('m_gfloor').value) || 0) / 100,
         jFloorPct: (parseFloat(document.getElementById('m_jfloor').value) || 0) / 100,
         spRate: parseFloat(document.getElementById('m_sprate').value) / 100,
-        spDelay: parseInt(document.getElementById('m_spdelay').value) || 0
+        spDelay: parseInt(document.getElementById('m_spdelay').value) || 0,
+        tierDateOverrides: readTierOverrides()
       };
     }
     function applyControls(plan) {
@@ -903,6 +952,7 @@
       // State Pension Risk sliders are what-if only — always reset to baseline (2.5% uprating, 0 delay)
       document.getElementById('m_sprate').value = 2.5;
       document.getElementById('m_spdelay').value = 0;
+      resetTierSliders();
       syncLabels();
     }
     function syncLabels() {
@@ -915,6 +965,7 @@
       document.getElementById('m_sprate_v').textContent = parseFloat(document.getElementById('m_sprate').value).toFixed(1) + '%';
       const dly = parseInt(document.getElementById('m_spdelay').value) || 0;
       document.getElementById('m_spdelay_v').textContent = dly + (dly === 1 ? ' yr' : ' yrs');
+      syncTierLabels();
     }
     function toggleInfo(evt, id) { evt.preventDefault(); const el = document.getElementById(id); if (el) el.classList.toggle('show'); }
     function onParam() { syncLabels(); document.getElementById('m_floors').classList.toggle('show', document.getElementById('m_dynamic').checked); recomputeAll(); }
@@ -972,6 +1023,7 @@
         gRatio: plan.gRatio, spendRed: plan.spendRed,
         startYear: startYr, retirementDate: plan.retirementDate,
         retireByMember: plan.retireByMember || null,
+        tierDateOverrides: plan.tierDateOverrides || null,
         dynamic: plan.dynamic, gFloorPct: plan.gFloorPct, jFloorPct: plan.jFloorPct,
         sp: sp
       });
@@ -1118,6 +1170,7 @@
         calib.g = 1;
         calib.j = 1;
 
+        buildTierSliders();
         applyControls(savedPlan);
         recomputeAll();
         status.className = 's-ok';
