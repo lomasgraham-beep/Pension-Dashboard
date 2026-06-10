@@ -112,7 +112,7 @@
     .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
     .params { background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:16px 18px; margin:0 0 14px; }
     .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:18px 26px; }
-    @media (min-width: 1000px) { .params .grid { grid-template-columns:repeat(4, 1fr); } }
+    @media (min-width: 1000px) { .params .grid { grid-template-columns:repeat(3, 1fr); } }
     .params .ctrl-wide { grid-column:1 / -1; }
     .params label { display:block; font-weight:bold; font-size:14px; color:var(--ink); margin-bottom:8px; }
     .params .ctrl { display:flex; flex-direction:column; }
@@ -326,17 +326,11 @@
         <!-- Row 1 -->
         <div class="ctrl"><label>Fully retire <span id="m_retire_v" class="sv">—</span></label><input type="range" id="m_retire" min="0" max="120" step="1" value="60" oninput="onParam()"></div>
         <div class="ctrl phone-hide"><label>Pension growth <span id="m_growth_v" class="sv">5.0%</span></label><input type="range" id="m_growth" min="0" max="10" step="0.25" value="5" oninput="onParam()"></div>
-        <div class="ctrl phone-hide"><label>Drop to 3-day week <span id="m_p2date_v" class="sv">—</span></label><input type="range" id="m_p2date" min="0" max="120" step="1" value="0" oninput="onParam()">
-          <div class="seg" id="m_p2days_seg" data-target="m_p2days"><button type="button" data-v="5">5 days</button><button type="button" data-v="4">4 days</button><button type="button" data-v="3">3 days</button></div>
-          <input type="hidden" id="m_p2days" value="3"></div>
         <div class="ctrl"><label>State pension growth <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
           <div class="hint">Annual rise on the State Pension. Default 2.5%. Drag down for the triple lock weakened, capped, or frozen (0%). <span style="color:var(--ink-soft);">What-if only, never saved.</span></div></div>
         <!-- Row 2 -->
         <div class="ctrl"><label>Spending in retirement <span id="m_spend_v" class="sv">100%</span></label><input type="range" id="m_spend" min="25" max="100" step="1" value="100" oninput="onParam()"></div>
         <div class="ctrl" id="ctrlRatio"><label><span class="nm-p1">Graham</span> drawdown ratio <span id="m_ratio_v" class="sv">50%</span></label><input type="range" id="m_ratio" min="0" max="100" step="1" value="50" oninput="onParam()"></div>
-        <div class="ctrl phone-hide"><label>Drop to 4-day week <span id="m_p1date_v" class="sv">—</span></label><input type="range" id="m_p1date" min="0" max="120" step="1" value="0" oninput="onParam()">
-          <div class="seg" id="m_p1days_seg" data-target="m_p1days"><button type="button" data-v="5">5 days</button><button type="button" data-v="4">4 days</button><button type="button" data-v="3">3 days</button></div>
-          <input type="hidden" id="m_p1days" value="4"></div>
         <div class="ctrl"><label>Delay state pension <span id="m_spdelay_v" class="sv">0 yrs</span></label><input type="range" id="m_spdelay" min="0" max="10" step="1" value="0" oninput="onParam()">
           <div class="hint">Years the State Pension age rises, delaying both of you equally.</div></div>
         <!-- Dynamic model mode (full width, floors on one line) -->
@@ -434,7 +428,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-129</span>
+    <span class="build-stamp">build: LC-130 (rm-phasing)</span>
   </div>
 
   <script>
@@ -889,10 +883,6 @@
         // dragged it, treat it as a single shared date for live exploration (override per-member).
         retireByMember: (savedPlan && savedPlan.retirementDate && idxToDate(document.getElementById('m_retire').value) && idxToDate(document.getElementById('m_retire').value).getTime() === savedPlan.retirementDate.getTime()) ? savedPlan.retireByMember : null,
         growthRate: parseFloat(document.getElementById('m_growth').value) / 100,
-        phase1Date: idxToDate(document.getElementById('m_p1date').value),
-        phase1Days: segValue('m_p1days'),
-        phase2Date: idxToDate(document.getElementById('m_p2date').value),
-        phase2Days: segValue('m_p2days'),
         p2phase: savedPlan ? savedPlan.p2phase : null,
         spendRed: parseFloat(document.getElementById('m_spend').value) / 100,
         gRatio: p2Name ? (parseFloat(document.getElementById('m_ratio').value) / 100) : 1,
@@ -906,10 +896,6 @@
     function applyControls(plan) {
       document.getElementById('m_retire').value = dateToIdx(plan.retirementDate);
       document.getElementById('m_growth').value = (plan.growthRate * 100).toFixed(2);
-      document.getElementById('m_p1date').value = dateToIdx(plan.phase1Date);
-      setSeg('m_p1days', plan.phase1Days);
-      document.getElementById('m_p2date').value = dateToIdx(plan.phase2Date);
-      setSeg('m_p2days', plan.phase2Days);
       document.getElementById('m_spend').value = Math.round(plan.spendRed * 100);
       document.getElementById('m_ratio').value = Math.round(plan.gRatio * 100);
       document.getElementById('m_gfloor').value = Math.round((plan.gFloorPct != null ? plan.gFloorPct : 0.25) * 100);
@@ -921,8 +907,6 @@
     }
     function syncLabels() {
       document.getElementById('m_retire_v').textContent = monthLabel(idxToDate(document.getElementById('m_retire').value));
-      document.getElementById('m_p1date_v').textContent = monthLabel(idxToDate(document.getElementById('m_p1date').value));
-      document.getElementById('m_p2date_v').textContent = monthLabel(idxToDate(document.getElementById('m_p2date').value));
       document.getElementById('m_growth_v').textContent = parseFloat(document.getElementById('m_growth').value).toFixed(1) + '%';
       document.getElementById('m_spend_v').textContent = document.getElementById('m_spend').value + '%';
       document.getElementById('m_ratio_v').textContent = document.getElementById('m_ratio').value + '%';
@@ -950,10 +934,6 @@
       const c = readControls();
       const payload = {
         member_name: p1Name,
-        shorter_week_date_1: App.toInputDate(c.phase1Date) || null,
-        working_days_1: c.phase1Days,
-        shorter_week_date_2: App.toInputDate(c.phase2Date) || null,
-        working_days_2: c.phase2Days,
         retirement_date: App.toInputDate(c.retirementDate) || null,
         pension_growth_rate: c.growthRate,
         spending_reduction_pct: c.spendRed,
