@@ -12,11 +12,16 @@
   #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
   .s-err { background:#fdecea !important; color:#c0392b !important; }
   .cols { display:grid; grid-template-columns:repeat(3, 1fr); gap:18px; align-items:start; }
-  .person { border:2px solid #2c3e50; border-radius:10px; background:#fff; height:520px; overflow-y:auto; }
-  .person .blocktitle { position:sticky; top:0; z-index:1; }
-  .col3 { display:flex; flex-direction:column; gap:18px; height:520px; }
+  .person { border:2px solid #2c3e50; border-radius:10px; background:#fff; height:calc(100vh - 40px); display:flex; flex-direction:column; overflow:hidden; }
+  .person .card-head { flex:0 0 auto; }
+  .person .card-scroll { flex:1 1 auto; overflow-y:auto; min-height:0; }
+  .person .card-foot { flex:0 0 auto; border-top:2px solid #cbd5e1; }
+  .col3 { display:flex; flex-direction:column; gap:18px; height:calc(100vh - 40px); }
   .col3 .person { height:auto; flex:1 1 0; min-height:0; }
-  @media (max-width: 760px) { .cols { grid-template-columns:1fr; } .person, .col3 .person { height:auto; max-height:520px; } }
+  /* col3 blocks (Credit Card, PayPal, Cash Summary) have no scroll wrapper; let their last table scroll */
+  .col3 .person > table { flex:1 1 auto; display:block; overflow-y:auto; min-height:0; }
+  .col3 .person > .blocktitle, .col3 .person > .subtitle { flex:0 0 auto; }
+  @media (max-width: 760px) { .cols { grid-template-columns:1fr; } .person, .col3 .person { height:auto; max-height:70vh; } .col3 { height:auto; } }
   .blocktitle { background:#2c3e50; color:#fff; font-weight:bold; text-align:center; padding:9px; font-size:16px; }
   .subtitle { background:#eef2f7; color:#2c3e50; font-weight:bold; text-align:center; padding:7px; font-size:14px; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; }
   table { border-collapse:collapse; width:100%; }
@@ -31,6 +36,7 @@
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
     h1 { color:#f1f5f9 !important; } .note { color:#94a3b8 !important; }
     .person, .panel { background:#1e293b !important; border-color:#334155 !important; }
+    .person .card-foot { border-color:#475569 !important; }
     .blocktitle { background:#0b1220 !important; color:#f1f5f9 !important; }
     .subtitle { background:#162132 !important; color:#cbd5e1 !important; border-color:#334155 !important; }
     td { border-color:#334155 !important; color:#cbd5e1 !important; }
@@ -43,7 +49,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v6)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v7)</span></p>
   <div id="status">Loading…</div>
   <div class="cols" id="cols" style="display:none;">
     <div id="colGraham"></div>
@@ -147,12 +153,17 @@
 
     const avail = totalIn - totalOut;
     const html = '<div class="person">' +
-      '<div class="blocktitle">' + name + '</div>' +
-      '<div class="subtitle">In</div><table><tbody>' + inRows +
-        '<tr class="total"><td>Total In</td><td class="amt">' + fmt(totalIn) + '</td></tr></tbody></table>' +
-      '<div class="subtitle">Out</div><table><tbody>' + outRows +
+      '<div class="card-head">' +
+        '<div class="blocktitle">' + name + '</div>' +
+        '<div class="subtitle">In</div><table><tbody>' + inRows +
+          '<tr class="total"><td>Total In</td><td class="amt">' + fmt(totalIn) + '</td></tr></tbody></table>' +
+        '<div class="subtitle">Out</div>' +
+      '</div>' +
+      '<div class="card-scroll"><table><tbody>' + outRows + '</tbody></table></div>' +
+      '<div class="card-foot"><table><tbody>' +
         '<tr class="total"><td>Total Out</td><td class="amt">' + fmt(totalOut) + '</td></tr>' +
         '<tr class="avail"><td>' + name + ' available per month</td><td class="amt">' + fmt(avail) + '</td></tr></tbody></table>' +
+      '</div>' +
       '</div>';
     return { html: html, avail: avail };
   }
