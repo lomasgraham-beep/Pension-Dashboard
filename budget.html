@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monthly Budget</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err71"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1100px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+  .cols { display:grid; grid-template-columns:repeat(auto-fit, minmax(330px, 1fr)); gap:18px; }
+  .person { border:2px solid #2c3e50; border-radius:10px; overflow:hidden; background:#fff; }
+  .blocktitle { background:#2c3e50; color:#fff; font-weight:bold; text-align:center; padding:9px; font-size:16px; }
+  .subtitle { background:#eef2f7; color:#2c3e50; font-weight:bold; text-align:center; padding:7px; font-size:14px; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; }
+  table { border-collapse:collapse; width:100%; }
+  td { padding:7px 12px; border-bottom:1px solid #eef2f7; font-size:15px; }
+  td.amt { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  tr.total td { font-weight:bold; border-top:2px solid #cbd5e1; background:#f8fafc; }
+  tr.avail td { font-weight:bold; background:#f59e0b; color:#1a1a1a; font-size:16px; }
+  tr.acct-head td { font-weight:bold; color:#64748b; font-size:13px; background:#fbfcfe; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:0; margin-top:18px; overflow:hidden; }
+
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1 { color:#f1f5f9 !important; } .note { color:#94a3b8 !important; }
+    .person, .panel { background:#1e293b !important; border-color:#334155 !important; }
+    .blocktitle { background:#0b1220 !important; color:#f1f5f9 !important; }
+    .subtitle { background:#162132 !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    tr.total td { background:#162132 !important; color:#f1f5f9 !important; border-color:#475569 !important; }
+    tr.acct-head td { background:#131c2b !important; color:#94a3b8 !important; }
+    tr.avail td { background:#b45309 !important; color:#fff !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Monthly Budget</h1>
+  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v1)</span></p>
+  <div id="status">Loading…</div>
+  <div class="cols" id="cols" style="display:none;"></div>
+  <div class="panel" id="pensionPanel" style="display:none;"></div>
+
+<script>
+  const fmt = App.fmt;
+
+  function annualToMonthly(premium, frequency) {
+    const p = Number(premium) || 0;
+    if (frequency === 'Weekly') return p * 52 / 12;
+    if (frequency === 'Annual') return p / 12;
+    return p;   // Monthly (or default)
+  }
+
+  // current active working-days tier for a member (latest from_date <= today)
+  function currentTierDays(member, tiers) {
+    const now = new Date(); let best = null;
+    (tiers || []).forEach(t => {
+      if (t.member_name !== member || !t.from_date) return;
+      const from = new Date(t.from_date);
+      if (from <= now && (!best || from > new Date(best.from_date))) best = t;
+    });
+    return best ? Number(best.days) : null;
+  }
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      const [members, bills, tiers, incAmts] = await Promise.all([
+        App.rest('bd_members?order=name.asc'),
+        App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
+        App.rest('bd_working_tiers?order=from_date.asc'),
+        App.rest('bd_income_amounts?order=member_name.asc')
+      ]);
+      const names = (members || []).map(m => m.name).filter(Boolean);
+      if (!names.length) { status.textContent = 'No members found.'; return; }
+
+      const cols = document.getElementById('cols');
+      cols.innerHTML = names.map(name => personBlock(name, bills || [], tiers || [], incAmts || [])).join('');
+      cols.style.display = 'grid';
+      status.style.display = 'none';
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  function personBlock(name, bills, tiers, incAmts) {
+    // --- IN: current-tier salary from Workplace Income ---
+    const days = currentTierDays(name, tiers);
+    let inRows = '', totalIn = 0;
+    const salaryRows = incAmts.filter(a => a.member_name === name && (days == null || Number(a.working_days) === Number(days)));
+    // if no tier match, fall back to any income rows for this member
+    const useRows = salaryRows.length ? salaryRows : incAmts.filter(a => a.member_name === name);
+    if (useRows.length) {
+      useRows.forEach(a => {
+        const v = Number(a.net_monthly) || 0; totalIn += v;
+        inRows += '<tr><td>' + (a.source_name || 'Salary') + '</td><td class="amt">' + fmt(v) + '</td></tr>';
+      });
+    } else {
+      inRows = '<tr><td colspan="2" style="color:#94a3b8;">No income set on Workplace Income</td></tr>';
+    }
+
+    // --- OUT: this person's bills, grouped by account ---
+    const mine = bills.filter(b => b.paid_by === name);
+    const byAcct = {};
+    mine.forEach(b => { const a = (b.paid_account || '\u2014'); (byAcct[a] = byAcct[a] || []).push(b); });
+    let outRows = '', totalOut = 0;
+    Object.keys(byAcct).sort().forEach(acct => {
+      let acctTotal = 0;
+      const rowsHtml = byAcct[acct].map(b => {
+        const m = annualToMonthly(b.premium, b.frequency); acctTotal += m; totalOut += m;
+        return '<tr><td>' + (b.bill_name || '') + '</td><td class="amt">' + fmt(m) + '</td></tr>';
+      }).join('');
+      const head = (Object.keys(byAcct).length > 1 || acct !== '\u2014')
+        ? '<tr class="acct-head"><td>' + (acct === '\u2014' ? 'Other' : acct) + '</td><td class="amt">' + fmt(acctTotal) + '</td></tr>'
+        : '';
+      outRows += head + rowsHtml;
+    });
+    if (!mine.length) outRows = '<tr><td colspan="2" style="color:#94a3b8;">No bills assigned to ' + name + '</td></tr>';
+
+    const avail = totalIn - totalOut;
+    return '<div class="person">' +
+      '<div class="blocktitle">' + name + '</div>' +
+      '<div class="subtitle">In</div><table><tbody>' + inRows +
+        '<tr class="total"><td>Total In</td><td class="amt">' + fmt(totalIn) + '</td></tr></tbody></table>' +
+      '<div class="subtitle">Out</div><table><tbody>' + outRows +
+        '<tr class="total"><td>Total Out</td><td class="amt">' + fmt(totalOut) + '</td></tr>' +
+        '<tr class="avail"><td>' + name + ' available per month</td><td class="amt">' + fmt(avail) + '</td></tr></tbody></table>' +
+      '</div>';
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  App.requireLogin(load, { title: 'Monthly Budget' });
+</script>
+</body>
+</html>

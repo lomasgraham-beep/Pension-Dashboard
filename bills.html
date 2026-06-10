@@ -75,7 +75,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: cats)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: payer)</span></p>
   <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -88,7 +88,7 @@
     <select id="filterCat" onchange="render()" style="padding:8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px;"><option value="All">All categories</option></select>
   </div>
   <table id="tbl">
-    <thead><tr><th>Bill Name</th><th>Category</th><th>Premium &pound;</th><th>Frequency</th><th>Annual &pound;</th><th>Month<br><span style="font-weight:normal;font-size:11px;">(annual only)</span></th><th>Reduce?</th><th>Taper 70</th><th>Taper 80</th><th>Taper 90</th><th></th></tr></thead>
+    <thead><tr><th>Bill Name</th><th>Category</th><th>Paid by</th><th>Account</th><th>Premium &pound;</th><th>Frequency</th><th>Annual &pound;</th><th>Month<br><span style="font-weight:normal;font-size:11px;">(annual only)</span></th><th>Reduce?</th><th>Taper 70</th><th>Taper 80</th><th>Taper 90</th><th></th></tr></thead>
     <tbody><tr><td colspan="10">Loading&hellip;</td></tr></tbody>
   </table>
   <div class="proj" id="proj"></div>
@@ -121,7 +121,7 @@
     };
   })();
 
-  let rows = [], dirty = false, deleted = [], categoryCodes = [];
+  let rows = [], dirty = false, deleted = [], categoryCodes = [], memberNames = [];
   const tbody = document.querySelector('#tbl tbody');
   const fmt = App.fmt;
   const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
@@ -154,9 +154,12 @@
     const freqOpt = f => ['Annual', 'Monthly', 'Weekly'].map(o => '<option' + (r.frequency === o ? ' selected' : '') + '>' + o + '</option>').join('');
     const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const monthOpt = m => '<option value="">\u2014</option>' + MONTHS.map((nm, k) => '<option value="' + (k + 1) + '"' + (Number(r.bill_month) === (k + 1) ? ' selected' : '') + '>' + nm + '</option>').join('');
+    const payerOpt = sel => '<option value="">\u2014</option>' + (memberNames || []).map(n => '<option' + (n === sel ? ' selected' : '') + '>' + n.replace(/"/g, '&quot;') + '</option>').join('');
     return '<tr data-i="' + i + '">' +
       '<td><input type="text" class="f-name" value="' + esc(r.bill_name) + '" oninput="mark()"></td>' +
       '<td><select class="f-cat" onchange="mark()" style="min-width:120px;">' + catOptions(r.category_code) + '</select></td>' +
+      '<td><select class="f-paidby" onchange="mark()" style="min-width:90px;">' + payerOpt(r.paid_by) + '</select></td>' +
+      '<td><input type="text" class="f-account" value="' + esc(r.paid_account) + '" placeholder="acct (optional)" style="min-width:110px;" oninput="mark()"></td>' +
       '<td><input type="number" class="f-premium" step="1" value="' + (r.premium != null ? r.premium : 0) + '" oninput="rowCalc(this)"></td>' +
       '<td><select class="f-freq" onchange="rowCalc(this)">' + freqOpt(r.frequency) + '</select></td>' +
       '<td class="annual-cell" style="font-weight:bold; color:var(--accent-dark);">' + fmt(annualOf(r.premium, r.frequency)) + '</td>' +
@@ -182,6 +185,8 @@
       const i = Number(tr.dataset.i); if (!rows[i]) return;
       rows[i].bill_name = tr.querySelector('.f-name').value.trim();
       rows[i].category_code = tr.querySelector('.f-cat').value.trim() || null;
+      rows[i].paid_by = tr.querySelector('.f-paidby').value.trim() || null;
+      rows[i].paid_account = tr.querySelector('.f-account').value.trim() || null;
       rows[i].premium = Math.round(parseFloat(tr.querySelector('.f-premium').value) || 0);
       rows[i].frequency = tr.querySelector('.f-freq').value;
       const mv = tr.querySelector('.f-month').value;
@@ -241,7 +246,7 @@
       for (const id of deleted) await App.write('DELETE', 'bd_household_bills?id=eq.' + id, undefined);
       for (const r of rows) {
         // total_annual is a GENERATED column — never write it; the DB computes it from premium + frequency
-        const payload = { bill_name: r.bill_name, category_code: r.category_code, premium: r.premium, frequency: r.frequency, bill_month: r.bill_month != null ? r.bill_month : null, spend_reduction: r.spend_reduction, taper_at_70: r.taper_at_70, taper_at_80: r.taper_at_80, taper_at_90: r.taper_at_90 };
+        const payload = { bill_name: r.bill_name, category_code: r.category_code, paid_by: r.paid_by || null, paid_account: r.paid_account || null, premium: r.premium, frequency: r.frequency, bill_month: r.bill_month != null ? r.bill_month : null, spend_reduction: r.spend_reduction, taper_at_70: r.taper_at_70, taper_at_80: r.taper_at_80, taper_at_90: r.taper_at_90 };
         if (r.id != null) await App.write('PATCH', 'bd_household_bills?id=eq.' + r.id, payload);
         else await App.write('POST', 'bd_household_bills', payload);
       }
@@ -257,6 +262,7 @@
     try {
       rows = await App.rest('bd_household_bills?order=category_code.asc,bill_name.asc');
       try { const cc = await App.rest('bd_bill_category?order=code.asc'); categoryCodes = (cc || []).map(c => c.code); } catch (e) { categoryCodes = []; }
+      try { const mm = await App.rest('bd_members?order=name.asc'); memberNames = (mm || []).map(m => m.name).filter(Boolean); } catch (e) { memberNames = []; }
       deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
       populateCatFilter(); render(); status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
