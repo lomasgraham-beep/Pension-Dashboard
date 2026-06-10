@@ -11,8 +11,12 @@
   .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
   #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
   .s-err { background:#fdecea !important; color:#c0392b !important; }
-  .cols { display:grid; grid-template-columns:repeat(auto-fit, minmax(330px, 1fr)); gap:18px; }
-  .person { border:2px solid #2c3e50; border-radius:10px; overflow:hidden; background:#fff; }
+  .cols { display:grid; grid-template-columns:repeat(3, 1fr); gap:18px; align-items:start; }
+  .person { border:2px solid #2c3e50; border-radius:10px; background:#fff; height:520px; overflow-y:auto; }
+  .person .blocktitle { position:sticky; top:0; z-index:1; }
+  .col3 { display:flex; flex-direction:column; gap:18px; height:520px; }
+  .col3 .person { height:auto; flex:1 1 0; min-height:0; }
+  @media (max-width: 760px) { .cols { grid-template-columns:1fr; } .person, .col3 .person { height:auto; max-height:520px; } }
   .blocktitle { background:#2c3e50; color:#fff; font-weight:bold; text-align:center; padding:9px; font-size:16px; }
   .subtitle { background:#eef2f7; color:#2c3e50; font-weight:bold; text-align:center; padding:7px; font-size:14px; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; }
   table { border-collapse:collapse; width:100%; }
@@ -39,10 +43,13 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v5)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v6)</span></p>
   <div id="status">Loading…</div>
-  <div class="cols" id="cols" style="display:none;"></div>
-  <div class="panel" id="pensionPanel" style="display:none; max-width:430px;"></div>
+  <div class="cols" id="cols" style="display:none;">
+    <div id="colGraham"></div>
+    <div id="colJulie"></div>
+    <div id="col3" class="col3"></div>
+  </div>
 
 <script>
   const fmt = App.fmt;
@@ -80,19 +87,25 @@
       const names = (members || []).map(m => m.name).filter(Boolean);
       if (!names.length) { status.textContent = 'No members found.'; return; }
 
-      const cols = document.getElementById('cols');
       const avails = {};
-      let cardsHtml = names.map(name => {
+      const blocks = names.map(name => {
         const r = personBlock(name, bills || [], tiers || [], incAmts || [], otherInc || []);
         avails[name] = r.avail;
         return r.html;
-      }).join('');
+      });
+      // column 1 = first member, column 2 = second member (alphabetical: Graham, Julie)
+      document.getElementById('colGraham').innerHTML = blocks[0] || '';
+      document.getElementById('colJulie').innerHTML = blocks[1] || '';
+      // extra members (3rd+), if any, append to column 1 so nothing is lost
+      if (blocks.length > 2) document.getElementById('colGraham').innerHTML += blocks.slice(2).join('');
+
       const cc = payerCatBlock(bills || [], billCats || [], 'Credit card', 'Credit Card');
       const pp = payerCatBlock(bills || [], billCats || [], 'PayPal', 'PayPal');
-      cardsHtml += cc.html + pp.html;
-      cols.innerHTML = cardsHtml;
-      cols.style.display = 'grid';
-      renderFooter(names, tiers || [], pensContribs || [], avails, cc.total, pp.total);
+      const footerHtml = buildFooter(names, tiers || [], pensContribs || [], avails, cc.total, pp.total);
+      // column 3 stacks: Credit Card, PayPal, then Cash Summary
+      document.getElementById('col3').innerHTML = cc.html + pp.html + footerHtml;
+
+      document.getElementById('cols').style.display = 'grid';
       status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
@@ -169,7 +182,7 @@
     return { html: html, total: total };
   }
 
-  function renderFooter(names, tiers, pensContribs, avails, creditTotal, paypalTotal) {
+  function buildFooter(names, tiers, pensContribs, avails, creditTotal, paypalTotal) {
     // current-tier monthly pension contribution per person
     let pensRows = '', totalPens = 0;
     names.forEach(name => {
@@ -192,16 +205,16 @@
     const totalCash = sumAvail - totalPens - cc - pp;
     const ccRow = cc > 0 ? '<tr class="total"><td>Less credit card spending</td><td class="amt">\u2212' + fmt(cc) + '</td></tr>' : '';
     const ppRow = pp > 0 ? '<tr class="total"><td>Less PayPal spending</td><td class="amt">\u2212' + fmt(pp) + '</td></tr>' : '';
-    const panel = document.getElementById('pensionPanel');
-    panel.innerHTML = '<div class="blocktitle">Cash Summary</div>' +
+    return '<div class="person">' +
+      '<div class="blocktitle">Cash Summary</div>' +
       '<div class="subtitle" style="border-top:none;">Pensions</div>' +
       '<table><tbody>' + (pensRows || '<tr><td colspan="2" style="color:#94a3b8;">No pension contributions at the current tier</td></tr>') +
         '<tr class="total"><td>Total pension contributions</td><td class="amt">' + fmt(totalPens) + '</td></tr>' +
         '<tr class="total"><td>Sum of available (both)</td><td class="amt">' + fmt(sumAvail) + '</td></tr>' +
         ccRow +
         ppRow +
-        '<tr class="avail"><td>Total cash available</td><td class="amt">' + fmt(totalCash) + '</td></tr></tbody></table>';
-    panel.style.display = 'block';
+        '<tr class="avail"><td>Total cash available</td><td class="amt">' + fmt(totalCash) + '</td></tr></tbody></table>' +
+      '</div>';
   }
 
   window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
