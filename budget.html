@@ -58,7 +58,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v14)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v15)</span></p>
   <div id="status">Loading…</div>
   <div class="cols" id="cols" style="display:none;">
     <div id="colGraham"></div>
@@ -101,7 +101,7 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, tiers, incAmts, otherInc, pensContribs, billCats, dining, bankAccts] = await Promise.all([
+      const [members, bills, tiers, incAmts, otherInc, pensContribs, billCats, diningRota, mealCost, bankAccts] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_working_tiers?order=from_date.asc'),
@@ -109,12 +109,18 @@
         App.rest('bd_other_income?order=member_name.asc'),
         App.rest('bd_pension_contributions?order=member_name.asc'),
         App.rest('bd_bill_category?order=code.asc'),
-        App.rest('bd_dining_habits?order=routine_name.asc'),
+        App.rest('bd_dining_rota'),
+        App.rest('bd_meal_cost'),
         App.rest('bd_bank_account?order=account_id.asc')
       ]);
       const names = (members || []).map(m => m.name).filter(Boolean);
       if (!names.length) { status.textContent = 'No members found.'; return; }
-      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], billCats: billCats || [], dining: dining || [], bankAccts: bankAccts || [] };
+      // new dining annual total = Σ (each filled rota cell × its meal-cost lookup)
+      const mealCostMap = {};
+      (mealCost || []).forEach(c => { mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
+      const DAY_COLS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+      const diningAnnual = (diningRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
+      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], billCats: billCats || [], diningAnnual: diningAnnual, bankAccts: bankAccts || [] };
       // default each person's selector to their current active tier
       names.forEach(n => { selectedTier[n] = currentTierDays(n, DATA.tiers); });
       status.style.display = 'none';
@@ -140,7 +146,7 @@
     document.getElementById('colJulie').innerHTML = blocks[1] || '';
     if (blocks.length > 2) document.getElementById('colGraham').innerHTML += blocks.slice(2).join('');
 
-    const diningMonthly = d.dining.reduce((s, x) => s + (Number(x.annual_total) || 0), 0) / 12;
+    const diningMonthly = (Number(d.diningAnnual) || 0) / 12;
     const cc = payerCatBlock(d.bills, d.billCats, 'Credit card', 'Credit Card', diningMonthly);
     const pp = payerCatBlock(d.bills, d.billCats, 'PayPal', 'PayPal', 0);
     const footerHtml = buildFooter(d.names, d.tiers, d.pensContribs, avails, cc.total, pp.total);

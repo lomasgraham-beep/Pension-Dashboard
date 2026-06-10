@@ -498,7 +498,15 @@
 
       const inflFactor = Math.pow(1 + INFL, Math.floor(elapsed));   // annual step: flat within each year since retirement
       const billsM = bills.reduce((s, b) => s + (Number(b.total_annual) || 0) * (b.spend_reduction ? spendRed : 1.0) * taperFor(b, oldest), 0) / 12 * inflFactor;
-      const diningM = dining.reduce((s, d) => s + (Number(d.annual_total) || 0) * (d.spend_reduction ? spendRed : 1.0) * taperFor(d, oldest), 0) / 12 * inflFactor;
+      // Dining: new model uses a single annual figure (rota × meal costs), subject to the
+      // spending-reduction slider, no age-taper. Falls back to the legacy dining array if not supplied.
+      let diningAnnual;
+      if (data.diningAnnual != null) {
+        diningAnnual = (Number(data.diningAnnual) || 0) * spendRed;
+      } else {
+        diningAnnual = dining.reduce((s, d) => s + (Number(d.annual_total) || 0) * (d.spend_reduction ? spendRed : 1.0) * taperFor(d, oldest), 0);
+      }
+      const diningM = diningAnnual / 12 * inflFactor;
 
       // ---- Savings accounts for THIS month ----
       // For each account: add contribution (within its window) unless at its own cap (then withhold and
