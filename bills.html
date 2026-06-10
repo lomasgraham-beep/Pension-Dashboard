@@ -75,7 +75,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: paypal)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: acctlist)</span></p>
   <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -87,6 +87,7 @@
     <label style="font-size:13px; font-weight:bold; color:var(--ink-soft);">Filter by category:</label>
     <select id="filterCat" onchange="render()" style="padding:8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px;"><option value="All">All categories</option></select>
   </div>
+  <datalist id="acctList"></datalist>
   <table id="tbl">
     <thead><tr><th>Bill Name</th><th>Category</th><th>Paid by</th><th>Account</th><th>Premium &pound;</th><th>Frequency</th><th>Annual &pound;</th><th>Month<br><span style="font-weight:normal;font-size:11px;">(annual only)</span></th><th>Reduce?</th><th>Taper 70</th><th>Taper 80</th><th>Taper 90</th><th></th></tr></thead>
     <tbody><tr><td colspan="10">Loading&hellip;</td></tr></tbody>
@@ -121,7 +122,7 @@
     };
   })();
 
-  let rows = [], dirty = false, deleted = [], categoryCodes = [], memberNames = [];
+  let rows = [], dirty = false, deleted = [], categoryCodes = [], memberNames = [], bankAccounts = [];
   const tbody = document.querySelector('#tbl tbody');
   const fmt = App.fmt;
   const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
@@ -159,7 +160,7 @@
       '<td><input type="text" class="f-name" value="' + esc(r.bill_name) + '" oninput="mark()"></td>' +
       '<td><select class="f-cat" onchange="mark()" style="min-width:120px;">' + catOptions(r.category_code) + '</select></td>' +
       '<td><select class="f-paidby" onchange="mark()" style="min-width:90px;">' + payerOpt(r.paid_by) + '</select></td>' +
-      '<td><input type="text" class="f-account" value="' + esc(r.paid_account) + '" placeholder="acct (optional)" style="min-width:110px;" oninput="mark()"></td>' +
+      '<td><input type="text" class="f-account" list="acctList" value="' + esc(r.paid_account) + '" placeholder="acct (optional)" style="min-width:110px;" oninput="mark()"></td>' +
       '<td><input type="number" class="f-premium" step="1" value="' + (r.premium != null ? r.premium : 0) + '" oninput="rowCalc(this)"></td>' +
       '<td><select class="f-freq" onchange="rowCalc(this)">' + freqOpt(r.frequency) + '</select></td>' +
       '<td class="annual-cell" style="font-weight:bold; color:var(--accent-dark);">' + fmt(annualOf(r.premium, r.frequency)) + '</td>' +
@@ -212,6 +213,8 @@
       .filter(x => cat === 'All' || (x.r.category_code || '') === cat)
       .map(x => rowHtml(x.r, x.i)).join('');
     tbody.innerHTML = html || '<tr><td colspan="10">No bills in this view. Use \u201cAdd bill\u201d or change the filter.</td></tr>';
+    const dl = document.getElementById('acctList');
+    if (dl) dl.innerHTML = bankAccounts.map(a => '<option value="' + esc(a) + '"></option>').join('');
     updateProj();
   }
   function mark() { syncDom(); setDirty(); updateProj(); }
@@ -263,6 +266,7 @@
       rows = await App.rest('bd_household_bills?order=category_code.asc,bill_name.asc');
       try { const cc = await App.rest('bd_bill_category?order=code.asc'); categoryCodes = (cc || []).map(c => c.code); } catch (e) { categoryCodes = []; }
       try { const mm = await App.rest('bd_members?order=name.asc'); memberNames = (mm || []).map(m => m.name).filter(Boolean); } catch (e) { memberNames = []; }
+      try { const ba = await App.rest('bd_bank_account?order=account_id.asc'); bankAccounts = (ba || []).map(a => a.account_id).filter(Boolean); } catch (e) { bankAccounts = []; }
       deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
       populateCatFilter(); render(); status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }

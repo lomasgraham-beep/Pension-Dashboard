@@ -21,6 +21,7 @@
   .tier-btn { border:1px solid #cbd5e1; background:#fff; color:#475569; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:bold; cursor:pointer; min-height:34px; }
   .tier-btn.on { background:#2c3e50; color:#fff; border-color:#2c3e50; }
   td.amt.neg { color:#c0392b; }
+  .muted { color:#64748b; font-size:13px; }
   .col3 .person { height:auto; flex:1 1 0; min-height:0; }
   /* col3 blocks (Credit Card, PayPal, Cash Summary) have no scroll wrapper; let their last table scroll */
   .col3 .person > table { flex:1 1 auto; display:block; overflow-y:auto; min-height:0; width:100%; }
@@ -57,7 +58,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v12)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v13)</span></p>
   <div id="status">Loading…</div>
   <div class="cols" id="cols" style="display:none;">
     <div id="colGraham"></div>
@@ -100,7 +101,7 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, tiers, incAmts, otherInc, pensContribs, billCats, dining] = await Promise.all([
+      const [members, bills, tiers, incAmts, otherInc, pensContribs, billCats, dining, bankAccts] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_working_tiers?order=from_date.asc'),
@@ -108,11 +109,12 @@
         App.rest('bd_other_income?order=member_name.asc'),
         App.rest('bd_pension_contributions?order=member_name.asc'),
         App.rest('bd_bill_category?order=code.asc'),
-        App.rest('bd_dining_habits?order=routine_name.asc')
+        App.rest('bd_dining_habits?order=routine_name.asc'),
+        App.rest('bd_bank_account?order=account_id.asc')
       ]);
       const names = (members || []).map(m => m.name).filter(Boolean);
       if (!names.length) { status.textContent = 'No members found.'; return; }
-      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], billCats: billCats || [], dining: dining || [] };
+      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], billCats: billCats || [], dining: dining || [], bankAccts: bankAccts || [] };
       // default each person's selector to their current active tier
       names.forEach(n => { selectedTier[n] = currentTierDays(n, DATA.tiers); });
       status.style.display = 'none';
@@ -130,7 +132,7 @@
     const d = DATA; if (!d) return;
     const avails = {};
     const blocks = d.names.map(name => {
-      const r = personBlock(name, d.bills, d.tiers, d.incAmts, d.otherInc);
+      const r = personBlock(name, d.bills, d.tiers, d.incAmts, d.otherInc, d.pensContribs, d.bankAccts);
       avails[name] = r.avail;
       return r.html;
     });
@@ -157,7 +159,7 @@
     return '<div class="tier-sel">' + btns + '</div>';
   }
 
-  function personBlock(name, bills, tiers, incAmts, otherInc) {
+  function personBlock(name, bills, tiers, incAmts, otherInc, pensContribs, bankAccts) {
     // --- IN: salary from Workplace Income at the selected tier + any other income ---
     const days = (selectedTier[name] !== undefined) ? selectedTier[name] : currentTierDays(name, tiers);
     let inRows = '', totalIn = 0;
@@ -174,23 +176,43 @@
     });
     if (!inRows) inRows = '<tr><td colspan="2" style="color:#94a3b8;">No income set</td></tr>';
 
-    // --- OUT: this person's bills, grouped by account ---
-    const mine = bills.filter(b => b.paid_by === name);
+    // accounts this person holds (by account_id), from the Bank Accounts table
+    const myAccounts = {};
+    (bankAccts || []).forEach(a => { if (a.account_holder === name && a.account_id) myAccounts[a.account_id] = true; });
+
+    // --- OUT: this person's bills + pension contributions, grouped by account ---
+    // bucket: account_id -> array of {label, amt}
     const byAcct = {};
-    mine.forEach(b => { const a = (b.paid_account || '\u2014'); (byAcct[a] = byAcct[a] || []).push(b); });
+    const add = (acct, label, amt) => { const k = acct || '\u2014'; (byAcct[k] = byAcct[k] || []).push({ label: label, amt: amt }); };
+    bills.filter(b => b.paid_by === name).forEach(b => {
+      add(b.paid_account, b.bill_name || '', annualToMonthly(b.premium, b.frequency));
+    });
+    // pension contributions whose paying account is held by this person (your actual cost = ÷1.25 for private, exclude Aegon)
+    (pensContribs || []).forEach(p => {
+      if (!p.paid_account || !myAccounts[p.paid_account]) return;
+      const pDays = (selectedTier[name] !== undefined) ? selectedTier[name] : currentTierDays(name, tiers);
+      if (p.working_days != null && pDays != null && Number(p.working_days) !== Number(pDays)) return;
+      const isWorkplace = /aegon/i.test(p.pension_name || '');
+      const gross = Number(p.monthly_contribution) || 0;
+      const cost = isWorkplace ? gross : gross / 1.25;
+      if (cost === 0) return;
+      add(p.paid_account, (p.pension_name || 'Pension') + ' (pension)', cost);
+    });
+
     let outRows = '', totalOut = 0;
-    Object.keys(byAcct).sort().forEach(acct => {
+    const acctKeys = Object.keys(byAcct).sort();
+    acctKeys.forEach(acct => {
       let acctTotal = 0;
-      const rowsHtml = byAcct[acct].map(b => {
-        const m = annualToMonthly(b.premium, b.frequency); acctTotal += m; totalOut += m;
-        return '<tr><td>' + (b.bill_name || '') + '</td><td class="amt">' + fmt(m) + '</td></tr>';
+      const rowsHtml = byAcct[acct].sort((a, b) => a.label.localeCompare(b.label)).map(item => {
+        acctTotal += item.amt; totalOut += item.amt;
+        return '<tr><td>' + item.label + '</td><td class="amt">' + fmt(item.amt) + '</td></tr>';
       }).join('');
-      const head = (Object.keys(byAcct).length > 1 || acct !== '\u2014')
+      const head = (acctKeys.length > 1 || acct !== '\u2014')
         ? '<tr class="acct-head"><td>' + (acct === '\u2014' ? 'Other' : acct) + '</td><td class="amt">' + fmt(acctTotal) + '</td></tr>'
         : '';
       outRows += head + rowsHtml;
     });
-    if (!mine.length) outRows = '<tr><td colspan="2" style="color:#94a3b8;">No bills assigned to ' + name + '</td></tr>';
+    if (!outRows) outRows = '<tr><td colspan="2" style="color:#94a3b8;">Nothing assigned to ' + name + '</td></tr>';
 
     const avail = totalIn - totalOut;
     const html = '<div class="person">' +
@@ -245,41 +267,21 @@
   }
 
   function buildFooter(names, tiers, pensContribs, avails, creditTotal, paypalTotal) {
-    // current-tier monthly pension contribution per person
-    let pensRows = '', totalPens = 0;
-    names.forEach(name => {
-      const days = (selectedTier[name] !== undefined) ? selectedTier[name] : currentTierDays(name, tiers);
-      const mine = pensContribs.filter(p => p.member_name === name);
-      mine.forEach(p => {
-        // pick the row matching the current tier; if working_days is null treat as always-on
-        if (p.working_days != null && days != null && Number(p.working_days) !== Number(days)) return;
-        // exclude the workplace pension (Aegon) from the budget footer
-        if (/aegon/i.test(p.pension_name || '')) return;
-        // stored figure includes the 25% government top-up; show only what leaves your account
-        const v = (Number(p.monthly_contribution) || 0) / 1.25;
-        if (v === 0) return;
-        totalPens += v;
-        pensRows += '<tr><td>' + (p.pension_name || 'Pension') + ' — ' + name + '</td><td class="amt">' + fmt(v) + '</td></tr>';
-      });
-    });
     const sumAvail = names.reduce((s, n) => s + (avails[n] || 0), 0);
     const cc = Number(creditTotal) || 0;
     const pp = Number(paypalTotal) || 0;
-    const totalCash = sumAvail - totalPens - cc - pp;
-    // deductions all shown as negatives for consistency; positives plain
-    const pensTotRow = '<tr class="total"><td>Less pension contributions</td><td class="amt neg">\u2212' + fmt(totalPens) + '</td></tr>';
+    const totalCash = sumAvail - cc - pp;
     const ccRow = cc > 0 ? '<tr class="total"><td>Less credit card spending</td><td class="amt neg">\u2212' + fmt(cc) + '</td></tr>' : '';
     const ppRow = pp > 0 ? '<tr class="total"><td>Less PayPal spending</td><td class="amt neg">\u2212' + fmt(pp) + '</td></tr>' : '';
-    const pensListRows = pensRows || '<tr><td colspan="2" style="color:#94a3b8;">No pension contributions at the current tier</td></tr>';
     return '<div class="person">' +
       '<div class="card-head">' +
         '<div class="blocktitle">Cash Summary</div>' +
-        '<div class="subtitle" style="border-top:none;">Pensions</div>' +
       '</div>' +
-      '<div class="card-scroll"><table><tbody>' + pensListRows + '</tbody></table></div>' +
+      '<div class="card-scroll"><table><tbody>' +
+        '<tr><td colspan="2" class="muted" style="padding:10px 12px;">Each person\u2019s pension contributions appear under their own accounts above. Credit card and PayPal spending are deducted below.</td></tr>' +
+      '</tbody></table></div>' +
       '<div class="card-foot"><table><tbody>' +
         '<tr class="total"><td>Sum of available (both)</td><td class="amt">' + fmt(sumAvail) + '</td></tr>' +
-        pensTotRow +
         ccRow +
         ppRow +
         '<tr class="avail"><td>Total cash available</td><td class="amt">' + fmt(totalCash) + '</td></tr></tbody></table>' +

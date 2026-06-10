@@ -111,7 +111,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: stageD2)</span></h1>
+<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: acct)</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -182,7 +182,16 @@
 
   const fmt = (n) => "£" + Number(n || 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   let rows = [];
+  let bankAccounts = [];
   const dirty = {};
+
+  function ACCT_OPTS(sel) {
+    const cur = sel || '';
+    let opts = '<option value="">—</option>' + bankAccounts.map(a => `<option ${a === cur ? 'selected' : ''}>${a.replace(/</g, '&lt;')}</option>`).join('');
+    // keep an unknown legacy value selectable so it isn't lost
+    if (cur && bankAccounts.indexOf(cur) < 0) opts += `<option selected>${cur.replace(/</g, '&lt;')}</option>`;
+    return opts;
+  }
 
   function markDirty(id) { dirty[id] = true; const f = document.getElementById('dirty_' + id); if (f) f.style.display = 'inline-block'; }
   function clearDirty(id) { dirty[id] = false; const f = document.getElementById('dirty_' + id); if (f) f.style.display = 'none'; }
@@ -241,6 +250,13 @@
                   ${MONTH_OPTS(r.increase_month)}
                 </select>
               </div>
+              <div class="field">
+                <label>Paid from account</label>
+                <span class="hint">Which bank account pays this in.</span>
+                <select id="acct_${id}" onchange="markDirty('${id}')">
+                  ${ACCT_OPTS(r.paid_account)}
+                </select>
+              </div>
             </div>
             <div class="btn-row">
               <button class="btn btn-save" onclick="saveRow('${id}')">Save</button>
@@ -260,6 +276,7 @@
     document.getElementById('amt_' + id).value = r.monthly_contribution != null ? r.monthly_contribution : '';
     document.getElementById('aug_' + id).value = toPct(r.august_increase_pct);
     document.getElementById('incm_' + id).value = String(r.increase_month == null ? 8 : r.increase_month);
+    if (document.getElementById('acct_' + id)) document.getElementById('acct_' + id).value = r.paid_account || '';
     clearDirty(id);
     document.getElementById('msg_' + id).innerHTML = '';
   }
@@ -278,7 +295,8 @@
     const payload = {
       monthly_contribution: amt,
       august_increase_pct: toDec(augRaw),
-      increase_month: parseInt(document.getElementById('incm_' + id).value) || 8
+      increase_month: parseInt(document.getElementById('incm_' + id).value) || 8,
+      paid_account: document.getElementById('acct_' + id).value || null
     };
 
     msg.style.color = '#1e3a8a'; msg.innerText = 'Saving…';
@@ -302,9 +320,13 @@
   async function loadAll() {
     const status = document.getElementById('status');
     try {
-      const r = await fetch(`${CONTRIB_URL}?order=member_name.asc,pension_name.asc`, { headers: getHeaders() });
+      const [r, ba] = await Promise.all([
+        fetch(`${CONTRIB_URL}?order=member_name.asc,pension_name.asc`, { headers: getHeaders() }),
+        fetch(`${SUPABASE_URL}/rest/v1/bd_bank_account?order=account_id.asc`, { headers: getHeaders() })
+      ]);
       if (!r.ok) throw new Error('load → ' + r.status);
       rows = await r.json();
+      bankAccounts = ba.ok ? (await ba.json()).map(a => a.account_id).filter(Boolean) : [];
       render();
       loadExceptions();
       status.className = 'status-ok';

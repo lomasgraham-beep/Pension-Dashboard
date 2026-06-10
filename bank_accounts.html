@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bank Accounts</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err82"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:820px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  .addbar { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:8px; }
+  .addbar label { display:block; font-weight:bold; font-size:13px; color:#475569; margin-bottom:5px; }
+  input[type=text], select { padding:11px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:15px; box-sizing:border-box; }
+  .btn { border:none; border-radius:8px; padding:12px 18px; font-size:15px; font-weight:bold; cursor:pointer; min-height:48px; background:#27ae60; color:#fff; }
+  .btn-del { background:#fff5f5; color:#c0392b; border:1px solid #f5c6cb; padding:8px 14px; min-height:0; font-size:14px; border-radius:6px; cursor:pointer; }
+  table { border-collapse:collapse; width:100%; margin-top:6px; }
+  th, td { padding:10px 12px; border-bottom:1px solid #e2e8f0; text-align:left; }
+  th { background:#f8fafc; color:#475569; font-size:14px; }
+  .muted { color:#64748b; font-size:13px; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+  .s-ok { background:#d1fae5 !important; color:#065f46 !important; }
+
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1, h2 { color:#f1f5f9 !important; }
+    .panel { background:#1e293b !important; border-color:#334155 !important; box-shadow:0 2px 4px rgba(0,0,0,0.4) !important; }
+    .note, .muted { color:#94a3b8 !important; }
+    .addbar label { color:#cbd5e1 !important; }
+    input[type=text], select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    .btn-del { background:#3a1a1a !important; color:#f87171 !important; border-color:#7f1d1d !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Bank Accounts</h1>
+  <p class="note">Accounts used to pay bills and pension contributions. For security, the account ID is a short alphanumeric label of your choosing (e.g. "xxxx651") — not the full account number. <span style="color:#94a3b8;">(accounts build: v1)</span></p>
+  <div id="status">Loading…</div>
+
+  <div class="panel" id="panel" style="display:none;">
+    <div class="addbar">
+      <div style="flex:1; min-width:150px;"><label>Bank name</label><input type="text" id="newBank" placeholder="e.g. First Direct" style="width:100%;" maxlength="60"></div>
+      <div style="flex:1; min-width:120px;"><label>Account ID</label><input type="text" id="newAcct" placeholder="e.g. xxxx651" style="width:100%;" maxlength="40"></div>
+      <div style="min-width:120px;"><label>Held by</label><select id="newHolder"></select></div>
+      <button class="btn" onclick="addAcct()">+ Add account</button>
+    </div>
+    <p class="muted" id="addHint">The Account ID is what appears in the bills and contributions dropdowns, so make it recognisable.</p>
+    <table id="acctTable"><thead><tr><th>Bank</th><th>Account ID</th><th>Held by</th><th>In use</th><th></th></tr></thead><tbody></tbody></table>
+  </div>
+
+<script>
+  let accts = [], members = [], usage = {};
+
+  function notify() { try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {} }
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      const [acctRows, memberRows, bills, contribs] = await Promise.all([
+        App.rest('bd_bank_account?order=bank_name.asc,account_id.asc'),
+        App.rest('bd_members?order=name.asc'),
+        App.rest('bd_household_bills?select=paid_account'),
+        App.rest('bd_pension_contributions?select=paid_account')
+      ]);
+      accts = acctRows || [];
+      members = (memberRows || []).map(m => m.name).filter(Boolean);
+      usage = {};
+      (bills || []).forEach(b => { if (b.paid_account) usage[b.paid_account] = (usage[b.paid_account] || 0) + 1; });
+      (contribs || []).forEach(c => { if (c.paid_account) usage[c.paid_account] = (usage[c.paid_account] || 0) + 1; });
+      const holder = document.getElementById('newHolder');
+      holder.innerHTML = '<option value="">—</option>' + members.map(n => '<option>' + n.replace(/</g, '&lt;') + '</option>').join('');
+      status.style.display = 'none';
+      document.getElementById('panel').style.display = 'block';
+      renderRows();
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  function renderRows() {
+    const tb = document.querySelector('#acctTable tbody');
+    if (!accts.length) { tb.innerHTML = '<tr><td colspan="5" style="color:#94a3b8;">No accounts yet — add one above.</td></tr>'; return; }
+    tb.innerHTML = accts.map(a => {
+      const n = usage[a.account_id] || 0;
+      const useText = n === 0 ? 'not used' : n + (n === 1 ? ' item' : ' items');
+      const delBtn = n === 0
+        ? '<button class="btn-del" onclick="delAcct(\'' + a.id + '\')">Delete</button>'
+        : '<span class="muted">in use</span>';
+      return '<tr><td>' + (a.bank_name || '') + '</td><td><strong>' + (a.account_id || '') + '</strong></td><td>' + (a.account_holder || '<span class="muted">—</span>') + '</td><td class="muted">' + useText + '</td><td style="text-align:right;">' + delBtn + '</td></tr>';
+    }).join('');
+  }
+
+  async function addAcct() {
+    const status = document.getElementById('status');
+    const bank = (document.getElementById('newBank').value || '').trim();
+    const acct = (document.getElementById('newAcct').value || '').trim();
+    const holder = document.getElementById('newHolder').value;
+    if (!bank) { status.style.display = 'block'; status.className = 's-err'; status.textContent = 'Enter a bank name.'; return; }
+    if (!acct) { status.style.display = 'block'; status.className = 's-err'; status.textContent = 'Enter an account ID.'; return; }
+    if (accts.some(a => (a.account_id || '').toLowerCase() === acct.toLowerCase())) { status.style.display = 'block'; status.className = 's-err'; status.textContent = 'That account ID already exists.'; return; }
+    try {
+      await App.write('POST', 'bd_bank_account', { bank_name: bank, account_id: acct, account_holder: holder || null });
+      document.getElementById('newBank').value = ''; document.getElementById('newAcct').value = '';
+      status.style.display = 'block'; status.className = 's-ok'; status.textContent = '✓ Added "' + acct + '".';
+      notify();
+      await load();
+    } catch (e) { status.style.display = 'block'; status.className = 's-err'; status.textContent = 'Add failed: ' + e.message; }
+  }
+
+  async function delAcct(id) {
+    const a = accts.find(x => x.id === id);
+    if (!confirm('Delete account "' + (a ? a.account_id : '') + '"?')) return;
+    const status = document.getElementById('status');
+    try {
+      await App.write('DELETE', 'bd_bank_account?id=eq.' + encodeURIComponent(id));
+      status.style.display = 'block'; status.className = 's-ok'; status.textContent = '✓ Deleted.';
+      notify();
+      await load();
+    } catch (e) { status.style.display = 'block'; status.className = 's-err'; status.textContent = 'Delete failed: ' + e.message; }
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  App.requireLogin(load, { title: 'Bank Accounts' });
+</script>
+</body>
+</html>
