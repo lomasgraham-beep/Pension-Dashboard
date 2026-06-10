@@ -49,7 +49,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v8)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v9)</span></p>
   <div id="status">Loading…</div>
   <div class="cols" id="cols" style="display:none;">
     <div id="colGraham"></div>
@@ -204,7 +204,8 @@
         if (p.working_days != null && days != null && Number(p.working_days) !== Number(days)) return;
         // exclude the workplace pension (Aegon) from the budget footer
         if (/aegon/i.test(p.pension_name || '')) return;
-        const v = Number(p.monthly_contribution) || 0;
+        // stored figure includes the 25% government top-up; show only what leaves your account
+        const v = (Number(p.monthly_contribution) || 0) / 1.25;
         if (v === 0) return;
         totalPens += v;
         pensRows += '<tr><td>' + (p.pension_name || 'Pension') + ' — ' + name + '</td><td class="amt">' + fmt(v) + '</td></tr>';
