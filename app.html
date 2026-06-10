@@ -122,7 +122,15 @@
       .model-layout .params .floors-panel.show { grid-template-columns:1fr; }
       .model-layout .model-main { flex:1 1 auto; min-width:0; }
       .model-layout .model-main h2 { margin-top:0; }                         /* charts rise to the top */
+      .rail-collapse { width:100%; margin-bottom:10px; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); color:var(--ink-soft); font-weight:bold; font-size:13px; cursor:pointer; }
+      .rail-strip { display:none; flex:0 0 30px; width:30px; align-self:stretch; min-height:300px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); cursor:pointer; position:sticky; top:20px; }
+      .rail-strip span { writing-mode:vertical-rl; transform:rotate(180deg); display:block; text-align:center; padding:14px 0; color:var(--ink-soft); font-weight:bold; font-size:13px; white-space:nowrap; }
+      /* collapsed: hide the rail, show the thin strip */
+      .model-layout.collapsed .params { display:none; }
+      .model-layout.collapsed .rail-strip { display:block; }
     }
+    /* below the rail breakpoint, the collapse controls are irrelevant (stacked layout) */
+    @media (max-width: 1299px) { .rail-collapse, .rail-strip { display:none !important; } }
     .params .ctrl-wide { grid-column:1 / -1; }
     .params label { display:block; font-weight:bold; font-size:14px; color:var(--ink); margin-bottom:8px; }
     .params .ctrl { display:flex; flex-direction:column; }
@@ -332,7 +340,9 @@
 
   <div id="Modelling" class="tabcontent">
     <div class="model-layout">
-    <div class="params">
+    <div class="rail-slot" id="railSlot-Modelling"></div><div class="rail-strip" onclick="expandRail()" title="Show controls"><span>Controls &#9654;</span></div>
+    <div class="params" id="modelRail">
+      <button type="button" class="rail-collapse" onclick="collapseRail()" title="Hide controls" aria-label="Hide controls">Controls &#9664;</button>
       <div class="grid">
         <!-- Row 1 -->
         <div class="ctrl"><label>Fully retire <span id="m_retire_v" class="sv">—</span></label><input type="range" id="m_retire" min="0" max="120" step="1" value="60" oninput="onParam()"></div>
@@ -388,6 +398,9 @@
   </div>
 
   <div id="Retirement" class="tabcontent">
+    <div class="model-layout">
+    <div class="rail-slot" id="railSlot-Retirement"></div><div class="rail-strip" onclick="expandRail()" title="Show controls"><span>Controls &#9654;</span></div>
+    <div class="model-main">
     <h2><span class="viewlabel">Joint</span> Retirement Drawdown</h2>
     <div style="margin:0 0 12px; font-size:14px;">
       <strong style="color:#2c3e50; margin-right:10px;">View:</strong>
@@ -409,6 +422,8 @@
         <thead><tr><th id="rThPeriod">Year</th><th class="rc-tf">Tax-Free Pot</th><th class="grow-col rc-tf" style="display:none;">TF Growth</th><th class="rc-tx">Taxable Pot</th><th class="grow-col rc-tx" style="display:none;">Tx Growth</th><th class="rc-cash">Cash Savings</th><th class="rc-other">Other Incomes</th><th class="rc-savbills">Savings to Bills</th><th class="rc-bills">Bills</th><th class="rc-dining">Dining</th><th class="rc-loan">Loan Payment</th><th class="rc-draw">Drawdown required</th><th>Total Gross Income</th></tr></thead>
         <tbody><tr><td colspan="13">Calculating…</td></tr></tbody>
       </table>
+    </div>
+    </div>
     </div>
   </div>
 
@@ -450,7 +465,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-134 (col-chooser)</span>
+    <span class="build-stamp">build: LC-135 (shared-rail)</span>
   </div>
 
   <script>
@@ -1168,6 +1183,25 @@
       if (f && f.getAttribute('src')) { setTimeout(() => sizeFrame(f), 50); }
     }
 
+    // ---- Shared modelling rail: one control set, shown on Modelling and Retirement ----
+    let railTab = 'Modelling';                          // which tab currently hosts the rail
+    const railCollapsed = { Modelling: false, Retirement: false };   // per-tab collapsed state (session)
+    function placeRail(tabId) {
+      railTab = tabId;
+      const rail = document.getElementById('modelRail');
+      const slot = document.getElementById('railSlot-' + tabId);
+      if (rail && slot && rail.parentElement !== slot) slot.appendChild(rail);
+      applyRailCollapse();
+    }
+    function applyRailCollapse() {
+      const layout = document.getElementById('railSlot-' + railTab) ? document.getElementById('railSlot-' + railTab).closest('.model-layout') : null;
+      // clear collapsed on both layouts, then set on the active one as needed
+      document.querySelectorAll('.model-layout').forEach(l => l.classList.remove('collapsed'));
+      if (layout && railCollapsed[railTab]) layout.classList.add('collapsed');
+    }
+    function collapseRail() { railCollapsed[railTab] = true; applyRailCollapse(); }
+    function expandRail() { railCollapsed[railTab] = false; applyRailCollapse(); }
+
     function showTab(evt, id) {
       document.querySelectorAll('.tabcontent').forEach(el => { el.style.display = 'none'; el.classList.remove('active'); });
       document.querySelectorAll('.tab-link').forEach(el => el.classList.remove('active-btn'));
@@ -1179,6 +1213,7 @@
       // the main title shows only on Overview, freeing space elsewhere
       const title = document.getElementById('appTitle'); if (title) title.style.display = (id === 'Overview') ? '' : 'none';
       if (id === 'Modelling') setTimeout(drawCharts, 40);
+      if (id === 'Modelling' || id === 'Retirement') placeRail(id);
       if (id === 'Cash') ensureFrame('frame-Cash', 'cash.html' + FV);
       if (id === 'Crashes') ensureFrame('frame-Crashes', 'crashes.html' + FV);
       if (id === 'KPIs') { ensureFrame('frame-kpis', 'kpis.html' + FV); pingFrame('frame-kpis'); }
