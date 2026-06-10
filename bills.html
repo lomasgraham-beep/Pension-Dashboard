@@ -75,7 +75,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: acctlist)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: acctlist2)</span></p>
   <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -214,7 +214,7 @@
       .map(x => rowHtml(x.r, x.i)).join('');
     tbody.innerHTML = html || '<tr><td colspan="10">No bills in this view. Use \u201cAdd bill\u201d or change the filter.</td></tr>';
     const dl = document.getElementById('acctList');
-    if (dl) dl.innerHTML = bankAccounts.map(a => '<option value="' + esc(a) + '"></option>').join('');
+    if (dl) dl.innerHTML = bankAccounts.map(a => '<option value="' + String(a).replace(/"/g, '&quot;') + '"></option>').join('');
     updateProj();
   }
   function mark() { syncDom(); setDirty(); updateProj(); }
