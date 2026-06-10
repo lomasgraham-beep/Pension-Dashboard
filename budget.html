@@ -49,7 +49,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v9)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v10)</span></p>
   <div id="status">Loading…</div>
   <div class="cols" id="cols" style="display:none;">
     <div id="colGraham"></div>
@@ -81,14 +81,15 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, tiers, incAmts, otherInc, pensContribs, billCats] = await Promise.all([
+      const [members, bills, tiers, incAmts, otherInc, pensContribs, billCats, dining] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_working_tiers?order=from_date.asc'),
         App.rest('bd_income_amounts?order=member_name.asc'),
         App.rest('bd_other_income?order=member_name.asc'),
         App.rest('bd_pension_contributions?order=member_name.asc'),
-        App.rest('bd_bill_category?order=code.asc')
+        App.rest('bd_bill_category?order=code.asc'),
+        App.rest('bd_dining_habits?order=routine_name.asc')
       ]);
       const names = (members || []).map(m => m.name).filter(Boolean);
       if (!names.length) { status.textContent = 'No members found.'; return; }
@@ -105,8 +106,9 @@
       // extra members (3rd+), if any, append to column 1 so nothing is lost
       if (blocks.length > 2) document.getElementById('colGraham').innerHTML += blocks.slice(2).join('');
 
-      const cc = payerCatBlock(bills || [], billCats || [], 'Credit card', 'Credit Card');
-      const pp = payerCatBlock(bills || [], billCats || [], 'PayPal', 'PayPal');
+      const diningMonthly = (dining || []).reduce((s, d) => s + (Number(d.annual_total) || 0), 0) / 12;
+      const cc = payerCatBlock(bills || [], billCats || [], 'Credit card', 'Credit Card', diningMonthly);
+      const pp = payerCatBlock(bills || [], billCats || [], 'PayPal', 'PayPal', 0);
       const footerHtml = buildFooter(names, tiers || [], pensContribs || [], avails, cc.total, pp.total);
       // column 3 stacks: Credit Card, PayPal, then Cash Summary
       document.getElementById('col3').innerHTML = cc.html + pp.html + footerHtml;
@@ -168,9 +170,10 @@
     return { html: html, avail: avail };
   }
 
-  function payerCatBlock(bills, billCats, payer, title) {
+  function payerCatBlock(bills, billCats, payer, title, diningMonthly) {
     const mine = bills.filter(b => b.paid_by === payer);
-    if (!mine.length) return { html: '', total: 0 };
+    const dining = Number(diningMonthly) || 0;
+    if (!mine.length && dining === 0) return { html: '', total: 0 };
     const catLabel = {};
     (billCats || []).forEach(c => { catLabel[c.code] = c.description || c.code; });
     const byCat = {};
@@ -181,10 +184,15 @@
       byCat[code] = (byCat[code] || 0) + m;
       total += m;
     });
-    const rows = Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a]).map(code => {
+    let rows = Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a]).map(code => {
       const label = code === '\u2014' ? 'Uncategorised' : (catLabel[code] || code);
       return '<tr><td>' + label + '</td><td class="amt">' + fmt(byCat[code]) + '</td></tr>';
     }).join('');
+    // dining is paid on the credit card; roll it up as a single Dining row
+    if (dining > 0) {
+      rows += '<tr><td>Dining</td><td class="amt">' + fmt(dining) + '</td></tr>';
+      total += dining;
+    }
     const html = '<div class="person">' +
       '<div class="blocktitle">' + title + '</div>' +
       '<div class="subtitle">By category</div><table><tbody>' + rows +
