@@ -432,21 +432,19 @@
   <div id="Logs" class="tabcontent"><iframe id="frame-logs" class="app-frame" title="Log Entry and Recent Logs"></iframe></div>
   <div id="LivingCosts" class="tabcontent">
     <div class="subtab-buttons">
-      <button id="subbtn-Bills" class="subtab-link active-sub" onclick="showSub(event,'Bills')">Household Bills</button>
+      <button id="subbtn-Budget" class="subtab-link active-sub" onclick="showSub(event,'Budget')">Budget</button>
+      <button id="subbtn-Bills" class="subtab-link" onclick="showSub(event,'Bills')">Household Bills</button>
+      <button id="subbtn-DiningNew" class="subtab-link" onclick="showSub(event,'DiningNew')">Dining</button>
       <button id="subbtn-BillsSummary" class="subtab-link" onclick="showSub(event,'BillsSummary')">Summary of Household Bills</button>
-      <button id="subbtn-Dining" class="subtab-link" onclick="showSub(event,'Dining')">Dining</button>
       <button id="subbtn-BillCats" class="subtab-link" onclick="showSub(event,'BillCats')">Bill Categories</button>
-      <button id="subbtn-Budget" class="subtab-link" onclick="showSub(event,'Budget')">Budget</button>
       <button id="subbtn-MealCosts" class="subtab-link" onclick="showSub(event,'MealCosts')">Meal Costs</button>
-      <button id="subbtn-DiningNew" class="subtab-link" onclick="showSub(event,'DiningNew')">Dining (new)</button>
     </div>
-    <div id="sub-Bills" class="subtabcontent"><iframe id="frame-Bills" class="app-frame" title="Household Bills"></iframe></div>
-    <div id="sub-BillsSummary" class="subtabcontent"><iframe id="frame-BillsSummary" class="app-frame" title="Summary of Household Bills"></iframe></div>
-    <div id="sub-Dining" class="subtabcontent"><iframe id="frame-Dining" class="app-frame" title="Dining"></iframe></div>
-    <div id="sub-BillCats" class="subtabcontent"><iframe id="frame-BillCats" class="app-frame" title="Bill Categories"></iframe></div>
     <div id="sub-Budget" class="subtabcontent"><iframe id="frame-Budget" class="app-frame" title="Monthly Budget"></iframe></div>
+    <div id="sub-Bills" class="subtabcontent"><iframe id="frame-Bills" class="app-frame" title="Household Bills"></iframe></div>
+    <div id="sub-DiningNew" class="subtabcontent"><iframe id="frame-DiningNew" class="app-frame" title="Dining"></iframe></div>
+    <div id="sub-BillsSummary" class="subtabcontent"><iframe id="frame-BillsSummary" class="app-frame" title="Summary of Household Bills"></iframe></div>
+    <div id="sub-BillCats" class="subtabcontent"><iframe id="frame-BillCats" class="app-frame" title="Bill Categories"></iframe></div>
     <div id="sub-MealCosts" class="subtabcontent"><iframe id="frame-MealCosts" class="app-frame" title="Meal Costs"></iframe></div>
-    <div id="sub-DiningNew" class="subtabcontent"><iframe id="frame-DiningNew" class="app-frame" title="Dining (new)"></iframe></div>
   </div>
 
 
@@ -473,7 +471,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-153 (dining-switch)</span>
+    <span class="build-stamp">build: LC-154</span>
   </div>
 
   <script>
@@ -1139,8 +1137,8 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err88';   // frame-file cache-buster: bump when any framed page changes
-    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', Dining:'dining.html' };
+    const FV = '?v=err89';   // frame-file cache-buster: bump when any framed page changes
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
       catch (e) { f.style.height = '1200px'; }
@@ -1227,7 +1225,7 @@
       if (id === 'KPIs') { ensureFrame('frame-kpis', 'kpis.html' + FV); pingFrame('frame-kpis'); }
       if (id === 'Forecast') { ensureFrame('frame-forecast', 'forecast.html' + FV); pingFrame('frame-forecast'); }
       if (id === 'Logs') ensureFrame('frame-logs', 'logs.html' + FV);
-      if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Bills'); }
+      if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Budget'); }
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
     }
 
