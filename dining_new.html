@@ -11,6 +11,9 @@
   .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:14px; }
   .bar { position:sticky; top:0; z-index:5; background:#f4f7f6; padding:10px 0; display:flex; gap:12px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #e2e8f0; margin-bottom:12px; }
   .btn { border:none; border-radius:8px; padding:11px 16px; font-size:15px; font-weight:bold; cursor:pointer; min-height:46px; background:#27ae60; color:#fff; }
+  .btn-light { background:#64748b; }
+  .wk-head { cursor:pointer; user-select:none; }
+  .chev { display:inline-block; width:1em; color:#cbd5e1; }
   .grand { font-weight:bold; color:#2c3e50; font-size:16px; }
   .wk { border:1px solid #e2e8f0; border-radius:8px; margin-bottom:14px; overflow:hidden; background:#fff; }
   .wk-head { background:#2c3e50; color:#fff; font-weight:bold; padding:8px 12px; display:flex; justify-content:space-between; }
@@ -44,11 +47,13 @@
 </head>
 <body>
   <h1>Dining <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(new — 52-week rota)</span></h1>
-  <p class="note">Set each meal's level (L/M/H) per day across 52 weeks. Costs are looked up from Meal Costs. Each row totals automatically; the year total feeds retirement modelling once switched on. <span style="color:#94a3b8;">(dining-new build: v1)</span></p>
+  <p class="note">Set each meal's level (L/M/H) per day across 52 weeks. Costs are looked up from Meal Costs. Each row totals automatically; the year total feeds retirement modelling once switched on. <span style="color:#94a3b8;">(dining-new build: v2)</span></p>
   <div id="status">Loading…</div>
 
   <div class="bar" id="bar" style="display:none;">
     <button class="btn" onclick="saveAll()">Save changes</button>
+    <button class="btn btn-light" onclick="expandAll()">Expand all</button>
+    <button class="btn btn-light" onclick="collapseAll()">Collapse all</button>
     <span id="msg" style="font-weight:bold;"></span>
     <span class="grand" style="margin-left:auto;">Year total: <span id="grandTotal">£0</span></span>
   </div>
@@ -63,6 +68,7 @@
   let rota = [];        // bd_dining_rota rows
   let costMap = {};     // "Meal|L" -> integer cost
   let dirty = {};       // id -> true
+  const weekCollapsed = {};   // week_no -> true(collapsed)/false(expanded); default collapsed
 
   function notify() { try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {} }
 
@@ -112,10 +118,16 @@
         }).join('');
         body += '<tr><td class="meal">' + meal + '</td>' + cells + '<td class="tot" id="rt_' + w + '_' + meal + '">' + fmt(rt) + '</td></tr>';
       });
-      html += '<div class="wk"><div class="wk-head"><span>Week ' + w + '</span><span id="wt_' + w + '">' + fmt(weekTotal) + '</span></div>' +
+      const collapsed = weekCollapsed[w] !== false;   // default collapsed
+      html += '<div class="wk">' +
+        '<div class="wk-head" onclick="toggleWeek(' + w + ')">' +
+          '<span><span class="chev" id="chev_' + w + '">' + (collapsed ? '\u25B8' : '\u25BE') + '</span> Week ' + w + '</span>' +
+          '<span id="wt_' + w + '">' + fmt(weekTotal) + '</span>' +
+        '</div>' +
+        '<div class="wk-body" id="wkbody_' + w + '" style="display:' + (collapsed ? 'none' : 'block') + ';">' +
         '<table><thead><tr><th style="text-align:left;padding-left:10px;">Meal</th>' +
         DAYS.map(([, lbl]) => '<th>' + lbl + '</th>').join('') +
-        '<th class="tot">Total</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+        '<th class="tot">Total</th></tr></thead><tbody>' + body + '</tbody></table></div></div>';
     }
     document.getElementById('weeks').innerHTML = html;
     recalcGrand();
@@ -141,6 +153,17 @@
     const total = rota.reduce((s, r) => s + rowTotal(r), 0);
     document.getElementById('grandTotal').textContent = fmt(total);
   }
+
+  function applyWeekState(w) {
+    const collapsed = weekCollapsed[w] !== false;
+    const body = document.getElementById('wkbody_' + w);
+    const chev = document.getElementById('chev_' + w);
+    if (body) body.style.display = collapsed ? 'none' : 'block';
+    if (chev) chev.textContent = collapsed ? '\u25B8' : '\u25BE';
+  }
+  function toggleWeek(w) { weekCollapsed[w] = !(weekCollapsed[w] !== false); applyWeekState(w); }
+  function collapseAll() { for (let w = 1; w <= WEEKS; w++) { weekCollapsed[w] = true; applyWeekState(w); } }
+  function expandAll() { for (let w = 1; w <= WEEKS; w++) { weekCollapsed[w] = false; applyWeekState(w); } }
 
   async function saveAll() {
     const msg = document.getElementById('msg');
