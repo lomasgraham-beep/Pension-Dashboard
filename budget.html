@@ -39,10 +39,10 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v1)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v2)</span></p>
   <div id="status">Loading…</div>
   <div class="cols" id="cols" style="display:none;"></div>
-  <div class="panel" id="pensionPanel" style="display:none;"></div>
+  <div class="panel" id="pensionPanel" style="display:none; max-width:430px;"></div>
 
 <script>
   const fmt = App.fmt;
@@ -68,37 +68,46 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, tiers, incAmts] = await Promise.all([
+      const [members, bills, tiers, incAmts, otherInc, pensContribs] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_working_tiers?order=from_date.asc'),
-        App.rest('bd_income_amounts?order=member_name.asc')
+        App.rest('bd_income_amounts?order=member_name.asc'),
+        App.rest('bd_other_income?order=member_name.asc'),
+        App.rest('bd_pension_contributions?order=member_name.asc')
       ]);
       const names = (members || []).map(m => m.name).filter(Boolean);
       if (!names.length) { status.textContent = 'No members found.'; return; }
 
       const cols = document.getElementById('cols');
-      cols.innerHTML = names.map(name => personBlock(name, bills || [], tiers || [], incAmts || [])).join('');
+      const avails = {};
+      cols.innerHTML = names.map(name => {
+        const r = personBlock(name, bills || [], tiers || [], incAmts || [], otherInc || []);
+        avails[name] = r.avail;
+        return r.html;
+      }).join('');
       cols.style.display = 'grid';
+      renderFooter(names, tiers || [], pensContribs || [], avails);
       status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
 
-  function personBlock(name, bills, tiers, incAmts) {
-    // --- IN: current-tier salary from Workplace Income ---
+  function personBlock(name, bills, tiers, incAmts, otherInc) {
+    // --- IN: current-tier salary from Workplace Income + any other income ---
     const days = currentTierDays(name, tiers);
     let inRows = '', totalIn = 0;
     const salaryRows = incAmts.filter(a => a.member_name === name && (days == null || Number(a.working_days) === Number(days)));
     // if no tier match, fall back to any income rows for this member
     const useRows = salaryRows.length ? salaryRows : incAmts.filter(a => a.member_name === name);
-    if (useRows.length) {
-      useRows.forEach(a => {
-        const v = Number(a.net_monthly) || 0; totalIn += v;
-        inRows += '<tr><td>' + (a.source_name || 'Salary') + '</td><td class="amt">' + fmt(v) + '</td></tr>';
-      });
-    } else {
-      inRows = '<tr><td colspan="2" style="color:#94a3b8;">No income set on Workplace Income</td></tr>';
-    }
+    useRows.forEach(a => {
+      const v = Number(a.net_monthly) || 0; totalIn += v;
+      inRows += '<tr><td>' + (a.source_name || 'Salary') + '</td><td class="amt">' + fmt(v) + '</td></tr>';
+    });
+    (otherInc || []).filter(o => o.member_name === name).forEach(o => {
+      const v = Number(o.net_monthly) || 0; totalIn += v;
+      inRows += '<tr><td>' + (o.source_name || 'Other') + '</td><td class="amt">' + fmt(v) + '</td></tr>';
+    });
+    if (!inRows) inRows = '<tr><td colspan="2" style="color:#94a3b8;">No income set</td></tr>';
 
     // --- OUT: this person's bills, grouped by account ---
     const mine = bills.filter(b => b.paid_by === name);
@@ -119,7 +128,7 @@
     if (!mine.length) outRows = '<tr><td colspan="2" style="color:#94a3b8;">No bills assigned to ' + name + '</td></tr>';
 
     const avail = totalIn - totalOut;
-    return '<div class="person">' +
+    const html = '<div class="person">' +
       '<div class="blocktitle">' + name + '</div>' +
       '<div class="subtitle">In</div><table><tbody>' + inRows +
         '<tr class="total"><td>Total In</td><td class="amt">' + fmt(totalIn) + '</td></tr></tbody></table>' +
@@ -127,6 +136,34 @@
         '<tr class="total"><td>Total Out</td><td class="amt">' + fmt(totalOut) + '</td></tr>' +
         '<tr class="avail"><td>' + name + ' available per month</td><td class="amt">' + fmt(avail) + '</td></tr></tbody></table>' +
       '</div>';
+    return { html: html, avail: avail };
+  }
+
+  function renderFooter(names, tiers, pensContribs, avails) {
+    // current-tier monthly pension contribution per person
+    let pensRows = '', totalPens = 0;
+    names.forEach(name => {
+      const days = currentTierDays(name, tiers);
+      const mine = pensContribs.filter(p => p.member_name === name);
+      mine.forEach(p => {
+        // pick the row matching the current tier; if working_days is null treat as always-on
+        if (p.working_days != null && days != null && Number(p.working_days) !== Number(days)) return;
+        const v = Number(p.monthly_contribution) || 0;
+        if (v === 0) return;
+        totalPens += v;
+        pensRows += '<tr><td>' + (p.pension_name || 'Pension') + ' — ' + name + '</td><td class="amt">' + fmt(v) + '</td></tr>';
+      });
+    });
+    const sumAvail = names.reduce((s, n) => s + (avails[n] || 0), 0);
+    const totalCash = sumAvail - totalPens;
+    const panel = document.getElementById('pensionPanel');
+    panel.innerHTML = '<div class="blocktitle">Cash Summary</div>' +
+      '<div class="subtitle" style="border-top:none;">Pensions</div>' +
+      '<table><tbody>' + (pensRows || '<tr><td colspan="2" style="color:#94a3b8;">No pension contributions at the current tier</td></tr>') +
+        '<tr class="total"><td>Total pension contributions</td><td class="amt">' + fmt(totalPens) + '</td></tr>' +
+        '<tr class="total"><td>Sum of available (both)</td><td class="amt">' + fmt(sumAvail) + '</td></tr>' +
+        '<tr class="avail"><td>Total cash available</td><td class="amt">' + fmt(totalCash) + '</td></tr></tbody></table>';
+    panel.style.display = 'block';
   }
 
   window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
