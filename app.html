@@ -397,9 +397,16 @@
     <div style="margin:0 0 12px; font-size:14px;">
       <label style="cursor:pointer; display:inline-flex; align-items:center; gap:8px;"><input type="checkbox" id="retGrowthToggle" class="toggle-switch" onchange="toggleRetGrowth()"> <span>Show investment growth on each pot</span></label>
     </div>
+    <div style="margin:0 0 12px;">
+      <button type="button" id="colChooserBtn" onclick="toggleColChooser()" style="padding:9px 14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); color:var(--ink); font-weight:bold; font-size:14px; cursor:pointer;">Columns &#9662;</button>
+      <div id="colChooser" style="display:none; margin-top:8px; padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); max-width:520px;">
+        <div style="font-size:13px; color:var(--ink-soft); margin-bottom:10px;">Tick the columns to show. Year and Total Gross Income always stay.</div>
+        <div id="colChooserList" style="display:grid; grid-template-columns:1fr 1fr; gap:8px 18px;"></div>
+      </div>
+    </div>
     <div class="table-wrap">
       <table id="rTable">
-        <thead><tr><th id="rThPeriod">Year</th><th>Tax-Free Pot</th><th class="grow-col" style="display:none;">TF Growth</th><th>Taxable Pot</th><th class="grow-col" style="display:none;">Tx Growth</th><th>Cash Savings</th><th>Other Incomes</th><th>Savings to Bills</th><th>Bills</th><th>Dining</th><th>Loan Payment</th><th>Drawdown required</th><th>Total Gross Income</th></tr></thead>
+        <thead><tr><th id="rThPeriod">Year</th><th class="rc-tf">Tax-Free Pot</th><th class="grow-col rc-tf" style="display:none;">TF Growth</th><th class="rc-tx">Taxable Pot</th><th class="grow-col rc-tx" style="display:none;">Tx Growth</th><th class="rc-cash">Cash Savings</th><th class="rc-other">Other Incomes</th><th class="rc-savbills">Savings to Bills</th><th class="rc-bills">Bills</th><th class="rc-dining">Dining</th><th class="rc-loan">Loan Payment</th><th class="rc-draw">Drawdown required</th><th>Total Gross Income</th></tr></thead>
         <tbody><tr><td colspan="13">Calculating…</td></tr></tbody>
       </table>
     </div>
@@ -443,7 +450,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-133 (rail)</span>
+    <span class="build-stamp">build: LC-134 (col-chooser)</span>
   </div>
 
   <script>
@@ -575,6 +582,42 @@
       if (!e.target.classList || !e.target.classList.contains('crash-info')) hideCrashTip();
     });
     function toggleRetGrowth() { retShowGrowth = document.getElementById('retGrowthToggle').checked; renderRetirementTable(); }
+
+    // ---- Retirement table column chooser ----
+    const RET_COLS = [
+      { cls:'rc-tf', label:'Tax-Free Pot' }, { cls:'rc-tx', label:'Taxable Pot' },
+      { cls:'rc-cash', label:'Cash Savings' }, { cls:'rc-other', label:'Other Incomes' },
+      { cls:'rc-savbills', label:'Savings to Bills' }, { cls:'rc-bills', label:'Bills' },
+      { cls:'rc-dining', label:'Dining' }, { cls:'rc-loan', label:'Loan Payment' },
+      { cls:'rc-draw', label:'Drawdown required' }
+    ];
+    let retHiddenCols = {};   // cls -> true when hidden (session only)
+    function buildColChooser() {
+      const host = document.getElementById('colChooserList');
+      if (!host) return;
+      host.innerHTML = RET_COLS.map(c =>
+        `<label style="cursor:pointer; display:inline-flex; align-items:center; gap:8px; font-size:14px;">` +
+        `<input type="checkbox" ${retHiddenCols[c.cls] ? '' : 'checked'} onchange="toggleCol('${c.cls}', this.checked)"> ${c.label}</label>`
+      ).join('');
+    }
+    function toggleColChooser() {
+      const box = document.getElementById('colChooser');
+      box.style.display = (box.style.display === 'none') ? 'block' : 'none';
+    }
+    function toggleCol(cls, show) {
+      retHiddenCols[cls] = !show;
+      applyColVisibility();
+    }
+    function applyColVisibility() {
+      RET_COLS.forEach(c => {
+        const hide = !!retHiddenCols[c.cls];
+        document.querySelectorAll('#rTable .' + c.cls).forEach(el => {
+          // growth columns are also gated by retShowGrowth; don't force them visible
+          if (el.classList.contains('grow-col') && !retShowGrowth) { el.style.display = 'none'; return; }
+          el.style.display = hide ? 'none' : '';
+        });
+      });
+    }
     function renderRetirementTable() {
       const tb = document.querySelector('#rTable tbody');
       const rowsToShow = (retGran === 'month') ? (drawdownRows.monthly || []) : drawdownRows;
@@ -593,21 +636,22 @@
           const safe = tip.replace(/'/g, "\\'").replace(/"/g, '&quot;');
           crashIcon = ` <button type="button" class="crash-info" aria-label="${tip}" onclick="showCrashTip(event,'${safe}')" onmouseenter="showCrashTip(event,'${safe}')" onmouseleave="hideCrashTip()">i</button>`;
         }
-        const tfGrow = retShowGrowth ? `<td class="grow-col" style="color:${v.tfG < 0 ? '#c0392b' : '#16a34a'};font-size:0.92em;">${fmt(v.tfG)}</td>` : '';
-        const txGrow = retShowGrowth ? `<td class="grow-col" style="color:${v.txG < 0 ? '#c0392b' : '#16a34a'};font-size:0.92em;">${fmt(v.txG)}</td>` : '';
+        const tfGrow = retShowGrowth ? `<td class="grow-col rc-tf" style="color:${v.tfG < 0 ? '#c0392b' : '#16a34a'};font-size:0.92em;">${fmt(v.tfG)}</td>` : '';
+        const txGrow = retShowGrowth ? `<td class="grow-col rc-tx" style="color:${v.txG < 0 ? '#c0392b' : '#16a34a'};font-size:0.92em;">${fmt(v.txG)}</td>` : '';
         return `<tr class="${r.shortfall ? 'shortfall' : ''}${r.crash ? ' crash-row' : ''}">
           <td>${period}${crashIcon}</td>
-          <td>${fmt(v.tf)}</td>${tfGrow}<td>${fmt(v.tx)}</td>${txGrow}
-          <td style="color:#2c7a7b;">${fmt(r.cashBalance || 0)}</td>
-          <td>${fmt(v.other)}</td>
-          <td style="font-weight:bold;color:#2c7a7b;">${fmt(v.savToBills)}</td>
-          <td style="font-weight:bold;color:#c0392b;">${fmt(v.bills)}</td>
-          <td style="font-weight:bold;color:#e67e22;">${fmt(v.dining)}</td>
-          <td style="font-weight:bold;color:#2563eb;">${fmt(v.loan)}</td>
-          <td>${fmt(v.draw)}</td>
+          <td class="rc-tf">${fmt(v.tf)}</td>${tfGrow}<td class="rc-tx">${fmt(v.tx)}</td>${txGrow}
+          <td class="rc-cash" style="color:#2c7a7b;">${fmt(r.cashBalance || 0)}</td>
+          <td class="rc-other">${fmt(v.other)}</td>
+          <td class="rc-savbills" style="font-weight:bold;color:#2c7a7b;">${fmt(v.savToBills)}</td>
+          <td class="rc-bills" style="font-weight:bold;color:#c0392b;">${fmt(v.bills)}</td>
+          <td class="rc-dining" style="font-weight:bold;color:#e67e22;">${fmt(v.dining)}</td>
+          <td class="rc-loan" style="font-weight:bold;color:#2563eb;">${fmt(v.loan)}</td>
+          <td class="rc-draw">${fmt(v.draw)}</td>
           <td style="font-weight:bold;color:#27ae60;">${fmt(v.income)}</td>
         </tr>`;
       }).join('');
+      applyColVisibility();
     }
 
     function drawCharts() {
@@ -1210,6 +1254,7 @@
         calib.j = 1;
 
         buildTierSliders();
+        buildColChooser();
         applyControls(savedPlan);
         applyDynamicMaxes();
         recomputeAll();
