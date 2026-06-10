@@ -429,7 +429,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-131 (tier-sliders)</span>
+    <span class="build-stamp">build: LC-132</span>
   </div>
 
   <script>
@@ -907,6 +907,31 @@
       });
       host.innerHTML = html;
     }
+    // Tweak 1: cap the Fully-retire slider at the eldest person's 67th birthday.
+    // Tweak 2: cap each tier-change slider at the current Fully-retire date.
+    function applyDynamicMaxes() {
+      const retire = document.getElementById('m_retire');
+      if (retire) {
+        const doms = (data.members || []).map(m => m.dob ? new Date(m.dob) : null).filter(Boolean);
+        if (doms.length) {
+          const eldest = doms.reduce((a, b) => (a < b ? a : b));   // earliest DOB = eldest person
+          const sixtySeven = new Date(eldest.getFullYear() + 67, eldest.getMonth(), 1);
+          const b = monthBase();
+          const maxIdx = (sixtySeven.getFullYear() - b.getFullYear()) * 12 + (sixtySeven.getMonth() - b.getMonth());
+          retire.max = Math.max(1, maxIdx);
+          if (Number(retire.value) > Number(retire.max)) retire.value = retire.max;
+        }
+      }
+      // tier sliders can't exceed the retire date (can't drop to a shorter week after fully retired)
+      const retIdx = retire ? Number(retire.value) : 120;
+      tierKeys.forEach(tk => {
+        const el = document.getElementById(tk.sid);
+        if (!el) return;
+        el.max = Math.max(1, retIdx);
+        if (Number(el.value) > Number(el.max)) el.value = el.max;
+      });
+    }
+
     function readTierOverrides() {
       const ov = {};
       tierKeys.forEach(tk => {
@@ -968,7 +993,7 @@
       syncTierLabels();
     }
     function toggleInfo(evt, id) { evt.preventDefault(); const el = document.getElementById(id); if (el) el.classList.toggle('show'); }
-    function onParam() { syncLabels(); document.getElementById('m_floors').classList.toggle('show', document.getElementById('m_dynamic').checked); recomputeAll(); }
+    function onParam() { applyDynamicMaxes(); syncLabels(); document.getElementById('m_floors').classList.toggle('show', document.getElementById('m_dynamic').checked); recomputeAll(); }
 
     // wire the segmented day buttons (delegated)
     document.querySelectorAll('.seg').forEach(seg => {
@@ -1172,6 +1197,7 @@
 
         buildTierSliders();
         applyControls(savedPlan);
+        applyDynamicMaxes();
         recomputeAll();
         status.className = 's-ok';
         status.textContent = 'Loaded. Move the Modelling sliders to explore live; the view toggle re-slices instantly.';
