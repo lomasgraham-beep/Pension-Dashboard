@@ -12,16 +12,16 @@
   #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
   .s-err { background:#fdecea !important; color:#c0392b !important; }
   .cols { display:grid; grid-template-columns:repeat(3, 1fr); gap:18px; align-items:start; }
-  .person { border:2px solid #2c3e50; border-radius:10px; background:#fff; height:calc(100vh - 40px); display:flex; flex-direction:column; overflow:hidden; }
+  .person { border:2px solid #2c3e50; border-radius:10px; background:#fff; height:820px; display:flex; flex-direction:column; overflow:hidden; }
   .person .card-head { flex:0 0 auto; }
   .person .card-scroll { flex:1 1 auto; overflow-y:auto; min-height:0; }
   .person .card-foot { flex:0 0 auto; border-top:2px solid #cbd5e1; }
-  .col3 { display:flex; flex-direction:column; gap:18px; height:calc(100vh - 40px); }
+  .col3 { display:flex; flex-direction:column; gap:18px; height:820px; }
   .col3 .person { height:auto; flex:1 1 0; min-height:0; }
   /* col3 blocks (Credit Card, PayPal, Cash Summary) have no scroll wrapper; let their last table scroll */
   .col3 .person > table { flex:1 1 auto; display:block; overflow-y:auto; min-height:0; }
   .col3 .person > .blocktitle, .col3 .person > .subtitle { flex:0 0 auto; }
-  @media (max-width: 760px) { .cols { grid-template-columns:1fr; } .person, .col3 .person { height:auto; max-height:70vh; } .col3 { height:auto; } }
+  @media (max-width: 760px) { .cols { grid-template-columns:1fr; } .person, .col3 .person { height:auto; max-height:600px; } .col3 { height:auto; } }
   .blocktitle { background:#2c3e50; color:#fff; font-weight:bold; text-align:center; padding:9px; font-size:16px; }
   .subtitle { background:#eef2f7; color:#2c3e50; font-weight:bold; text-align:center; padding:7px; font-size:14px; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; }
   table { border-collapse:collapse; width:100%; }
@@ -49,7 +49,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v7)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v8)</span></p>
   <div id="status">Loading…</div>
   <div class="cols" id="cols" style="display:none;">
     <div id="colGraham"></div>
