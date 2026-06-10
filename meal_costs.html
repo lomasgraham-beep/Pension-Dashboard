@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meal Costs</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err85"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:640px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:10px 12px; border-bottom:1px solid #e2e8f0; text-align:left; }
+  th { background:#f8fafc; color:#475569; font-size:14px; }
+  td.lvl { font-weight:bold; }
+  input[type=number] { width:90px; padding:9px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; text-align:right; }
+  .btn { border:none; border-radius:8px; padding:12px 18px; font-size:15px; font-weight:bold; cursor:pointer; min-height:48px; background:#27ae60; color:#fff; }
+  .meal-head td { background:#eef2f7; font-weight:bold; color:#2c3e50; font-size:15px; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+  .s-ok { background:#d1fae5 !important; color:#065f46 !important; }
+
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1 { color:#f1f5f9 !important; } .note { color:#94a3b8 !important; }
+    .panel { background:#1e293b !important; border-color:#334155 !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    .meal-head td { background:#162132 !important; color:#f1f5f9 !important; }
+    input[type=number] { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Meal Costs</h1>
+  <p class="note">The cost of each meal at Low, Medium and High. These values are looked up by the dining rota to total your dining costs. Whole pounds only. <span style="color:#94a3b8;">(meal costs build: v1)</span></p>
+  <div id="status">Loading…</div>
+
+  <div class="panel" id="panel" style="display:none;">
+    <table id="mcTable"><thead><tr><th>Meal</th><th>Level</th><th>Cost (£)</th></tr></thead><tbody></tbody></table>
+    <div style="margin-top:14px;"><button class="btn" onclick="saveAll()">Save changes</button> <span id="msg" style="margin-left:10px; font-weight:bold;"></span></div>
+  </div>
+
+<script>
+  const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Drinks'];
+  const LEVELS = [['L', 'Low'], ['M', 'Medium'], ['H', 'High']];
+  let rows = [];   // {id, meal_type, level, cost}
+
+  function notify() { try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {} }
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      rows = await App.rest('bd_meal_cost') || [];
+      status.style.display = 'none';
+      document.getElementById('panel').style.display = 'block';
+      render();
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  function findRow(meal, lvl) { return rows.find(r => r.meal_type === meal && r.level === lvl); }
+
+  function render() {
+    const tb = document.querySelector('#mcTable tbody');
+    let html = '';
+    MEALS.forEach(meal => {
+      html += '<tr class="meal-head"><td colspan="3">' + meal + '</td></tr>';
+      LEVELS.forEach(([code, label]) => {
+        const r = findRow(meal, code);
+        const val = r && r.cost != null ? r.cost : 0;
+        const key = meal + '|' + code;
+        html += '<tr><td></td><td class="lvl">' + label + '</td><td><input type="number" step="1" min="0" id="mc_' + key.replace(/[^A-Za-z]/g, '_') + '" value="' + val + '"></td></tr>';
+      });
+    });
+    tb.innerHTML = html;
+  }
+
+  async function saveAll() {
+    const msg = document.getElementById('msg');
+    msg.style.color = '#1e3a8a'; msg.textContent = 'Saving…';
+    try {
+      const updates = [];
+      MEALS.forEach(meal => {
+        LEVELS.forEach(([code]) => {
+          const key = (meal + '|' + code).replace(/[^A-Za-z]/g, '_');
+          const el = document.getElementById('mc_' + key);
+          if (!el) return;
+          const v = parseInt(el.value, 10);
+          const cost = isNaN(v) || v < 0 ? 0 : v;
+          const r = findRow(meal, code);
+          if (r) updates.push({ id: r.id, cost: cost });
+        });
+      });
+      for (const u of updates) {
+        await App.write('PATCH', 'bd_meal_cost?id=eq.' + u.id, { cost: u.cost });
+      }
+      msg.style.color = '#065f46'; msg.textContent = '✓ Saved.';
+      notify();
+      await load();
+    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  App.requireLogin(load, { title: 'Meal Costs' });
+</script>
+</body>
+</html>

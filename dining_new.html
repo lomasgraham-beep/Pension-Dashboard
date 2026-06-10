@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dining (new)</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err85"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1000px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:14px; }
+  .bar { position:sticky; top:0; z-index:5; background:#f4f7f6; padding:10px 0; display:flex; gap:12px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #e2e8f0; margin-bottom:12px; }
+  .btn { border:none; border-radius:8px; padding:11px 16px; font-size:15px; font-weight:bold; cursor:pointer; min-height:46px; background:#27ae60; color:#fff; }
+  .grand { font-weight:bold; color:#2c3e50; font-size:16px; }
+  .wk { border:1px solid #e2e8f0; border-radius:8px; margin-bottom:14px; overflow:hidden; background:#fff; }
+  .wk-head { background:#2c3e50; color:#fff; font-weight:bold; padding:8px 12px; display:flex; justify-content:space-between; }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:5px 6px; border-bottom:1px solid #eef2f7; text-align:center; font-size:14px; }
+  th { background:#f0fdf4; color:#166534; font-size:13px; }
+  td.meal { text-align:left; font-weight:bold; color:#2c3e50; white-space:nowrap; padding-left:10px; }
+  td.tot { text-align:right; font-weight:bold; color:#9a3412; background:#fff7ed; white-space:nowrap; padding-right:10px; }
+  th.tot { background:#ffedd5; color:#9a3412; text-align:right; }
+  select.cell { width:54px; padding:6px 2px; border:1px solid #e2e8f0; border-radius:5px; font-size:14px; text-align:center; background:#fff; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+  .s-ok { background:#d1fae5 !important; color:#065f46 !important; }
+
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1 { color:#f1f5f9 !important; } .note { color:#94a3b8 !important; }
+    .bar { background:#0f172a !important; border-color:#334155 !important; }
+    .grand { color:#f1f5f9 !important; }
+    .wk { background:#1e293b !important; border-color:#334155 !important; }
+    .wk-head { background:#15803d !important; color:#fff !important; }
+    th { background:#0b2818 !important; color:#86efac !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    td.meal { color:#f1f5f9 !important; }
+    td.tot { background:#2a1a0f !important; color:#fdba74 !important; }
+    th.tot { background:#3a2410 !important; color:#fdba74 !important; }
+    select.cell { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Dining <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(new — 52-week rota)</span></h1>
+  <p class="note">Set each meal's level (L/M/H) per day across 52 weeks. Costs are looked up from Meal Costs. Each row totals automatically; the year total feeds retirement modelling once switched on. <span style="color:#94a3b8;">(dining-new build: v1)</span></p>
+  <div id="status">Loading…</div>
+
+  <div class="bar" id="bar" style="display:none;">
+    <button class="btn" onclick="saveAll()">Save changes</button>
+    <span id="msg" style="font-weight:bold;"></span>
+    <span class="grand" style="margin-left:auto;">Year total: <span id="grandTotal">£0</span></span>
+  </div>
+  <div id="weeks"></div>
+
+<script>
+  const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Drinks'];
+  const DAYS = [['mon', 'M'], ['tue', 'T'], ['wed', 'W'], ['thu', 'Th'], ['fri', 'F'], ['sat', 'S'], ['sun', 'Su']];
+  const WEEKS = 52;
+  const fmt = App.fmt;
+
+  let rota = [];        // bd_dining_rota rows
+  let costMap = {};     // "Meal|L" -> integer cost
+  let dirty = {};       // id -> true
+
+  function notify() { try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {} }
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      const [rotaRows, costRows] = await Promise.all([
+        App.rest('bd_dining_rota?order=week_no.asc,meal_type.asc'),
+        App.rest('bd_meal_cost')
+      ]);
+      rota = rotaRows || [];
+      costMap = {};
+      (costRows || []).forEach(c => { costMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
+      dirty = {};
+      status.style.display = 'none';
+      document.getElementById('bar').style.display = 'flex';
+      render();
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  function rowFor(week, meal) { return rota.find(r => Number(r.week_no) === week && r.meal_type === meal); }
+  function cellCost(meal, lvl) { if (!lvl) return 0; return costMap[meal + '|' + lvl] || 0; }
+
+  function rowTotal(r) {
+    if (!r) return 0;
+    return DAYS.reduce((s, [col]) => s + cellCost(r.meal_type, r[col]), 0);
+  }
+
+  function render() {
+    let html = '';
+    for (let w = 1; w <= WEEKS; w++) {
+      let weekTotal = 0;
+      let body = '';
+      MEALS.forEach(meal => {
+        const r = rowFor(w, meal);
+        const rt = rowTotal(r);
+        weekTotal += rt;
+        const cells = DAYS.map(([col]) => {
+          const v = r ? (r[col] || '') : '';
+          const id = 'c_' + w + '_' + meal + '_' + col;
+          return '<td><select class="cell" id="' + id + '" onchange="onCell(' + w + ',\'' + meal + '\',\'' + col + '\',this.value)">' +
+            '<option value=""></option>' +
+            '<option' + (v === 'L' ? ' selected' : '') + '>L</option>' +
+            '<option' + (v === 'M' ? ' selected' : '') + '>M</option>' +
+            '<option' + (v === 'H' ? ' selected' : '') + '>H</option>' +
+            '</select></td>';
+        }).join('');
+        body += '<tr><td class="meal">' + meal + '</td>' + cells + '<td class="tot" id="rt_' + w + '_' + meal + '">' + fmt(rt) + '</td></tr>';
+      });
+      html += '<div class="wk"><div class="wk-head"><span>Week ' + w + '</span><span id="wt_' + w + '">' + fmt(weekTotal) + '</span></div>' +
+        '<table><thead><tr><th style="text-align:left;padding-left:10px;">Meal</th>' +
+        DAYS.map(([, lbl]) => '<th>' + lbl + '</th>').join('') +
+        '<th class="tot">Total</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+    }
+    document.getElementById('weeks').innerHTML = html;
+    recalcGrand();
+  }
+
+  function onCell(week, meal, col, value) {
+    const r = rowFor(week, meal);
+    if (!r) return;
+    r[col] = value || null;
+    dirty[r.id] = true;
+    // update this row's total, the week total, and the grand total live
+    const rt = rowTotal(r);
+    const rtEl = document.getElementById('rt_' + week + '_' + meal);
+    if (rtEl) rtEl.textContent = fmt(rt);
+    let weekTotal = 0;
+    MEALS.forEach(m => { weekTotal += rowTotal(rowFor(week, m)); });
+    const wtEl = document.getElementById('wt_' + week);
+    if (wtEl) wtEl.textContent = fmt(weekTotal);
+    recalcGrand();
+  }
+
+  function recalcGrand() {
+    const total = rota.reduce((s, r) => s + rowTotal(r), 0);
+    document.getElementById('grandTotal').textContent = fmt(total);
+  }
+
+  async function saveAll() {
+    const msg = document.getElementById('msg');
+    const ids = Object.keys(dirty);
+    if (!ids.length) { msg.style.color = '#64748b'; msg.textContent = 'No changes to save.'; return; }
+    msg.style.color = '#1e3a8a'; msg.textContent = 'Saving ' + ids.length + ' row(s)…';
+    try {
+      for (const id of ids) {
+        const r = rota.find(x => x.id === id);
+        if (!r) continue;
+        const payload = { mon: r.mon || null, tue: r.tue || null, wed: r.wed || null, thu: r.thu || null, fri: r.fri || null, sat: r.sat || null, sun: r.sun || null };
+        await App.write('PATCH', 'bd_dining_rota?id=eq.' + id, payload);
+      }
+      dirty = {};
+      msg.style.color = '#065f46'; msg.textContent = '✓ Saved.';
+      notify();
+    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  App.requireLogin(load, { title: 'Dining (new)' });
+</script>
+</body>
+</html>
