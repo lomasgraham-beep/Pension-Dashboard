@@ -39,7 +39,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v4)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v5)</span></p>
   <div id="status">Loading…</div>
   <div class="cols" id="cols" style="display:none;"></div>
   <div class="panel" id="pensionPanel" style="display:none; max-width:430px;"></div>
@@ -87,11 +87,12 @@
         avails[name] = r.avail;
         return r.html;
       }).join('');
-      const cc = creditBlock(bills || [], billCats || []);
-      cardsHtml += cc.html;
+      const cc = payerCatBlock(bills || [], billCats || [], 'Credit card', 'Credit Card');
+      const pp = payerCatBlock(bills || [], billCats || [], 'PayPal', 'PayPal');
+      cardsHtml += cc.html + pp.html;
       cols.innerHTML = cardsHtml;
       cols.style.display = 'grid';
-      renderFooter(names, tiers || [], pensContribs || [], avails, cc.total);
+      renderFooter(names, tiers || [], pensContribs || [], avails, cc.total, pp.total);
       status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
@@ -143,8 +144,8 @@
     return { html: html, avail: avail };
   }
 
-  function creditBlock(bills, billCats) {
-    const mine = bills.filter(b => b.paid_by === 'Credit card');
+  function payerCatBlock(bills, billCats, payer, title) {
+    const mine = bills.filter(b => b.paid_by === payer);
     if (!mine.length) return { html: '', total: 0 };
     const catLabel = {};
     (billCats || []).forEach(c => { catLabel[c.code] = c.description || c.code; });
@@ -161,14 +162,14 @@
       return '<tr><td>' + label + '</td><td class="amt">' + fmt(byCat[code]) + '</td></tr>';
     }).join('');
     const html = '<div class="person">' +
-      '<div class="blocktitle">Credit Card</div>' +
+      '<div class="blocktitle">' + title + '</div>' +
       '<div class="subtitle">By category</div><table><tbody>' + rows +
-        '<tr class="total"><td>Total on cards</td><td class="amt">' + fmt(total) + '</td></tr></tbody></table>' +
+        '<tr class="total"><td>Total</td><td class="amt">' + fmt(total) + '</td></tr></tbody></table>' +
       '</div>';
     return { html: html, total: total };
   }
 
-  function renderFooter(names, tiers, pensContribs, avails, creditTotal) {
+  function renderFooter(names, tiers, pensContribs, avails, creditTotal, paypalTotal) {
     // current-tier monthly pension contribution per person
     let pensRows = '', totalPens = 0;
     names.forEach(name => {
@@ -187,8 +188,10 @@
     });
     const sumAvail = names.reduce((s, n) => s + (avails[n] || 0), 0);
     const cc = Number(creditTotal) || 0;
-    const totalCash = sumAvail - totalPens - cc;
+    const pp = Number(paypalTotal) || 0;
+    const totalCash = sumAvail - totalPens - cc - pp;
     const ccRow = cc > 0 ? '<tr class="total"><td>Less credit card spending</td><td class="amt">\u2212' + fmt(cc) + '</td></tr>' : '';
+    const ppRow = pp > 0 ? '<tr class="total"><td>Less PayPal spending</td><td class="amt">\u2212' + fmt(pp) + '</td></tr>' : '';
     const panel = document.getElementById('pensionPanel');
     panel.innerHTML = '<div class="blocktitle">Cash Summary</div>' +
       '<div class="subtitle" style="border-top:none;">Pensions</div>' +
@@ -196,6 +199,7 @@
         '<tr class="total"><td>Total pension contributions</td><td class="amt">' + fmt(totalPens) + '</td></tr>' +
         '<tr class="total"><td>Sum of available (both)</td><td class="amt">' + fmt(sumAvail) + '</td></tr>' +
         ccRow +
+        ppRow +
         '<tr class="avail"><td>Total cash available</td><td class="amt">' + fmt(totalCash) + '</td></tr></tbody></table>';
     panel.style.display = 'block';
   }
