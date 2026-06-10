@@ -17,6 +17,9 @@
   .person .card-scroll { flex:1 1 auto; overflow-y:auto; min-height:0; }
   .person .card-foot { flex:0 0 auto; border-top:2px solid #cbd5e1; }
   .col3 { display:flex; flex-direction:column; gap:18px; height:820px; }
+  .tier-sel { display:flex; gap:6px; padding:8px 12px; flex-wrap:wrap; }
+  .tier-btn { border:1px solid #cbd5e1; background:#fff; color:#475569; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:bold; cursor:pointer; min-height:34px; }
+  .tier-btn.on { background:#2c3e50; color:#fff; border-color:#2c3e50; }
   .col3 .person { height:auto; flex:1 1 0; min-height:0; }
   /* col3 blocks (Credit Card, PayPal, Cash Summary) have no scroll wrapper; let their last table scroll */
   .col3 .person > table { flex:1 1 auto; display:block; overflow-y:auto; min-height:0; }
@@ -37,6 +40,8 @@
     h1 { color:#f1f5f9 !important; } .note { color:#94a3b8 !important; }
     .person, .panel { background:#1e293b !important; border-color:#334155 !important; }
     .person .card-foot { border-color:#475569 !important; }
+    .tier-btn { background:#0f172a !important; color:#cbd5e1 !important; border-color:#475569 !important; }
+    .tier-btn.on { background:#3b82f6 !important; color:#fff !important; border-color:#3b82f6 !important; }
     .blocktitle { background:#0b1220 !important; color:#f1f5f9 !important; }
     .subtitle { background:#162132 !important; color:#cbd5e1 !important; border-color:#334155 !important; }
     td { border-color:#334155 !important; color:#cbd5e1 !important; }
@@ -49,7 +54,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v10)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v11)</span></p>
   <div id="status">Loading…</div>
   <div class="cols" id="cols" style="display:none;">
     <div id="colGraham"></div>
@@ -78,6 +83,17 @@
     return best ? Number(best.days) : null;
   }
 
+  // distinct day-counts this member actually has, sorted high→low (e.g. [5,3])
+  function tiersFor(member, tiers) {
+    const set = {};
+    (tiers || []).forEach(t => { if (t.member_name === member && t.days != null) set[Number(t.days)] = true; });
+    return Object.keys(set).map(Number).sort((a, b) => b - a);
+  }
+
+  // loaded data + per-person what-if tier selection (resets on reload)
+  let DATA = null;
+  const selectedTier = {};   // member -> chosen day-count
+
   async function load() {
     const status = document.getElementById('status');
     try {
@@ -93,34 +109,54 @@
       ]);
       const names = (members || []).map(m => m.name).filter(Boolean);
       if (!names.length) { status.textContent = 'No members found.'; return; }
-
-      const avails = {};
-      const blocks = names.map(name => {
-        const r = personBlock(name, bills || [], tiers || [], incAmts || [], otherInc || []);
-        avails[name] = r.avail;
-        return r.html;
-      });
-      // column 1 = first member, column 2 = second member (alphabetical: Graham, Julie)
-      document.getElementById('colGraham').innerHTML = blocks[0] || '';
-      document.getElementById('colJulie').innerHTML = blocks[1] || '';
-      // extra members (3rd+), if any, append to column 1 so nothing is lost
-      if (blocks.length > 2) document.getElementById('colGraham').innerHTML += blocks.slice(2).join('');
-
-      const diningMonthly = (dining || []).reduce((s, d) => s + (Number(d.annual_total) || 0), 0) / 12;
-      const cc = payerCatBlock(bills || [], billCats || [], 'Credit card', 'Credit Card', diningMonthly);
-      const pp = payerCatBlock(bills || [], billCats || [], 'PayPal', 'PayPal', 0);
-      const footerHtml = buildFooter(names, tiers || [], pensContribs || [], avails, cc.total, pp.total);
-      // column 3 stacks: Credit Card, PayPal, then Cash Summary
-      document.getElementById('col3').innerHTML = cc.html + pp.html + footerHtml;
-
-      document.getElementById('cols').style.display = 'grid';
+      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], billCats: billCats || [], dining: dining || [] };
+      // default each person's selector to their current active tier
+      names.forEach(n => { selectedTier[n] = currentTierDays(n, DATA.tiers); });
       status.style.display = 'none';
+      rebuild();
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
 
+  // called by each tier selector button
+  function setTier(member, days) {
+    selectedTier[member] = (days === '' || days == null) ? null : Number(days);
+    rebuild();
+  }
+
+  function rebuild() {
+    const d = DATA; if (!d) return;
+    const avails = {};
+    const blocks = d.names.map(name => {
+      const r = personBlock(name, d.bills, d.tiers, d.incAmts, d.otherInc);
+      avails[name] = r.avail;
+      return r.html;
+    });
+    document.getElementById('colGraham').innerHTML = blocks[0] || '';
+    document.getElementById('colJulie').innerHTML = blocks[1] || '';
+    if (blocks.length > 2) document.getElementById('colGraham').innerHTML += blocks.slice(2).join('');
+
+    const diningMonthly = d.dining.reduce((s, x) => s + (Number(x.annual_total) || 0), 0) / 12;
+    const cc = payerCatBlock(d.bills, d.billCats, 'Credit card', 'Credit Card', diningMonthly);
+    const pp = payerCatBlock(d.bills, d.billCats, 'PayPal', 'PayPal', 0);
+    const footerHtml = buildFooter(d.names, d.tiers, d.pensContribs, avails, cc.total, pp.total);
+    document.getElementById('col3').innerHTML = cc.html + pp.html + footerHtml;
+    document.getElementById('cols').style.display = 'grid';
+  }
+
+  // segmented tier selector for a person (only their actual tiers); '' was current
+  function tierSelectorHtml(name, tiers) {
+    const opts = tiersFor(name, tiers);
+    if (opts.length < 2) return '';   // nothing to switch if only one tier
+    const sel = selectedTier[name];
+    const btns = opts.map(d =>
+      '<button type="button" class="tier-btn' + (Number(sel) === d ? ' on' : '') + '" onclick="setTier(\'' + name.replace(/'/g, "\\'") + '\',' + d + ')">' + d + '-day</button>'
+    ).join('');
+    return '<div class="tier-sel">' + btns + '</div>';
+  }
+
   function personBlock(name, bills, tiers, incAmts, otherInc) {
-    // --- IN: current-tier salary from Workplace Income + any other income ---
-    const days = currentTierDays(name, tiers);
+    // --- IN: salary from Workplace Income at the selected tier + any other income ---
+    const days = (selectedTier[name] !== undefined) ? selectedTier[name] : currentTierDays(name, tiers);
     let inRows = '', totalIn = 0;
     const salaryRows = incAmts.filter(a => a.member_name === name && (days == null || Number(a.working_days) === Number(days)));
     // if no tier match, fall back to any income rows for this member
@@ -157,6 +193,7 @@
     const html = '<div class="person">' +
       '<div class="card-head">' +
         '<div class="blocktitle">' + name + '</div>' +
+        tierSelectorHtml(name, tiers) +
         '<div class="subtitle">In</div><table><tbody>' + inRows +
           '<tr class="total"><td>Total In</td><td class="amt">' + fmt(totalIn) + '</td></tr></tbody></table>' +
         '<div class="subtitle">Out</div>' +
@@ -184,10 +221,13 @@
       byCat[code] = (byCat[code] || 0) + m;
       total += m;
     });
-    let rows = Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a]).map(code => {
-      const label = code === '\u2014' ? 'Uncategorised' : (catLabel[code] || code);
-      return '<tr><td>' + label + '</td><td class="amt">' + fmt(byCat[code]) + '</td></tr>';
-    }).join('');
+    let rows = Object.keys(byCat).map(code => ({
+      code: code,
+      label: code === '\u2014' ? 'Uncategorised' : (catLabel[code] || code),
+      amt: byCat[code]
+    })).sort((a, b) => a.label.localeCompare(b.label)).map(r =>
+      '<tr><td>' + r.label + '</td><td class="amt">' + fmt(r.amt) + '</td></tr>'
+    ).join('');
     // dining is paid on the credit card; roll it up as a single Dining row
     if (dining > 0) {
       rows += '<tr><td>Dining</td><td class="amt">' + fmt(dining) + '</td></tr>';
@@ -205,7 +245,7 @@
     // current-tier monthly pension contribution per person
     let pensRows = '', totalPens = 0;
     names.forEach(name => {
-      const days = currentTierDays(name, tiers);
+      const days = (selectedTier[name] !== undefined) ? selectedTier[name] : currentTierDays(name, tiers);
       const mine = pensContribs.filter(p => p.member_name === name);
       mine.forEach(p => {
         // pick the row matching the current tier; if working_days is null treat as always-on
