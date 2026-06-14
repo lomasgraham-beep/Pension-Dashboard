@@ -40,7 +40,7 @@
 </head>
 <body>
   <h1>Bank Accounts</h1>
-  <p class="note">Accounts used to pay bills and pension contributions. For security, the account ID is a short alphanumeric label of your choosing (e.g. "xxxx651") — not the full account number. <span style="color:#94a3b8;">(accounts build: v1)</span></p>
+  <p class="note">Accounts used to pay bills and pension contributions. For security, the account ID is a short alphanumeric label of your choosing (e.g. "xxxx651") — not the full account number. Set "Funded from" when an account is a savings pot topped up from another account (e.g. money put aside for insurance and car bills) — the Budget then attributes that spending to the funding account. <span style="color:#94a3b8;">(accounts build: v2)</span></p>
   <div id="status">Loading…</div>
 
   <div class="panel" id="panel" style="display:none;">
@@ -48,10 +48,11 @@
       <div style="flex:1; min-width:150px;"><label>Bank name</label><input type="text" id="newBank" placeholder="e.g. First Direct" style="width:100%;" maxlength="60"></div>
       <div style="flex:1; min-width:120px;"><label>Account ID</label><input type="text" id="newAcct" placeholder="e.g. xxxx651" style="width:100%;" maxlength="40"></div>
       <div style="min-width:120px;"><label>Held by</label><select id="newHolder"></select></div>
+      <div style="min-width:140px;"><label>Funded from</label><select id="newFunded"></select></div>
       <button class="btn" onclick="addAcct()">+ Add account</button>
     </div>
     <p class="muted" id="addHint">The Account ID is what appears in the bills and contributions dropdowns, so make it recognisable.</p>
-    <table id="acctTable"><thead><tr><th>Bank</th><th>Account ID</th><th>Held by</th><th>In use</th><th></th></tr></thead><tbody></tbody></table>
+    <table id="acctTable"><thead><tr><th>Bank</th><th>Account ID</th><th>Held by</th><th>Funded from</th><th>In use</th><th></th></tr></thead><tbody></tbody></table>
   </div>
 
 <script>
@@ -75,6 +76,8 @@
       (contribs || []).forEach(c => { if (c.paid_account) usage[c.paid_account] = (usage[c.paid_account] || 0) + 1; });
       const holder = document.getElementById('newHolder');
       holder.innerHTML = '<option value="">—</option>' + members.map(n => '<option>' + n.replace(/</g, '&lt;') + '</option>').join('');
+      const funded = document.getElementById('newFunded');
+      funded.innerHTML = '<option value="">— none —</option>' + accts.filter(a => a.account_id).map(a => '<option>' + a.account_id.replace(/</g, '&lt;') + '</option>').join('');
       status.style.display = 'none';
       document.getElementById('panel').style.display = 'block';
       renderRows();
@@ -83,15 +86,40 @@
 
   function renderRows() {
     const tb = document.querySelector('#acctTable tbody');
-    if (!accts.length) { tb.innerHTML = '<tr><td colspan="5" style="color:#94a3b8;">No accounts yet — add one above.</td></tr>'; return; }
+    if (!accts.length) { tb.innerHTML = '<tr><td colspan="6" style="color:#94a3b8;">No accounts yet — add one above.</td></tr>'; return; }
     tb.innerHTML = accts.map(a => {
       const n = usage[a.account_id] || 0;
       const useText = n === 0 ? 'not used' : n + (n === 1 ? ' item' : ' items');
       const delBtn = n === 0
         ? '<button class="btn-del" onclick="delAcct(\'' + a.id + '\')">Delete</button>'
         : '<span class="muted">in use</span>';
-      return '<tr><td>' + (a.bank_name || '') + '</td><td><strong>' + (a.account_id || '') + '</strong></td><td>' + (a.account_holder || '<span class="muted">—</span>') + '</td><td class="muted">' + useText + '</td><td style="text-align:right;">' + delBtn + '</td></tr>';
+      return '<tr><td>' + (a.bank_name || '') + '</td><td><strong>' + (a.account_id || '') + '</strong></td><td>' + (a.account_holder || '<span class="muted">—</span>') + '</td><td><select onchange="saveFunded(\'' + a.id + '\', this.value)">' + fundedOptions(a.account_id, a.funded_from) + '</select></td><td class="muted">' + useText + '</td><td style="text-align:right;">' + delBtn + '</td></tr>';
     }).join('');
+  }
+
+  function fundedOptions(selfId, current) {
+    let html = '<option value="">— none —</option>';
+    accts.forEach(a => {
+      if (!a.account_id || a.account_id === selfId) return;
+      const sel = (current && current === a.account_id) ? ' selected' : '';
+      html += '<option value="' + a.account_id.replace(/"/g, '&quot;') + '"' + sel + '>' + a.account_id.replace(/</g, '&lt;') + '</option>';
+    });
+    if (current && !accts.some(a => a.account_id === current)) {
+      html += '<option value="' + current.replace(/"/g, '&quot;') + '" selected>' + current.replace(/</g, '&lt;') + '</option>';
+    }
+    return html;
+  }
+
+  async function saveFunded(id, value) {
+    const status = document.getElementById('status');
+    try {
+      await App.write('PATCH', 'bd_bank_account?id=eq.' + encodeURIComponent(id), { funded_from: value || null });
+      const a = accts.find(x => x.id === id);
+      if (a) a.funded_from = value || null;
+      status.style.display = 'block'; status.className = 's-ok'; status.textContent = '✓ Saved.';
+      notify();
+      renderRows();
+    } catch (e) { status.style.display = 'block'; status.className = 's-err'; status.textContent = 'Save failed: ' + e.message; }
   }
 
   async function addAcct() {
@@ -103,8 +131,8 @@
     if (!acct) { status.style.display = 'block'; status.className = 's-err'; status.textContent = 'Enter an account ID.'; return; }
     if (accts.some(a => (a.account_id || '').toLowerCase() === acct.toLowerCase())) { status.style.display = 'block'; status.className = 's-err'; status.textContent = 'That account ID already exists.'; return; }
     try {
-      await App.write('POST', 'bd_bank_account', { bank_name: bank, account_id: acct, account_holder: holder || null });
-      document.getElementById('newBank').value = ''; document.getElementById('newAcct').value = '';
+      await App.write('POST', 'bd_bank_account', { bank_name: bank, account_id: acct, account_holder: holder || null, funded_from: (document.getElementById('newFunded').value || null) });
+      document.getElementById('newBank').value = ''; document.getElementById('newAcct').value = ''; document.getElementById('newFunded').value = '';
       status.style.display = 'block'; status.className = 's-ok'; status.textContent = '✓ Added "' + acct + '".';
       notify();
       await load();
