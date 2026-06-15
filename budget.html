@@ -11,65 +11,66 @@
   .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
   #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
   .s-err { background:#fdecea !important; color:#c0392b !important; }
-  .cols { display:grid; grid-template-columns:repeat(4, 1fr); gap:18px; align-items:start; }
-  .person { border:2px solid #2c3e50; border-radius:10px; background:#fff; height:820px; display:flex; flex-direction:column; overflow:hidden; }
-  .person .card-head { flex:0 0 auto; }
-  .person .card-scroll { flex:1 1 auto; overflow-y:auto; min-height:0; }
-  .person .card-foot { flex:0 0 auto; border-top:2px solid #cbd5e1; }
-  .col3 { display:flex; flex-direction:column; gap:18px; height:820px; }
+
+  .people { display:grid; grid-template-columns:repeat(2, 1fr); gap:18px; align-items:start; }
+  .person { border:2px solid #2c3e50; border-radius:10px; background:#fff; overflow:hidden; }
+  .blocktitle { background:#2c3e50; color:#fff; font-weight:bold; text-align:center; padding:9px; font-size:16px; }
+  .subtitle { background:#eef2f7; color:#2c3e50; font-weight:bold; text-align:center; padding:7px; font-size:14px; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; }
   .tier-sel { display:flex; gap:6px; padding:8px 12px; flex-wrap:wrap; }
   .tier-btn { border:1px solid #cbd5e1; background:#fff; color:#475569; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:bold; cursor:pointer; min-height:34px; }
   .tier-btn.on { background:#2c3e50; color:#fff; border-color:#2c3e50; }
-  td.amt.neg { color:#c0392b; }
-  .muted { color:#64748b; font-size:13px; }
-  .col3 .person { height:auto; flex:1 1 0; min-height:0; }
-  /* col3 blocks (Credit Card, PayPal, Cash Summary) have no scroll wrapper; let their last table scroll */
-  .col3 .person > table { flex:1 1 auto; display:block; overflow-y:auto; min-height:0; width:100%; }
-  .col3 .person > table tbody { display:table; width:100%; }
-  .col3 .person > .blocktitle, .col3 .person > .subtitle { flex:0 0 auto; }
-  @media (max-width: 1100px) and (min-width: 761px) { .cols { grid-template-columns:repeat(2, 1fr); } }
-  @media (max-width: 760px) { .cols { grid-template-columns:1fr; } .person, .col3 .person { height:auto; max-height:600px; } .col3 { height:auto; } }
-  .blocktitle { background:#2c3e50; color:#fff; font-weight:bold; text-align:center; padding:9px; font-size:16px; }
-  .subtitle { background:#eef2f7; color:#2c3e50; font-weight:bold; text-align:center; padding:7px; font-size:14px; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; }
+
   table { border-collapse:collapse; width:100%; }
   td { padding:7px 12px; border-bottom:1px solid #eef2f7; font-size:15px; }
   td.amt { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  td.amt.neg { color:#c0392b; }
   tr.total td { font-weight:bold; border-top:2px solid #cbd5e1; background:#f8fafc; }
   tr.avail td { font-weight:bold; background:#f59e0b; color:#1a1a1a; font-size:16px; }
-  tr.acct-head td { font-weight:bold; color:#64748b; font-size:13px; background:#fbfcfe; }
-  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:0; margin-top:18px; overflow:hidden; }
+  .muted { color:#64748b; font-size:13px; }
+
+  /* coloured account boxes */
+  .acct-box { margin:12px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; }
+  .acct-box .box-head { color:#fff; font-weight:bold; padding:8px 12px; font-size:14px; display:flex; justify-content:space-between; gap:10px; }
+  .acct-box .box-head .box-amt { font-variant-numeric:tabular-nums; }
+  .acct-box td { font-size:14px; }
+  tr.pot-line td { font-style:italic; }
+
+  .extras { margin-top:18px; display:grid; grid-template-columns:repeat(2, 1fr); gap:18px; align-items:start; }
+  .panelcard { border:2px solid #2c3e50; border-radius:10px; background:#fff; overflow:hidden; }
+
+  @media (max-width: 760px) { .people, .extras { grid-template-columns:1fr; } }
 
   @media (prefers-color-scheme: dark) {
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
     h1 { color:#f1f5f9 !important; } .note { color:#94a3b8 !important; }
-    .person, .panel { background:#1e293b !important; border-color:#334155 !important; }
-    .person .card-foot { border-color:#475569 !important; }
+    .person, .panelcard { background:#1e293b !important; border-color:#334155 !important; }
     .tier-btn { background:#0f172a !important; color:#cbd5e1 !important; border-color:#475569 !important; }
     .tier-btn.on { background:#3b82f6 !important; color:#fff !important; border-color:#3b82f6 !important; }
     td.amt.neg { color:#f87171 !important; }
-    .blocktitle { background:#15803d !important; color:#ffffff !important; }
+    .blocktitle { background:#15803d !important; color:#fff !important; }
     .subtitle { background:#162132 !important; color:#cbd5e1 !important; border-color:#334155 !important; }
     td { border-color:#334155 !important; color:#cbd5e1 !important; }
     tr.total td { background:#162132 !important; color:#f1f5f9 !important; border-color:#475569 !important; }
-    tr.acct-head td { background:#131c2b !important; color:#94a3b8 !important; }
     tr.avail td { background:#b45309 !important; color:#fff !important; }
+    .acct-box { border-color:#334155 !important; }
     #status { background:#1e293b !important; color:#93c5fd !important; }
   }
 </style>
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out (grouped by account), and what's left each month. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v16)</span></p>
-  <div id="status">Loading…</div>
-  <div class="cols" id="cols" style="display:none;">
-    <div id="colGraham"></div>
-    <div id="colJulie"></div>
-    <div id="col3" class="col3"></div>
-    <div id="col4" class="col3"></div>
+  <p class="note">Today's budget per person: net income in, bills out in coloured boxes by account, and what's left each month. Pensions are gathered into their own block and taken off once at the end. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v17)</span></p>
+  <div id="status">Loading&hellip;</div>
+  <div id="cols" style="display:none;">
+    <div id="people" class="people"></div>
+    <div id="extras" class="extras"></div>
   </div>
 
 <script>
   const fmt = App.fmt;
+  const DAY_COLS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  // fixed palette for account boxes, assigned in stable account order
+  const BOX_PALETTE = ['#2980b9', '#27ae60', '#8e44ad', '#e67e22', '#16a085', '#c0392b', '#2c3e50', '#d35400'];
 
   function annualToMonthly(premium, frequency) {
     const p = Number(premium) || 0;
@@ -78,7 +79,6 @@
     return p;   // Monthly (or default)
   }
 
-  // current active working-days tier for a member (latest from_date <= today)
   function currentTierDays(member, tiers) {
     const now = new Date(); let best = null;
     (tiers || []).forEach(t => {
@@ -89,218 +89,238 @@
     return best ? Number(best.days) : null;
   }
 
-  // distinct day-counts this member actually has, sorted high→low (e.g. [5,3])
   function tiersFor(member, tiers) {
     const set = {};
     (tiers || []).forEach(t => { if (t.member_name === member && t.days != null) set[Number(t.days)] = true; });
     return Object.keys(set).map(Number).sort((a, b) => b - a);
   }
 
-  // loaded data + per-person what-if tier selection (resets on reload)
   let DATA = null;
-  const selectedTier = {};   // member -> chosen day-count
+  const selectedTier = {};
 
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, tiers, incAmts, otherInc, pensContribs, billCats, diningRota, mealCost, bankAccts] = await Promise.all([
+      const [members, bills, tiers, incAmts, otherInc, pensContribs, bankAccts] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_working_tiers?order=from_date.asc'),
         App.rest('bd_income_amounts?order=member_name.asc'),
         App.rest('bd_other_income?order=member_name.asc'),
         App.rest('bd_pension_contributions?order=member_name.asc'),
-        App.rest('bd_bill_category?order=code.asc'),
-        App.rest('bd_dining_rota'),
-        App.rest('bd_meal_cost'),
         App.rest('bd_bank_account?order=account_id.asc')
       ]);
       const names = (members || []).map(m => m.name).filter(Boolean);
       if (!names.length) { status.textContent = 'No members found.'; return; }
-      // new dining annual total = Σ (each filled rota cell × its meal-cost lookup)
-      const mealCostMap = {};
-      (mealCost || []).forEach(c => { mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
-      const DAY_COLS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-      const diningAnnual = (diningRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
-      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], billCats: billCats || [], diningAnnual: diningAnnual, bankAccts: bankAccts || [] };
-      // default each person's selector to their current active tier
+      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [] };
       names.forEach(n => { selectedTier[n] = currentTierDays(n, DATA.tiers); });
       status.style.display = 'none';
       rebuild();
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
 
-  // called by each tier selector button
   function setTier(member, days) {
     selectedTier[member] = (days === '' || days == null) ? null : Number(days);
     rebuild();
   }
 
+  // ---- helpers shared across people ----
+  function buildAccountMeta(d) {
+    // colour per account_id (stable order), holder lookup, and pot maps
+    const byId = {};
+    (d.bankAccts || []).forEach(a => { if (a.account_id) byId[a.account_id] = a; });
+    const ids = Object.keys(byId).sort();
+    const colour = {}; ids.forEach((id, i) => { colour[id] = BOX_PALETTE[i % BOX_PALETTE.length]; });
+
+    // a pot = account with funded_from set; it gets NO box of its own
+    const isPot = {}; const fundingToPots = {};
+    (d.bankAccts || []).forEach(a => {
+      if (a.account_id && a.funded_from != null && String(a.funded_from).trim() !== '') {
+        isPot[a.account_id] = true;
+        const f = String(a.funded_from).trim();
+        (fundingToPots[f] = fundingToPots[f] || []).push(a.account_id);
+      }
+    });
+    // monthly set-aside per pot = Σ monthly of its (non credit-card) bills
+    const potMonthly = {};
+    (d.bills || []).forEach(b => {
+      const acct = (b.paid_account || '').trim();
+      if (acct && isPot[acct] && b.paid_by !== 'Credit card') {
+        potMonthly[acct] = (potMonthly[acct] || 0) + annualToMonthly(b.premium, b.frequency);
+      }
+    });
+    return { byId, colour, isPot, fundingToPots, potMonthly };
+  }
+
   function rebuild() {
     const d = DATA; if (!d) return;
+    const meta = buildAccountMeta(d);
+    const shown = {};   // bill row index -> true, so we can detect leftovers
+
     const avails = {};
-    const blocks = d.names.map(name => {
-      const r = personBlock(name, d.bills, d.tiers, d.incAmts, d.otherInc, d.pensContribs, d.bankAccts);
+    const peopleHtml = d.names.map(name => {
+      const r = personBlock(name, d, meta, shown);
       avails[name] = r.avail;
       return r.html;
-    });
-    document.getElementById('colGraham').innerHTML = blocks[0] || '';
-    document.getElementById('colJulie').innerHTML = blocks[1] || '';
-    if (blocks.length > 2) document.getElementById('colGraham').innerHTML += blocks.slice(2).join('');
+    }).join('');
 
-    const diningMonthly = (Number(d.diningAnnual) || 0) / 12;
-    const cc = payerCatBlock(d.bills, d.billCats, 'Credit card', 'Credit Card', diningMonthly);
-    const pp = payerCatBlock(d.bills, d.billCats, 'PayPal', 'PayPal', 0);
-    const footerHtml = buildFooter(d.names, d.tiers, d.pensContribs, avails, cc.total, pp.total);
-    document.getElementById('col3').innerHTML = cc.html;
-    document.getElementById('col4').innerHTML = pp.html + footerHtml;
-    document.getElementById('cols').style.display = 'grid';
+    // any non credit-card, non-pot bill not placed in a person's box → Unassigned
+    let leftoverHtml = '';
+    const leftovers = (d.bills || []).filter((b, i) =>
+      !shown[i] && b.paid_by !== 'Credit card' && !meta.isPot[(b.paid_account || '').trim()]);
+    if (leftovers.length) {
+      let rows = '', tot = 0;
+      leftovers.forEach(b => {
+        const m = annualToMonthly(b.premium, b.frequency); tot += m;
+        rows += '<tr><td>' + esc(b.bill_name || '\u2014') + ' <span class="muted">(' + esc(b.paid_account || 'no account') + ')</span></td><td class="amt">' + fmt(m) + '</td></tr>';
+      });
+      leftoverHtml =
+        '<div class="panelcard">' +
+          '<div class="blocktitle">Unassigned bills</div>' +
+          '<div class="subtitle">Not tied to anyone\u2019s account</div>' +
+          '<table><tbody>' + rows +
+            '<tr class="total"><td>Total</td><td class="amt">' + fmt(tot) + '</td></tr></tbody></table>' +
+        '</div>';
+    }
+
+    const pens = pensionBlock(d);
+    const cash = cashSummary(avails, pens.total);
+
+    document.getElementById('people').innerHTML = peopleHtml;
+    document.getElementById('extras').innerHTML = pens.html + cash + leftoverHtml;
+    document.getElementById('cols').style.display = 'block';
   }
 
-  // segmented tier selector for a person (only their actual tiers); '' was current
-  function tierSelectorHtml(name, tiers) {
-    const opts = tiersFor(name, tiers);
-    if (opts.length < 2) return '';   // nothing to switch if only one tier
-    const sel = selectedTier[name];
-    const btns = opts.map(d =>
-      '<button type="button" class="tier-btn' + (Number(sel) === d ? ' on' : '') + '" onclick="setTier(\'' + name.replace(/'/g, "\\'") + '\',' + d + ')">' + d + '-day</button>'
-    ).join('');
-    return '<div class="tier-sel">' + btns + '</div>';
-  }
-
-  function personBlock(name, bills, tiers, incAmts, otherInc, pensContribs, bankAccts) {
-    // --- IN: salary from Workplace Income at the selected tier + any other income ---
-    const days = (selectedTier[name] !== undefined) ? selectedTier[name] : currentTierDays(name, tiers);
+  function personBlock(name, d, meta, shown) {
+    // --- IN: salary at selected tier + other income ---
+    const days = (selectedTier[name] !== undefined) ? selectedTier[name] : currentTierDays(name, d.tiers);
     let inRows = '', totalIn = 0;
-    const salaryRows = incAmts.filter(a => a.member_name === name && (days == null || Number(a.working_days) === Number(days)));
-    // if no tier match, fall back to any income rows for this member
-    const useRows = salaryRows.length ? salaryRows : incAmts.filter(a => a.member_name === name);
+    const salaryRows = d.incAmts.filter(a => a.member_name === name && (days == null || Number(a.working_days) === Number(days)));
+    const useRows = salaryRows.length ? salaryRows : d.incAmts.filter(a => a.member_name === name);
     useRows.forEach(a => {
       const v = Number(a.net_monthly) || 0; totalIn += v;
-      inRows += '<tr><td>' + (a.source_name || 'Salary') + '</td><td class="amt">' + fmt(v) + '</td></tr>';
+      inRows += '<tr><td>' + esc(a.source_name || 'Salary') + '</td><td class="amt">' + fmt(v) + '</td></tr>';
     });
-    (otherInc || []).filter(o => o.member_name === name).forEach(o => {
+    (d.otherInc || []).filter(o => o.member_name === name).forEach(o => {
       const v = Number(o.net_monthly) || 0; totalIn += v;
-      inRows += '<tr><td>' + (o.source_name || 'Other') + '</td><td class="amt">' + fmt(v) + '</td></tr>';
+      inRows += '<tr><td>' + esc(o.source_name || 'Other') + '</td><td class="amt">' + fmt(v) + '</td></tr>';
     });
     if (!inRows) inRows = '<tr><td colspan="2" style="color:#94a3b8;">No income set</td></tr>';
 
-    // accounts this person holds (by account_id), from the Bank Accounts table
-    const myAccounts = {};
-    (bankAccts || []).forEach(a => { if (a.account_holder === name && a.account_id) myAccounts[a.account_id] = true; });
+    // accounts this person holds, in stable order, excluding pots (no box of their own)
+    const held = (d.bankAccts || [])
+      .filter(a => a.account_holder === name && a.account_id && !meta.isPot[a.account_id])
+      .sort((a, b) => a.account_id.localeCompare(b.account_id));
 
-    // --- OUT: this person's bills + pension contributions, grouped by account ---
-    // bucket: account_id -> array of {label, amt}
-    const byAcct = {};
-    const add = (acct, label, amt) => { const k = acct || '\u2014'; (byAcct[k] = byAcct[k] || []).push({ label: label, amt: amt }); };
-    bills.filter(b => b.paid_by === name).forEach(b => {
-      add(b.paid_account, b.bill_name || '', annualToMonthly(b.premium, b.frequency));
+    let boxesHtml = '', totalBills = 0;
+    held.forEach(a => {
+      const acctId = a.account_id;
+      let rows = '', boxTotal = 0;
+      // bills paid from this account (any payer except Credit card)
+      (d.bills || []).forEach((b, i) => {
+        if ((b.paid_account || '').trim() !== acctId) return;
+        if (b.paid_by === 'Credit card') return;
+        shown[i] = true;
+        const m = annualToMonthly(b.premium, b.frequency); boxTotal += m;
+        rows += '<tr><td>' + esc(b.bill_name || '\u2014') + '</td><td class="amt">' + fmt(m) + '</td></tr>';
+      });
+      // savings-pot set-aside: if this account funds any pot(s), add one summed line
+      const pots = meta.fundingToPots[acctId] || [];
+      const potSum = pots.reduce((s, pid) => s + (meta.potMonthly[pid] || 0), 0);
+      if (potSum > 0) {
+        rows += '<tr class="pot-line"><td>Insurance/car savings</td><td class="amt">' + fmt(potSum) + '</td></tr>';
+        boxTotal += potSum;
+      }
+      if (!rows) return;   // skip empty boxes
+      totalBills += boxTotal;
+      const title = esc(a.bank_name ? (a.bank_name + ' \u00b7 ' + acctId) : acctId);
+      boxesHtml +=
+        '<div class="acct-box">' +
+          '<div class="box-head" style="background:' + meta.colour[acctId] + ';">' +
+            '<span>' + title + '</span><span class="box-amt">' + fmt(boxTotal) + '</span>' +
+          '</div>' +
+          '<table><tbody>' + rows + '</tbody></table>' +
+        '</div>';
     });
-    // pension contributions whose paying account is held by this person.
-    // NOTE: the contribution may belong to a DIFFERENT member (e.g. Julie's pension paid from your account),
-    // so the tier check must use the contribution OWNER's tier, not this card-holder's.
-    (pensContribs || []).forEach(p => {
-      if (!p.paid_account || !myAccounts[p.paid_account]) return;
+    if (!boxesHtml) boxesHtml = '<div class="acct-box"><table><tbody><tr><td colspan="2" style="color:#94a3b8;">No bills assigned to ' + esc(name) + '\u2019s accounts</td></tr></tbody></table></div>';
+
+    const avail = totalIn - totalBills;
+    const html =
+      '<div class="person">' +
+        '<div class="blocktitle">' + esc(name) + '</div>' +
+        tierSelectorHtml(name, d.tiers) +
+        '<div class="subtitle">In</div><table><tbody>' + inRows +
+          '<tr class="total"><td>Total In</td><td class="amt">' + fmt(totalIn) + '</td></tr></tbody></table>' +
+        '<div class="subtitle">Out &mdash; by account</div>' +
+        boxesHtml +
+        '<table><tbody>' +
+          '<tr class="total"><td>Total bills</td><td class="amt">' + fmt(totalBills) + '</td></tr>' +
+          '<tr class="avail"><td>' + esc(name) + ' available per month</td><td class="amt">' + fmt(avail) + '</td></tr>' +
+        '</tbody></table>' +
+      '</div>';
+    return { html: html, avail: avail };
+  }
+
+  // global pensions block — net cost (private ÷1.25; Aegon/workplace at gross), using each owner's tier
+  function pensionBlock(d) {
+    const heldIds = {};
+    (d.bankAccts || []).forEach(a => { if (a.account_id) heldIds[a.account_id] = a.account_holder || ''; });
+    let rows = '', total = 0;
+    (d.pensContribs || []).forEach(p => {
+      const acct = (p.paid_account || '').trim();
+      if (!acct || !(acct in heldIds)) return;   // only pensions paid from a known account
       const owner = p.member_name;
-      const ownerDays = (selectedTier[owner] !== undefined) ? selectedTier[owner] : currentTierDays(owner, tiers);
+      const ownerDays = (selectedTier[owner] !== undefined) ? selectedTier[owner] : currentTierDays(owner, d.tiers);
       if (p.working_days != null && ownerDays != null && Number(p.working_days) !== Number(ownerDays)) return;
       const isWorkplace = /aegon/i.test(p.pension_name || '');
       const gross = Number(p.monthly_contribution) || 0;
       const cost = isWorkplace ? gross : gross / 1.25;
       if (cost === 0) return;
-      // label shows whose pension it is when it's not the account holder's own
-      const whose = (owner && owner !== name) ? owner + ' ' : '';
-      add(p.paid_account, whose + (p.pension_name || 'Pension') + ' (pension)', cost);
+      total += cost;
+      const whose = owner ? owner + ' ' : '';
+      rows += '<tr><td>' + esc(whose + (p.pension_name || 'Pension')) + ' <span class="muted">(' + esc(acct) + ')</span></td><td class="amt">' + fmt(cost) + '</td></tr>';
     });
-
-    let outRows = '', totalOut = 0;
-    const acctKeys = Object.keys(byAcct).sort();
-    acctKeys.forEach(acct => {
-      let acctTotal = 0;
-      const rowsHtml = byAcct[acct].sort((a, b) => a.label.localeCompare(b.label)).map(item => {
-        acctTotal += item.amt; totalOut += item.amt;
-        return '<tr><td>' + item.label + '</td><td class="amt">' + fmt(item.amt) + '</td></tr>';
-      }).join('');
-      const head = (acctKeys.length > 1 || acct !== '\u2014')
-        ? '<tr class="acct-head"><td>' + (acct === '\u2014' ? 'Other' : acct) + '</td><td class="amt">' + fmt(acctTotal) + '</td></tr>'
-        : '';
-      outRows += head + rowsHtml;
-    });
-    if (!outRows) outRows = '<tr><td colspan="2" style="color:#94a3b8;">Nothing assigned to ' + name + '</td></tr>';
-
-    const avail = totalIn - totalOut;
-    const html = '<div class="person">' +
-      '<div class="card-head">' +
-        '<div class="blocktitle">' + name + '</div>' +
-        tierSelectorHtml(name, tiers) +
-        '<div class="subtitle">In</div><table><tbody>' + inRows +
-          '<tr class="total"><td>Total In</td><td class="amt">' + fmt(totalIn) + '</td></tr></tbody></table>' +
-        '<div class="subtitle">Out</div>' +
-      '</div>' +
-      '<div class="card-scroll"><table><tbody>' + outRows + '</tbody></table></div>' +
-      '<div class="card-foot"><table><tbody>' +
-        '<tr class="total"><td>Total Out</td><td class="amt">' + fmt(totalOut) + '</td></tr>' +
-        '<tr class="avail"><td>' + name + ' available per month</td><td class="amt">' + fmt(avail) + '</td></tr></tbody></table>' +
-      '</div>' +
-      '</div>';
-    return { html: html, avail: avail };
-  }
-
-  function payerCatBlock(bills, billCats, payer, title, diningMonthly) {
-    const mine = bills.filter(b => b.paid_by === payer);
-    const dining = Number(diningMonthly) || 0;
-    if (!mine.length && dining === 0) return { html: '', total: 0 };
-    const catLabel = {};
-    (billCats || []).forEach(c => { catLabel[c.code] = c.description || c.code; });
-    const byCat = {};
-    let total = 0;
-    mine.forEach(b => {
-      const code = b.category_code || '\u2014';
-      const m = annualToMonthly(b.premium, b.frequency);
-      byCat[code] = (byCat[code] || 0) + m;
-      total += m;
-    });
-    let rows = Object.keys(byCat).map(code => ({
-      code: code,
-      label: code === '\u2014' ? 'Uncategorised' : (catLabel[code] || code),
-      amt: byCat[code]
-    })).sort((a, b) => a.label.localeCompare(b.label)).map(r =>
-      '<tr><td>' + r.label + '</td><td class="amt">' + fmt(r.amt) + '</td></tr>'
-    ).join('');
-    // dining is paid on the credit card; roll it up as a single Dining row
-    if (dining > 0) {
-      rows += '<tr><td>Dining</td><td class="amt">' + fmt(dining) + '</td></tr>';
-      total += dining;
-    }
-    const html = '<div class="person">' +
-      '<div class="blocktitle">' + title + '</div>' +
-      '<div class="subtitle">By category</div><table><tbody>' + rows +
-        '<tr class="total"><td>Total</td><td class="amt">' + fmt(total) + '</td></tr></tbody></table>' +
+    if (!rows) rows = '<tr><td colspan="2" style="color:#94a3b8;">No pension contributions</td></tr>';
+    const html =
+      '<div class="panelcard">' +
+        '<div class="blocktitle">Pensions</div>' +
+        '<div class="subtitle">Net cost &mdash; taken off once below</div>' +
+        '<table><tbody>' + rows +
+          '<tr class="total"><td>Total pensions</td><td class="amt">' + fmt(total) + '</td></tr></tbody></table>' +
       '</div>';
     return { html: html, total: total };
   }
 
-  function buildFooter(names, tiers, pensContribs, avails, creditTotal, paypalTotal) {
+  function cashSummary(avails, pensTotal) {
+    const names = Object.keys(avails);
     const sumAvail = names.reduce((s, n) => s + (avails[n] || 0), 0);
-    const cc = Number(creditTotal) || 0;
-    const pp = Number(paypalTotal) || 0;
-    const totalCash = sumAvail - cc - pp;
-    const ccRow = cc > 0 ? '<tr class="total"><td>Less credit card spending</td><td class="amt neg">\u2212' + fmt(cc) + '</td></tr>' : '';
-    const ppRow = pp > 0 ? '<tr class="total"><td>Less PayPal spending</td><td class="amt neg">\u2212' + fmt(pp) + '</td></tr>' : '';
-    return '<div class="person">' +
-      '<div class="card-head">' +
-        '<div class="blocktitle">Cash Summary</div>' +
-      '</div>' +
-      '<div class="card-scroll"><table><tbody>' +
-        '<tr><td colspan="2" class="muted" style="padding:10px 12px;">Each person\u2019s pension contributions appear under their own accounts above. Credit card and PayPal spending are deducted below.</td></tr>' +
-      '</tbody></table></div>' +
-      '<div class="card-foot"><table><tbody>' +
-        '<tr class="total"><td>Sum of available (both)</td><td class="amt">' + fmt(sumAvail) + '</td></tr>' +
-        ccRow +
-        ppRow +
-        '<tr class="avail"><td>Total cash available</td><td class="amt">' + fmt(totalCash) + '</td></tr></tbody></table>' +
-      '</div>' +
-      '</div>';
+    const pens = Number(pensTotal) || 0;
+    const totalCash = sumAvail - pens;
+    let availRows = names.map(n => '<tr><td>' + esc(n) + ' available</td><td class="amt">' + fmt(avails[n] || 0) + '</td></tr>').join('');
+    return '<div class="panelcard">' +
+      '<div class="blocktitle">Cash Summary</div>' +
+      '<table><tbody>' +
+        availRows +
+        '<tr class="total"><td>Sum of available</td><td class="amt">' + fmt(sumAvail) + '</td></tr>' +
+        '<tr class="total"><td>Less pensions</td><td class="amt neg">\u2212' + fmt(pens) + '</td></tr>' +
+        '<tr class="avail"><td>Total cash available</td><td class="amt">' + fmt(totalCash) + '</td></tr>' +
+      '</tbody></table>' +
+    '</div>';
+  }
+
+  function tierSelectorHtml(name, tiers) {
+    const opts = tiersFor(name, tiers);
+    if (opts.length < 2) return '';
+    const sel = selectedTier[name];
+    const btns = opts.map(dd =>
+      '<button type="button" class="tier-btn' + (Number(sel) === dd ? ' on' : '') + '" onclick="setTier(\'' + name.replace(/'/g, "\\'") + '\',' + dd + ')">' + dd + '-day</button>'
+    ).join('');
+    return '<div class="tier-sel">' + btns + '</div>';
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });

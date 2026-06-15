@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Credit Card</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err85"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:680px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  h2 { color:#2c3e50; font-size:18px; margin:0 0 12px; }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:9px 14px; border-bottom:1px solid #e2e8f0; text-align:right; }
+  th:first-child, td:first-child { text-align:left; }
+  th { background:#f8fafc; color:#475569; font-size:14px; }
+  tr.dining-row td { font-style:italic; }
+  tr.total-row td { font-weight:bold; border-top:2px solid #cbd5e1; color:#2c3e50; }
+  td.empty { text-align:left; color:#94a3b8; font-style:italic; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+
+  /* ---- Automatic dark mode (follows device setting) ---- */
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1, h2, h3, h4 { color:#f1f5f9 !important; }
+    .panel { background:#1e293b !important; border-color:#334155 !important; box-shadow:0 2px 4px rgba(0,0,0,0.4) !important; }
+    .note { color:#94a3b8 !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    tr.total-row td { color:#f1f5f9 !important; border-top-color:#475569 !important; }
+    td.empty { color:#94a3b8 !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Credit Card</h1>
+  <p class="note">Monthly credit-card spending by category &mdash; every bill whose &ldquo;Paid by&rdquo; is Credit card, plus the Dining roll-up. Figures are monthly (weekly &times;52/12, annual &divide;12, monthly as-is); Dining is the rota total &divide; 12. <span style="color:#94a3b8;">(credit card build: v1)</span></p>
+  <div id="status">Loading&hellip;</div>
+
+  <div id="cardPanel" class="panel" style="display:none;">
+    <h2>By category</h2>
+    <table id="ccTable"><thead><tr><th>Category</th><th>Monthly &pound;</th></tr></thead><tbody></tbody></table>
+  </div>
+
+<script>
+  const fmt = App.fmt;
+  const DAY_COLS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+  // monthly amount of a bill — same convention as the Budget page
+  function annualToMonthly(premium, frequency) {
+    const p = Number(premium) || 0;
+    if (frequency === 'Weekly') return p * 52 / 12;
+    if (frequency === 'Annual') return p / 12;
+    return p;   // Monthly (or default)
+  }
+
+  let bills = [], billCats = [], diningRota = [], mealCost = [];
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      status.textContent = 'Loading\u2026 (fetching bills and dining)';
+      [bills, billCats, diningRota, mealCost] = await Promise.all([
+        App.rest('bd_household_bills?order=bill_name.asc'),
+        App.rest('bd_bill_category?order=code.asc'),
+        App.rest('bd_dining_rota'),
+        App.rest('bd_meal_cost')
+      ]);
+      render();
+    } catch (e) {
+      status.className = 's-err';
+      status.textContent = 'Could not load: ' + (e && e.message ? e.message : e);
+    }
+  }
+
+  function diningMonthly() {
+    const map = {};
+    (mealCost || []).forEach(c => { map[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
+    const annual = (diningRota || []).reduce((sum, r) =>
+      sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (map[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
+    return annual / 12;
+  }
+
+  function render() {
+    const status = document.getElementById('status');
+    const panel = document.getElementById('cardPanel');
+    const tb = document.querySelector('#ccTable tbody');
+
+    const catLabel = {};
+    (billCats || []).forEach(c => { catLabel[c.code] = c.description || c.code; });
+
+    const mine = (bills || []).filter(b => b.paid_by === 'Credit card');
+    const byCat = {};
+    let total = 0;
+    mine.forEach(b => {
+      const code = b.category_code || '\u2014';
+      const m = annualToMonthly(b.premium, b.frequency);
+      byCat[code] = (byCat[code] || 0) + m;
+      total += m;
+    });
+
+    let rows = Object.keys(byCat).map(code => ({
+      label: code === '\u2014' ? 'Uncategorised' : (catLabel[code] || code),
+      amt: byCat[code]
+    })).sort((a, b) => a.label.localeCompare(b.label)).map(r =>
+      '<tr><td>' + escapeHtml(r.label) + '</td><td>' + fmt(r.amt) + '</td></tr>'
+    ).join('');
+
+    const dining = diningMonthly();
+    if (dining > 0) {
+      rows += '<tr class="dining-row"><td>Dining</td><td>' + fmt(dining) + '</td></tr>';
+      total += dining;
+    }
+
+    if (!rows) {
+      tb.innerHTML = '<tr><td class="empty" colspan="2">No credit-card bills found. Set a bill\u2019s &ldquo;Paid by&rdquo; to Credit card on the Household Bills tab.</td></tr>';
+    } else {
+      tb.innerHTML = rows + '<tr class="total-row"><td>Total</td><td>' + fmt(total) + '</td></tr>';
+    }
+
+    status.style.display = 'none';
+    panel.style.display = 'block';
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  if (typeof App === 'undefined' || !App.requireLogin) {
+    document.getElementById('status').textContent = 'Error: common.js did not load (App is undefined).';
+  } else {
+    try {
+      App.requireLogin(load, { title: 'Credit Card' });
+    } catch (err) {
+      document.getElementById('status').textContent = 'Error during startup: ' + (err && err.message ? err.message : err);
+    }
+  }
+</script>
+</body>
+</html>
