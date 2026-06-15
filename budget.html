@@ -17,7 +17,7 @@
   .person { border:2px solid #2c3e50; border-radius:10px; background:#fff; overflow:hidden; }
   .blocktitle { background:#2c3e50; color:#fff; font-weight:bold; text-align:center; padding:9px; font-size:16px; }
   .subtitle { background:#eef2f7; color:#2c3e50; font-weight:bold; text-align:center; padding:7px; font-size:14px; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; }
-  .tier-sel { display:flex; gap:6px; padding:8px 12px; flex-wrap:wrap; }
+  .tier-sel { display:flex; gap:6px; padding:8px 12px; flex-wrap:wrap; min-height:34px; align-items:center; box-sizing:content-box; }
   .tier-btn { border:1px solid #cbd5e1; background:#fff; color:#475569; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:bold; cursor:pointer; min-height:34px; }
   .tier-btn.on { background:#2c3e50; color:#fff; border-color:#2c3e50; }
 
@@ -59,7 +59,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out in coloured boxes by account, and what's left each month. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. The Credit Card box is an estimate for reference only and is not part of any total here. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v20)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out in coloured boxes by account, and what's left each month. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. The Credit Card box is an estimate for reference only and is not part of any total here. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v21)</span></p>
   <div id="status">Loading&hellip;</div>
   <div id="cols" style="display:none;">
     <div class="col-stack" id="colLeft"></div>
@@ -340,9 +340,19 @@
     '</div>';
   }
 
+  // true if ANY member has 2+ distinct tiers (i.e. a selector is shown somewhere)
+  function anyMultiTier(tiers) {
+    const byMember = {};
+    (tiers || []).forEach(t => {
+      if (t.member_name && t.days != null) (byMember[t.member_name] = byMember[t.member_name] || {})[Number(t.days)] = true;
+    });
+    return Object.keys(byMember).some(m => Object.keys(byMember[m]).length >= 2);
+  }
+
   function tierSelectorHtml(name, tiers) {
     const opts = tiersFor(name, tiers);
-    if (opts.length < 2) return '';
+    // no selector for this person: reserve the same height as a selector so the "In" headers stay aligned
+    if (opts.length < 2) return anyMultiTier(tiers) ? '<div class="tier-sel" aria-hidden="true"></div>' : '';
     const sel = selectedTier[name];
     const btns = opts.map(dd =>
       '<button type="button" class="tier-btn' + (Number(sel) === dd ? ' on' : '') + '" onclick="setTier(\'' + name.replace(/'/g, "\\'") + '\',' + dd + ')">' + dd + '-day</button>'
