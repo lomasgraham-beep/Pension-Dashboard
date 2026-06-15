@@ -59,7 +59,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out in coloured boxes by account, and what's left each month. Pensions are gathered into their own block and taken off once at the end. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v17)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out in coloured boxes by account, and what's left each month. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. The Credit Card box is an estimate for reference only and is not part of any total here. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v18)</span></p>
   <div id="status">Loading&hellip;</div>
   <div id="cols" style="display:none;">
     <div id="people" class="people"></div>
@@ -101,18 +101,24 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, tiers, incAmts, otherInc, pensContribs, bankAccts] = await Promise.all([
+      const [members, bills, tiers, incAmts, otherInc, pensContribs, bankAccts, billCats, diningRota, mealCost] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_working_tiers?order=from_date.asc'),
         App.rest('bd_income_amounts?order=member_name.asc'),
         App.rest('bd_other_income?order=member_name.asc'),
         App.rest('bd_pension_contributions?order=member_name.asc'),
-        App.rest('bd_bank_account?order=account_id.asc')
+        App.rest('bd_bank_account?order=account_id.asc'),
+        App.rest('bd_bill_category?order=code.asc'),
+        App.rest('bd_dining_rota'),
+        App.rest('bd_meal_cost')
       ]);
       const names = (members || []).map(m => m.name).filter(Boolean);
       if (!names.length) { status.textContent = 'No members found.'; return; }
-      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [] };
+      const mealCostMap = {};
+      (mealCost || []).forEach(c => { mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
+      const diningAnnual = (diningRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
+      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual };
       names.forEach(n => { selectedTier[n] = currentTierDays(n, DATA.tiers); });
       status.style.display = 'none';
       rebuild();
@@ -185,9 +191,10 @@
 
     const pens = pensionBlock(d);
     const cash = cashSummary(avails, pens.total);
+    const cc = creditCardBox(d);
 
     document.getElementById('people').innerHTML = peopleHtml;
-    document.getElementById('extras').innerHTML = pens.html + cash + leftoverHtml;
+    document.getElementById('extras').innerHTML = pens.html + cash + cc + leftoverHtml;
     document.getElementById('cols').style.display = 'block';
   }
 
@@ -215,15 +222,22 @@
     let boxesHtml = '', totalBills = 0;
     held.forEach(a => {
       const acctId = a.account_id;
-      let rows = '', boxTotal = 0;
+      let rows = '', boxTotal = 0, paypalSum = 0;
       // bills paid from this account (any payer except Credit card)
       (d.bills || []).forEach((b, i) => {
         if ((b.paid_account || '').trim() !== acctId) return;
         if (b.paid_by === 'Credit card') return;
         shown[i] = true;
-        const m = annualToMonthly(b.premium, b.frequency); boxTotal += m;
+        const m = annualToMonthly(b.premium, b.frequency);
+        if (b.paid_by === 'PayPal') { paypalSum += m; return; }   // collapse PayPal into one line
+        boxTotal += m;
         rows += '<tr><td>' + esc(b.bill_name || '\u2014') + '</td><td class="amt">' + fmt(m) + '</td></tr>';
       });
+      // PayPal drawn from this account, shown as one connected line (counts in the total)
+      if (paypalSum > 0) {
+        rows += '<tr class="pot-line"><td>PayPal</td><td class="amt">' + fmt(paypalSum) + '</td></tr>';
+        boxTotal += paypalSum;
+      }
       // savings-pot set-aside: if this account funds any pot(s), add one summed line
       const pots = meta.fundingToPots[acctId] || [];
       const potSum = pots.reduce((s, pid) => s + (meta.potMonthly[pid] || 0), 0);
@@ -289,6 +303,31 @@
           '<tr class="total"><td>Total pensions</td><td class="amt">' + fmt(total) + '</td></tr></tbody></table>' +
       '</div>';
     return { html: html, total: total };
+  }
+
+  // reference-only: monthly credit-card cost (bills paid on the card + Dining). NOT part of any total on this page.
+  function creditCardBox(d) {
+    const catLabel = {};
+    (d.billCats || []).forEach(c => { catLabel[c.code] = c.description || c.code; });
+    const byCat = {}; let total = 0;
+    (d.bills || []).filter(b => b.paid_by === 'Credit card').forEach(b => {
+      const code = b.category_code || '\u2014';
+      const m = annualToMonthly(b.premium, b.frequency);
+      byCat[code] = (byCat[code] || 0) + m; total += m;
+    });
+    let rows = Object.keys(byCat).map(code => ({
+      label: code === '\u2014' ? 'Uncategorised' : (catLabel[code] || code), amt: byCat[code]
+    })).sort((a, b) => a.label.localeCompare(b.label)).map(r =>
+      '<tr><td>' + esc(r.label) + '</td><td class="amt">' + fmt(r.amt) + '</td></tr>').join('');
+    const dining = (Number(d.diningAnnual) || 0) / 12;
+    if (dining > 0) { rows += '<tr><td>Dining</td><td class="amt">' + fmt(dining) + '</td></tr>'; total += dining; }
+    if (!rows) rows = '<tr><td colspan="2" style="color:#94a3b8;">No credit-card spending</td></tr>';
+    return '<div class="panelcard">' +
+      '<div class="blocktitle">Credit Card</div>' +
+      '<div class="subtitle">Estimated monthly cost &mdash; not included in totals</div>' +
+      '<table><tbody>' + rows +
+        '<tr class="total"><td>Estimated total</td><td class="amt">' + fmt(total) + '</td></tr></tbody></table>' +
+    '</div>';
   }
 
   function cashSummary(avails, pensTotal) {

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PayPal</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err85"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:680px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  h2 { color:#2c3e50; font-size:18px; margin:0 0 4px; }
+  .acct-sub { color:#64748b; font-size:13px; margin:0 0 12px; }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:9px 14px; border-bottom:1px solid #e2e8f0; text-align:right; }
+  th:first-child, td:first-child { text-align:left; }
+  th { background:#f8fafc; color:#475569; font-size:14px; }
+  tr.sub-row td { font-weight:bold; border-top:2px solid #cbd5e1; color:#2c3e50; }
+  tr.grand-row td { font-weight:bold; color:#2c3e50; font-size:16px; }
+  td.empty { text-align:left; color:#94a3b8; font-style:italic; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1, h2 { color:#f1f5f9 !important; }
+    .panel { background:#1e293b !important; border-color:#334155 !important; box-shadow:0 2px 4px rgba(0,0,0,0.4) !important; }
+    .note, .acct-sub { color:#94a3b8 !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    tr.sub-row td, tr.grand-row td { color:#f1f5f9 !important; border-top-color:#475569 !important; }
+    td.empty { color:#94a3b8 !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>PayPal</h1>
+  <p class="note">Monthly PayPal costs &mdash; every bill whose &ldquo;Paid by&rdquo; is PayPal, grouped by the account it draws from. These also appear as a single &ldquo;PayPal&rdquo; line in that account&rsquo;s box on the Budget. Figures are monthly (weekly &times;52/12, annual &divide;12, monthly as-is). <span style="color:#94a3b8;">(paypal build: v1)</span></p>
+  <div id="status">Loading&hellip;</div>
+
+  <div id="acctPanels"></div>
+
+<script>
+  const fmt = App.fmt;
+
+  function annualToMonthly(premium, frequency) {
+    const p = Number(premium) || 0;
+    if (frequency === 'Weekly') return p * 52 / 12;
+    if (frequency === 'Annual') return p / 12;
+    return p;   // Monthly (or default)
+  }
+
+  let bills = [], accounts = [];
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      status.textContent = 'Loading\u2026 (fetching PayPal bills)';
+      [bills, accounts] = await Promise.all([
+        App.rest('bd_household_bills?order=bill_name.asc'),
+        App.rest('bd_bank_account?order=account_id.asc')
+      ]);
+      render();
+    } catch (e) {
+      status.className = 's-err';
+      status.textContent = 'Could not load: ' + (e && e.message ? e.message : e);
+    }
+  }
+
+  function acctLabel(id) {
+    const a = (accounts || []).find(x => (x.account_id || '').trim() === (id || '').trim());
+    if (!a) return id || 'No account';
+    const bits = [a.bank_name, a.account_holder].filter(Boolean).join(' \u00b7 ');
+    return bits ? (a.account_id + ' (' + bits + ')') : a.account_id;
+  }
+
+  function render() {
+    const status = document.getElementById('status');
+    const host = document.getElementById('acctPanels');
+    host.innerHTML = '';
+
+    const mine = (bills || []).filter(b => b.paid_by === 'PayPal');
+    if (!mine.length) {
+      status.className = '';
+      status.textContent = 'No PayPal bills found. Set a bill\u2019s \u201cPaid by\u201d to PayPal (and choose the account it draws from) on the Household Bills tab.';
+      return;
+    }
+    status.style.display = 'none';
+
+    // group by connected account
+    const groups = {};
+    mine.forEach(b => { const k = (b.paid_account || '').trim() || '\u2014'; (groups[k] = groups[k] || []).push(b); });
+
+    let grand = 0;
+    Object.keys(groups).sort().forEach(acct => {
+      let rows = '', sub = 0;
+      groups[acct].sort((a, b) => (a.bill_name || '').localeCompare(b.bill_name || '')).forEach(b => {
+        const m = annualToMonthly(b.premium, b.frequency); sub += m; grand += m;
+        rows += '<tr><td>' + escapeHtml(b.bill_name || '\u2014') + '</td><td>' + fmt(m) + '</td></tr>';
+      });
+      const panel = document.createElement('div');
+      panel.className = 'panel';
+      panel.innerHTML =
+        '<h2>' + escapeHtml(acct === '\u2014' ? 'No account set' : acctLabel(acct)) + '</h2>' +
+        '<p class="acct-sub">Drawn from this account via PayPal</p>' +
+        '<table><thead><tr><th>Bill</th><th>Monthly \u00a3</th></tr></thead><tbody>' + rows +
+        '<tr class="sub-row"><td>Subtotal</td><td>' + fmt(sub) + '</td></tr></tbody></table>';
+      host.appendChild(panel);
+    });
+
+    if (Object.keys(groups).length > 1) {
+      const tot = document.createElement('div');
+      tot.className = 'panel';
+      tot.innerHTML = '<table><tbody><tr class="grand-row"><td>Total PayPal per month</td><td style="text-align:right;">' + fmt(grand) + '</td></tr></tbody></table>';
+      host.appendChild(tot);
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  if (typeof App === 'undefined' || !App.requireLogin) {
+    document.getElementById('status').textContent = 'Error: common.js did not load (App is undefined).';
+  } else {
+    try {
+      App.requireLogin(load, { title: 'PayPal' });
+    } catch (err) {
+      document.getElementById('status').textContent = 'Error during startup: ' + (err && err.message ? err.message : err);
+    }
+  }
+</script>
+</body>
+</html>

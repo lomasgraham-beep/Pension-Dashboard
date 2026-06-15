@@ -433,22 +433,24 @@
   <div id="LivingCosts" class="tabcontent">
     <div class="subtab-buttons">
       <button id="subbtn-Budget" class="subtab-link active-sub" onclick="showSub(event,'Budget')">Budget</button>
-      <button id="subbtn-CreditCard" class="subtab-link" onclick="showSub(event,'CreditCard')">Credit Card</button>
       <button id="subbtn-Bills" class="subtab-link" onclick="showSub(event,'Bills')">Household Bills</button>
-      <button id="subbtn-DiningNew" class="subtab-link" onclick="showSub(event,'DiningNew')">Dining</button>
-      <button id="subbtn-BillsSummary" class="subtab-link" onclick="showSub(event,'BillsSummary')">Summary of Household Bills</button>
+      <button id="subbtn-CreditCard" class="subtab-link" onclick="showSub(event,'CreditCard')">Credit Card</button>
+      <button id="subbtn-PayPal" class="subtab-link" onclick="showSub(event,'PayPal')">PayPal</button>
       <button id="subbtn-InsSavings" class="subtab-link" onclick="showSub(event,'InsSavings')">Insurance Savings</button>
-      <button id="subbtn-BillCats" class="subtab-link" onclick="showSub(event,'BillCats')">Bill Categories</button>
+      <button id="subbtn-DiningNew" class="subtab-link" onclick="showSub(event,'DiningNew')">Dining</button>
       <button id="subbtn-MealCosts" class="subtab-link" onclick="showSub(event,'MealCosts')">Meal Costs</button>
+      <button id="subbtn-BillsSummary" class="subtab-link" onclick="showSub(event,'BillsSummary')">Summary of Household Bills</button>
+      <button id="subbtn-BillCats" class="subtab-link" onclick="showSub(event,'BillCats')">Bill Categories</button>
     </div>
     <div id="sub-Budget" class="subtabcontent"><iframe id="frame-Budget" class="app-frame" title="Monthly Budget"></iframe></div>
-    <div id="sub-CreditCard" class="subtabcontent"><iframe id="frame-CreditCard" class="app-frame" title="Credit Card"></iframe></div>
     <div id="sub-Bills" class="subtabcontent"><iframe id="frame-Bills" class="app-frame" title="Household Bills"></iframe></div>
-    <div id="sub-DiningNew" class="subtabcontent"><iframe id="frame-DiningNew" class="app-frame" title="Dining"></iframe></div>
-    <div id="sub-BillsSummary" class="subtabcontent"><iframe id="frame-BillsSummary" class="app-frame" title="Summary of Household Bills"></iframe></div>
+    <div id="sub-CreditCard" class="subtabcontent"><iframe id="frame-CreditCard" class="app-frame" title="Credit Card"></iframe></div>
+    <div id="sub-PayPal" class="subtabcontent"><iframe id="frame-PayPal" class="app-frame" title="PayPal"></iframe></div>
     <div id="sub-InsSavings" class="subtabcontent"><iframe id="frame-InsSavings" class="app-frame" title="Insurance Savings"></iframe></div>
-    <div id="sub-BillCats" class="subtabcontent"><iframe id="frame-BillCats" class="app-frame" title="Bill Categories"></iframe></div>
+    <div id="sub-DiningNew" class="subtabcontent"><iframe id="frame-DiningNew" class="app-frame" title="Dining"></iframe></div>
     <div id="sub-MealCosts" class="subtabcontent"><iframe id="frame-MealCosts" class="app-frame" title="Meal Costs"></iframe></div>
+    <div id="sub-BillsSummary" class="subtabcontent"><iframe id="frame-BillsSummary" class="app-frame" title="Summary of Household Bills"></iframe></div>
+    <div id="sub-BillCats" class="subtabcontent"><iframe id="frame-BillCats" class="app-frame" title="Bill Categories"></iframe></div>
   </div>
 
 
@@ -475,7 +477,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-158</span>
+    <span class="build-stamp">build: LC-159</span>
   </div>
 
   <script>
@@ -1141,8 +1143,8 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=err93';   // frame-file cache-buster: bump when any framed page changes
-    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html' };
+    const FV = '?v=err94';   // frame-file cache-buster: bump when any framed page changes
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
       catch (e) { f.style.height = '1200px'; }
