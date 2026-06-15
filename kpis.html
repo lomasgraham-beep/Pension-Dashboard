@@ -86,7 +86,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr2)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr3)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
     <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span> expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
@@ -312,7 +312,7 @@
   // pension's first log entry. EVERY log entry is plotted as its own point on a real date
   // axis, so a busy month shows all of its logs (not one month-end value). Each line starts
   // at £0 at its own first log and rises to its total growth-to-date. Full history.
-  // Ignores the filters above — this is a whole-portfolio overview.
+  // Respects the member / pension filters above (via filteredLogs()).
   // Contribution rule (per-log, not month-weighted): one standard monthly contribution is
   // subtracted only on a log flagged contribution_applied, matching what that checkbox
   // records at entry — so intra-month points don't get a phantom contribution removed.
@@ -321,7 +321,7 @@
     const box = document.getElementById('chartCumGrowth'); if (!box) return;
     const parseD = s => { const p = String(s).split('-').map(Number); return new Date(p[0], (p[1] || 1) - 1, p[2] || 1); };
     const dict = {};
-    allLogs.forEach(l => { const k = l.member_name + '|' + l.pension_name; (dict[k] = dict[k] || []).push(l); });
+    filteredLogs().forEach(l => { const k = l.member_name + '|' + l.pension_name; (dict[k] = dict[k] || []).push(l); });
 
     const labels = [];          // pension display labels, in column order
     const series = {};          // label -> { timeMs: cumulativeGrowth }
