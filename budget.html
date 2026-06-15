@@ -12,7 +12,8 @@
   #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
   .s-err { background:#fdecea !important; color:#c0392b !important; }
 
-  .people { display:grid; grid-template-columns:repeat(2, 1fr); gap:18px; align-items:start; }
+  #cols { display:grid; grid-template-columns:repeat(2, 1fr); gap:18px; align-items:start; }
+  .col-stack { display:flex; flex-direction:column; gap:18px; min-width:0; }
   .person { border:2px solid #2c3e50; border-radius:10px; background:#fff; overflow:hidden; }
   .blocktitle { background:#2c3e50; color:#fff; font-weight:bold; text-align:center; padding:9px; font-size:16px; }
   .subtitle { background:#eef2f7; color:#2c3e50; font-weight:bold; text-align:center; padding:7px; font-size:14px; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; }
@@ -35,10 +36,9 @@
   .acct-box td { font-size:14px; }
   tr.pot-line td { font-style:italic; }
 
-  .extras { margin-top:18px; display:grid; grid-template-columns:repeat(2, 1fr); gap:18px; align-items:start; }
   .panelcard { border:2px solid #2c3e50; border-radius:10px; background:#fff; overflow:hidden; }
 
-  @media (max-width: 760px) { .people, .extras { grid-template-columns:1fr; } }
+  @media (max-width: 760px) { #cols { grid-template-columns:1fr; } }
 
   @media (prefers-color-scheme: dark) {
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
@@ -59,11 +59,11 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out in coloured boxes by account, and what's left each month. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. The Credit Card box is an estimate for reference only and is not part of any total here. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v19)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out in coloured boxes by account, and what's left each month. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. The Credit Card box is an estimate for reference only and is not part of any total here. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v20)</span></p>
   <div id="status">Loading&hellip;</div>
   <div id="cols" style="display:none;">
-    <div id="people" class="people"></div>
-    <div id="extras" class="extras"></div>
+    <div class="col-stack" id="colLeft"></div>
+    <div class="col-stack" id="colRight"></div>
   </div>
 
 <script>
@@ -164,11 +164,11 @@
     const shown = {};   // bill row index -> true, so we can detect leftovers
 
     const avails = {};
-    const peopleHtml = d.names.map(name => {
+    const blocks = d.names.map(name => {
       const r = personBlock(name, d, meta, shown);
       avails[name] = r.avail;
       return r.html;
-    }).join('');
+    });
 
     // any non credit-card, non-pot bill not placed in a person's box → Unassigned
     let leftoverHtml = '';
@@ -193,9 +193,12 @@
     const cash = cashSummary(avails, pens.total);
     const cc = creditCardBox(d);
 
-    document.getElementById('people').innerHTML = peopleHtml;
-    document.getElementById('extras').innerHTML = pens.html + cash + cc + leftoverHtml;
-    document.getElementById('cols').style.display = 'block';
+    // two stacked columns: left = first person + pensions; right = second person + credit card + cash summary
+    const left = (blocks[0] || '') + blocks.slice(2).join('') + pens.html + leftoverHtml;
+    const right = (blocks[1] || '') + cc + cash;
+    document.getElementById('colLeft').innerHTML = left;
+    document.getElementById('colRight').innerHTML = right;
+    document.getElementById('cols').style.display = 'grid';
   }
 
   function personBlock(name, d, meta, shown) {
