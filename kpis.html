@@ -86,7 +86,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgro)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr2)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
     <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span> expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
@@ -309,48 +309,51 @@
   }
 
   // One line per pension: cumulative ORGANIC growth (contributions stripped) from each
-  // pension's first log entry. Each line starts at £0 at its own first log and rises to
-  // its total growth-to-date. Full history (not the 12-month slice). Ignores the filters
-  // above — this is a whole-portfolio overview.
+  // pension's first log entry. EVERY log entry is plotted as its own point on a real date
+  // axis, so a busy month shows all of its logs (not one month-end value). Each line starts
+  // at £0 at its own first log and rises to its total growth-to-date. Full history.
+  // Ignores the filters above — this is a whole-portfolio overview.
+  // Contribution rule (per-log, not month-weighted): one standard monthly contribution is
+  // subtracted only on a log flagged contribution_applied, matching what that checkbox
+  // records at entry — so intra-month points don't get a phantom contribution removed.
   function drawCumGrowthChart() {
     if (!chartsReady) return;
     const box = document.getElementById('chartCumGrowth'); if (!box) return;
+    const parseD = s => { const p = String(s).split('-').map(Number); return new Date(p[0], (p[1] || 1) - 1, p[2] || 1); };
     const dict = {};
     allLogs.forEach(l => { const k = l.member_name + '|' + l.pension_name; (dict[k] = dict[k] || []).push(l); });
 
     const labels = [];          // pension display labels, in column order
-    const series = {};          // label -> { 'YYYY-MM': cumulativeGrowth }
-    const monthSet = {};        // union of all logged months across pensions
+    const series = {};          // label -> { timeMs: cumulativeGrowth }
+    const dateSet = {};         // timeMs -> Date (union of all log dates)
     Object.keys(dict).forEach(k => {
-      const logs = dict[k].sort((a, b) => new Date(a.log_date) - new Date(b.log_date));
-      const md = monthlyBuckets(logs), mk = Object.keys(md).sort();
-      if (mk.length < 2) return; // need two months to show any accumulation
+      const logs = dict[k].sort((a, b) => parseD(a.log_date) - parseD(b.log_date));
+      if (logs.length < 2) return; // need two logs to show any accumulation
       const label = logs[0].member_name + ' - ' + logs[0].pension_name;
       labels.push(label);
       const ser = {}; let cum = 0;
-      ser[mk[0]] = 0; monthSet[mk[0]] = true;   // baseline: £0 at first log
-      for (let i = 1; i < mk.length; i++) {
-        const cur = Number(md[mk[i]].logs[md[mk[i]].logs.length - 1].pot_value);
-        const prev = Number(md[mk[i - 1]].logs[md[mk[i - 1]].logs.length - 1].pot_value);
-        const pp = mk[i - 1].split('-'), mp = mk[i].split('-');
-        let monthDiff = (mp[0] - pp[0]) * 12 + (mp[1] - pp[1]); if (monthDiff < 1) monthDiff = 1;
-        const contrib = (md[mk[i]].hasContrib ? md[mk[i]].expectedAmt : 0) * monthDiff;
-        cum += (cur - prev - contrib);          // total organic change over the interval
-        ser[mk[i]] = cum; monthSet[mk[i]] = true;
+      const t0 = parseD(logs[0].log_date).getTime();
+      ser[t0] = 0; dateSet[t0] = parseD(logs[0].log_date);   // baseline: £0 at first log
+      for (let i = 1; i < logs.length; i++) {
+        const cur = Number(logs[i].pot_value);
+        const prev = Number(logs[i - 1].pot_value);
+        const contrib = logs[i].contribution_applied ? getExpectedContribution(logs[i]) : 0;
+        cum += (cur - prev - contrib);          // organic change since the previous log
+        const t = parseD(logs[i].log_date).getTime();
+        ser[t] = cum; dateSet[t] = parseD(logs[i].log_date);
       }
       series[label] = ser;
     });
 
     if (!labels.length) { box.innerHTML = ''; return; }
 
-    const months = Object.keys(monthSet).sort();
+    const times = Object.keys(dateSet).map(Number).sort((a, b) => a - b);
     const dt = new google.visualization.DataTable();
-    dt.addColumn('string', 'Month');
+    dt.addColumn('date', 'Date');
     labels.forEach(l => dt.addColumn('number', l));
-    months.forEach(m => {
-      const p = m.split('-'), lbl = p[1] + '/' + p[0].slice(-2);   // mm/yy
-      const row = [lbl];
-      labels.forEach(l => { const s = series[l]; row.push(s.hasOwnProperty(m) ? Math.round(s[m]) : null); });
+    times.forEach(t => {
+      const row = [dateSet[t]];
+      labels.forEach(l => { const s = series[l]; row.push(s.hasOwnProperty(t) ? Math.round(s[t]) : null); });
       dt.addRow(row);
     });
     const nf = new google.visualization.NumberFormat({ prefix: '£', fractionDigits: 0 });
@@ -360,8 +363,8 @@
       title: 'Accumulated Organic Growth Since First Log — by Pension (£)',
       curveType: 'function', legend: { position: 'bottom' },
       chartArea: { left: 85, right: 30, top: 40, bottom: 80 },
-      vAxis: { format: '£#,###' }, hAxis: { slantedText: true, slantedTextAngle: 45 },
-      lineWidth: 3, pointsVisible: true, interpolateNulls: true,
+      vAxis: { format: '£#,###' }, hAxis: { format: 'MM/yy', slantedText: true, slantedTextAngle: 45 },
+      lineWidth: 2, pointsVisible: true, pointSize: 3, interpolateNulls: true,
       colors: ['#3498db', '#9b59b6', '#2ecc71', '#e67e22', '#f1c40f', '#e74c3c']
     });
   }
