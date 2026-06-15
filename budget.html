@@ -59,7 +59,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out in coloured boxes by account, and what's left each month. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. The Credit Card box is an estimate for reference only and is not part of any total here. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v18)</span></p>
+  <p class="note">Today's budget per person: net income in, bills out in coloured boxes by account, and what's left each month. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. The Credit Card box is an estimate for reference only and is not part of any total here. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v19)</span></p>
   <div id="status">Loading&hellip;</div>
   <div id="cols" style="display:none;">
     <div id="people" class="people"></div>
@@ -305,27 +305,17 @@
     return { html: html, total: total };
   }
 
-  // reference-only: monthly credit-card cost (bills paid on the card + Dining). NOT part of any total on this page.
+  // reference-only: total monthly credit-card cost (bills paid on the card + Dining). NOT part of any total on this page.
   function creditCardBox(d) {
-    const catLabel = {};
-    (d.billCats || []).forEach(c => { catLabel[c.code] = c.description || c.code; });
-    const byCat = {}; let total = 0;
+    let total = 0;
     (d.bills || []).filter(b => b.paid_by === 'Credit card').forEach(b => {
-      const code = b.category_code || '\u2014';
-      const m = annualToMonthly(b.premium, b.frequency);
-      byCat[code] = (byCat[code] || 0) + m; total += m;
+      total += annualToMonthly(b.premium, b.frequency);
     });
-    let rows = Object.keys(byCat).map(code => ({
-      label: code === '\u2014' ? 'Uncategorised' : (catLabel[code] || code), amt: byCat[code]
-    })).sort((a, b) => a.label.localeCompare(b.label)).map(r =>
-      '<tr><td>' + esc(r.label) + '</td><td class="amt">' + fmt(r.amt) + '</td></tr>').join('');
-    const dining = (Number(d.diningAnnual) || 0) / 12;
-    if (dining > 0) { rows += '<tr><td>Dining</td><td class="amt">' + fmt(dining) + '</td></tr>'; total += dining; }
-    if (!rows) rows = '<tr><td colspan="2" style="color:#94a3b8;">No credit-card spending</td></tr>';
+    total += (Number(d.diningAnnual) || 0) / 12;   // dining is paid on the card
     return '<div class="panelcard">' +
       '<div class="blocktitle">Credit Card</div>' +
       '<div class="subtitle">Estimated monthly cost &mdash; not included in totals</div>' +
-      '<table><tbody>' + rows +
+      '<table><tbody>' +
         '<tr class="total"><td>Estimated total</td><td class="amt">' + fmt(total) + '</td></tr></tbody></table>' +
     '</div>';
   }
