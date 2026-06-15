@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Insurance Savings</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err85"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:980px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  h2 { color:#2c3e50; font-size:18px; margin:0 0 2px; }
+  .pot-sub { color:#64748b; font-size:13px; margin:0 0 12px; }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:9px 14px; border-bottom:1px solid #e2e8f0; text-align:right; }
+  th:first-child, td:first-child { text-align:left; }
+  th { background:#f8fafc; color:#475569; font-size:14px; }
+  tr.total-row td { font-weight:bold; border-top:2px solid #cbd5e1; color:#2c3e50; }
+  td.empty { text-align:left; color:#94a3b8; font-style:italic; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+
+  /* ---- Automatic dark mode (follows device setting) ---- */
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1, h2, h3, h4 { color:#f1f5f9 !important; }
+    .panel { background:#1e293b !important; border-color:#334155 !important; box-shadow:0 2px 4px rgba(0,0,0,0.4) !important; }
+    .note, .pot-sub { color:#94a3b8 !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    tr.total-row td { color:#f1f5f9 !important; border-top-color:#475569 !important; }
+    td.empty { color:#94a3b8 !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Insurance Savings</h1>
+  <p class="note">A read-only reference of the bills paid from each savings pot (an account with &ldquo;Funded from&rdquo; set on the Bank Accounts page). Each pot foots a monthly set-aside and an annual figure; that monthly total is the single &ldquo;Insurance/car savings&rdquo; line shown against the funding account on the Budget, so the two reconcile. Monthly = weekly &times;52/12, annual &divide;12, monthly as-is. <span style="color:#94a3b8;">(insurance savings build: v1)</span></p>
+  <div id="status">Loading&hellip;</div>
+
+  <div id="pots"></div>
+
+<script>
+  const fmt = App.fmt;
+
+  // annual cost of a bill — same convention as the rest of the app
+  function annualOf(premium, frequency) {
+    const p = Number(premium) || 0;
+    if (frequency === 'Weekly') return p * 52;
+    if (frequency === 'Monthly') return p * 12;
+    if (frequency === 'Annual') return p * 1;
+    return p * 12;   // fallback treat as monthly
+  }
+  // monthly set-aside = even spread of the annual cost
+  function monthlyOf(premium, frequency) { return annualOf(premium, frequency) / 12; }
+
+  let accounts = [];
+  let bills = [];
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      status.textContent = 'Loading\u2026 (fetching accounts and bills)';
+      accounts = await App.rest('bd_bank_account?order=account_id.asc');
+      bills    = await App.rest('bd_household_bills?order=bill_name.asc');
+      render();
+    } catch (e) {
+      status.className = 's-err';
+      status.textContent = 'Could not load: ' + (e && e.message ? e.message : e);
+    }
+  }
+
+  function acctLabel(id) {
+    const a = (accounts || []).find(x => (x.account_id || '').trim() === (id || '').trim());
+    if (!a) return id || '\u2014';
+    const bits = [a.bank_name, a.account_holder].filter(Boolean).join(' \u00b7 ');
+    return bits ? (a.account_id + ' (' + bits + ')') : a.account_id;
+  }
+
+  function render() {
+    const status = document.getElementById('status');
+    const host = document.getElementById('pots');
+    host.innerHTML = '';
+
+    // a pot = any account with funded_from set
+    const pots = (accounts || []).filter(a => a.funded_from != null && String(a.funded_from).trim() !== '');
+
+    if (!pots.length) {
+      status.className = '';
+      status.textContent = 'No savings pots defined. Set \u201cFunded from\u201d on an account in Bank Accounts to create one.';
+      return;
+    }
+    status.style.display = 'none';
+
+    pots.forEach(pot => {
+      const potId = (pot.account_id || '').trim();
+      const mine = (bills || []).filter(b => (b.paid_account || '').trim() === potId)
+                                .sort((a, b) => (a.bill_name || '').localeCompare(b.bill_name || ''));
+
+      let annualTotal = 0, monthlyTotal = 0;
+      const rows = mine.map(b => {
+        const an = annualOf(b.premium, b.frequency);
+        const mo = monthlyOf(b.premium, b.frequency);
+        annualTotal += an; monthlyTotal += mo;
+        return '<tr><td>' + escapeHtml(b.bill_name || '\u2014') + '</td>' +
+               '<td>' + escapeHtml(b.frequency || '\u2014') + '</td>' +
+               '<td>' + fmt(an) + '</td><td>' + fmt(mo) + '</td></tr>';
+      }).join('');
+
+      const body = mine.length
+        ? rows + '<tr class="total-row"><td>Monthly set-aside</td><td></td><td>' + fmt(annualTotal) + '</td><td>' + fmt(monthlyTotal) + '</td></tr>'
+        : '<tr><td class="empty" colspan="4">No bills are assigned to this pot yet.</td></tr>';
+
+      const panel = document.createElement('div');
+      panel.className = 'panel';
+      panel.innerHTML =
+        '<h2>' + escapeHtml(potBankName(pot)) + '</h2>' +
+        '<p class="pot-sub">Savings pot ' + escapeHtml(potId) + ' &mdash; funded from ' + escapeHtml(acctLabel(pot.funded_from)) + '</p>' +
+        '<table><thead><tr><th>Bill</th><th>Frequency</th><th>Annual \u00a3</th><th>Monthly \u00a3</th></tr></thead>' +
+        '<tbody>' + body + '</tbody></table>';
+      host.appendChild(panel);
+    });
+  }
+
+  function potBankName(pot) {
+    const bits = [pot.bank_name, pot.account_holder].filter(Boolean).join(' \u00b7 ');
+    return bits || ('Pot ' + (pot.account_id || ''));
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  if (typeof App === 'undefined' || !App.requireLogin) {
+    document.getElementById('status').textContent = 'Error: common.js did not load (App is undefined).';
+  } else {
+    try {
+      App.requireLogin(load, { title: 'Insurance Savings' });
+    } catch (err) {
+      document.getElementById('status').textContent = 'Error during startup: ' + (err && err.message ? err.message : err);
+    }
+  }
+</script>
+</body>
+</html>
