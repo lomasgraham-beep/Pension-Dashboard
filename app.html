@@ -477,7 +477,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-165</span>
+    <span class="build-stamp">build: LC-166</span>
   </div>
 
   <script>
@@ -1316,7 +1316,7 @@
         applyDynamicMaxes();
         recomputeAll();
         status.className = 's-ok';
-        status.textContent = 'Loaded. Move the Modelling sliders to explore live; the view toggle re-slices instantly.';
+        status.textContent = 'Connection healthy. Welcome back ' + p1Name + (p2Name ? ' and ' + p2Name : '');
       } catch (e) {
         status.className = 's-err';
         status.textContent = 'Could not load: ' + e.message + '. Check your network settings allow access to Supabase.';
