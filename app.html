@@ -58,6 +58,16 @@
     .card h3 { margin:0 0 8px; font-size:12px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; }
     .card .value { font-size:24px; font-weight:700; color:var(--ink); }
     .card.hl .value { color:var(--accent-dark); }
+    /* Overview pension-performance blocks */
+    .perf-member { margin:22px 0 10px; font-size:16px; color:var(--ink); font-weight:700; }
+    .perf-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:15px; }
+    .perf-card { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:16px 16px 12px; }
+    .perf-card h4 { margin:0 0 10px; font-size:15px; color:var(--ink); font-weight:700; border-bottom:1px solid var(--line); padding-bottom:8px; }
+    .perf-row { display:flex; justify-content:space-between; align-items:baseline; font-size:13px; padding:3px 0; }
+    .perf-row .lbl { color:var(--ink-soft); }
+    .perf-row .val { font-weight:600; color:var(--ink); }
+    .perf-row .val.pos-growth { color:#27ae60; }
+    .perf-row .val.neg-growth { color:#c0392b; }
 
     .chart-box { width:100%; height:400px; margin-bottom:20px; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
@@ -333,6 +343,7 @@
       <div class="card" id="cardP2Ret"><h3><span class="nm-p2">Julie</span> at retirement</h3><div id="ovProjJulie" class="value">£0</div></div>
     </div>
     <p class="note" id="ovNote" style="margin-top:14px;"></p>
+    <div id="ovPerf"></div>
   </div>
 
   <div id="Cash" class="tabcontent"><iframe id="frame-Cash" class="app-frame" title="Cash and Purchases"></iframe></div>
@@ -477,7 +488,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-170</span>
+    <span class="build-stamp">build: LC-171</span>
   </div>
 
   <script>
@@ -945,6 +956,141 @@
       const c = readControls();
       const ry = c.retirementDate ? c.retirementDate.getFullYear() : '—';
       document.getElementById('ovNote').textContent = 'Projected figures assume retirement in ' + ry + ', at the growth rate, contributions and working-pattern shown on the Modelling tab.';
+      renderPerfBlocks();
+    }
+
+    // ---- Overview pension-performance blocks ----
+    // Mirrors the KPI table's per-pension calculation EXACTLY (same tier-based
+    // contribution stripping fixed in kpis.html build cumgr5), so the two pages agree.
+    let _perfContribs = [], _perfExceptions = [], _perfTiers = {}, _perfParams = {};
+    function perfMedian(a) { const s = [...a].sort((x, y) => x - y), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+    function perfExpectedDays(log) {
+      const ld = new Date(log.log_date);
+      const tiers = _perfTiers[log.member_name];
+      if (tiers && tiers.length) {
+        let chosen = null;
+        for (let i = 0; i < tiers.length; i++) { if (tiers[i].from && tiers[i].from <= ld) chosen = tiers[i]; }
+        if (!chosen) chosen = tiers[0];
+        if (chosen && chosen.days) return Number(chosen.days);
+      }
+      const prm = _perfParams[log.member_name] || null;
+      if (prm) {
+        const d1 = prm.shorter_week_date_1 ? new Date(prm.shorter_week_date_1) : null;
+        const d2 = prm.shorter_week_date_2 ? new Date(prm.shorter_week_date_2) : null;
+        if (d2 && ld >= d2) return Number(prm.working_days_2) || 5;
+        if (d1 && ld >= d1) return Number(prm.working_days_1) || 5;
+      }
+      return 5;
+    }
+    function perfExpectedContribution(log) {
+      const d = new Date(log.log_date);
+      const idx = d.getFullYear() * 12 + d.getMonth();
+      const expectedDays = perfExpectedDays(log);
+      const match = _perfContribs.find(c => {
+        if (c.member_name !== log.member_name || c.pension_name !== log.pension_name) return false;
+        const wd = c.working_days;
+        if (wd == null || wd === '') return true;
+        return Number(wd) === Number(expectedDays);
+      });
+      let normal = match ? (Number(match.monthly_contribution) || 0) : 0;
+      let override = null, oneOff = 0;
+      (_perfExceptions || []).forEach(e => {
+        if (e.member_name !== log.member_name || e.pension_name !== log.pension_name) return;
+        const s = e.start_date ? new Date(e.start_date) : null;
+        const en = e.end_date ? new Date(e.end_date) : null;
+        const sIdx = s ? s.getFullYear() * 12 + s.getMonth() : null;
+        const eIdx = en ? en.getFullYear() * 12 + en.getMonth() : null;
+        if (e.one_off === true) { if (sIdx === idx) oneOff += Number(e.contribution_value) || 0; }
+        else { if (sIdx != null && idx >= sIdx && (eIdx == null || idx <= eIdx)) override = Number(e.contribution_value) || 0; }
+      });
+      return ((override != null) ? override : normal) + oneOff;
+    }
+    function perfBuckets(logs) {
+      const md = {};
+      logs.forEach(l => {
+        const d = new Date(l.log_date); if (isNaN(d)) return;
+        const k = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+        if (!md[k]) md[k] = { logs: [], hasContrib: false, expectedAmt: 0 };
+        md[k].logs.push(l);
+        if (l.contribution_applied) { md[k].hasContrib = true; md[k].expectedAmt = perfExpectedContribution(l); }
+      });
+      return md;
+    }
+    function perfStats(rawLogs) {
+      const logs = rawLogs.slice().sort((a, b) => new Date(a.log_date) - new Date(b.log_date));
+      if (logs.length < 2) return null;   // need two points to measure growth (mirrors KPI table)
+      const md = perfBuckets(logs), mk = Object.keys(md).sort();
+      const diffs = [], pcts = []; let latest = 0;
+      for (let i = 1; i < mk.length; i++) {
+        const cur = Number(md[mk[i]].logs[md[mk[i]].logs.length - 1].pot_value);
+        const prev = Number(md[mk[i - 1]].logs[md[mk[i - 1]].logs.length - 1].pot_value);
+        const pp = mk[i - 1].split('-'), mp = mk[i].split('-');
+        let monthDiff = (mp[0] - pp[0]) * 12 + (mp[1] - pp[1]); if (monthDiff < 1) monthDiff = 1;
+        const contrib = (md[mk[i]].hasContrib ? md[mk[i]].expectedAmt : 0) * monthDiff;
+        const organic = (cur - prev - contrib) / monthDiff;
+        diffs.push(organic); pcts.push(prev ? organic / prev * 100 : 0);
+        if (i === mk.length - 1) latest = organic;
+      }
+      if (mk.length === 1) {
+        const ml = md[mk[0]].logs, fv = Number(ml[0].pot_value), cv = Number(ml[ml.length - 1].pot_value);
+        const sc = md[mk[0]].hasContrib ? md[mk[0]].expectedAmt : 0;
+        latest = cv - fv - sc; diffs.push(latest); pcts.push(fv ? latest / fv * 100 : 0);
+      }
+      return {
+        current: Number(logs[logs.length - 1].pot_value),
+        latest: latest,
+        expected: diffs.length ? perfMedian(diffs) : 0,
+        avgAmt: diffs.length ? diffs.reduce((a, b) => a + b, 0) / diffs.length : 0,
+        avgPct: pcts.length ? perfMedian(pcts) : 0
+      };
+    }
+    function renderPerfBlocks() {
+      const host = document.getElementById('ovPerf');
+      if (!host) return;
+      _perfContribs = data.contributions || [];
+      _perfExceptions = data.contributionExceptions || [];
+      _perfParams = data.paramsByMember || {};
+      _perfTiers = {};
+      (data.workingTiers || []).forEach(t => {
+        if (!t.member_name) return;
+        (_perfTiers[t.member_name] = _perfTiers[t.member_name] || []).push({ from: t.from_date ? new Date(t.from_date) : null, days: Number(t.days) });
+      });
+      Object.keys(_perfTiers).forEach(m => _perfTiers[m].sort((a, b) => (a.from || 0) - (b.from || 0)));
+
+      const dict = {};
+      (data.logs || []).forEach(l => { const k = l.member_name + '|' + l.pension_name; (dict[k] = dict[k] || []).push(l); });
+
+      const membersInData = [];
+      Object.keys(dict).forEach(k => { const m = k.split('|')[0]; if (membersInData.indexOf(m) < 0) membersInData.push(m); });
+      const rank = x => x === p1Name ? 0 : (x === p2Name ? 1 : 2);
+      membersInData.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+
+      const cls = v => v >= 0 ? 'pos-growth' : 'neg-growth';
+      const fmtPct = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+      let inner = '';
+      membersInData.forEach(member => {
+        const cards = [];
+        Object.keys(dict).filter(k => k.split('|')[0] === member)
+          .sort((a, b) => a.split('|').slice(1).join('|').localeCompare(b.split('|').slice(1).join('|')))
+          .forEach(k => {
+            const s = perfStats(dict[k]);
+            if (!s) return;   // skip pensions with fewer than two logs
+            const name = k.split('|').slice(1).join('|');
+            cards.push(
+              '<div class="perf-card"><h4>' + name + '</h4>' +
+              '<div class="perf-row"><span class="lbl">Current value</span><span class="val">' + fmt(s.current) + '</span></div>' +
+              '<div class="perf-row"><span class="lbl">Latest monthly growth</span><span class="val ' + cls(s.latest) + '">' + App.fmtDiff(s.latest) + '</span></div>' +
+              '<div class="perf-row"><span class="lbl">Expected growth</span><span class="val ' + cls(s.expected) + '">' + App.fmtDiff(s.expected) + '</span></div>' +
+              '<div class="perf-row"><span class="lbl">Average monthly £</span><span class="val ' + cls(s.avgAmt) + '">' + App.fmtDiff(s.avgAmt) + '</span></div>' +
+              '<div class="perf-row"><span class="lbl">Average monthly %</span><span class="val ' + cls(s.avgPct) + '">' + fmtPct(s.avgPct) + '</span></div>' +
+              '</div>'
+            );
+          });
+        if (cards.length) inner += '<h3 class="perf-member">' + member + '</h3><div class="perf-grid">' + cards.join('') + '</div>';
+      });
+      host.innerHTML = inner
+        ? '<h2 style="margin-top:25px;">Pension Performance</h2>' + inner
+        : '';
     }
 
     // ---- live controls on the Modelling tab ----
@@ -1309,6 +1455,12 @@
         serverPots = { graham: Math.max(0, js0.graham || 0), julie: Math.max(0, js0.julie || 0) };
         calib.g = 1;
         calib.j = 1;
+
+        // per-member modelling params, for the Overview performance-block contribution calc
+        // (fallback only — tier-based members resolve via data.workingTiers)
+        data.paramsByMember = {};
+        if (p1Name) data.paramsByMember[p1Name] = p;
+        if (p2Name && p2row) data.paramsByMember[p2Name] = p2row;
 
         buildTierSliders();
         buildColChooser();
