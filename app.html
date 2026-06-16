@@ -58,16 +58,12 @@
     .card h3 { margin:0 0 8px; font-size:12px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; }
     .card .value { font-size:24px; font-weight:700; color:var(--ink); }
     .card.hl .value { color:var(--accent-dark); }
-    /* Overview pension-performance blocks */
-    .perf-member { margin:24px 0 12px; font-size:19px; color:var(--ink); font-weight:700; }
-    .perf-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:15px; }
-    .perf-card { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:18px 18px 14px; }
-    .perf-card h4 { margin:0 0 12px; font-size:18px; color:var(--ink); font-weight:700; border-bottom:1px solid var(--line); padding-bottom:9px; }
-    .perf-row { display:flex; justify-content:space-between; align-items:baseline; font-size:16px; padding:5px 0; }
-    .perf-row .lbl { color:var(--ink-soft); }
-    .perf-row .val { font-weight:600; color:var(--ink); }
-    .perf-row .val.pos-growth { color:#27ae60; }
-    .perf-row .val.neg-growth { color:#c0392b; }
+    /* Overview pension-performance blocks (one card per measure, a row per pension) */
+    .perf-member { margin:26px 0 4px; font-size:20px; color:var(--ink); font-weight:700; }
+    .perf-pension { margin:14px 0 8px; font-size:16px; color:var(--ink); font-weight:700; }
+    .perf-measure-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:8px; }
+    .card .value.pos-growth { color:#27ae60; }
+    .card .value.neg-growth { color:#c0392b; }
 
     .chart-box { width:100%; height:400px; margin-bottom:20px; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
@@ -488,7 +484,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-172</span>
+    <span class="build-stamp">build: LC-173</span>
   </div>
 
   <script>
@@ -1069,24 +1065,27 @@
       const fmtPct = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
       let inner = '';
       membersInData.forEach(member => {
-        const cards = [];
+        let pensionsHtml = '';
         Object.keys(dict).filter(k => k.split('|')[0] === member)
           .sort((a, b) => a.split('|').slice(1).join('|').localeCompare(b.split('|').slice(1).join('|')))
           .forEach(k => {
             const s = perfStats(dict[k]);
             if (!s) return;   // skip pensions with fewer than two logs
             const name = k.split('|').slice(1).join('|');
-            cards.push(
-              '<div class="perf-card"><h4>' + name + '</h4>' +
-              '<div class="perf-row"><span class="lbl">Current value</span><span class="val">' + fmt(s.current) + '</span></div>' +
-              '<div class="perf-row"><span class="lbl">Latest monthly growth</span><span class="val ' + cls(s.latest) + '">' + App.fmtDiff(s.latest) + '</span></div>' +
-              '<div class="perf-row"><span class="lbl">Expected growth</span><span class="val ' + cls(s.expected) + '">' + App.fmtDiff(s.expected) + '</span></div>' +
-              '<div class="perf-row"><span class="lbl">Average monthly £</span><span class="val ' + cls(s.avgAmt) + '">' + App.fmtDiff(s.avgAmt) + '</span></div>' +
-              '<div class="perf-row"><span class="lbl">Average monthly %</span><span class="val ' + cls(s.avgPct) + '">' + fmtPct(s.avgPct) + '</span></div>' +
-              '</div>'
-            );
+            // one card per measure; the pension name heads the row
+            const measures = [
+              ['Current Value', fmt(s.current), ''],
+              ['Latest Monthly Growth', App.fmtDiff(s.latest), cls(s.latest)],
+              ['Expected Growth', App.fmtDiff(s.expected), cls(s.expected)],
+              ['Average Monthly £', App.fmtDiff(s.avgAmt), cls(s.avgAmt)],
+              ['Average Monthly %', fmtPct(s.avgPct), cls(s.avgPct)]
+            ];
+            const cardsHtml = measures.map(m =>
+              '<div class="card"><h3>' + m[0] + '</h3><div class="value ' + m[2] + '">' + m[1] + '</div></div>'
+            ).join('');
+            pensionsHtml += '<h4 class="perf-pension">' + name + '</h4><div class="perf-measure-grid">' + cardsHtml + '</div>';
           });
-        if (cards.length) inner += '<h3 class="perf-member">' + member + '</h3><div class="perf-grid">' + cards.join('') + '</div>';
+        if (pensionsHtml) inner += '<h3 class="perf-member">' + member + '</h3>' + pensionsHtml;
       });
       host.innerHTML = inner
         ? '<h2 style="margin-top:25px;">Pension Performance</h2>' + inner
