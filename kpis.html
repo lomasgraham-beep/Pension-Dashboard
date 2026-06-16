@@ -86,7 +86,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr4)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr5)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
     <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span> expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
@@ -114,23 +114,41 @@
   const fmt = App.fmt, fmtDiff = App.fmtDiff;
   let allLogs = [], allContributions = [], grahamParams = null, allExceptions = [];
   let paramsByMember = {};
+  let allTiers = [], tiersByMember = {};
   let p1Name = 'Graham', p2Name = null;
   let chartsReady = false;
   let cumMode = 'gbp';   // accumulated-growth chart unit: 'gbp' (£) or 'pct' (% of starting value)
   google.charts.load('current', { packages:['corechart'] });
   google.charts.setOnLoadCallback(() => { chartsReady = true; if (allLogs.length) drawCharts(); });
 
-  function getExpectedContribution(log) {
-    const d = new Date(log.log_date);
-    const idx = d.getFullYear() * 12 + d.getMonth();
+  // Expected working-days for a log, taken from the working TIERS (bd_working_tiers) — the
+  // live source the contribution rows are keyed to — not the legacy shorter-week params.
+  // The tier in effect on the log date wins; for logs before the earliest tier we use that
+  // earliest ("starting") tier. Members with no tiers fall back to the old shorter-week
+  // params, then to 5. (Fixes contributions not being stripped for non-5-day members.)
+  function expectedDaysForLog(log) {
+    const ld = new Date(log.log_date);
+    const tiers = tiersByMember[log.member_name];
+    if (tiers && tiers.length) {
+      let chosen = null;
+      for (let i = 0; i < tiers.length; i++) { if (tiers[i].from && tiers[i].from <= ld) chosen = tiers[i]; }
+      if (!chosen) chosen = tiers[0];
+      if (chosen && chosen.days) return Number(chosen.days);
+    }
     const prm = paramsByMember[log.member_name] || null;
-    let expectedDays = 5;
     if (prm) {
       const d1 = prm.shorter_week_date_1 ? new Date(prm.shorter_week_date_1) : null;
       const d2 = prm.shorter_week_date_2 ? new Date(prm.shorter_week_date_2) : null;
-      if (d2 && d >= d2) expectedDays = prm.working_days_2 || 5;
-      else if (d1 && d >= d1) expectedDays = prm.working_days_1 || 5;
+      if (d2 && ld >= d2) return Number(prm.working_days_2) || 5;
+      if (d1 && ld >= d1) return Number(prm.working_days_1) || 5;
     }
+    return 5;
+  }
+
+  function getExpectedContribution(log) {
+    const d = new Date(log.log_date);
+    const idx = d.getFullYear() * 12 + d.getMonth();
+    const expectedDays = expectedDaysForLog(log);
     const match = allContributions.find(c => {
       if (c.member_name !== log.member_name || c.pension_name !== log.pension_name) return false;
       const wd = c.working_days;
@@ -420,15 +438,23 @@
     try {
       const mn = await App.memberNames();
       p1Name = mn.p1 || 'Graham'; p2Name = mn.p2;
-      const [logs, contribs, allParams, excRows] = await Promise.all([
+      const [logs, contribs, allParams, excRows, tierRows] = await Promise.all([
         App.rest('op_pension_logs?order=log_date.desc&limit=2000'), App.rest('bd_pension_contributions'),
         App.rest('op_modelling_parameters'),
-        App.rest('bd_contribution_exceptions?order=start_date.asc')
+        App.rest('bd_contribution_exceptions?order=start_date.asc'),
+        App.rest('bd_working_tiers?order=from_date.asc')
       ]);
       allLogs = logs; allContributions = contribs; allExceptions = excRows || [];
+      allTiers = tierRows || [];
       paramsByMember = {};
       (allParams || []).forEach(r => { if (r.member_name) paramsByMember[r.member_name] = r; });
       grahamParams = paramsByMember[p1Name] || null;
+      tiersByMember = {};
+      (allTiers || []).forEach(t => {
+        if (!t.member_name) return;
+        (tiersByMember[t.member_name] = tiersByMember[t.member_name] || []).push({ from: t.from_date ? new Date(t.from_date) : null, days: Number(t.days) });
+      });
+      Object.keys(tiersByMember).forEach(m => tiersByMember[m].sort((a, b) => (a.from || 0) - (b.from || 0)));
       // member filter options + dynamic labels
       document.getElementById('fMember').innerHTML = '<option value="All">All Members</option>' + mn.all.map(n => `<option>${n}</option>`).join('');
       document.querySelectorAll('.nm-p1').forEach(el => el.textContent = p1Name);
