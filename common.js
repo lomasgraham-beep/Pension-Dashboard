@@ -23,25 +23,56 @@
   let authToken = null;
   const sb = global.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+  // Keep our token copy in step with the library's background refreshes.
+  // Supabase silently issues a new access token roughly hourly; without this,
+  // requests would keep using the original (now expired) snapshot and get 401s.
+  sb.auth.onAuthStateChange(function (_event, session) {
+    if (session && session.access_token) authToken = session.access_token;
+  });
+
+  // Force a fresh token, used to self-heal a 401 (e.g. after an iPad tab was
+  // frozen in the background and its refresh timer paused). Tries an explicit
+  // refresh first, then falls back to whatever session is currently stored.
+  async function refreshToken() {
+    try {
+      const r = await sb.auth.refreshSession();
+      if (r && r.data && r.data.session && r.data.session.access_token) { authToken = r.data.session.access_token; return authToken; }
+    } catch (e) {}
+    try {
+      const r = await sb.auth.getSession();
+      if (r && r.data && r.data.session && r.data.session.access_token) { authToken = r.data.session.access_token; return authToken; }
+    } catch (e) {}
+    return authToken;
+  }
+
   // ---- request helpers (use the logged-in token once available) ----
   function getHeaders() {
     return { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + (authToken || SUPABASE_KEY), "Content-Type": "application/json" };
   }
   async function rest(path) {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/" + path, { headers: getHeaders() });
+    const url = SUPABASE_URL + "/rest/v1/" + path;
+    let r = await fetch(url, { headers: getHeaders() });
+    if (r.status === 401) { await refreshToken(); r = await fetch(url, { headers: getHeaders() }); }
     if (!r.ok) throw new Error(path + " -> " + r.status);
     return r.json();
   }
   async function rpc(name, body) {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + name, { method: "POST", headers: getHeaders(), body: JSON.stringify(body || {}) });
+    const url = SUPABASE_URL + "/rest/v1/rpc/" + name;
+    const payload = JSON.stringify(body || {});
+    let r = await fetch(url, { method: "POST", headers: getHeaders(), body: payload });
+    if (r.status === 401) { await refreshToken(); r = await fetch(url, { method: "POST", headers: getHeaders(), body: payload }); }
     if (!r.ok) throw new Error("rpc " + name + " -> " + r.status);
     return r.json();
   }
   async function write(method, path, payload) {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/" + path, { method: method, headers: Object.assign(getHeaders(), { Prefer: "return=minimal" }), body: JSON.stringify(payload) });
+    const url = SUPABASE_URL + "/rest/v1/" + path;
+    const body = JSON.stringify(payload);
+    const opts = function () { return { method: method, headers: Object.assign(getHeaders(), { Prefer: "return=minimal" }), body: body }; };
+    let r = await fetch(url, opts());
+    if (r.status === 401) { await refreshToken(); r = await fetch(url, opts()); }
     if (!r.ok) {
       let detail = "";
-      try { const body = await r.json(); detail = body.message || body.hint || body.details || JSON.stringify(body); } catch (e) { try { detail = await r.text(); } catch (e2) {} }
+      try { const eb = await r.json(); detail = eb.message || eb.hint || eb.details || JSON.stringify(eb); } catch (e) { try { detail = await r.text(); } catch (e2) {} }
       throw new Error(method + " " + path + " -> " + r.status + (detail ? " | " + detail : ""));
     }
     return true;
