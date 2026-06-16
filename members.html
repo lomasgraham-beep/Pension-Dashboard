@@ -142,7 +142,7 @@
   (function(){
     const _f = window.fetch;
     window.fetch = async function(u, o){
-      const r = await _f(u, o);
+      let r = await _f(u, o); if (r.status === 401 && String(u).indexOf('/rest/v1/') >= 0) { try { const rs = await sb.auth.refreshSession(); const s = rs && rs.data && rs.data.session; if (s && s.access_token) { authToken = s.access_token; if (o && o.headers && o.headers.Authorization) o.headers.Authorization = 'Bearer ' + authToken; r = await _f(u, o); } } catch (e) {} }
       try {
         const m = (o && o.method || 'GET').toUpperCase();
         if (r.ok && (m==='POST'||m==='PATCH'||m==='DELETE'||m==='PUT') && String(u).indexOf('/rest/v1/')>=0) {
@@ -168,6 +168,8 @@
   const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${authToken || SUPABASE_KEY}`, "Content-Type": "application/json" });
   let authToken = null;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  // keep our captured token in step with the library's background refreshes (avoids stale-token 401s)
+  sb.auth.onAuthStateChange(function (_e, session) { if (session && session.access_token) authToken = session.access_token; });
 
   const toInputDate = (ds) => { if (!ds) return ""; const p = String(ds).split('T')[0].split('-'); return p.length < 3 ? "" : p[0] + '-' + p[1] + '-' + p[2]; };
   const esc = (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, '_'); // safe id from name
