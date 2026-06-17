@@ -170,6 +170,7 @@
     .params .pbtn { padding:13px 22px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:15px; color:#fff; }
     .pbtn-save { background:#27ae60; } .pbtn-save:hover { background:#219150; }
     .pbtn-reset { background:#64748b; } .pbtn-reset:hover { background:#475569; }
+    .pbtn-mss { background:var(--accent); } .pbtn-mss:hover { filter:brightness(0.92); }
     .params .msg { font-size:14px; font-weight:bold; }
 
     /* dual-handle year range slider */
@@ -380,9 +381,21 @@
         <button class="pbtn pbtn-reset" onclick="resetPlan()">↺ Reset to saved</button>
         <span class="msg" id="m_msg"></span>
       </div>
-      <div class="actions" id="mssRow">
-        <button class="pbtn" onclick="findMaxSpend()">Find my maximum sustainable spend</button>
-        <span class="msg" id="mss_msg"></span>
+      <div id="mssRow" style="margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0;">
+        <div style="display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end;">
+          <label style="display:flex; flex-direction:column; font-size:12px; color:#475569; gap:4px;">Bridge floor %
+            <input type="number" id="mss_bridge" min="0" max="100" step="1" value="10" style="width:74px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px;"></label>
+          <label style="display:flex; flex-direction:column; font-size:12px; color:#475569; gap:4px;">End-of-life floor %
+            <input type="number" id="mss_eol" min="0" max="100" step="1" value="10" style="width:74px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px;"></label>
+          <label style="display:flex; flex-direction:column; font-size:12px; color:#475569; gap:4px;">Spend cap %
+            <input type="number" id="mss_cap" min="100" max="1000" step="10" value="500" style="width:84px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px;"></label>
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569;">
+            <input type="checkbox" id="mss_crashes" class="toggle-switch">Include crashes</label>
+        </div>
+        <div class="actions" style="margin-top:12px;">
+          <button class="pbtn pbtn-mss" onclick="findMaxSpend()">Find my maximum sustainable spend</button>
+          <span class="msg" id="mss_msg"></span>
+        </div>
       </div>
       <div id="mss_result" style="margin-top:8px;"></div>
     </div>
@@ -490,7 +503,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-175</span>
+    <span class="build-stamp">build: LC-176</span>
   </div>
 
   <script>
@@ -1307,9 +1320,13 @@
       const gbp = n => '£' + Math.round(n).toLocaleString('en-GB');
       const good = 'padding:10px 12px; border-radius:8px; background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46;';
       const bad  = 'padding:10px 12px; border-radius:8px; background:#fef2f2; border:1px solid #fecaca; color:#991b1b;';
+      const bridgePct = Math.max(0, (parseFloat(document.getElementById('mss_bridge').value) || 0) / 100);
+      const eolPct = Math.max(0, (parseFloat(document.getElementById('mss_eol').value) || 0) / 100);
+      const spendCap = Math.max(1, (parseFloat(document.getElementById('mss_cap').value) || 500) / 100);
+      const includeCrashes = !!document.getElementById('mss_crashes').checked;
       let res;
       try {
-        res = PensionOptimiser.maxSustainableSpend(data, lastDrawdownCfg, { bridgePct: 0.10, eolPct: 0.10, includeCrashes: false });
+        res = PensionOptimiser.maxSustainableSpend(data, lastDrawdownCfg, { bridgePct: bridgePct, eolPct: eolPct, includeCrashes: includeCrashes, spendCap: spendCap });
       } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Error: ' + e.message; return; }
 
       if (!res.feasible) {
@@ -1333,7 +1350,7 @@
         '<div style="' + good + '">' +
           '<div style="font-size:15px;"><strong>Maximum sustainable spend: ' + res.maxSpendRed.toFixed(2) + '\u00d7</strong> (' + pct + '% of current planned discretionary spend)</div>' +
           '<div style="margin-top:4px;">\u2248 ' + gbp(res.maxDiscMonthly) + '/month of discretionary spend, in today\u2019s money.</div>' +
-          '<div style="margin-top:6px; font-size:12px; color:#475569;">Binding constraint: ' + bindTxt + '. Defaults: 10% bridge &amp; end-of-life floors, crashes off.</div>' +
+          '<div style="margin-top:6px; font-size:12px; color:#475569;">Binding constraint: ' + bindTxt + '. Floors: ' + (bridgePct*100).toFixed(0) + '% bridge, ' + (eolPct*100).toFixed(0) + '% end-of-life; crashes ' + (includeCrashes ? 'on' : 'off') + '.</div>' +
         '</div>';
     }
 
