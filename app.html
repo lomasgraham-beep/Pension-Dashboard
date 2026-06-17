@@ -360,7 +360,7 @@
         <div class="ctrl"><label>State pension growth <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
           <div class="hint">Annual rise on the State Pension. Default 2.5%. Drag down for the triple lock weakened, capped, or frozen (0%). <span style="color:var(--ink-soft);">What-if only, never saved.</span></div></div>
         <!-- Row 2 -->
-        <div class="ctrl"><label>Spending in retirement <span id="m_spend_v" class="sv">100%</span></label><input type="range" id="m_spend" min="25" max="150" step="1" value="100" oninput="onParam()"></div>
+        <div class="ctrl"><label>Spending in retirement <span id="m_spend_v" class="sv">100%</span></label><input type="range" id="m_spend" min="25" max="200" step="1" value="100" oninput="onParam()"></div>
         <div class="ctrl" id="ctrlRatio"><label><span class="nm-p1">Graham</span> drawdown ratio <span id="m_ratio_v" class="sv">50%</span></label><input type="range" id="m_ratio" min="0" max="100" step="1" value="50" oninput="onParam()"></div>
         <div class="ctrl"><label>Delay state pension <span id="m_spdelay_v" class="sv">0 yrs</span></label><input type="range" id="m_spdelay" min="0" max="10" step="1" value="0" oninput="onParam()">
           <div class="hint">Years the State Pension age rises, delaying both of you equally.</div></div>
@@ -510,7 +510,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-178</span>
+    <span class="build-stamp">build: LC-179</span>
   </div>
 
   <script>
@@ -1359,6 +1359,16 @@
           '<div style="margin-top:4px;">\u2248 ' + gbp(res.maxDiscMonthly) + '/month of discretionary spend, in today\u2019s money.</div>' +
           '<div style="margin-top:6px; font-size:12px; color:#475569;">Binding constraint: ' + bindTxt + '. Floors: ' + (bridgePct*100).toFixed(0) + '% bridge, ' + (eolPct*100).toFixed(0) + '% end-of-life; crashes ' + (includeCrashes ? 'on' : 'off') + '.</div>' +
         '</div>';
+
+      // Reflect the result on the spending slider so every chart redraws to this scenario (what-if, not saved).
+      const sld = document.getElementById('m_spend');
+      const target = Math.floor(res.maxSpendRed * 100);
+      const applied = Math.max(parseInt(sld.min, 10), Math.min(parseInt(sld.max, 10), target));
+      sld.value = applied;
+      document.getElementById('m_spend_v').textContent = applied + '%';
+      if (typeof onParam === 'function') onParam();
+      const clampNote = (applied < target) ? ' (slider maximum \u2014 true figure is higher)' : '';
+      out.innerHTML += '<div style="margin-top:6px; font-size:12px; color:#475569;">Spending slider set to ' + applied + '%' + clampNote + ' \u2014 the charts now show this scenario (what-if, not saved).</div>';
     }
 
     // ---------- embedded frames ----------
