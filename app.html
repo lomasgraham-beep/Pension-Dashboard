@@ -165,6 +165,10 @@
     .params .switch input:checked + .track { background:#27ae60; }
     .params .switch input:checked + .track::after { left:27px; }
     .params .switch .switch-text { font-weight:bold; font-size:15px; color:var(--ink); }
+    #mssBlock .ctrl > label.switch { margin-bottom:8px; }
+    #mssBlock .mss-control { height:36px; display:flex; align-items:center; }
+    #mssBlock .mss-control input[type=range] { margin:0; width:100%; }
+    #mssBlock .mss-control label.switch { margin:0; }
 
     .params .actions { margin-top:18px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
     .params .pbtn { padding:13px 22px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:15px; color:#fff; }
@@ -350,22 +354,22 @@
   <div id="Modelling" class="tabcontent">
     <div class="params" id="mssBlock">
       <h3 style="margin:0 0 12px; color:var(--ink); font-size:16px;">Maximum sustainable spend</h3>
-      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 18px; align-items:end;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 18px; align-items:start;">
         <div class="ctrl">
           <label class="switch">Bridge floor <span id="mss_bridge_v" class="sv">10%</span></label>
-          <input type="range" id="mss_bridge" min="0" max="50" step="1" value="10" oninput="document.getElementById('mss_bridge_v').textContent=this.value+'%'">
+          <div class="mss-control"><input type="range" id="mss_bridge" min="0" max="50" step="1" value="10" oninput="document.getElementById('mss_bridge_v').textContent=this.value+'%'"></div>
         </div>
         <div class="ctrl">
           <label class="switch">End-of-life floor <span id="mss_eol_v" class="sv">10%</span></label>
-          <input type="range" id="mss_eol" min="0" max="50" step="1" value="10" oninput="document.getElementById('mss_eol_v').textContent=this.value+'%'">
+          <div class="mss-control"><input type="range" id="mss_eol" min="0" max="50" step="1" value="10" oninput="document.getElementById('mss_eol_v').textContent=this.value+'%'"></div>
         </div>
         <div class="ctrl">
           <label class="switch">Spend cap <span id="mss_cap_v" class="sv">200%</span></label>
-          <input type="range" id="mss_cap" min="100" max="200" step="5" value="200" oninput="document.getElementById('mss_cap_v').textContent=this.value+'%'">
+          <div class="mss-control"><input type="range" id="mss_cap" min="100" max="200" step="5" value="200" oninput="document.getElementById('mss_cap_v').textContent=this.value+'%'"></div>
         </div>
         <div class="ctrl">
           <label class="switch">Include crashes</label>
-          <label class="switch" style="margin:6px 0;"><input type="checkbox" id="mss_crashes"><span class="track"></span></label>
+          <div class="mss-control"><label class="switch" style="margin:0;"><input type="checkbox" id="mss_crashes"><span class="track"></span></label></div>
         </div>
       </div>
       <div class="actions" style="margin-top:14px;">
@@ -512,7 +516,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-182</span>
+    <span class="build-stamp">build: LC-183</span>
   </div>
 
   <script>
