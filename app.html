@@ -363,8 +363,10 @@
           <label class="switch">Spend cap <span id="mss_cap_v" class="sv">200%</span></label>
           <input type="range" id="mss_cap" min="100" max="200" step="5" value="200" oninput="document.getElementById('mss_cap_v').textContent=this.value+'%'">
         </div>
-        <label style="display:flex; align-items:center; gap:10px; font-size:14px; color:var(--ink); cursor:pointer;">
-          <input type="checkbox" id="mss_crashes" class="toggle-switch"> Include crashes</label>
+        <div class="ctrl">
+          <label class="switch">Include crashes</label>
+          <label class="switch" style="margin:6px 0;"><input type="checkbox" id="mss_crashes"><span class="track"></span></label>
+        </div>
       </div>
       <div class="actions" style="margin-top:14px;">
         <button class="pbtn pbtn-mss" onclick="findMaxSpend()">Find my maximum sustainable spend</button>
@@ -510,7 +512,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-181</span>
+    <span class="build-stamp">build: LC-182</span>
   </div>
 
   <script>
