@@ -382,14 +382,20 @@
         <span class="msg" id="m_msg"></span>
       </div>
       <div id="mssRow" style="margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0;">
-        <div style="display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end;">
-          <label style="display:flex; flex-direction:column; font-size:12px; color:#475569; gap:4px;">Bridge floor %
-            <input type="number" id="mss_bridge" min="0" max="100" step="1" value="10" style="width:74px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px;"></label>
-          <label style="display:flex; flex-direction:column; font-size:12px; color:#475569; gap:4px;">End-of-life floor %
-            <input type="number" id="mss_eol" min="0" max="100" step="1" value="10" style="width:74px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px;"></label>
-          <label style="display:flex; flex-direction:column; font-size:12px; color:#475569; gap:4px;">Spend cap %
-            <input type="number" id="mss_cap" min="100" max="1000" step="10" value="500" style="width:84px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px;"></label>
-          <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569;">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 18px; align-items:end;">
+          <div class="ctrl">
+            <label class="switch">Bridge floor <span id="mss_bridge_v" class="sv">10%</span></label>
+            <input type="range" id="mss_bridge" min="0" max="50" step="1" value="10" oninput="document.getElementById('mss_bridge_v').textContent=this.value+'%'">
+          </div>
+          <div class="ctrl">
+            <label class="switch">End-of-life floor <span id="mss_eol_v" class="sv">10%</span></label>
+            <input type="range" id="mss_eol" min="0" max="50" step="1" value="10" oninput="document.getElementById('mss_eol_v').textContent=this.value+'%'">
+          </div>
+          <div class="ctrl">
+            <label class="switch">Spend cap <span id="mss_cap_v" class="sv">500%</span></label>
+            <input type="range" id="mss_cap" min="100" max="1000" step="10" value="500" oninput="document.getElementById('mss_cap_v').textContent=this.value+'%'">
+          </div>
+          <label class="switch" style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569; min-height:0;">
             <input type="checkbox" id="mss_crashes" class="toggle-switch">Include crashes</label>
         </div>
         <div class="actions" style="margin-top:12px;">
@@ -503,7 +509,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-176</span>
+    <span class="build-stamp">build: LC-177</span>
   </div>
 
   <script>
