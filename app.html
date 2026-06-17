@@ -348,6 +348,30 @@
   <div id="Crashes" class="tabcontent"><iframe id="frame-Crashes" class="app-frame" title="Market Crashes"></iframe></div>
 
   <div id="Modelling" class="tabcontent">
+    <div class="params" id="mssBlock">
+      <h3 style="margin:0 0 12px; color:var(--ink); font-size:16px;">Maximum sustainable spend</h3>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 18px; align-items:end;">
+        <div class="ctrl">
+          <label class="switch">Bridge floor <span id="mss_bridge_v" class="sv">10%</span></label>
+          <input type="range" id="mss_bridge" min="0" max="50" step="1" value="10" oninput="document.getElementById('mss_bridge_v').textContent=this.value+'%'">
+        </div>
+        <div class="ctrl">
+          <label class="switch">End-of-life floor <span id="mss_eol_v" class="sv">10%</span></label>
+          <input type="range" id="mss_eol" min="0" max="50" step="1" value="10" oninput="document.getElementById('mss_eol_v').textContent=this.value+'%'">
+        </div>
+        <div class="ctrl">
+          <label class="switch">Spend cap <span id="mss_cap_v" class="sv">200%</span></label>
+          <input type="range" id="mss_cap" min="100" max="200" step="5" value="200" oninput="document.getElementById('mss_cap_v').textContent=this.value+'%'">
+        </div>
+        <label class="switch" style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569; min-height:0;">
+          <input type="checkbox" id="mss_crashes" class="toggle-switch">Include crashes</label>
+      </div>
+      <div class="actions" style="margin-top:14px;">
+        <button class="pbtn pbtn-mss" onclick="findMaxSpend()">Find my maximum sustainable spend</button>
+        <span class="msg" id="mss_msg"></span>
+      </div>
+      <div id="mss_result" style="margin-top:10px;"></div>
+    </div>
     <div class="model-layout">
     <div class="rail-slot" id="railSlot-Modelling"></div><div class="rail-strip" onclick="expandRail()" title="Show controls"><span>Controls &#9654;</span></div>
     <div class="params" id="modelRail">
@@ -403,30 +427,6 @@
     <h3 id="cashModelHead" style="color:var(--ink); margin:18px 0 4px; display:none;">Cash Savings Balance</h3>
     <div id="cashModelChart" class="chart-box" style="display:none;"></div>
     </div>
-    </div>
-    <div class="params" id="mssBlock" style="margin-top:18px;">
-      <h3 style="margin:0 0 12px; color:var(--ink); font-size:16px;">Maximum sustainable spend</h3>
-      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 18px; align-items:end;">
-        <div class="ctrl">
-          <label class="switch">Bridge floor <span id="mss_bridge_v" class="sv">10%</span></label>
-          <input type="range" id="mss_bridge" min="0" max="50" step="1" value="10" oninput="document.getElementById('mss_bridge_v').textContent=this.value+'%'">
-        </div>
-        <div class="ctrl">
-          <label class="switch">End-of-life floor <span id="mss_eol_v" class="sv">10%</span></label>
-          <input type="range" id="mss_eol" min="0" max="50" step="1" value="10" oninput="document.getElementById('mss_eol_v').textContent=this.value+'%'">
-        </div>
-        <div class="ctrl">
-          <label class="switch">Spend cap <span id="mss_cap_v" class="sv">200%</span></label>
-          <input type="range" id="mss_cap" min="100" max="200" step="5" value="200" oninput="document.getElementById('mss_cap_v').textContent=this.value+'%'">
-        </div>
-        <label class="switch" style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569; min-height:0;">
-          <input type="checkbox" id="mss_crashes" class="toggle-switch">Include crashes</label>
-      </div>
-      <div class="actions" style="margin-top:14px;">
-        <button class="pbtn pbtn-mss" onclick="findMaxSpend()">Find my maximum sustainable spend</button>
-        <span class="msg" id="mss_msg"></span>
-      </div>
-      <div id="mss_result" style="margin-top:10px;"></div>
     </div>
   </div>
 
@@ -510,7 +510,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-179</span>
+    <span class="build-stamp">build: LC-180</span>
   </div>
 
   <script>
