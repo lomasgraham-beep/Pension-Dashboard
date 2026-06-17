@@ -8,6 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=auth01"></script>
   <script src="engine.js?v=fDine"></script>
+  <script src="optimiser.js?v=mss01"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -379,6 +380,11 @@
         <button class="pbtn pbtn-reset" onclick="resetPlan()">↺ Reset to saved</button>
         <span class="msg" id="m_msg"></span>
       </div>
+      <div class="actions" id="mssRow">
+        <button class="pbtn" onclick="findMaxSpend()">Find my maximum sustainable spend</button>
+        <span class="msg" id="mss_msg"></span>
+      </div>
+      <div id="mss_result" style="margin-top:8px;"></div>
     </div>
     <div class="model-main">
     <h2><span class="viewlabel">Joint</span> Projections</h2>
@@ -484,7 +490,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-173</span>
+    <span class="build-stamp">build: LC-174</span>
   </div>
 
   <script>
@@ -493,6 +499,7 @@
     let savedPlan = null;     // parsed modelling parameters
     let serverPots = null;    // forecast pots calibrated to the server
     let drawdownRows = [];    // engine.drawdown output for the current controls
+    let lastDrawdownCfg = null; // exact cfg last passed to drawdown — reused by the optimiser
     let calib = { g: 1, j: 1 };   // calibrates the JS forecast to the server's figure
     let livePots = { graham: 0, julie: 0 }; // pots at retirement for the current controls
     let currentView = 'Joint';
@@ -1273,7 +1280,7 @@
       sp.spDelay = {};
       if (p1Name) sp.spDelay[p1Name] = dly;
       if (p2Name) sp.spDelay[p2Name] = dly;
-      drawdownRows = PensionEngine.drawdown(data, {
+      lastDrawdownCfg = {
         pots: livePots, potsAtOwnRetire: ownRetirePots,
         gRatio: plan.gRatio, spendRed: plan.spendRed,
         startYear: startYr, retirementDate: plan.retirementDate,
@@ -1281,10 +1288,53 @@
         tierDateOverrides: plan.tierDateOverrides || null,
         dynamic: plan.dynamic, gFloorPct: plan.gFloorPct, jFloorPct: plan.jFloorPct,
         sp: sp
-      });
+      };
+      drawdownRows = PensionEngine.drawdown(data, lastDrawdownCfg);
       renderOverview();
       renderRetirementTable();
       if (chartsReady) drawCharts();
+    }
+
+    // ---- Read-only: maximum sustainable spend (objective 3) ----
+    // Reuses the exact cfg recomputeAll just built (lastDrawdownCfg) so the
+    // optimiser sees identical inputs to the dashboard. Changes nothing else.
+    function findMaxSpend() {
+      const out = document.getElementById('mss_result');
+      const msg = document.getElementById('mss_msg');
+      msg.textContent = ''; out.innerHTML = '';
+      if (!window.PensionOptimiser) { msg.style.color = '#c0392b'; msg.textContent = 'Optimiser not loaded.'; return; }
+      if (!lastDrawdownCfg) { msg.style.color = '#c0392b'; msg.textContent = 'Adjust a control first so the model is built.'; return; }
+      const gbp = n => '£' + Math.round(n).toLocaleString('en-GB');
+      const good = 'padding:10px 12px; border-radius:8px; background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46;';
+      const bad  = 'padding:10px 12px; border-radius:8px; background:#fef2f2; border:1px solid #fecaca; color:#991b1b;';
+      let res;
+      try {
+        res = PensionOptimiser.maxSustainableSpend(data, lastDrawdownCfg, { bridgePct: 0.10, eolPct: 0.10, includeCrashes: false });
+      } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Error: ' + e.message; return; }
+
+      if (!res.feasible) {
+        out.innerHTML = '<div style="' + bad + '"><strong>Not sustainable.</strong> The plan fails even with no discretionary spending \u2014 pots and guaranteed income can\u2019t cover the essentials to end of life.</div>';
+        return;
+      }
+      if (res.unbounded) {
+        out.innerHTML = '<div style="' + good + '"><strong>Sustainable beyond ' + res.maxSpendRed + '\u00d7 planned spend.</strong> The pots are comfortably over-funded for this objective.</div>';
+        return;
+      }
+      let binding = null;
+      (res.detail.people || []).forEach(function (p) {
+        const cands = [];
+        if (p.trough != null) cands.push({ who: p.name, what: 'bridge', val: p.trough, floor: p.bridgeFloor, slack: p.trough - p.bridgeFloor });
+        if (p.eolVal != null) cands.push({ who: p.name, what: 'end-of-life', val: p.eolVal, floor: p.eolFloor, slack: p.eolVal - p.eolFloor });
+        cands.forEach(function (c) { if (!binding || c.slack < binding.slack) binding = c; });
+      });
+      const pct = (res.maxSpendRed * 100).toFixed(0);
+      const bindTxt = binding ? (binding.who + '\u2019s ' + binding.what + ' floor (' + gbp(binding.val) + ' against ' + gbp(binding.floor) + ')') : '\u2014';
+      out.innerHTML =
+        '<div style="' + good + '">' +
+          '<div style="font-size:15px;"><strong>Maximum sustainable spend: ' + res.maxSpendRed.toFixed(2) + '\u00d7</strong> (' + pct + '% of current planned discretionary spend)</div>' +
+          '<div style="margin-top:4px;">\u2248 ' + gbp(res.maxDiscMonthly) + '/month of discretionary spend, in today\u2019s money.</div>' +
+          '<div style="margin-top:6px; font-size:12px; color:#475569;">Binding constraint: ' + bindTxt + '. Defaults: 10% bridge &amp; end-of-life floors, crashes off.</div>' +
+        '</div>';
     }
 
     // ---------- embedded frames ----------
