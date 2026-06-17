@@ -381,29 +381,6 @@
         <button class="pbtn pbtn-reset" onclick="resetPlan()">↺ Reset to saved</button>
         <span class="msg" id="m_msg"></span>
       </div>
-      <div id="mssRow" style="margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0;">
-        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 18px; align-items:end;">
-          <div class="ctrl">
-            <label class="switch">Bridge floor <span id="mss_bridge_v" class="sv">10%</span></label>
-            <input type="range" id="mss_bridge" min="0" max="50" step="1" value="10" oninput="document.getElementById('mss_bridge_v').textContent=this.value+'%'">
-          </div>
-          <div class="ctrl">
-            <label class="switch">End-of-life floor <span id="mss_eol_v" class="sv">10%</span></label>
-            <input type="range" id="mss_eol" min="0" max="50" step="1" value="10" oninput="document.getElementById('mss_eol_v').textContent=this.value+'%'">
-          </div>
-          <div class="ctrl">
-            <label class="switch">Spend cap <span id="mss_cap_v" class="sv">500%</span></label>
-            <input type="range" id="mss_cap" min="100" max="1000" step="10" value="500" oninput="document.getElementById('mss_cap_v').textContent=this.value+'%'">
-          </div>
-          <label class="switch" style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569; min-height:0;">
-            <input type="checkbox" id="mss_crashes" class="toggle-switch">Include crashes</label>
-        </div>
-        <div class="actions" style="margin-top:12px;">
-          <button class="pbtn pbtn-mss" onclick="findMaxSpend()">Find my maximum sustainable spend</button>
-          <span class="msg" id="mss_msg"></span>
-        </div>
-      </div>
-      <div id="mss_result" style="margin-top:8px;"></div>
     </div>
     <div class="model-main">
     <h2><span class="viewlabel">Joint</span> Projections</h2>
@@ -426,6 +403,30 @@
     <h3 id="cashModelHead" style="color:var(--ink); margin:18px 0 4px; display:none;">Cash Savings Balance</h3>
     <div id="cashModelChart" class="chart-box" style="display:none;"></div>
     </div>
+    </div>
+    <div class="params" id="mssBlock" style="margin-top:18px;">
+      <h3 style="margin:0 0 12px; color:var(--ink); font-size:16px;">Maximum sustainable spend</h3>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 18px; align-items:end;">
+        <div class="ctrl">
+          <label class="switch">Bridge floor <span id="mss_bridge_v" class="sv">10%</span></label>
+          <input type="range" id="mss_bridge" min="0" max="50" step="1" value="10" oninput="document.getElementById('mss_bridge_v').textContent=this.value+'%'">
+        </div>
+        <div class="ctrl">
+          <label class="switch">End-of-life floor <span id="mss_eol_v" class="sv">10%</span></label>
+          <input type="range" id="mss_eol" min="0" max="50" step="1" value="10" oninput="document.getElementById('mss_eol_v').textContent=this.value+'%'">
+        </div>
+        <div class="ctrl">
+          <label class="switch">Spend cap <span id="mss_cap_v" class="sv">200%</span></label>
+          <input type="range" id="mss_cap" min="100" max="200" step="5" value="200" oninput="document.getElementById('mss_cap_v').textContent=this.value+'%'">
+        </div>
+        <label class="switch" style="display:flex; align-items:center; gap:8px; font-size:13px; color:#475569; min-height:0;">
+          <input type="checkbox" id="mss_crashes" class="toggle-switch">Include crashes</label>
+      </div>
+      <div class="actions" style="margin-top:14px;">
+        <button class="pbtn pbtn-mss" onclick="findMaxSpend()">Find my maximum sustainable spend</button>
+        <span class="msg" id="mss_msg"></span>
+      </div>
+      <div id="mss_result" style="margin-top:10px;"></div>
     </div>
   </div>
 
@@ -509,7 +510,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-177</span>
+    <span class="build-stamp">build: LC-178</span>
   </div>
 
   <script>
@@ -1328,7 +1329,7 @@
       const bad  = 'padding:10px 12px; border-radius:8px; background:#fef2f2; border:1px solid #fecaca; color:#991b1b;';
       const bridgePct = Math.max(0, (parseFloat(document.getElementById('mss_bridge').value) || 0) / 100);
       const eolPct = Math.max(0, (parseFloat(document.getElementById('mss_eol').value) || 0) / 100);
-      const spendCap = Math.max(1, (parseFloat(document.getElementById('mss_cap').value) || 500) / 100);
+      const spendCap = Math.max(1, (parseFloat(document.getElementById('mss_cap').value) || 200) / 100);
       const includeCrashes = !!document.getElementById('mss_crashes').checked;
       let res;
       try {
