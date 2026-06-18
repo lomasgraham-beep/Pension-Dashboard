@@ -107,7 +107,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Members <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(members build: crud2)</span></h1>
+<h1>Members <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(members build: crud3)</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -156,14 +156,28 @@
   const SUPABASE_URL = "https://yavfcitgyyftpubqwddp.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
   const MEMBERS_URL = `${SUPABASE_URL}/rest/v1/bd_members`;
-  // Tables storing member_name, split by how a rename propagates:
-  //  - FK_CASCADE_TABLES have a foreign key to bd_members(name) with ON UPDATE CASCADE,
-  //    so the database updates them automatically when the member name changes.
-  //  - APP_RENAME_TABLES store member_name as plain text (no FK), so the app updates them.
-  // For DELETE-guard we check ALL of them.
-  const FK_CASCADE_TABLES = ['bd_pensions', 'bd_pension_contributions', 'op_pension_logs', 'op_modelling_parameters'];
-  const APP_RENAME_TABLES = ['bd_guaranteed_incomes', 'bd_savings_accounts', 'bd_contribution_exceptions'];
-  const CHILD_TABLES = FK_CASCADE_TABLES.concat(APP_RENAME_TABLES);
+  // Every table that stores a member's name, and the column it lives in.
+  //   cascade:true  → the table has an ON UPDATE CASCADE foreign key to bd_members(name),
+  //                   so the DATABASE renames it automatically. The app only COUNTS these.
+  //   cascade:false → plain-text reference with no FK; the APP must PATCH it on rename.
+  // The cascade flags were verified against information_schema (the FK list referencing
+  // bd_members) on 2026-06-18. bd_bank_account.account_holder and bd_household_bills.paid_by
+  // are plain text under non-standard column names — previously missed, which let a rename
+  // orphan them. For the DELETE-guard we check ALL of these.
+  const CHILD_TABLES = [
+    { table: 'bd_pensions',                col: 'member_name',    cascade: true  },
+    { table: 'bd_pension_contributions',   col: 'member_name',    cascade: true  },
+    { table: 'op_pension_logs',            col: 'member_name',    cascade: true  },
+    { table: 'op_modelling_parameters',    col: 'member_name',    cascade: true  },
+    { table: 'bd_income_amounts',          col: 'member_name',    cascade: true  },
+    { table: 'bd_income_sources',          col: 'member_name',    cascade: true  },
+    { table: 'bd_working_tiers',           col: 'member_name',    cascade: true  },
+    { table: 'bd_guaranteed_incomes',      col: 'member_name',    cascade: false },
+    { table: 'bd_savings_accounts',        col: 'member_name',    cascade: false },
+    { table: 'bd_contribution_exceptions', col: 'member_name',    cascade: false },
+    { table: 'bd_bank_account',            col: 'account_holder', cascade: false },
+    { table: 'bd_household_bills',         col: 'paid_by',        cascade: false },
+  ];
   const childUrl = (t) => `${SUPABASE_URL}/rest/v1/${t}`;
   const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${authToken || SUPABASE_KEY}`, "Content-Type": "application/json" });
   let authToken = null;
@@ -280,13 +294,13 @@
   async function countChildRows(name) {
     const counts = {};
     let total = 0;
-    for (const t of CHILD_TABLES) {
+    for (const e of CHILD_TABLES) {
       try {
-        const res = await fetch(`${childUrl(t)}?member_name=eq.${encodeURIComponent(name)}&select=*`, { headers: { ...getHeaders(), 'Prefer': 'count=exact', 'Range': '0-0' } });
+        const res = await fetch(`${childUrl(e.table)}?${e.col}=eq.${encodeURIComponent(name)}&select=*`, { headers: { ...getHeaders(), 'Prefer': 'count=exact', 'Range': '0-0' } });
         const cr = res.headers.get('content-range'); // e.g. "0-0/12"
         const n = cr && cr.indexOf('/') >= 0 ? parseInt(cr.split('/')[1]) || 0 : 0;
-        counts[t] = n; total += n;
-      } catch (e) { counts[t] = 0; }
+        counts[e.table] = n; total += n;
+      } catch (err) { counts[e.table] = 0; }
     }
     return { counts, total };
   }
@@ -324,8 +338,9 @@
 
     msg.style.color = '#1e3a8a'; msg.innerText = 'Saving…';
     try {
-      // 1) member row FIRST. The FK tables (pensions, contributions, logs, params) have
-      //    ON UPDATE CASCADE, so the database renames their member_name atomically with this.
+      // 1) member row FIRST. Every CHILD_TABLES entry marked cascade:true has an
+      //    ON UPDATE CASCADE FK to bd_members(name), so the database renames their
+      //    member_name atomically with this PATCH.
       const payload = { name: newName, dob: dob || null, end_of_life_date: eol || null };
       if (dob) payload.birth_year = new Date(dob).getFullYear();
       const res = await fetch(`${MEMBERS_URL}?${memberAnchor(m)}`, { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify(payload) });
@@ -333,14 +348,15 @@
       const rows = await res.json();
       if (rows && rows.length) { const i = members.findIndex(x => x._k === id); if (i >= 0) { rows[0]._k = id; members[i] = rows[0]; } }
 
-      // 2) non-FK tables store member_name as plain text — update them in the app.
+      // 2) plain-text tables (no FK cascade) store the member name as text — rename them here.
       if (renaming && oldName) {
         const failed = [];
-        for (const t of APP_RENAME_TABLES) {
-          if (!childInfo.counts[t]) continue;
-          const r2 = await fetch(`${childUrl(t)}?member_name=eq.${encodeURIComponent(oldName)}`,
-            { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify({ member_name: newName }) });
-          if (!r2.ok) failed.push(t + ' (' + r2.status + ')');
+        for (const e of CHILD_TABLES) {
+          if (e.cascade) continue;               // DB renames these via ON UPDATE CASCADE
+          if (!childInfo.counts[e.table]) continue;
+          const r2 = await fetch(`${childUrl(e.table)}?${e.col}=eq.${encodeURIComponent(oldName)}`,
+            { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify({ [e.col]: newName }) });
+          if (!r2.ok) failed.push(e.table + ' (' + r2.status + ')');
         }
         if (failed.length) { msg.style.color = '#c0392b'; msg.innerText = 'Member renamed and linked pension data updated, but these did not update: ' + failed.join(', ') + '. Re-save to retry those.'; document.getElementById('title_' + id).textContent = newName; refreshDerived(id); clearDirty(id); return; }
       }
