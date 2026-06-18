@@ -382,8 +382,8 @@
       <h3 style="margin:0 0 12px; color:var(--ink); font-size:16px;">Earliest retirement age</h3>
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 18px; align-items:start;">
         <div class="ctrl">
-          <label class="switch">Nest-egg floor at state pension (&pound;)</label>
-          <div class="mss-control"><input type="number" id="era_floor" min="0" step="5000" value="0" style="width:100%; padding:6px 8px; border:1px solid var(--line,#cbd5e1); border-radius:6px;"></div>
+          <label class="switch">Nest-egg floor at state pension <span id="era_floor_v" class="sv">&pound;0</span></label>
+          <div class="mss-control"><input type="range" id="era_floor" min="0" max="500000" step="5000" value="0" oninput="document.getElementById('era_floor_v').textContent='\u00a3'+Number(this.value).toLocaleString('en-GB')"></div>
         </div>
         <div class="ctrl">
           <label class="switch">Include crashes</label>
@@ -535,7 +535,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-185</span>
+    <span class="build-stamp">build: LC-186</span>
   </div>
 
   <script>
@@ -1343,9 +1343,23 @@
       lastDrawdownCfg = buildDrawdownCfg(plan);
       livePots = lastDrawdownCfg.pots;
       drawdownRows = PensionEngine.drawdown(data, lastDrawdownCfg);
+      updateEraFloorMax();
       renderOverview();
       renderRetirementTable();
       if (chartsReady) drawCharts();
+    }
+
+    // Keep the earliest-retirement nest-egg slider's ceiling tied to the pot you'd
+    // retire with, so 0 = no floor and the top = "the whole pot still there at 67".
+    function updateEraFloorMax() {
+      const el = document.getElementById('era_floor');
+      if (!el) return;
+      const pot = (lastDrawdownCfg && lastDrawdownCfg.potsAtOwnRetire && lastDrawdownCfg.potsAtOwnRetire.graham) || 0;
+      const max = Math.max(100000, Math.ceil(pot / 10000) * 10000);
+      el.max = max;
+      if (Number(el.value) > max) el.value = max;
+      const v = document.getElementById('era_floor_v');
+      if (v) v.textContent = '\u00a3' + Number(el.value).toLocaleString('en-GB');
     }
 
     // ---- Read-only: maximum sustainable spend (objective 3) ----
@@ -1449,6 +1463,17 @@
       }
 
       const e = res.detail;
+
+      // Drive the dashboard to this scenario so the pot/income charts show it:
+      // set the retirement slider to the earliest date and recompute (what-if, not saved).
+      const sld = document.getElementById('m_retire');
+      const idx = dateToIdx(res.earliestDate);
+      const applied = Math.max(parseInt(sld.min, 10), Math.min(parseInt(sld.max, 10), idx));
+      sld.value = applied;
+      const lab = document.getElementById('m_retire_v');
+      if (lab) lab.textContent = monthLabel(idxToDate(applied));
+      if (typeof onParam === 'function') onParam();
+
       let body = '<strong>Earliest you can fully retire: ' + fmtDate(res.earliestDate) + '.</strong>';
       if (res.atRangeFloor) body += ' <span style="color:#475569;">(This is the earliest the slider allows \u2014 you may be able to retire even earlier.)</span>';
       body += '<div style="margin-top:6px;">DC pot at state pension age <strong>' + gbp(e.potAtSPA) + '</strong>, '
@@ -1456,7 +1481,7 @@
                 ? 'growing to <strong>' + gbp(e.potAtEOL) + '</strong> by end of life (a ' + gbp(e.growth) + ' nest-egg gain across the post\u2011state\u2011pension years).'
                 : 'ending at <strong>' + gbp(e.potAtEOL) + '</strong> by end of life.') + '</div>';
       if (nestEggFloor > 0) body += '<div style="margin-top:4px; font-size:12px; color:#475569;">Nest-egg floor at state pension age ' + gbp(nestEggFloor) + ' \u2014 ' + (e.floorOK ? 'met' : 'not met') + '.</div>';
-      body += '<div style="margin-top:4px; font-size:12px; color:#475569;">Searched the retirement slider\u2019s range using your current growth, spend and ratio settings (what-if, not saved).</div>';
+      body += '<div style="margin-top:4px; font-size:12px; color:#475569;">Retirement slider moved to ' + fmtDate(res.earliestDate) + ' \u2014 the charts below now show this scenario, computed with your current growth, spend and ratio settings (what-if, not saved).</div>';
       out.innerHTML = '<div style="' + good + '">' + body + '</div>';
     }
 
