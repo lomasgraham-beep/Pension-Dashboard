@@ -1,34 +1,61 @@
 /* ============================================================
    optimiser.js  —  Maximum Sustainable Spend (MSS) finder
+                    + Earliest Retirement Age (ERA) finder
 
    A PURE layer on top of PensionEngine. It does not touch the
-   validated maths — it only re-runs PensionEngine.drawdown() with
-   different spend multipliers and reads the output it already
+   validated maths — it only re-runs PensionEngine.drawdown() (and,
+   for ERA, PensionEngine.forecast() via a caller-supplied rebuild)
+   with different inputs and reads the output the engine already
    produces (per-month g_closing / j_closing and the shortfall flag).
 
-   It finds the highest spending multiplier (spendRed) whose drawdown
-   still "survives", where survives means ALL of:
-     (a) no month is flagged shortfall;
-     (b) for each person, the DC pot's LOWEST point during their own
-         bridge (their retirement -> their own state-pension start)
-         stays at or above a bridge floor (default 10% of starting pot);
-     (c) each person's pot at their own end of life is at or above an
-         end-of-life floor (default 10% of starting pot).
+   ----------------------------------------------------------------
+   1) maxSustainableSpend  — retirement date FIXED, bisect SPEND.
+      Finds the highest spending multiplier (spendRed) whose drawdown
+      still "survives", where survives means ALL of:
+        (a) no month is flagged shortfall;
+        (b) for each person, the DC pot's LOWEST point during their own
+            bridge (their retirement -> their own state-pension start)
+            stays at or above a bridge floor (default 10% of starting pot);
+        (c) each person's pot at their own end of life is at or above an
+            end-of-life floor (default 10% of starting pot).
+      Spending more only ever worsens survival, so we BISECT one number.
 
-   Because spending more only ever worsens survival, the pass/fail
-   boundary is a single threshold, so we BISECT one number.
+   2) earliestRetirement  — spend FIXED, bisect the RETIREMENT DATE.
+      Finds the EARLIEST retirement date for the target person at which
+      their plan still "survives", where survives (for the target person)
+      means ALL of:
+        (a) no month is flagged shortfall (essentials always covered);
+        (b) the DC pot value at the target's own STATE PENSION AGE — the
+            pivot where all DB + state income switch on — is at or above a
+            nest-egg floor (default £0). Because the pot is drawn down
+            through the bridge and grows afterwards, this is its low point,
+            so this single check subsumes "don't empty the pot by SPA";
+        (c) SUSTAIN-OR-GROW: the DC pot at the target's end of life is at or
+            above its value at SPA — i.e. from SPA the pot sustains or grows
+            into the 80s/90s rather than being quietly drained.
+      Retiring later means a bigger pot, a shorter bridge, and (end-of-life
+      being a fixed date) a shorter horizon, so feasibility is monotone in
+      the date and we BISECT one number — the month index.
 
-   Usage (mirrors app.html recomputeAll — the caller builds the same
-   cfg it already builds for drawdown, with pots/potsAtOwnRetire/sp etc.):
+      Unlike MSS, moving the retirement date changes the pot you retire
+      WITH, so the caller must supply a rebuild callback that re-forecasts
+      the pots for a candidate date and returns a drawdown cfg identical to
+      the one app.html's recomputeAll builds:
 
-     const res = PensionOptimiser.maxSustainableSpend(data, baseCfg, {
-       bridgePct: 0.10, eolPct: 0.10, includeCrashes: true
-     });
+        const res = PensionOptimiser.earliestRetirement(data, {
+          rebuildForDate: (retireDate) => buildDrawdownCfg(retireDate),
+          minDate: earliestSliderDate,   // Date or 'YYYY-MM-DD'
+          maxDate: latestSliderDate,     // Date or 'YYYY-MM-DD'
+          who: 'graham',                 // whose pot the SPA/EoL test uses
+          nestEggFloor: 0,               // £ minimum on the pot at SPA
+          includeCrashes: true
+        });
    ============================================================ */
 (function (global) {
   'use strict';
 
   function monthIdx(d) { d = new Date(d); return d.getFullYear() * 12 + d.getMonth(); }
+  function idxToDate(idx) { return new Date(Math.floor(idx / 12), ((idx % 12) + 12) % 12, 1); }
 
   // Resolve the two engine "slots". The engine sorts members alphabetically and
   // maps member 1 -> the graham-key (g_closing) and member 2 -> the julie-key
@@ -190,11 +217,124 @@
     }, base);
   }
 
+  /* ============================================================
+     EARLIEST RETIREMENT AGE  (spend fixed, bisect the date)
+     ============================================================ */
+
+  // Survival test for the EARLIEST-retirement question, applied to ONE target
+  // person: essentials covered everywhere, pot at SPA >= nest-egg floor, and
+  // pot at end of life >= pot at SPA (sustain-or-grow). Household no-shortfall
+  // still uses every month's flag, so the other person can't quietly fail.
+  function evaluateEarliest(rows, slots, who, nestEggFloor) {
+    const monthly = rows.monthly || [];
+    const ck = { graham: 'g_closing', julie: 'j_closing' };
+    const byIdx = {};
+    let anyShortfall = false, lastIdx = -Infinity;
+    monthly.forEach(function (r) {
+      const idx = r.year * 12 + r.month;
+      byIdx[idx] = r;
+      if (idx > lastIdx) lastIdx = idx;
+      if (r.shortfall) anyShortfall = true;
+    });
+
+    const target = slots.filter(function (s) { return s.key === who; })[0] || slots[0] || null;
+    const TOL = 1e-6;
+
+    let potAtSPA = null, potAtEOL = null;
+    let spaIdx = null, eolIdx = null, name = null, startPot = null;
+    if (target) {
+      const key = ck[target.key];
+      name = target.name; spaIdx = target.spaIdx; eolIdx = target.eolIdx; startPot = target.startPot;
+      if (spaIdx != null && byIdx[spaIdx]) potAtSPA = byIdx[spaIdx][key];
+      if (eolIdx != null) { const r = byIdx[eolIdx] || byIdx[lastIdx]; if (r) potAtEOL = r[key]; }
+    }
+
+    const floorOK = (potAtSPA == null) ? true : (potAtSPA >= (nestEggFloor || 0) - TOL);
+    const growOK = (potAtSPA == null || potAtEOL == null) ? true : (potAtEOL >= potAtSPA - TOL);
+    const pass = !anyShortfall && floorOK && growOK;
+
+    return {
+      pass: pass, anyShortfall: anyShortfall,
+      who: name, startPot: startPot, spaIdx: spaIdx, eolIdx: eolIdx,
+      potAtSPA: potAtSPA, potAtEOL: potAtEOL,
+      nestEggFloor: (nestEggFloor || 0), floorOK: floorOK, growOK: growOK,
+      growth: (potAtSPA != null && potAtEOL != null) ? (potAtEOL - potAtSPA) : null
+    };
+  }
+
+  // Build the cfg for a candidate date (via the caller's rebuild), run drawdown,
+  // resolve slots for THAT date's pots, and apply the earliest-survival test.
+  function survivesAtDate(data, retireDate, who, nestEggFloor, includeCrashes, rebuildForDate) {
+    const baseCfg = rebuildForDate(retireDate);
+    const runData = includeCrashes ? data : Object.assign({}, data, { crashes: [] });
+    const rows = global.PensionEngine.drawdown(runData, baseCfg);
+    const slots = resolveSlots(data, baseCfg);
+    const ev = evaluateEarliest(rows, slots, who, nestEggFloor);
+    return { pass: ev.pass, ev: ev, baseCfg: baseCfg };
+  }
+
+  function earliestRetirement(data, opts) {
+    opts = opts || {};
+    if (typeof opts.rebuildForDate !== 'function') {
+      throw new Error('earliestRetirement requires opts.rebuildForDate(retireDate) -> drawdown cfg');
+    }
+    const who = opts.who || 'graham';
+    const nestEggFloor = (opts.nestEggFloor != null) ? opts.nestEggFloor : 0;
+    const includeCrashes = (opts.includeCrashes != null) ? opts.includeCrashes : true;
+    if (opts.minDate == null || opts.maxDate == null) {
+      throw new Error('earliestRetirement requires minDate and maxDate (the slider range)');
+    }
+    const minIdx = monthIdx(opts.minDate);
+    const maxIdx = monthIdx(opts.maxDate);
+    if (maxIdx < minIdx) throw new Error('earliestRetirement: maxDate must be >= minDate');
+
+    const base = { who: who, nestEggFloor: nestEggFloor, includeCrashes: includeCrashes,
+                   minDate: idxToDate(minIdx), maxDate: idxToDate(maxIdx) };
+
+    function at(idx) {
+      return survivesAtDate(data, idxToDate(idx), who, nestEggFloor, includeCrashes, opts.rebuildForDate);
+    }
+
+    // Retiring as late as allowed is the easiest case. If even that fails,
+    // there is no feasible retirement date inside the range.
+    const atMax = at(maxIdx);
+    if (!atMax.pass) {
+      return Object.assign({ feasible: false,
+        reason: 'fails even at the latest allowed retirement date',
+        detail: atMax.ev, latestTried: idxToDate(maxIdx) }, base);
+    }
+
+    // If the earliest allowed date already passes, retire as early as you like.
+    const atMin = at(minIdx);
+    if (atMin.pass) {
+      return Object.assign({ feasible: true, atRangeFloor: true,
+        earliestIdx: minIdx, earliestDate: idxToDate(minIdx),
+        detail: atMin.ev, iterations: 0 }, base);
+    }
+
+    // Bisect months: lo fails, hi passes -> smallest passing month index.
+    let lo = minIdx, hi = maxIdx, lastPass = atMax, iters = 0;
+    while (hi - lo > 1) {
+      const mid = Math.floor((lo + hi) / 2);
+      const r = at(mid);
+      if (r.pass) { hi = mid; lastPass = r; } else { lo = mid; }
+      iters++;
+    }
+    return Object.assign({ feasible: true, atRangeFloor: false,
+      earliestIdx: hi, earliestDate: idxToDate(hi),
+      detail: lastPass.ev, iterations: iters }, base);
+  }
+
   global.PensionOptimiser = {
     maxSustainableSpend: maxSustainableSpend,
+    earliestRetirement: earliestRetirement,
     _resolveSlots: resolveSlots,
     _evaluate: evaluate,
-    _survives: survives
+    _survives: survives,
+    _evaluateEarliest: evaluateEarliest,
+    _survivesAtDate: survivesAtDate,
+    _idxToDate: idxToDate,
+    _monthIdx: monthIdx
   };
 
 })(typeof window !== 'undefined' ? window : globalThis);
