@@ -8,7 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=auth01"></script>
   <script src="engine.js?v=fDine"></script>
-  <script src="optimiser.js?v=mss01"></script>
+  <script src="optimiser.js?v=era01"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -378,6 +378,25 @@
       </div>
       <div id="mss_result" style="margin-top:10px;"></div>
     </div>
+    <div class="params" id="eraBlock">
+      <h3 style="margin:0 0 12px; color:var(--ink); font-size:16px;">Earliest retirement age</h3>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 18px; align-items:start;">
+        <div class="ctrl">
+          <label class="switch">Nest-egg floor at state pension (&pound;)</label>
+          <div class="mss-control"><input type="number" id="era_floor" min="0" step="5000" value="0" style="width:100%; padding:6px 8px; border:1px solid var(--line,#cbd5e1); border-radius:6px;"></div>
+        </div>
+        <div class="ctrl">
+          <label class="switch">Include crashes</label>
+          <div class="mss-control"><label class="switch" style="margin:0;"><input type="checkbox" id="era_crashes"><span class="track"></span></label></div>
+        </div>
+      </div>
+      <div class="actions" style="margin-top:14px;">
+        <button class="pbtn pbtn-mss" onclick="findEarliest()">Find my earliest retirement age</button>
+        <span class="msg" id="era_msg"></span>
+      </div>
+      <div class="hint" style="margin-top:6px;">The earliest date you can fully retire while keeping the DC pot intact through the bridge to state pension age, then sustaining or growing it for later life. Searched across the retirement slider&rsquo;s range using your current growth, spend and ratio settings.</div>
+      <div id="era_result" style="margin-top:10px;"></div>
+    </div>
     <div class="model-layout">
     <div class="rail-slot" id="railSlot-Modelling"></div><div class="rail-strip" onclick="expandRail()" title="Show controls"><span>Controls &#9654;</span></div>
     <div class="params" id="modelRail">
@@ -516,7 +535,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-184</span>
+    <span class="build-stamp">build: LC-185</span>
   </div>
 
   <script>
@@ -1289,16 +1308,18 @@
       } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
     }
 
-    function recomputeAll() {
-      const plan = readControls();
+    // Build a drawdown cfg from a plan, applying calibration and SP baseline exactly
+    // as the dashboard does. Shared by recomputeAll and the earliest-retirement
+    // optimiser so the two can never drift apart.
+    function buildDrawdownCfg(plan) {
       const stateNames = new Set((data.guaranteed || []).map(x => x.income_name).filter(n => n && n.toLowerCase().indexOf('state') >= 0));
       const js = PensionEngine.forecast(data, plan, 1);
-      livePots = { graham: js.graham * calib.g, julie: js.julie * calib.j };
+      const pots = { graham: js.graham * calib.g, julie: js.julie * calib.j };
       // Stage F 4b: pots valued at each person's OWN retirement (for the staggered gap handoff).
       // For equal dates these equal the peak, so this is a no-op for the equal-date case.
       const ownRetirePots = js.potsAtOwnRetire
         ? { graham: js.potsAtOwnRetire.p1 * calib.g, julie: js.potsAtOwnRetire.p2 * calib.j }
-        : livePots;
+        : pots;
       const startYr = plan.retirementDate ? plan.retirementDate.getFullYear() : new Date().getFullYear();
       const sp = PensionEngine.baselineSP(stateNames);
       if (plan.spRate != null) sp.spRate = plan.spRate;
@@ -1306,8 +1327,8 @@
       sp.spDelay = {};
       if (p1Name) sp.spDelay[p1Name] = dly;
       if (p2Name) sp.spDelay[p2Name] = dly;
-      lastDrawdownCfg = {
-        pots: livePots, potsAtOwnRetire: ownRetirePots,
+      return {
+        pots: pots, potsAtOwnRetire: ownRetirePots,
         gRatio: plan.gRatio, spendRed: plan.spendRed,
         startYear: startYr, retirementDate: plan.retirementDate,
         retireByMember: plan.retireByMember || null,
@@ -1315,6 +1336,12 @@
         dynamic: plan.dynamic, gFloorPct: plan.gFloorPct, jFloorPct: plan.jFloorPct,
         sp: sp
       };
+    }
+
+    function recomputeAll() {
+      const plan = readControls();
+      lastDrawdownCfg = buildDrawdownCfg(plan);
+      livePots = lastDrawdownCfg.pots;
       drawdownRows = PensionEngine.drawdown(data, lastDrawdownCfg);
       renderOverview();
       renderRetirementTable();
@@ -1375,6 +1402,62 @@
       if (typeof onParam === 'function') onParam();
       const clampNote = (applied < target) ? ' (slider maximum \u2014 true figure is higher)' : '';
       out.innerHTML += '<div style="margin-top:6px; font-size:12px; color:#475569;">Spending slider set to ' + applied + '%' + clampNote + ' \u2014 the charts now show this scenario (what-if, not saved).</div>';
+    }
+
+    // ---- Read-only: earliest retirement age (objective 4) ----
+    // Holds the current spend/growth/ratio settings, bisects the retirement DATE.
+    // Uses buildDrawdownCfg so the optimiser re-forecasts each candidate date with
+    // inputs identical to the dashboard. Changes nothing else.
+    function findEarliest() {
+      const out = document.getElementById('era_result');
+      const msg = document.getElementById('era_msg');
+      msg.textContent = ''; out.innerHTML = '';
+      if (!window.PensionOptimiser || !PensionOptimiser.earliestRetirement) { msg.style.color = '#c0392b'; msg.textContent = 'Optimiser not loaded.'; return; }
+      const gbp = n => (n == null ? '\u2014' : '\u00a3' + Math.round(n).toLocaleString('en-GB'));
+      const fmtDate = d => MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+      const good = 'padding:10px 12px; border-radius:8px; background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46;';
+      const bad  = 'padding:10px 12px; border-radius:8px; background:#fef2f2; border:1px solid #fecaca; color:#991b1b;';
+
+      const nestEggFloor = Math.max(0, parseFloat(document.getElementById('era_floor').value) || 0);
+      const includeCrashes = !!document.getElementById('era_crashes').checked;
+      const retireEl = document.getElementById('m_retire');
+      const minDate = idxToDate(Number(retireEl.min) || 0);
+      const maxDate = idxToDate(Number(retireEl.max) || 120);
+
+      // rebuild callback: current controls, with only the retirement date overridden
+      // (single shared date while exploring, mirroring a dragged slider).
+      const basePlan = readControls();
+      const rebuildForDate = function (retireDate) {
+        const plan = Object.assign({}, basePlan, { retirementDate: retireDate, retireByMember: null });
+        return buildDrawdownCfg(plan);
+      };
+
+      let res;
+      try {
+        res = PensionOptimiser.earliestRetirement(data, {
+          rebuildForDate: rebuildForDate, minDate: minDate, maxDate: maxDate,
+          who: 'graham', nestEggFloor: nestEggFloor, includeCrashes: includeCrashes
+        });
+      } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Error: ' + e.message; return; }
+
+      if (!res.feasible) {
+        const why = res.detail.anyShortfall
+          ? 'the essentials can\u2019t be covered all the way to end of life'
+          : 'the pot at state pension age can\u2019t sustain or grow into later life';
+        out.innerHTML = '<div style="' + bad + '"><strong>No feasible early retirement in range.</strong> Even retiring as late as ' + fmtDate(res.latestTried) + ', ' + why + '. DC pot at state pension age ' + gbp(res.detail.potAtSPA) + ', at end of life ' + gbp(res.detail.potAtEOL) + '.</div>';
+        return;
+      }
+
+      const e = res.detail;
+      let body = '<strong>Earliest you can fully retire: ' + fmtDate(res.earliestDate) + '.</strong>';
+      if (res.atRangeFloor) body += ' <span style="color:#475569;">(This is the earliest the slider allows \u2014 you may be able to retire even earlier.)</span>';
+      body += '<div style="margin-top:6px;">DC pot at state pension age <strong>' + gbp(e.potAtSPA) + '</strong>, '
+            + (e.growth != null && e.growth >= 0
+                ? 'growing to <strong>' + gbp(e.potAtEOL) + '</strong> by end of life (a ' + gbp(e.growth) + ' nest-egg gain across the post\u2011state\u2011pension years).'
+                : 'ending at <strong>' + gbp(e.potAtEOL) + '</strong> by end of life.') + '</div>';
+      if (nestEggFloor > 0) body += '<div style="margin-top:4px; font-size:12px; color:#475569;">Nest-egg floor at state pension age ' + gbp(nestEggFloor) + ' \u2014 ' + (e.floorOK ? 'met' : 'not met') + '.</div>';
+      body += '<div style="margin-top:4px; font-size:12px; color:#475569;">Searched the retirement slider\u2019s range using your current growth, spend and ratio settings (what-if, not saved).</div>';
+      out.innerHTML = '<div style="' + good + '">' + body + '</div>';
     }
 
     // ---------- embedded frames ----------
