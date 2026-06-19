@@ -385,10 +385,6 @@
           <label class="switch">Nest-egg floor at state pension <span id="era_floor_v" class="sv">&pound;0</span></label>
           <div class="mss-control"><input type="range" id="era_floor" min="0" max="500000" step="5000" value="0" oninput="document.getElementById('era_floor_v').textContent='\u00a3'+Number(this.value).toLocaleString('en-GB')"></div>
         </div>
-        <div class="ctrl">
-          <label class="switch">Include crashes</label>
-          <div class="mss-control"><label class="switch" style="margin:0;"><input type="checkbox" id="era_crashes"><span class="track"></span></label></div>
-        </div>
       </div>
       <div class="actions" style="margin-top:14px;">
         <button class="pbtn pbtn-mss" onclick="findEarliest()">Find my earliest retirement age</button>
@@ -535,7 +531,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-186</span>
+    <span class="build-stamp">build: LC-187</span>
   </div>
 
   <script>
@@ -1433,7 +1429,6 @@
       const bad  = 'padding:10px 12px; border-radius:8px; background:#fef2f2; border:1px solid #fecaca; color:#991b1b;';
 
       const nestEggFloor = Math.max(0, parseFloat(document.getElementById('era_floor').value) || 0);
-      const includeCrashes = !!document.getElementById('era_crashes').checked;
       const retireEl = document.getElementById('m_retire');
       const minDate = idxToDate(Number(retireEl.min) || 0);
       const maxDate = idxToDate(Number(retireEl.max) || 120);
@@ -1450,7 +1445,7 @@
       try {
         res = PensionOptimiser.earliestRetirement(data, {
           rebuildForDate: rebuildForDate, minDate: minDate, maxDate: maxDate,
-          who: 'graham', nestEggFloor: nestEggFloor, includeCrashes: includeCrashes
+          who: 'graham', nestEggFloor: nestEggFloor, includeCrashes: true
         });
       } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Error: ' + e.message; return; }
 
