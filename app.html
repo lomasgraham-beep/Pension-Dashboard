@@ -390,7 +390,7 @@
         <button class="pbtn pbtn-mss" onclick="findEarliest()">Find my earliest retirement age</button>
         <span class="msg" id="era_msg"></span>
       </div>
-      <div class="hint" style="margin-top:6px;">The earliest date you can fully retire while the DC pot&rsquo;s lowest point anywhere in retirement stays at or above your nest-egg floor (and the essentials are always covered). Set the floor to the reserve you want kept available throughout &mdash; for the 80s/90s or a large purchase. Searched across the retirement slider&rsquo;s range using your current growth, spend and ratio settings.</div>
+      <div class="hint" style="margin-top:6px;">The earliest date you can fully retire while the DC pot&rsquo;s lowest point anywhere in retirement stays at or above your nest-egg floor (and the essentials are always covered). Julie keeps to her own saved retirement date &mdash; only your date moves. Set the floor to the reserve you want kept available throughout &mdash; for the 80s/90s or a large purchase. Searched across the retirement slider&rsquo;s range using your current growth, spend and ratio settings.</div>
       <div id="era_result" style="margin-top:10px;"></div>
     </div>
     <div class="model-layout">
@@ -531,7 +531,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-188</span>
+    <span class="build-stamp">build: LC-189</span>
   </div>
 
   <script>
@@ -1433,11 +1433,21 @@
       const minDate = idxToDate(Number(retireEl.min) || 0);
       const maxDate = idxToDate(Number(retireEl.max) || 120);
 
-      // rebuild callback: current controls, with only the retirement date overridden
-      // (single shared date while exploring, mirroring a dragged slider).
+      // rebuild callback: move ONLY Graham's retirement date and hold Julie at her
+      // own saved date. This answers "when can GRAHAM retire" — Julie keeps to her
+      // own schedule, so while she is still working her salary covers household costs
+      // first and Graham's pot isn't carrying the whole bill during the gap. (Moving
+      // both together made Julie's early retirement the real bottleneck.)
       const basePlan = readControls();
+      const p2Fixed = (savedPlan && savedPlan.retireByMember && p2Name) ? savedPlan.retireByMember[p2Name] : null;
       const rebuildForDate = function (retireDate) {
-        const plan = Object.assign({}, basePlan, { retirementDate: retireDate, retireByMember: null });
+        let rbm = null;
+        if (p2Name && p2Fixed) {
+          rbm = {};
+          if (p1Name) rbm[p1Name] = retireDate;
+          rbm[p2Name] = p2Fixed;
+        }
+        const plan = Object.assign({}, basePlan, { retirementDate: retireDate, retireByMember: rbm });
         return buildDrawdownCfg(plan);
       };
 
