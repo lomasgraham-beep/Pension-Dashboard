@@ -531,7 +531,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-189</span>
+    <span class="build-stamp">build: LC-190</span>
   </div>
 
   <script>
@@ -757,6 +757,14 @@
       function evDot(year) { return eventByYear[year] ? '●' : null; }
       function evText(year) { return eventByYear[year] || null; }
 
+      // annual spend line: total household outgoings (joint) or this person's share (single view)
+      function spendForRow(r) {
+        if (joint) return Math.round(r.outgoings || 0);
+        const gR = savedPlan ? savedPlan.gRatio : 0.5;
+        const share = (currentView === p1Name) ? gR : (1 - gR);
+        return Math.round((r.outgoings || 0) * share);
+      }
+
       // ---------- POT CHART (stacked columns) ----------
       const dPots = new google.visualization.DataTable();
       dPots.addColumn('string','Year');
@@ -766,15 +774,17 @@
         dPots.addColumn('number', p2Name + ' tax-free'); dPots.addColumn('number', p1Name + ' tax-free');
         dPots.addColumn('number', p2Name + ' taxable');  dPots.addColumn('number', p1Name + ' taxable');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
+        dPots.addColumn('number','Annual spend');
         yrRows.forEach(r => dPots.addRow([String(r.year),
           Math.round(r.j_taxFree), Math.round(r.g_taxFree), Math.round(r.j_taxable), Math.round(r.g_taxable),
-          evDot(r.year), evText(r.year)]));
+          evDot(r.year), evText(r.year), spendForRow(r)]));
         potColors = ['#c39bd3','#85c1e9','#8e44ad','#2471a3']; // Julie light, Graham light, Julie dark, Graham dark
         potTitle = 'Combined Pots';
       } else {
         dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
-        yrRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx), evDot(r.year), evText(r.year)]); });
+        dPots.addColumn('number','Annual spend');
+        yrRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx), evDot(r.year), evText(r.year), spendForRow(r)]); });
         potColors = ['#2ecc71','#e74c3c'];
         potTitle = currentView + ' Pots';
       }
@@ -822,11 +832,16 @@
       drawdownRows.forEach(r => { const t = joint ? r.totalIncome : vrow(r).income; if (t > incMax) incMax = t; });
       incMax = Math.ceil((incMax * 1.05) / 1000) * 1000; // round up to a tidy £1k
 
+      // annual-spend line axis (pot chart, right side): scale to the spend, not the pots
+      let spendMax = 0;
+      drawdownRows.forEach(r => { const s = spendForRow(r); if (s > spendMax) spendMax = s; });
+      spendMax = Math.ceil((spendMax * 1.1) / 1000) * 1000 || 1000;
+
       // On narrow screens, percentage chart margins are too small for the y-axis
       // numbers (they clip to "£…"). Use a fixed left margin + short £1.2M/£250K ticks.
       const phone = window.innerWidth <= 600;
       const axisText = phone ? { fontSize: 10 } : { fontSize: 12 };
-      const potArea = phone ? { left: 50, right: 10, top: 40, bottom: 90, height: '62%' } : { width: '85%', height: '70%' };
+      const potArea = phone ? { left: 50, right: 50, top: 40, bottom: 90, height: '58%' } : { width: '80%', height: '66%' };
       const incArea = phone ? { left: 50, right: 50, top: 40, bottom: 90, height: '58%' } : { width: '80%', height: '66%' };
 
       // Compact currency for phone axis labels: £1.2M, £250K, £500
@@ -843,10 +858,15 @@
         for (let i = 0; i <= steps; i++) { const v = Math.round(step * i); ticks.push({ v: v, f: shortGBP(v) }); }
         return ticks;
       }
-      // stacked pot chart max = largest row total across the stacked segments (number cols only)
+      // stacked pot chart max = largest row total across the STACKED bar segments only
+      // (exclude the Annual spend column, which is a line on the 2nd axis, not stacked)
+      const potBarCount = joint ? 4 : 2;
       let potMax = 0;
       for (let row = 0; row < dPots.getNumberOfRows(); row++) {
-        let t = 0; for (let col = 1; col < dPots.getNumberOfColumns(); col++) if (dPots.getColumnType(col) === 'number') t += (dPots.getValue(row, col) || 0);
+        let t = 0, seen = 0;
+        for (let col = 1; col < dPots.getNumberOfColumns() && seen < potBarCount; col++) {
+          if (dPots.getColumnType(col) === 'number') { t += (dPots.getValue(row, col) || 0); seen++; }
+        }
         if (t > potMax) potMax = t;
       }
       potMax = Math.ceil((potMax * 1.05) / 1000) * 1000;
@@ -856,9 +876,17 @@
         : { minValue: 0, format: '£#,###', textStyle: axisText };
       const incTicks = phone ? shortTicks(incMax) : null;
 
-      new google.visualization.ColumnChart(document.getElementById('potChart')).draw(dPots, {
-        title: potTitle, isStacked:true, legend:{position:'bottom'},
-        chartArea: potArea, colors:potColors, vAxis: potVAxis,
+      const potSpendIdx = joint ? 4 : 2;
+      const potSeries = {};
+      potSeries[potSpendIdx] = { type: 'line', targetAxisIndex: 1, color: '#2c3e50', lineWidth: 3, pointSize: 4 };
+      const spendVAxis = phone
+        ? { viewWindow: { min: 0, max: spendMax }, ticks: shortTicks(spendMax), textStyle: axisText }
+        : { title: 'Annual spend (£)', viewWindow: { min: 0, max: spendMax }, format: '£#,###', textStyle: axisText };
+
+      new google.visualization.ComboChart(document.getElementById('potChart')).draw(dPots, {
+        title: potTitle, seriesType: 'bars', isStacked: true, series: potSeries,
+        legend: { position: 'bottom' }, chartArea: potArea, colors: potColors,
+        vAxes: { 0: potVAxis, 1: spendVAxis },
         annotations: { alwaysOutside:true, textStyle:{ fontSize:13, color:'#c0392b', bold:true }, stem:{ color:'#c0392b' } }
       });
       new google.visualization.ComboChart(document.getElementById('incomeChart')).draw(dInc, {
