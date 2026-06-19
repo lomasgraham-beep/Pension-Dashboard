@@ -89,9 +89,9 @@ const nestEggFloor = 0;
 const minDate = new Date('2028-06-01');     // earliest you might retire
 const maxDate = new Date('2037-06-01');     // = Graham's state pension date (no bridge)
 
-// ---- 1) date sweep: show pot at SPA, pot at EoL, growth, pass/fail ----
+// ---- 1) date sweep: show the low point of the pot, its year, floor status, pass/fail ----
 console.log('Earliest-retirement sweep (who =', who + ', nest-egg floor =', f(nestEggFloor) + ', crashes off):');
-console.log('retire   pass   potAtSPA    potAtEoL    growth(EoL-SPA)   shortfall');
+console.log('retire    pass    lowPoint   (year)   potAtEoL    floorOK   shortfall');
 const O2 = O;
 let lastPass = false, monotonic = true;
 for (let y = 2028; y <= 2037; y++) {
@@ -100,10 +100,9 @@ for (let y = 2028; y <= 2037; y++) {
   const e = r.ev;
   console.log(
     ym(d), '  ', (e.pass ? 'PASS' : 'fail'), ' ',
-    f(e.potAtSPA).padStart(10), f(e.potAtEOL).padStart(11),
-    f(e.growth).padStart(13), '     ', e.anyShortfall ? 'YES' : 'no'
+    f(e.minPot).padStart(10), String(e.minPotYear).padStart(7),
+    f(e.potAtEOL).padStart(11), '   ', e.floorOK ? 'yes' : 'NO ', '   ', e.anyShortfall ? 'YES' : 'no'
   );
-  if (e.pass && lastPass === false && y > 2028) { /* first pass after fails is fine */ }
   if (lastPass === true && !e.pass) monotonic = false;  // a fail AFTER a pass = non-monotonic
   lastPass = e.pass;
 }
@@ -113,25 +112,36 @@ console.log('Monotonic (never fails at a later date after passing):', monotonic 
 const res = O.earliestRetirement(data, {
   rebuildForDate, minDate, maxDate, who, nestEggFloor, includeCrashes: false
 });
-console.log('\nOptimiser result (crashes off):');
+console.log('\nOptimiser result, floor', f(nestEggFloor), '(crashes off):');
 if (!res.feasible) {
   console.log('  NOT FEASIBLE —', res.reason, '(latest tried', ym(res.latestTried) + ')');
-  console.log('    at latest date: potAtSPA', f(res.detail.potAtSPA), ' potAtEoL', f(res.detail.potAtEOL),
+  console.log('    at latest date: low point', f(res.detail.minPot), 'in', res.detail.minPotYear,
               ' shortfall', res.detail.anyShortfall);
 } else {
   console.log('  Earliest retirement date:', ym(res.earliestDate),
               res.atRangeFloor ? '(= earliest allowed; could be earlier still)' : '',
               ' — bisection iters:', res.iterations);
   const e = res.detail;
-  console.log('    Graham pot at SPA:', f(e.potAtSPA), ' at EoL:', f(e.potAtEOL),
-              ' growth:', f(e.growth), ' (floorOK', e.floorOK + ', growOK', e.growOK + ')');
-  // boundary check: the returned month passes; one month earlier must fail
+  console.log('    Graham pot low point:', f(e.minPot), 'in', e.minPotYear,
+              ' | at EoL:', f(e.potAtEOL), ' (floorOK', e.floorOK + ')');
   if (!res.atRangeFloor) {
     const oneEarlier = O._idxToDate(res.earliestIdx - 1);
     const rb = O._survivesAtDate(data, oneEarlier, who, nestEggFloor, false, rebuildForDate);
     console.log('  Boundary check: at result =', res.detail.pass ? 'PASS' : 'fail',
                 '| one month earlier (' + ym(oneEarlier) + ') =', rb.pass ? 'PASS (PROBLEM)' : 'fail (correct)');
   }
+}
+
+// ---- 2b) raising the floor above the £0-case low point must push the date out ----
+const FLOOR_HI = 150000;
+const resHi = O.earliestRetirement(data, { rebuildForDate, minDate, maxDate, who, nestEggFloor: FLOOR_HI, includeCrashes: false });
+console.log('\nWith a £' + FLOOR_HI.toLocaleString('en-GB') + ' floor:',
+  resHi.feasible
+    ? ym(resHi.earliestDate) + ' (low point ' + f(resHi.detail.minPot) + ' in ' + resHi.detail.minPotYear + ')'
+    : 'infeasible');
+if (res.feasible && resHi.feasible) {
+  const pushedOut = resHi.earliestIdx > res.earliestIdx;
+  console.log('  Higher floor moves the earliest date strictly later:', pushedOut ? 'YES (correct)' : 'no (floor not binding here)');
 }
 
 // ---- 3) crashes-on toggle still runs ----

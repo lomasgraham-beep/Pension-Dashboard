@@ -25,17 +25,17 @@
       their plan still "survives", where survives (for the target person)
       means ALL of:
         (a) no month is flagged shortfall (essentials always covered);
-        (b) the DC pot value at the target's own STATE PENSION AGE — the
-            pivot where all DB + state income switch on — is at or above a
-            nest-egg floor (default £0). Because the pot is drawn down
-            through the bridge and grows afterwards, this is its low point,
-            so this single check subsumes "don't empty the pot by SPA";
-        (c) SUSTAIN-OR-GROW: the DC pot at the target's end of life is at or
-            above its value at SPA — i.e. from SPA the pot sustains or grows
-            into the 80s/90s rather than being quietly drained.
-      Retiring later means a bigger pot, a shorter bridge, and (end-of-life
-      being a fixed date) a shorter horizon, so feasibility is monotone in
-      the date and we BISECT one number — the month index.
+        (b) the target's DC pot never falls below the nest-egg floor (default £0)
+            at ANY point in their retirement. The pot is typically U-shaped — drawn
+            down well past state pension age, then recovering — so the floor is
+            tested against the TRUE low point wherever it falls, NOT against the
+            value at state pension age. floor £0 lets the pot run down toward zero
+            at its trough (earliest possible date); raising the floor lifts the
+            trough and pushes the date out, making the floor a real always-available
+            reserve for the 80s/90s and large purchases.
+      Retiring later means a bigger pot throughout and a shorter bridge, so the low
+      point only rises with the date — feasibility is monotone and we BISECT one
+      number, the month index.
 
       Unlike MSS, moving the retirement date changes the pot you retire
       WITH, so the caller must supply a rebuild callback that re-forecasts
@@ -46,8 +46,8 @@
           rebuildForDate: (retireDate) => buildDrawdownCfg(retireDate),
           minDate: earliestSliderDate,   // Date or 'YYYY-MM-DD'
           maxDate: latestSliderDate,     // Date or 'YYYY-MM-DD'
-          who: 'graham',                 // whose pot the SPA/EoL test uses
-          nestEggFloor: 0,               // £ minimum on the pot at SPA
+          who: 'graham',                 // whose pot the floor test uses
+          nestEggFloor: 0,               // £ minimum the pot may reach at any point
           includeCrashes: true
         });
    ============================================================ */
@@ -222,9 +222,13 @@
      ============================================================ */
 
   // Survival test for the EARLIEST-retirement question, applied to ONE target
-  // person: essentials covered everywhere, pot at SPA >= nest-egg floor, and
-  // pot at end of life >= pot at SPA (sustain-or-grow). Household no-shortfall
-  // still uses every month's flag, so the other person can't quietly fail.
+  // person: essentials covered everywhere (no shortfall), AND the target's DC pot
+  // never falls below the nest-egg floor at ANY point in their retirement. The
+  // pot is typically U-shaped (drawn down well past state pension age, then it
+  // recovers), so the floor is tested against the TRUE low point — wherever it
+  // falls — not against the value at state pension age. potAtSPA / potAtEOL are
+  // kept for reporting only. Household no-shortfall uses every month's flag, so
+  // the other person can't quietly fail.
   function evaluateEarliest(rows, slots, who, nestEggFloor) {
     const monthly = rows.monthly || [];
     const ck = { graham: 'g_closing', julie: 'j_closing' };
@@ -240,25 +244,36 @@
     const target = slots.filter(function (s) { return s.key === who; })[0] || slots[0] || null;
     const TOL = 1e-6;
 
-    let potAtSPA = null, potAtEOL = null;
-    let spaIdx = null, eolIdx = null, name = null, startPot = null;
+    let potAtSPA = null, potAtEOL = null, minPot = null, minPotIdx = null;
+    let spaIdx = null, eolIdx = null, retIdx = null, name = null, startPot = null;
     if (target) {
       const key = ck[target.key];
-      name = target.name; spaIdx = target.spaIdx; eolIdx = target.eolIdx; startPot = target.startPot;
+      name = target.name; spaIdx = target.spaIdx; eolIdx = target.eolIdx; retIdx = target.retIdx; startPot = target.startPot;
       if (spaIdx != null && byIdx[spaIdx]) potAtSPA = byIdx[spaIdx][key];
+      const endIdx = (eolIdx != null) ? eolIdx : lastIdx;
       if (eolIdx != null) { const r = byIdx[eolIdx] || byIdx[lastIdx]; if (r) potAtEOL = r[key]; }
+      // lowest pot across the target's whole retirement: own retirement -> own end of life
+      let fromIdx = (retIdx != null) ? retIdx : (monthly.length ? (monthly[0].year * 12 + monthly[0].month) : null);
+      if (fromIdx != null) {
+        for (let i = fromIdx; i <= endIdx; i++) {
+          const r = byIdx[i];
+          if (!r) continue;
+          const v = r[key];
+          if (minPot == null || v < minPot) { minPot = v; minPotIdx = i; }
+        }
+      }
     }
 
-    const floorOK = (potAtSPA == null) ? true : (potAtSPA >= (nestEggFloor || 0) - TOL);
-    const growOK = (potAtSPA == null || potAtEOL == null) ? true : (potAtEOL >= potAtSPA - TOL);
-    const pass = !anyShortfall && floorOK && growOK;
+    const floorOK = (minPot == null) ? true : (minPot >= (nestEggFloor || 0) - TOL);
+    const pass = !anyShortfall && floorOK;
 
     return {
       pass: pass, anyShortfall: anyShortfall,
-      who: name, startPot: startPot, spaIdx: spaIdx, eolIdx: eolIdx,
+      who: name, startPot: startPot, spaIdx: spaIdx, eolIdx: eolIdx, retIdx: retIdx,
       potAtSPA: potAtSPA, potAtEOL: potAtEOL,
-      nestEggFloor: (nestEggFloor || 0), floorOK: floorOK, growOK: growOK,
-      growth: (potAtSPA != null && potAtEOL != null) ? (potAtEOL - potAtSPA) : null
+      minPot: minPot, minPotIdx: minPotIdx,
+      minPotYear: (minPotIdx != null) ? Math.floor(minPotIdx / 12) : null,
+      nestEggFloor: (nestEggFloor || 0), floorOK: floorOK
     };
   }
 

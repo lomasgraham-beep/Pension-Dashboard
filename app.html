@@ -8,7 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=auth01"></script>
   <script src="engine.js?v=fDine"></script>
-  <script src="optimiser.js?v=era01"></script>
+  <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -390,7 +390,7 @@
         <button class="pbtn pbtn-mss" onclick="findEarliest()">Find my earliest retirement age</button>
         <span class="msg" id="era_msg"></span>
       </div>
-      <div class="hint" style="margin-top:6px;">The earliest date you can fully retire while keeping the DC pot intact through the bridge to state pension age, then sustaining or growing it for later life. Searched across the retirement slider&rsquo;s range using your current growth, spend and ratio settings.</div>
+      <div class="hint" style="margin-top:6px;">The earliest date you can fully retire while the DC pot&rsquo;s lowest point anywhere in retirement stays at or above your nest-egg floor (and the essentials are always covered). Set the floor to the reserve you want kept available throughout &mdash; for the 80s/90s or a large purchase. Searched across the retirement slider&rsquo;s range using your current growth, spend and ratio settings.</div>
       <div id="era_result" style="margin-top:10px;"></div>
     </div>
     <div class="model-layout">
@@ -531,7 +531,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-187</span>
+    <span class="build-stamp">build: LC-188</span>
   </div>
 
   <script>
@@ -1452,8 +1452,8 @@
       if (!res.feasible) {
         const why = res.detail.anyShortfall
           ? 'the essentials can\u2019t be covered all the way to end of life'
-          : 'the pot at state pension age can\u2019t sustain or grow into later life';
-        out.innerHTML = '<div style="' + bad + '"><strong>No feasible early retirement in range.</strong> Even retiring as late as ' + fmtDate(res.latestTried) + ', ' + why + '. DC pot at state pension age ' + gbp(res.detail.potAtSPA) + ', at end of life ' + gbp(res.detail.potAtEOL) + '.</div>';
+          : 'the DC pot would dip below your nest-egg floor';
+        out.innerHTML = '<div style="' + bad + '"><strong>No feasible early retirement in range.</strong> Even retiring as late as ' + fmtDate(res.latestTried) + ', ' + why + '. The pot bottoms at ' + gbp(res.detail.minPot) + (res.detail.minPotYear != null ? ' in ' + res.detail.minPotYear : '') + (nestEggFloor > 0 ? ' (floor ' + gbp(nestEggFloor) + ')' : '') + '.</div>';
         return;
       }
 
@@ -1471,11 +1471,14 @@
 
       let body = '<strong>Earliest you can fully retire: ' + fmtDate(res.earliestDate) + '.</strong>';
       if (res.atRangeFloor) body += ' <span style="color:#475569;">(This is the earliest the slider allows \u2014 you may be able to retire even earlier.)</span>';
-      body += '<div style="margin-top:6px;">DC pot at state pension age <strong>' + gbp(e.potAtSPA) + '</strong>, '
-            + (e.growth != null && e.growth >= 0
-                ? 'growing to <strong>' + gbp(e.potAtEOL) + '</strong> by end of life (a ' + gbp(e.growth) + ' nest-egg gain across the post\u2011state\u2011pension years).'
-                : 'ending at <strong>' + gbp(e.potAtEOL) + '</strong> by end of life.') + '</div>';
-      if (nestEggFloor > 0) body += '<div style="margin-top:4px; font-size:12px; color:#475569;">Nest-egg floor at state pension age ' + gbp(nestEggFloor) + ' \u2014 ' + (e.floorOK ? 'met' : 'not met') + '.</div>';
+      body += '<div style="margin-top:6px;">Your DC pot reaches its lowest point at <strong>' + gbp(e.minPot) + '</strong>'
+            + (e.minPotYear != null ? ' in <strong>' + e.minPotYear + '</strong>' : '')
+            + (nestEggFloor > 0 ? ', against your nest-egg floor of ' + gbp(nestEggFloor) + ' (' + (e.floorOK ? 'met' : 'not met') + ')' : '')
+            + '. By end of life it stands at <strong>' + gbp(e.potAtEOL) + '</strong>.</div>';
+      var spaYr = (e.spaIdx != null) ? Math.floor(e.spaIdx / 12) : null;
+      var laterTrough = (e.minPotYear != null && spaYr != null && e.minPotYear > spaYr);
+      body += '<div style="margin-top:4px; font-size:12px; color:#475569;">For reference, the pot is ' + gbp(e.potAtSPA) + ' at state pension age'
+            + (laterTrough ? ' \u2014 it carries on falling past then, which is why the low point comes later.' : '.') + '</div>';
       body += '<div style="margin-top:4px; font-size:12px; color:#475569;">Retirement slider moved to ' + fmtDate(res.earliestDate) + ' \u2014 the charts below now show this scenario, computed with your current growth, spend and ratio settings (what-if, not saved).</div>';
       out.innerHTML = '<div style="' + good + '">' + body + '</div>';
     }
