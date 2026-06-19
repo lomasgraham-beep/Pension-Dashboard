@@ -531,7 +531,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-190</span>
+    <span class="build-stamp">build: LC-191</span>
   </div>
 
   <script>
@@ -764,6 +764,12 @@
         const share = (currentView === p1Name) ? gR : (1 - gR);
         return Math.round((r.outgoings || 0) * share);
       }
+      // fixed (guaranteed) income paying the bills: state + DB pensions. The gap up to
+      // the spend line is what the DC pot has to contribute that year.
+      function fixedIncomeForRow(r) {
+        if (joint) return Math.round((r.g_other || 0) + (r.j_other || 0));
+        return Math.round(vrow(r).other || 0);
+      }
 
       // ---------- POT CHART (stacked columns) ----------
       const dPots = new google.visualization.DataTable();
@@ -774,17 +780,17 @@
         dPots.addColumn('number', p2Name + ' tax-free'); dPots.addColumn('number', p1Name + ' tax-free');
         dPots.addColumn('number', p2Name + ' taxable');  dPots.addColumn('number', p1Name + ' taxable');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
-        dPots.addColumn('number','Annual spend');
+        dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Fixed income');
         yrRows.forEach(r => dPots.addRow([String(r.year),
           Math.round(r.j_taxFree), Math.round(r.g_taxFree), Math.round(r.j_taxable), Math.round(r.g_taxable),
-          evDot(r.year), evText(r.year), spendForRow(r)]));
+          evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]));
         potColors = ['#c39bd3','#85c1e9','#8e44ad','#2471a3']; // Julie light, Graham light, Julie dark, Graham dark
         potTitle = 'Combined Pots';
       } else {
         dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
-        dPots.addColumn('number','Annual spend');
-        yrRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx), evDot(r.year), evText(r.year), spendForRow(r)]); });
+        dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Fixed income');
+        yrRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx), evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]); });
         potColors = ['#2ecc71','#e74c3c'];
         potTitle = currentView + ' Pots';
       }
@@ -832,9 +838,13 @@
       drawdownRows.forEach(r => { const t = joint ? r.totalIncome : vrow(r).income; if (t > incMax) incMax = t; });
       incMax = Math.ceil((incMax * 1.05) / 1000) * 1000; // round up to a tidy £1k
 
-      // annual-spend line axis (pot chart, right side): scale to the spend, not the pots
+      // annual-spend / fixed-income line axis (pot chart, right side)
       let spendMax = 0;
-      drawdownRows.forEach(r => { const s = spendForRow(r); if (s > spendMax) spendMax = s; });
+      drawdownRows.forEach(r => {
+        const s = spendForRow(r), fi = fixedIncomeForRow(r);
+        if (s > spendMax) spendMax = s;
+        if (fi > spendMax) spendMax = fi;
+      });
       spendMax = Math.ceil((spendMax * 1.1) / 1000) * 1000 || 1000;
 
       // On narrow screens, percentage chart margins are too small for the y-axis
@@ -877,11 +887,13 @@
       const incTicks = phone ? shortTicks(incMax) : null;
 
       const potSpendIdx = joint ? 4 : 2;
+      const potFixedIdx = joint ? 5 : 3;
       const potSeries = {};
       potSeries[potSpendIdx] = { type: 'line', targetAxisIndex: 1, color: '#2c3e50', lineWidth: 3, pointSize: 4 };
+      potSeries[potFixedIdx] = { type: 'line', targetAxisIndex: 1, color: '#16a085', lineWidth: 3, pointSize: 4, lineDashStyle: [6, 4] };
       const spendVAxis = phone
         ? { viewWindow: { min: 0, max: spendMax }, ticks: shortTicks(spendMax), textStyle: axisText }
-        : { title: 'Annual spend (£)', viewWindow: { min: 0, max: spendMax }, format: '£#,###', textStyle: axisText };
+        : { title: 'Spend & fixed income (£)', viewWindow: { min: 0, max: spendMax }, format: '£#,###', textStyle: axisText };
 
       new google.visualization.ComboChart(document.getElementById('potChart')).draw(dPots, {
         title: potTitle, seriesType: 'bars', isStacked: true, series: potSeries,
