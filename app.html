@@ -385,12 +385,16 @@
           <label class="switch">Nest-egg floor at state pension <span id="era_floor_v" class="sv">&pound;0</span></label>
           <div class="mss-control"><input type="range" id="era_floor" min="0" max="500000" step="5000" value="0" oninput="document.getElementById('era_floor_v').textContent='\u00a3'+Number(this.value).toLocaleString('en-GB')"></div>
         </div>
+        <div class="ctrl">
+          <label class="switch">Combine retirement</label>
+          <div class="mss-control"><label class="switch" style="margin:0;"><input type="checkbox" id="era_combine" checked><span class="track"></span></label></div>
+        </div>
       </div>
       <div class="actions" style="margin-top:14px;">
         <button class="pbtn pbtn-mss" onclick="findEarliest()">Find my earliest retirement age</button>
         <span class="msg" id="era_msg"></span>
       </div>
-      <div class="hint" style="margin-top:6px;">The earliest date you can fully retire while the DC pot&rsquo;s lowest point anywhere in retirement stays at or above your nest-egg floor (and the essentials are always covered). Julie keeps to her own saved retirement date &mdash; only your date moves. Set the floor to the reserve you want kept available throughout &mdash; for the 80s/90s or a large purchase. Searched across the retirement slider&rsquo;s range using your current growth, spend and ratio settings.</div>
+      <div class="hint" style="margin-top:6px;">The earliest date you can fully retire while the DC pot&rsquo;s lowest point anywhere in retirement stays at or above your nest-egg floor (and the essentials are always covered). <strong>Combine retirement</strong> on: both of you retire on the found date &mdash; the earliest you can stop work together. Off: only your date moves and Julie stays on her saved plan. Set the floor to the reserve you want kept available throughout &mdash; for the 80s/90s or a large purchase. Searched across the retirement slider&rsquo;s range using your current growth, spend and ratio settings.</div>
       <div id="era_result" style="margin-top:10px;"></div>
     </div>
     <div class="model-layout">
@@ -531,7 +535,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-191</span>
+    <span class="build-stamp">build: LC-192</span>
   </div>
 
   <script>
@@ -1473,20 +1477,20 @@
       const minDate = idxToDate(Number(retireEl.min) || 0);
       const maxDate = idxToDate(Number(retireEl.max) || 120);
 
-      // rebuild callback: move ONLY Graham's retirement date and hold Julie at her
-      // own saved date. This answers "when can GRAHAM retire" — Julie keeps to her
-      // own schedule, so while she is still working her salary covers household costs
-      // first and Graham's pot isn't carrying the whole bill during the gap. (Moving
-      // both together made Julie's early retirement the real bottleneck.)
+      // rebuild callback. Combine retirement ON (default): both retire on the searched
+      // date (shared) — the earliest you can stop work together. OFF: move only Graham's
+      // date and hold Julie at her own saved date (while she still works her salary
+      // covers costs first, so Graham's pot barely draws during that gap).
       const basePlan = readControls();
-      const p2Fixed = (savedPlan && savedPlan.retireByMember && p2Name) ? savedPlan.retireByMember[p2Name] : null;
+      const combine = !!(document.getElementById('era_combine') && document.getElementById('era_combine').checked);
+      const p2Fixed = (!combine && savedPlan && savedPlan.retireByMember && p2Name) ? savedPlan.retireByMember[p2Name] : null;
       const rebuildForDate = function (retireDate) {
         let rbm = null;
-        if (p2Name && p2Fixed) {
+        if (p2Name && p2Fixed) {            // not combined: Julie held at her saved date
           rbm = {};
           if (p1Name) rbm[p1Name] = retireDate;
           rbm[p2Name] = p2Fixed;
-        }
+        }                                   // combined: rbm stays null -> shared date, both move
         const plan = Object.assign({}, basePlan, { retirementDate: retireDate, retireByMember: rbm });
         return buildDrawdownCfg(plan);
       };
@@ -1509,17 +1513,24 @@
 
       const e = res.detail;
 
-      // Drive the dashboard to this scenario so the pot/income charts show it:
-      // set the retirement slider to the earliest date and recompute (what-if, not saved).
+      // Render the dashboard from the EXACT scenario the finder used, so the charts
+      // match the mode (combined => both retire on the date; not combined => Julie held
+      // at her saved date). What-if only; any later slider drag recomputes normally.
       const sld = document.getElementById('m_retire');
       const idx = dateToIdx(res.earliestDate);
       const applied = Math.max(parseInt(sld.min, 10), Math.min(parseInt(sld.max, 10), idx));
       sld.value = applied;
       const lab = document.getElementById('m_retire_v');
       if (lab) lab.textContent = monthLabel(idxToDate(applied));
-      if (typeof onParam === 'function') onParam();
+      lastDrawdownCfg = rebuildForDate(res.earliestDate);
+      livePots = lastDrawdownCfg.pots;
+      drawdownRows = PensionEngine.drawdown(data, lastDrawdownCfg);
+      updateEraFloorMax();
+      renderOverview();
+      renderRetirementTable();
+      if (chartsReady) drawCharts();
 
-      let body = '<strong>Earliest you can fully retire: ' + fmtDate(res.earliestDate) + '.</strong>';
+      let body = '<strong>Earliest you can ' + (combine ? 'both fully retire' : 'fully retire') + ': ' + fmtDate(res.earliestDate) + '.</strong>';
       if (res.atRangeFloor) body += ' <span style="color:#475569;">(This is the earliest the slider allows \u2014 you may be able to retire even earlier.)</span>';
       body += '<div style="margin-top:6px;">Your DC pot reaches its lowest point at <strong>' + gbp(e.minPot) + '</strong>'
             + (e.minPotYear != null ? ' in <strong>' + e.minPotYear + '</strong>' : '')
@@ -1529,7 +1540,7 @@
       var laterTrough = (e.minPotYear != null && spaYr != null && e.minPotYear > spaYr);
       body += '<div style="margin-top:4px; font-size:12px; color:#475569;">For reference, the pot is ' + gbp(e.potAtSPA) + ' at state pension age'
             + (laterTrough ? ' \u2014 it carries on falling past then, which is why the low point comes later.' : '.') + '</div>';
-      body += '<div style="margin-top:4px; font-size:12px; color:#475569;">Retirement slider moved to ' + fmtDate(res.earliestDate) + ' \u2014 the charts below now show this scenario, computed with your current growth, spend and ratio settings (what-if, not saved).</div>';
+      body += '<div style="margin-top:4px; font-size:12px; color:#475569;">' + (combine ? 'Both retirement dates moved to ' : 'Your retirement date moved to ') + fmtDate(res.earliestDate) + (combine ? '' : ' (Julie stays on her saved plan)') + ' \u2014 the charts below now show this scenario, computed with your current growth, spend and ratio settings (what-if, not saved).</div>';
       out.innerHTML = '<div style="' + good + '">' + body + '</div>';
     }
 
