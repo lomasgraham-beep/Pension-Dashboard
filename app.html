@@ -535,7 +535,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-192</span>
+    <span class="build-stamp">build: LC-193</span>
   </div>
 
   <script>
@@ -775,6 +775,50 @@
         return Math.round(vrow(r).other || 0);
       }
 
+      // net (take-home) salary line, by view. Mirrors engine salaryFor: net monthly for
+      // the member's active working-days tier, grown by award % since now; counted only
+      // for months before that person retires. Zero once retired (e.g. combined mode).
+      const salTierOv = (lastDrawdownCfg && lastDrawdownCfg.tierDateOverrides) || {};
+      function monthIdxOf(d) { d = new Date(d); return d.getFullYear() * 12 + d.getMonth(); }
+      function retIdxOf(name) {
+        const rbm = lastDrawdownCfg && lastDrawdownCfg.retireByMember;
+        if (rbm && rbm[name]) return monthIdxOf(rbm[name]);
+        return lastDrawdownCfg && lastDrawdownCfg.retirementDate ? monthIdxOf(lastDrawdownCfg.retirementDate) : Infinity;
+      }
+      const gRetIdxS = retIdxOf(p1Name), jRetIdxS = p2Name ? retIdxOf(p2Name) : Infinity;
+      function netSalaryMonthly(member, idx) {
+        if (!member) return 0;
+        let best = null;
+        (data.workingTiers || []).forEach(t => {
+          if (t.member_name !== member) return;
+          const key = t.member_name + '|' + Number(t.days);
+          const src = salTierOv[key] ? new Date(salTierOv[key]) : (t.from_date ? new Date(t.from_date) : null);
+          if (!src) return;
+          const fromIdx = src.getFullYear() * 12 + src.getMonth();
+          if (fromIdx <= idx && (!best || fromIdx > best.fromIdx)) best = { days: Number(t.days), fromIdx };
+        });
+        if (!best) return 0;
+        const amt = (data.incomeAmounts || []).find(a => a.member_name === member && Number(a.working_days) === best.days);
+        if (!amt) return 0;
+        const src = (data.incomeSources || []).find(s => s.member_name === member && s.source_name === amt.source_name);
+        const awardPct = src ? (Number(src.award_pct) || 0) : 0;
+        const awardMonth = src ? (Number(src.award_month) || 4) : 4;
+        let rises = 0; const now = new Date(); const startC = now.getFullYear() * 12 + now.getMonth();
+        for (let k = startC + 1; k <= idx; k++) { if ((k % 12) === ((awardMonth - 1) % 12)) rises++; }
+        return (Number(amt.net_monthly) || 0) * Math.pow(1 + awardPct, rises);
+      }
+      function salaryMemberYear(r, member, retIdx) {
+        let tot = 0;
+        for (let m = 0; m < 12; m++) { const idx = r.year * 12 + m; if (idx < retIdx) tot += netSalaryMonthly(member, idx); }
+        return tot;
+      }
+      function salaryForRow(r) {
+        const gS = salaryMemberYear(r, p1Name, gRetIdxS);
+        const jS = p2Name ? salaryMemberYear(r, p2Name, jRetIdxS) : 0;
+        if (joint) return Math.round(gS + jS);
+        return Math.round(currentView === p1Name ? gS : jS);
+      }
+
       // ---------- POT CHART (stacked columns) ----------
       const dPots = new google.visualization.DataTable();
       dPots.addColumn('string','Year');
@@ -784,17 +828,17 @@
         dPots.addColumn('number', p2Name + ' tax-free'); dPots.addColumn('number', p1Name + ' tax-free');
         dPots.addColumn('number', p2Name + ' taxable');  dPots.addColumn('number', p1Name + ' taxable');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
-        dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Fixed income');
+        dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Fixed income'); dPots.addColumn('number','Salary (net)');
         yrRows.forEach(r => dPots.addRow([String(r.year),
           Math.round(r.j_taxFree), Math.round(r.g_taxFree), Math.round(r.j_taxable), Math.round(r.g_taxable),
-          evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]));
+          evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r), salaryForRow(r)]));
         potColors = ['#c39bd3','#85c1e9','#8e44ad','#2471a3']; // Julie light, Graham light, Julie dark, Graham dark
         potTitle = 'Combined Pots';
       } else {
         dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
-        dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Fixed income');
-        yrRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx), evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]); });
+        dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Fixed income'); dPots.addColumn('number','Salary (net)');
+        yrRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx), evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r), salaryForRow(r)]); });
         potColors = ['#2ecc71','#e74c3c'];
         potTitle = currentView + ' Pots';
       }
@@ -842,12 +886,13 @@
       drawdownRows.forEach(r => { const t = joint ? r.totalIncome : vrow(r).income; if (t > incMax) incMax = t; });
       incMax = Math.ceil((incMax * 1.05) / 1000) * 1000; // round up to a tidy £1k
 
-      // annual-spend / fixed-income line axis (pot chart, right side)
+      // annual-spend / fixed-income / salary line axis (pot chart, right side)
       let spendMax = 0;
       drawdownRows.forEach(r => {
-        const s = spendForRow(r), fi = fixedIncomeForRow(r);
+        const s = spendForRow(r), fi = fixedIncomeForRow(r), sa = salaryForRow(r);
         if (s > spendMax) spendMax = s;
         if (fi > spendMax) spendMax = fi;
+        if (sa > spendMax) spendMax = sa;
       });
       spendMax = Math.ceil((spendMax * 1.1) / 1000) * 1000 || 1000;
 
@@ -892,12 +937,14 @@
 
       const potSpendIdx = joint ? 4 : 2;
       const potFixedIdx = joint ? 5 : 3;
+      const potSalaryIdx = joint ? 6 : 4;
       const potSeries = {};
       potSeries[potSpendIdx] = { type: 'line', targetAxisIndex: 1, color: '#2c3e50', lineWidth: 3, pointSize: 4 };
       potSeries[potFixedIdx] = { type: 'line', targetAxisIndex: 1, color: '#16a085', lineWidth: 3, pointSize: 4, lineDashStyle: [6, 4] };
+      potSeries[potSalaryIdx] = { type: 'line', targetAxisIndex: 1, color: '#e67e22', lineWidth: 3, pointSize: 4, lineDashStyle: [2, 2] };
       const spendVAxis = phone
         ? { viewWindow: { min: 0, max: spendMax }, ticks: shortTicks(spendMax), textStyle: axisText }
-        : { title: 'Spend & fixed income (£)', viewWindow: { min: 0, max: spendMax }, format: '£#,###', textStyle: axisText };
+        : { title: 'Spend / income / salary (£)', viewWindow: { min: 0, max: spendMax }, format: '£#,###', textStyle: axisText };
 
       new google.visualization.ComboChart(document.getElementById('potChart')).draw(dPots, {
         title: potTitle, seriesType: 'bars', isStacked: true, series: potSeries,
