@@ -440,7 +440,7 @@
       const drawGross = Math.min(desiredGross, txAvail);
       const netFromTax = (drawGross <= paRem) ? drawGross : paRem + (drawGross - paRem) * 0.80;
       const unmetNet = Math.max(netGap - netFromTax, 0);
-      return { drawTf, drawGross, tfAfter: tfPot - drawTf, txAfter: txPot - drawGross, unmetNet, inc };
+      return { drawTf, drawGross, tfAfter: tfPot - drawTf, txAfter: txPot - drawGross, unmetNet, inc, dbNet };
     }
 
     // MANUAL mode: independent per person, no floor, no redistribution (with means test).
@@ -490,7 +490,7 @@
           g_taxFree: gTf, g_taxable: gTx, j_taxFree: jTf, j_taxable: jTx,
           g_tfGrowth: 0, g_txGrowth: 0, j_tfGrowth: 0, j_txGrowth: 0, tfGrowth: 0, txGrowth: 0, crash: null,
           stateGross: 0, otherPensions: 0, drawdown: 0,
-          g_other: 0, j_other: 0, g_draw: 0, j_draw: 0, g_income: 0, j_income: 0, totalIncome: 0,
+          g_other: 0, j_other: 0, g_otherNet: 0, j_otherNet: 0, g_draw: 0, j_draw: 0, g_income: 0, j_income: 0, totalIncome: 0,
           combinedClosing: 0, g_closing: 0, j_closing: 0, shortfall: false,
           cashBalance: 0, cashFinance: 0, cashDeposit: 0, cashShortfall: 0, cashCapDraw: 0
         };
@@ -663,7 +663,7 @@
         tfGrowth: gTfGrowth + jTfGrowth, txGrowth: gTxGrowth + jTxGrowth,
         crash: crashInfo(idx),
         stateGross: mState, otherPensions: mOther, drawdown: gDraw + jDraw,
-        g_other: gRes.inc.total, j_other: jRes.inc.total, g_draw: gDraw, j_draw: jDraw,
+        g_other: gRes.inc.total, j_other: jRes.inc.total, g_otherNet: gRes.dbNet, j_otherNet: jRes.dbNet, g_draw: gDraw, j_draw: jDraw,
         g_income: gRes.inc.total + gDraw, j_income: jRes.inc.total + jDraw,
         totalIncome: mOther + gDraw + jDraw,
         combinedClosing: gTf + gTx + jTf + jTx, g_closing: gTf + gTx, j_closing: jTf + jTx,
@@ -676,6 +676,7 @@
       acc.gTarget += gTargetM; acc.jTarget += jTargetM;
       acc.stateGross += gRes.inc.stateGross + jRes.inc.stateGross;
       acc.g_other += gRes.inc.total; acc.j_other += jRes.inc.total;
+      acc.g_otherNet += gRes.dbNet; acc.j_otherNet += jRes.dbNet;
       acc.otherPensions += gRes.inc.total + jRes.inc.total;
       acc.g_draw += gDraw; acc.j_draw += jDraw; acc.drawdown += gDraw + jDraw;
       acc.g_tfGrowth += gTfGrowth; acc.g_txGrowth += gTxGrowth; acc.j_tfGrowth += jTfGrowth; acc.j_txGrowth += jTxGrowth;

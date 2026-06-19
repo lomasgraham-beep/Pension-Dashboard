@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=auth01"></script>
-  <script src="engine.js?v=fDine"></script>
+  <script src="engine.js?v=fNet1"></script>
   <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
@@ -535,7 +535,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-194</span>
+    <span class="build-stamp">build: LC-195</span>
   </div>
 
   <script>
@@ -768,11 +768,13 @@
         const share = (currentView === p1Name) ? gR : (1 - gR);
         return Math.round((r.outgoings || 0) * share);
       }
-      // fixed (guaranteed) income paying the bills: state + DB pensions, GROSS (before tax).
-      // The gap up to the spend line is what the DC pot has to contribute that year.
+      // fixed (guaranteed) income paying the bills: state + DB pensions, NET (after tax).
+      // Net is what actually meets the bills, so the gap up to the spend line is exactly
+      // what the DC pot must draw that year.
       function fixedIncomeForRow(r) {
-        if (joint) return Math.round((r.g_other || 0) + (r.j_other || 0));
-        return Math.round(vrow(r).other || 0);
+        const gN = r.g_otherNet || 0, jN = r.j_otherNet || 0;
+        if (joint) return Math.round(gN + jN);
+        return Math.round(currentView === p1Name ? gN : jN);
       }
 
       // ---------- POT CHART (stacked columns) ----------
@@ -784,7 +786,7 @@
         dPots.addColumn('number', p2Name + ' tax-free'); dPots.addColumn('number', p1Name + ' tax-free');
         dPots.addColumn('number', p2Name + ' taxable');  dPots.addColumn('number', p1Name + ' taxable');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
-        dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Pension income (gross)');
+        dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Pension income (net)');
         yrRows.forEach(r => dPots.addRow([String(r.year),
           Math.round(r.j_taxFree), Math.round(r.g_taxFree), Math.round(r.j_taxable), Math.round(r.g_taxable),
           evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]));
@@ -793,7 +795,7 @@
       } else {
         dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
-        dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Pension income (gross)');
+        dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Pension income (net)');
         yrRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx), evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]); });
         potColors = ['#2ecc71','#e74c3c'];
         potTitle = currentView + ' Pots';
