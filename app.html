@@ -178,16 +178,10 @@
     .pbtn-reset { background:#64748b; } .pbtn-reset:hover { background:#475569; }
     .pbtn-mss { background:var(--accent); } .pbtn-mss:hover { filter:brightness(0.92); }
     .params .msg { font-size:14px; font-weight:bold; }
+    .yf-chip { display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:6px 10px; border:1px solid var(--line); border-radius:7px; background:var(--surface); color:var(--ink); cursor:pointer; user-select:none; white-space:nowrap; }
+    .yf-chip input { width:15px; height:15px; cursor:pointer; margin:0; }
+    .yf-chip:hover { border-color:var(--accent-border); background:var(--accent-soft); }
 
-    /* dual-handle year range slider */
-    .range-slider { position:relative; height:36px; }
-    .range-track { position:absolute; top:50%; left:0; right:0; height:6px; transform:translateY(-50%); background:#cbd5e1; border-radius:3px; }
-    .range-fill { position:absolute; top:50%; height:6px; transform:translateY(-50%); background:var(--accent); border-radius:3px; }
-    .range-slider input[type=range] { position:absolute; top:0; left:0; width:100%; height:36px; margin:0; background:none; -webkit-appearance:none; appearance:none; pointer-events:none; }
-    .range-slider input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:26px; height:26px; border-radius:50%; background:var(--accent); border:3px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); cursor:pointer; pointer-events:auto; }
-    .range-slider input[type=range]::-moz-range-thumb { width:26px; height:26px; border-radius:50%; background:var(--accent); border:3px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); cursor:pointer; pointer-events:auto; }
-    .range-slider input[type=range]::-webkit-slider-runnable-track { background:none; }
-    .range-slider input[type=range]::-moz-range-track { background:none; }
     .floors-panel { display:none; margin-top:10px; }
     .floors-panel.show { display:grid; grid-template-columns:1fr 1fr; gap:14px 26px; align-items:start; }
     .floors-panel .hint { grid-column:1 / -1; }
@@ -438,16 +432,21 @@
         <button class="btn-toggle vt" data-view="p2" onclick="setView(p2Name)">Julie</button>
       </div>
     </div>
-    <div id="zoomBar" style="margin-bottom:14px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-        <strong style="color:var(--ink); font-size:14px;">Focus years: <span id="zoomLabel" style="color:var(--accent); font-weight:bold;">—</span></strong>
-        <button onclick="resetZoom()" style="padding:6px 12px; border:none; border-radius:6px; background:#64748b; color:#fff; font-weight:bold; cursor:pointer; font-size:13px;">Reset</button>
+    <div id="yearFilterBar" style="margin:0 0 14px;">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <button type="button" id="yfBtn" onclick="toggleYearFilter()" style="padding:9px 14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); color:var(--ink); font-weight:bold; font-size:14px; cursor:pointer;">Filter years &#9662;</button>
+        <span id="yfStatus" style="font-size:13px; color:var(--ink-soft);">All years shown</span>
       </div>
-      <div class="range-slider" id="rangeSlider">
-        <div class="range-track"></div>
-        <div class="range-fill" id="rangeFill"></div>
-        <input type="range" id="zoomFrom" min="0" max="100" value="0" oninput="onZoom('from')">
-        <input type="range" id="zoomTo" min="0" max="100" value="100" oninput="onZoom('to')">
+      <div id="yfPanel" style="display:none; margin-top:8px; padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); max-width:640px;">
+        <div style="font-size:13px; color:var(--ink-soft); margin-bottom:12px;">Tick the years to show on every chart on this page. With none ticked, all years are shown. Press <strong>Save filter</strong> to remember this selection on this device.</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px;">
+          <button type="button" onclick="yfSetAll(true)" style="padding:7px 14px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--ink); font-weight:600; font-size:13px; cursor:pointer;">All</button>
+          <button type="button" onclick="yfSetAll(false)" style="padding:7px 14px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--ink); font-weight:600; font-size:13px; cursor:pointer;">None</button>
+          <span style="flex:1 1 auto;"></span>
+          <button type="button" onclick="saveYearFilter()" style="padding:9px 18px; border:none; border-radius:8px; background:#27ae60; color:#fff; font-weight:bold; font-size:14px; cursor:pointer;">Save filter</button>
+          <span id="yfMsg" style="font-size:14px; font-weight:bold; color:#27ae60;"></span>
+        </div>
+        <div id="yfGrid" style="display:flex; flex-wrap:wrap; gap:7px 10px;"></div>
       </div>
     </div>
     <div id="potChart" class="chart-box"></div>
@@ -548,7 +547,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-207</span>
+    <span class="build-stamp">build: LC-208</span>
   </div>
 
   <script>
@@ -565,52 +564,105 @@
     function displayName(view) { return view === 'Joint' ? 'Joint' : view; }
     let retGran = 'year';     // Retirement table granularity: 'year' or 'month'
     let chartsReady = false;
-    let zoomFrom = null, zoomTo = null;   // actual years
 
-    // set up the range slider from the current projection's year span
-    function buildZoomSlider() {
+    // ---- Year filter (per-year checkboxes; replaces the old Focus-years range slider) ----
+    // yearFilter is a Set of calendar years to SHOW on every chart. null or an empty set => show all.
+    // Saved on this device via localStorage; re-applied by calendar year, so it survives the
+    // year list changing when the retirement date moves (years no longer present are simply absent).
+    const YF_KEY = 'mpm_yearFilter';
+    let yearFilter = null;
+    let yfBuiltSig = '';   // signature of the year span the checkbox grid was last built for
+
+    (function loadSavedYearFilter() {
+      try {
+        const raw = localStorage.getItem(YF_KEY);
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr) && arr.length) yearFilter = new Set(arr.map(Number));
+        }
+      } catch (e) { /* storage corrupt or unavailable — leave null (show all) */ }
+    })();
+
+    // (re)build the checkbox grid from the current projection's years, reflecting yearFilter.
+    // Only rebuilds the DOM when the year span actually changes, so live dragging doesn't wipe ticks.
+    function buildYearFilter() {
       if (!drawdownRows.length) return;
+      const grid = document.getElementById('yfGrid'); if (!grid) return;
       const years = drawdownRows.map(r => r.year);
-      const minY = years[0], maxY = years[years.length - 1];
-      const selF = document.getElementById('zoomFrom'), selT = document.getElementById('zoomTo');
-      if (!selF || !selT) return;
-      // keep prior selection if still valid, else full range
-      if (zoomFrom == null || zoomFrom < minY || zoomFrom > maxY) zoomFrom = minY;
-      if (zoomTo == null || zoomTo < minY || zoomTo > maxY) zoomTo = maxY;
-      const n = years.length - 1;
-      selF.min = 0; selF.max = n; selT.min = 0; selT.max = n;
-      selF.value = zoomFrom - minY; selT.value = zoomTo - minY;
-      updateZoomVisual();
+      const sig = years[0] + '_' + years[years.length - 1] + '_' + years.length;
+      if (sig !== yfBuiltSig) {
+        const showAll = (!yearFilter || yearFilter.size === 0);
+        grid.innerHTML = years.map(y =>
+          '<label class="yf-chip"><input type="checkbox" value="' + y + '"' +
+          ((showAll || yearFilter.has(y)) ? ' checked' : '') +
+          ' onchange="onYearToggle()"> ' + y + '</label>'
+        ).join('');
+        yfBuiltSig = sig;
+      }
+      updateYfStatus();
     }
-    function yearSpan() { const ys = drawdownRows.map(r => r.year); return { minY: ys[0], maxY: ys[ys.length - 1], n: ys.length - 1 }; }
-    function updateZoomVisual() {
-      const { minY, n } = yearSpan();
-      const selF = document.getElementById('zoomFrom'), selT = document.getElementById('zoomTo');
-      const a = Number(selF.value), b = Number(selT.value);
-      const lo = Math.min(a, b), hi = Math.max(a, b);
-      const fill = document.getElementById('rangeFill');
-      if (fill && n > 0) { fill.style.left = (lo / n * 100) + '%'; fill.style.width = ((hi - lo) / n * 100) + '%'; }
-      document.getElementById('zoomLabel').textContent = (minY + lo) + ' → ' + (minY + hi);
-    }
-    function onZoom(which) {
-      const { minY } = yearSpan();
-      const selF = document.getElementById('zoomFrom'), selT = document.getElementById('zoomTo');
-      let a = Number(selF.value), b = Number(selT.value);
-      // prevent handles crossing: the one being dragged pushes against the other
-      if (a > b) { if (which === 'from') { b = a; selT.value = b; } else { a = b; selF.value = a; } }
-      zoomFrom = minY + Math.min(a, b); zoomTo = minY + Math.max(a, b);
-      updateZoomVisual();
+
+    function yfCheckboxes() { return Array.from(document.querySelectorAll('#yfGrid input[type="checkbox"]')); }
+
+    // read the ticked years into yearFilter, then redraw all charts
+    function onYearToggle() {
+      const ticked = yfCheckboxes().filter(c => c.checked).map(c => Number(c.value));
+      yearFilter = new Set(ticked);   // empty set => show all (handled in zYears/zMonths)
+      updateYfStatus();
       if (chartsReady) drawCharts();
     }
-    function resetZoom() {
-      const { minY, maxY } = yearSpan();
-      zoomFrom = minY; zoomTo = maxY;
-      buildZoomSlider();
-      if (chartsReady) drawCharts();
+
+    function yfSetAll(on) {
+      yfCheckboxes().forEach(c => { c.checked = on; });
+      onYearToggle();
     }
-    // filter helpers honouring the zoom range
-    function zYears(rows) { return rows.filter(r => (zoomFrom == null || r.year >= zoomFrom) && (zoomTo == null || r.year <= zoomTo)); }
-    function zMonths(rows) { return rows.filter(r => (zoomFrom == null || r.year >= zoomFrom) && (zoomTo == null || r.year <= zoomTo)); }
+
+    function updateYfStatus() {
+      const el = document.getElementById('yfStatus'); if (!el) return;
+      const total = drawdownRows.length;
+      let sel = total;
+      if (yearFilter && yearFilter.size) sel = drawdownRows.filter(r => yearFilter.has(r.year)).length;
+      el.textContent = (!yearFilter || yearFilter.size === 0 || sel === 0 || sel >= total)
+        ? 'All years shown'
+        : ('Showing ' + sel + ' of ' + total + ' years');
+    }
+
+    function toggleYearFilter() {
+      const box = document.getElementById('yfPanel');
+      box.style.display = (box.style.display === 'none') ? 'block' : 'none';
+    }
+
+    function saveYearFilter() {
+      try {
+        const total = drawdownRows.length;
+        // "all ticked" or "none ticked" both mean show-all => clear the saved filter
+        if (!yearFilter || yearFilter.size === 0 || yearFilter.size >= total) {
+          localStorage.removeItem(YF_KEY);
+        } else {
+          localStorage.setItem(YF_KEY, JSON.stringify(Array.from(yearFilter).sort((a, b) => a - b)));
+        }
+        flashYfMsg('Saved \u2713');
+      } catch (e) { flashYfMsg('Could not save'); }
+    }
+    function flashYfMsg(t) {
+      const m = document.getElementById('yfMsg'); if (!m) return;
+      m.textContent = t;
+      clearTimeout(window.__yfMsgT);
+      window.__yfMsgT = setTimeout(() => { m.textContent = ''; }, 2500);
+    }
+
+    // filter helpers honouring the year filter (empty/none => all; never returns a blank set,
+    // so a saved selection that doesn't intersect the current projection falls back to all)
+    function zYears(rows) {
+      if (!yearFilter || yearFilter.size === 0) return rows;
+      const out = rows.filter(r => yearFilter.has(r.year));
+      return out.length ? out : rows;
+    }
+    function zMonths(rows) {
+      if (!yearFilter || yearFilter.size === 0) return rows;
+      const out = rows.filter(r => yearFilter.has(r.year));
+      return out.length ? out : rows;
+    }
 
     google.charts.load('current', { packages: ['corechart'] });
     google.charts.setOnLoadCallback(() => { chartsReady = true; if (drawdownRows.length) drawCharts(); });
@@ -752,8 +804,8 @@
     function drawCharts() {
       if (!chartsReady || !drawdownRows.length) return;
       const joint = (currentView === 'Joint');
-      buildZoomSlider();
-      const yrRows = zYears(drawdownRows);   // rows within the focus-year range
+      buildYearFilter();
+      const yrRows = zYears(drawdownRows);   // rows passing the year filter (all years if none/empty)
 
       // map a calendar year -> event marker text (crash starts and cash purchases that year)
       const eventByYear = {};
