@@ -9,16 +9,17 @@
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:#333; }
   h2 { color:#2c3e50; margin-top:0; border-bottom:2px solid #e2e8f0; padding-bottom:6px; }
   .form-group { margin-bottom:15px; }
-  .form-group label { display:block; font-weight:bold; font-size:13px; color:#2c3e50; margin-bottom:5px; }
-  .form-group input, .form-group select { padding:11px; border:1px solid #ccc; border-radius:6px; font-size:15px; box-sizing:border-box; max-width:360px; width:100%; }
+  .form-group label { display:block; font-weight:bold; font-size:15px; color:#2c3e50; margin-bottom:6px; }
+  .form-group input, .form-group select { padding:14px; border:1px solid #ccc; border-radius:6px; font-size:18px; box-sizing:border-box; max-width:480px; width:100%; }
   .btn { background:#3498db; color:#fff; border:none; padding:13px 22px; border-radius:8px; font-weight:bold; font-size:15px; cursor:pointer; }
   .btn-clear { background:#64748b; padding:9px 16px; font-size:14px; }
-  .pot-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; max-width:740px; margin-bottom:15px; }
-  .pot-card { background:#f8fafc; padding:14px; border-radius:8px; border:1px solid #e2e8f0; }
-  .pot-label { display:block; font-weight:bold; font-size:14px; color:#2c3e50; margin-bottom:6px; }
-  .pot-input { width:100%; padding:11px; border:1px solid #ccc; border-radius:6px; font-size:16px; box-sizing:border-box; text-align:right; }
-  .contrib-label { display:flex; align-items:flex-start; gap:8px; font-weight:normal; color:#64748b; cursor:pointer; margin-top:10px; font-size:13px; }
-  .contrib-label input { width:auto; flex:0 0 auto; margin-top:2px; }
+  .pot-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px; max-width:840px; margin-bottom:15px; }
+  .pot-card { background:#f8fafc; padding:18px; border-radius:8px; border:1px solid #e2e8f0; }
+  .pot-label { display:block; font-weight:bold; font-size:16px; color:#2c3e50; margin-bottom:8px; }
+  .pot-input { width:100%; padding:14px; border:1px solid #ccc; border-radius:6px; font-size:20px; box-sizing:border-box; text-align:right; }
+  .contrib-label { display:flex; align-items:center; gap:10px; font-weight:normal; color:#64748b; cursor:pointer; margin-top:14px; font-size:15px; }
+  .contrib-label input { width:24px; height:24px; flex:0 0 auto; accent-color:#3498db; cursor:pointer; }
+  .pot-hint { font-size:13px; color:#94a3b8; margin:-4px 0 14px; }
   .filter-bar { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; margin:16px 0; }
   .filter-bar label { display:block; font-size:12px; color:#64748b; font-weight:bold; margin-bottom:4px; }
   .filter-bar select, .filter-bar input { padding:8px; border:1px solid #ccc; border-radius:6px; font-size:14px; }
@@ -49,6 +50,8 @@
     .pot-grid { grid-template-columns:1fr 1fr; gap:10px; }
     .pot-card { padding:10px; }
     .pot-label { font-size:13px; }
+    .pot-input { font-size:16px; padding:11px; }
+    .pot-hint { font-size:12px; }
     .contrib-label { font-size:12px; }
     .filter-bar { gap:8px 10px; padding:10px; }
     .filter-bar > div { flex:1 1 auto; }
@@ -104,7 +107,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
 
-  <h2>Log New Balances <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(logs build: edit)</span></h2>
+  <h2>Log New Balances <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(logs build: logbox)</span></h2>
   <div class="form-group"><label>Whose accounts are you updating?</label><select id="logMember" onchange="renderInputs()"></select></div>
   <div class="form-group"><label>Date</label><input type="date" id="entryDate"></div>
   <div id="inputs"></div>
@@ -171,7 +174,8 @@
         <input type="number" class="pot-input" data-pension="${p.pension_name}" step="1" value="0" onfocus="if(this.value==='0'){this.value='';}" onblur="if(this.value.trim()===''){this.value='0';}">
         <label class="contrib-label">
           <input type="checkbox" class="contrib-input" data-pension="${p.pension_name}">Includes standard monthly contribution?</label>
-      </div>`).join('') + '</div>';
+      </div>`).join('') + '</div>'
+      + '<p class="pot-hint">Leave a pension at 0 to record no change for it — only boxes with a new value are saved.</p>';
   }
 
   async function submitEntry() {
@@ -180,10 +184,13 @@
     if (!date) { msg.style.color = '#c0392b'; msg.textContent = 'Pick a date first.'; return; }
     const payloads = [];
     document.querySelectorAll('.pot-input').forEach(inp => {
+      const val = parseFloat(inp.value) || 0;
+      if (val <= 0) return;                       // 0 / blank = no change for this pension -> skip
       const pName = inp.dataset.pension;
       const cb = document.querySelector(`.contrib-input[data-pension="${pName}"]`);
-      payloads.push({ member_name: document.getElementById('logMember').value, pension_name: pName, pot_value: parseFloat(inp.value) || 0, log_date: date, contribution_applied: cb ? cb.checked : false });
+      payloads.push({ member_name: document.getElementById('logMember').value, pension_name: pName, pot_value: val, log_date: date, contribution_applied: cb ? cb.checked : false });
     });
+    if (!payloads.length) { msg.style.color = '#c0392b'; msg.textContent = 'Nothing to save — every pension is at 0 (no change). Enter at least one new value.'; return; }
     try {
       await App.write('POST', 'op_pension_logs', payloads);
       msg.style.color = '#065f46'; msg.textContent = '✓ Saved ' + payloads.length + ' balance(s).';

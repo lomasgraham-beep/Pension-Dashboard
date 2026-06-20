@@ -308,24 +308,24 @@
   <select id="tabSelect" class="tab-select" onchange="showTab(null, this.value)" aria-label="Choose section">
     <option value="Overview">Overview</option>
     <option value="KPIs">Performance KPIs</option>
+    <option value="Logs">Log Entry</option>
     <option value="Forecast">Monthly Forecast</option>
     <option value="Modelling">Modelling</option>
     <option value="Cash">Cash &amp; Purchases</option>
     <option value="Crashes">Market Crashes</option>
     <option value="Retirement">Retirement</option>
-    <option value="Logs">Log Entry</option>
     <option value="LivingCosts">Living Costs</option>
     <option value="BasicData">Basic Data</option>
   </select>
   <div class="tab-buttons">
     <button class="tab-link active-btn" onclick="showTab(event,'Overview')">Overview</button>
     <button class="tab-link" onclick="showTab(event,'KPIs')">Performance KPIs</button>
+    <button class="tab-link" onclick="showTab(event,'Logs')">Log Entry</button>
     <button class="tab-link" onclick="showTab(event,'Forecast')">Monthly Forecast</button>
     <button class="tab-link" onclick="showTab(event,'Modelling')">Modelling</button>
     <button class="tab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
     <button class="tab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
     <button class="tab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-    <button class="tab-link" onclick="showTab(event,'Logs')">Log Entry</button>
     <button class="tab-link" onclick="showTab(event,'LivingCosts')">Living Costs</button>
     <button class="tab-link" onclick="showTab(event,'BasicData')">Basic Data</button>
   </div>
@@ -535,7 +535,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-195</span>
+    <span class="build-stamp">build: LC-196</span>
   </div>
 
   <script>
@@ -1547,7 +1547,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=rncasc';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=logbox';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
