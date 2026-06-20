@@ -23,8 +23,8 @@
   .pot-hint { grid-column:1 / -1; font-size:13px; color:#94a3b8; margin:2px 0 0; }
   .pot-msg { grid-column:1 / -1; }
   .entry-grid input, .entry-grid select { max-width:none; min-width:0; }
-  .date-box { width:100%; box-sizing:border-box; padding:14px; border:1px solid #ccc; border-radius:6px; background:#ececec; overflow:hidden; }
-  .date-box input[type="date"] { -webkit-appearance:none; appearance:none; border:0; box-shadow:none; outline:none; padding:0; margin:0; background:transparent; width:100%; min-width:0; font-size:18px; font-family:inherit; color:inherit; text-align:center; box-sizing:border-box; }
+  .date-box { width:100%; box-sizing:border-box; padding:14px; border:1px solid #ccc; border-radius:6px; background:#fff; overflow:hidden; }
+  .date-box input[type="date"] { -webkit-appearance:none; appearance:none; border:0; box-shadow:none; outline:none; padding:0; margin:0; background:transparent !important; width:100%; min-width:0; font-size:18px; font-family:inherit; color:inherit; text-align:center; box-sizing:border-box; }
   .buildtag { font-size:12px; font-weight:bold; background:#fde68a; color:#92400e; padding:3px 10px; border-radius:10px; vertical-align:middle; }
   .filter-bar { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; margin:16px 0; }
   .filter-bar label { display:block; font-size:12px; color:#64748b; font-weight:bold; margin-bottom:4px; }
@@ -84,6 +84,7 @@
       background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important;
     }
     input::placeholder { color:#64748b !important; }
+    .date-box { background:#0f172a !important; border-color:#475569 !important; }
     table { color:#cbd5e1 !important; }
     th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
     td { border-color:#334155 !important; color:#cbd5e1 !important; }
@@ -112,7 +113,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
 
-  <h2>Log New Balances <span class="buildtag">build row7</span></h2>
+  <h2>Log New Balances <span class="buildtag">build row8</span></h2>
   <div class="entry-grid" id="entryGrid">
     <div class="form-group"><label>Whose accounts are you updating?</label><select id="logMember" onchange="renderInputs()"></select></div>
     <div class="form-group"><label>Date</label><div class="date-box"><input type="date" id="entryDate"></div></div>
