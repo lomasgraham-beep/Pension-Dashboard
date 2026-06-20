@@ -14,7 +14,7 @@
   .btn { background:#3498db; color:#fff; border:none; padding:13px 22px; border-radius:8px; font-weight:bold; font-size:15px; cursor:pointer; }
   .btn-clear { background:#64748b; padding:9px 16px; font-size:14px; }
   .entry-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:18px; max-width:840px; align-items:start; margin-bottom:15px; }
-  .entry-grid .form-group { margin-bottom:0; }
+  .entry-grid .form-group { margin-bottom:0; min-width:0; }
   .pot-field { min-width:0; }
   .pot-label { display:block; font-weight:bold; font-size:15px; color:#2c3e50; margin-bottom:6px; }
   .pot-input { width:100%; min-width:0; padding:14px; border:1px solid #ccc; border-radius:6px; font-size:18px; box-sizing:border-box; text-align:right; }
@@ -110,7 +110,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
 
-  <h2>Log New Balances <span class="buildtag">build row4</span></h2>
+  <h2>Log New Balances <span class="buildtag">build row5</span></h2>
   <div class="entry-grid" id="entryGrid">
     <div class="form-group"><label>Whose accounts are you updating?</label><select id="logMember" onchange="renderInputs()"></select></div>
     <div class="form-group"><label>Date</label><input type="date" id="entryDate"></div>
