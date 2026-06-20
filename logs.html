@@ -13,9 +13,7 @@
   .form-group input, .form-group select { padding:14px; border:1px solid #ccc; border-radius:6px; font-size:18px; box-sizing:border-box; max-width:480px; width:100%; }
   .btn { background:#3498db; color:#fff; border:none; padding:13px 22px; border-radius:8px; font-weight:bold; font-size:15px; cursor:pointer; }
   .btn-clear { background:#64748b; padding:9px 16px; font-size:14px; }
-  .entry-grid, #inputs { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:18px; max-width:840px; align-items:start; }
-  .entry-grid { margin-bottom:18px; }
-  #inputs { margin-bottom:15px; }
+  .entry-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:18px; max-width:840px; align-items:start; margin-bottom:15px; }
   .entry-grid .form-group { margin-bottom:0; }
   .pot-field { min-width:0; }
   .pot-label { display:block; font-weight:bold; font-size:15px; color:#2c3e50; margin-bottom:6px; }
@@ -24,7 +22,8 @@
   .contrib-label input { width:30px; height:30px; flex:0 0 auto; accent-color:#3498db; cursor:pointer; }
   .pot-hint { grid-column:1 / -1; font-size:13px; color:#94a3b8; margin:2px 0 0; }
   .pot-msg { grid-column:1 / -1; }
-  .entry-grid input, .entry-grid select, #inputs input { max-width:none; min-width:0; }
+  .entry-grid input, .entry-grid select { max-width:none; min-width:0; }
+  .buildtag { font-size:12px; font-weight:bold; background:#fde68a; color:#92400e; padding:3px 10px; border-radius:10px; vertical-align:middle; }
   .filter-bar { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; margin:16px 0; }
   .filter-bar label { display:block; font-size:12px; color:#64748b; font-weight:bold; margin-bottom:4px; }
   .filter-bar select, .filter-bar input { padding:8px; border:1px solid #ccc; border-radius:6px; font-size:14px; }
@@ -52,7 +51,7 @@
     .form-group { margin-bottom:10px; }
     .form-group label { font-size:12px; margin-bottom:3px; }
     .form-group input, .form-group select { padding:9px; font-size:15px; max-width:none; }
-    .entry-grid, #inputs { grid-template-columns:1fr; gap:12px; }
+    .entry-grid { grid-template-columns:1fr; gap:12px; }
     .pot-label { font-size:13px; }
     .pot-input { font-size:16px; padding:11px; }
     .pot-hint { font-size:12px; }
@@ -111,12 +110,11 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
 
-  <h2>Log New Balances <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(logs build: row3)</span></h2>
-  <div class="entry-grid">
+  <h2>Log New Balances <span class="buildtag">build row4</span></h2>
+  <div class="entry-grid" id="entryGrid">
     <div class="form-group"><label>Whose accounts are you updating?</label><select id="logMember" onchange="renderInputs()"></select></div>
     <div class="form-group"><label>Date</label><input type="date" id="entryDate"></div>
   </div>
-  <div id="inputs"></div>
   <button class="btn" onclick="submitEntry()">Submit to Cloud Database</button>
   <div class="msg" id="entryMsg"></div>
 
@@ -171,17 +169,19 @@
   }
 
   function renderInputs() {
-    const member = document.getElementById('logMember').value, box = document.getElementById('inputs');
+    const grid = document.getElementById('entryGrid');
+    grid.querySelectorAll('.pot-field, .pot-hint, .pot-msg').forEach(el => el.remove());
+    const member = document.getElementById('logMember').value;
     const pots = userPensions.filter(p => p.member_name === member && p.pension_type === 'Defined Contributions');
-    if (!pots.length) { box.innerHTML = '<p class="pot-msg">No DC pots found for ' + member + '.</p>'; return; }
-    box.innerHTML = pots.map(p => `
+    if (!pots.length) { grid.insertAdjacentHTML('beforeend', '<p class="pot-msg">No DC pots found for ' + member + '.</p>'); return; }
+    grid.insertAdjacentHTML('beforeend', pots.map(p => `
       <div class="pot-field">
         <label class="pot-label">${p.pension_name} Value (£)</label>
         <input type="number" class="pot-input" data-pension="${p.pension_name}" step="1" value="0" onfocus="if(this.value==='0'){this.value='';}" onblur="if(this.value.trim()===''){this.value='0';}">
         <label class="contrib-label">
           <input type="checkbox" class="contrib-input" data-pension="${p.pension_name}">Includes standard monthly contribution?</label>
       </div>`).join('')
-      + '<p class="pot-hint">Leave a pension at 0 to record no change for it — only boxes with a new value are saved.</p>';
+      + '<p class="pot-hint">Leave a pension at 0 to record no change for it — only boxes with a new value are saved.</p>');
   }
 
   async function submitEntry() {
