@@ -35,6 +35,8 @@
     .btn-toggle { background:transparent; border:none; padding:9px 16px; font-weight:600; cursor:pointer; color:var(--ink-soft); font-size:13px; transition:background .12s,color .12s; }
     .btn-toggle:hover { background:var(--accent-soft); }
     .btn-toggle.active-toggle { background:var(--accent); color:#fff; }
+    .scope-toggle { display:flex; align-items:center; gap:10px; margin:0 0 14px; flex-wrap:wrap; }
+    .scope-lbl { font-weight:bold; color:var(--ink); font-size:14px; }
     .who { font-size:13px; color:var(--ink-soft); }
     .who a { color:var(--accent); font-weight:600; cursor:pointer; text-decoration:none; margin-left:10px; }
     .logout-link { color:var(--accent); font-weight:600; cursor:pointer; text-decoration:none; font-size:13px; }
@@ -295,11 +297,6 @@
   <div class="topbar">
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
-      <div class="view-toggle" id="viewToggle">
-        <button id="vt-joint" class="btn-toggle active-toggle" onclick="setView('Joint')">Joint</button>
-        <button id="vt-p1" class="btn-toggle" onclick="setView(p1Name)">Graham</button>
-        <button id="vt-p2" class="btn-toggle" onclick="setView(p2Name)">Julie</button>
-      </div>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -433,6 +430,14 @@
     </div>
     <div class="model-main">
     <h2><span class="viewlabel">Joint</span> Projections</h2>
+    <div class="scope-toggle">
+      <span class="scope-lbl">Show:</span>
+      <div class="view-toggle">
+        <button class="btn-toggle vt active-toggle" data-view="Joint" onclick="setView('Joint')">Joint</button>
+        <button class="btn-toggle vt" data-view="p1" onclick="setView(p1Name)">Graham</button>
+        <button class="btn-toggle vt" data-view="p2" onclick="setView(p2Name)">Julie</button>
+      </div>
+    </div>
     <div id="zoomBar" style="margin-bottom:14px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <strong style="color:var(--ink); font-size:14px;">Focus years: <span id="zoomLabel" style="color:var(--accent); font-weight:bold;">—</span></strong>
@@ -460,6 +465,14 @@
     <div class="rail-slot" id="railSlot-Retirement"></div><div class="rail-strip" onclick="expandRail()" title="Show controls"><span>Controls &#9654;</span></div>
     <div class="model-main">
     <h2><span class="viewlabel">Joint</span> Retirement Drawdown</h2>
+    <div class="scope-toggle">
+      <span class="scope-lbl">Show:</span>
+      <div class="view-toggle">
+        <button class="btn-toggle vt active-toggle" data-view="Joint" onclick="setView('Joint')">Joint</button>
+        <button class="btn-toggle vt" data-view="p1" onclick="setView(p1Name)">Graham</button>
+        <button class="btn-toggle vt" data-view="p2" onclick="setView(p2Name)">Julie</button>
+      </div>
+    </div>
     <div style="margin:0 0 12px; font-size:14px;">
       <strong style="color:#2c3e50; margin-right:10px;">View:</strong>
       <label style="margin-right:16px; cursor:pointer;"><input type="radio" name="retGran" value="year" checked onchange="setRetGran('year')"> Annual</label>
@@ -535,7 +548,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-206</span>
+    <span class="build-stamp">build: LC-207</span>
   </div>
 
   <script>
@@ -605,9 +618,11 @@
     // ---------- view toggle ----------
     function setView(v) {
       currentView = v;
-      document.getElementById('vt-joint').classList.toggle('active-toggle', v === 'Joint');
-      document.getElementById('vt-p1').classList.toggle('active-toggle', v === p1Name);
-      document.getElementById('vt-p2').classList.toggle('active-toggle', v === p2Name);
+      document.querySelectorAll('.vt').forEach(b => {
+        const dv = b.dataset.view;
+        const on = (dv === 'Joint' && v === 'Joint') || (dv === 'p1' && v === p1Name) || (dv === 'p2' && v === p2Name);
+        b.classList.toggle('active-toggle', on);
+      });
       document.querySelectorAll('.viewlabel').forEach(el => el.textContent = displayName(v));
       renderRetirementTable();
       if (chartsReady) drawCharts();
@@ -616,17 +631,11 @@
     // set all visible names from the members data; hide person-2 + joint/combined when single
     function applyMemberLabels() {
       const single = !p2Name;
-      // toggle buttons
-      document.getElementById('vt-p1').textContent = p1Name;
-      const p2btn = document.getElementById('vt-p2'), jbtn = document.getElementById('vt-joint');
-      if (single) {
-        p2btn.style.display = 'none';
-        jbtn.style.display = 'none';            // no Joint concept for one person
-        if (currentView !== p1Name) setView(p1Name);
-      } else {
-        p2btn.style.display = ''; jbtn.style.display = '';
-        p2btn.textContent = p2Name;
-      }
+      // toggle buttons (class-based; the toggle now appears on Modelling and Retirement)
+      document.querySelectorAll('.vt[data-view="p1"]').forEach(b => b.textContent = p1Name);
+      document.querySelectorAll('.vt[data-view="p2"]').forEach(b => { b.textContent = p2Name || ''; b.style.display = single ? 'none' : ''; });
+      document.querySelectorAll('.vt[data-view="Joint"]').forEach(b => b.style.display = single ? 'none' : '');
+      if (single && currentView !== p1Name) setView(p1Name);
       // name spans (cards, slider labels)
       document.querySelectorAll('.nm-p1').forEach(el => el.textContent = p1Name);
       document.querySelectorAll('.nm-p2').forEach(el => el.textContent = p2Name || '');
