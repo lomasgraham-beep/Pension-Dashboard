@@ -69,6 +69,12 @@
     .card .value.neg-growth { color:#c0392b; }
 
     .chart-box { width:100%; height:400px; margin-bottom:20px; }
+    .chart-wrap { position:relative; }
+    .chart-fs-btn { position:absolute; top:8px; right:8px; z-index:6; display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; padding:0; border:1px solid var(--line-strong); border-radius:8px; background:var(--surface); color:var(--ink-soft); cursor:pointer; opacity:0.8; box-shadow:var(--shadow); }
+    .chart-fs-btn:hover { opacity:1; color:var(--accent); border-color:var(--accent-border); }
+    .chart-wrap.fs { position:fixed; inset:0; z-index:10000; margin:0; padding:12px 12px 16px; background:var(--surface); overflow:auto; }
+    .chart-wrap.fs .chart-box { height:calc(100vh - 52px); margin:0; }
+    .chart-wrap.fs .chart-fs-btn { position:fixed; top:14px; right:18px; width:44px; height:44px; opacity:1; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
     .toggle-switch { appearance:none; -webkit-appearance:none; width:48px; height:28px; background:#cbd5e1; border-radius:999px; position:relative; cursor:pointer; outline:none; transition:background 0.2s; flex:none; vertical-align:middle; }
     .toggle-switch:checked { background:#27ae60; }
@@ -449,12 +455,12 @@
         <div id="yfGrid" style="display:flex; flex-wrap:wrap; gap:7px 10px;"></div>
       </div>
     </div>
-    <div id="potChart" class="chart-box"></div>
-    <div id="incomeChart" class="chart-box"></div>
+    <div class="chart-wrap"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="potChart" class="chart-box"></div></div>
+    <div class="chart-wrap"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="incomeChart" class="chart-box"></div></div>
     <h3 id="crashChartHead" style="color:var(--ink); margin:18px 0 4px; display:none;">Pot Through Market Crashes</h3>
-    <div id="crashChart" class="chart-box" style="display:none;"></div>
+    <div class="chart-wrap" id="crashWrap" style="display:none;"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="crashChart" class="chart-box"></div></div>
     <h3 id="cashModelHead" style="color:var(--ink); margin:18px 0 4px; display:none;">Cash Savings Balance</h3>
-    <div id="cashModelChart" class="chart-box" style="display:none;"></div>
+    <div class="chart-wrap" id="cashModelWrap" style="display:none;"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="cashModelChart" class="chart-box"></div></div>
     </div>
     </div>
   </div>
@@ -547,7 +553,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-208</span>
+    <span class="build-stamp">build: LC-209</span>
   </div>
 
   <script>
@@ -664,8 +670,42 @@
       return out.length ? out : rows;
     }
 
+    // ---- Chart full-screen (one chart at a time, via a fixed CSS overlay) ----
+    // Inline SVGs so the icon never depends on a font glyph rendering on iPad Safari.
+    const FS_EXPAND_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
+    const FS_CLOSE_SVG  = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+    let fsWrap = null;   // the chart-wrap currently full-screen, or null
+
+    function initChartFsButtons() {
+      document.querySelectorAll('.chart-fs-btn').forEach(b => { if (!b.innerHTML.trim()) b.innerHTML = FS_EXPAND_SVG; });
+    }
+
+    function toggleChartFs(btn) {
+      const wrap = btn.closest('.chart-wrap'); if (!wrap) return;
+      if (wrap.classList.contains('fs')) { closeChartFs(); return; }
+      if (fsWrap && fsWrap !== wrap) closeChartFs();   // only one at a time
+      wrap.classList.add('fs');
+      fsWrap = wrap;
+      document.body.style.overflow = 'hidden';
+      btn.innerHTML = FS_CLOSE_SVG; btn.title = 'Exit full screen'; btn.setAttribute('aria-label', 'Exit full screen');
+      // redraw after the overlay has taken its full size so Google Charts measures it
+      requestAnimationFrame(() => { if (chartsReady) drawCharts(); });
+    }
+
+    function closeChartFs() {
+      if (!fsWrap) return;
+      const wrap = fsWrap, btn = fsWrap.querySelector('.chart-fs-btn');
+      wrap.classList.remove('fs');
+      fsWrap = null;
+      document.body.style.overflow = '';
+      if (btn) { btn.innerHTML = FS_EXPAND_SVG; btn.title = 'Full screen'; btn.setAttribute('aria-label', 'Full screen'); }
+      requestAnimationFrame(() => { if (chartsReady) drawCharts(); });
+    }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && fsWrap) closeChartFs(); });
+
     google.charts.load('current', { packages: ['corechart'] });
-    google.charts.setOnLoadCallback(() => { chartsReady = true; if (drawdownRows.length) drawCharts(); });
+    google.charts.setOnLoadCallback(() => { chartsReady = true; initChartFsButtons(); if (drawdownRows.length) drawCharts(); });
 
     // ---------- view toggle ----------
     function setView(v) {
@@ -983,10 +1023,11 @@
 
     function drawCrashChart() {
       const head = document.getElementById('crashChartHead'), box = document.getElementById('crashChart');
+      const wrap = box.closest('.chart-wrap');
       const monthly = zMonths(drawdownRows.monthly || []);
       const windows = drawdownRows.crashWindows || [];
-      if (!chartsReady || !windows.length || !monthly.length) { head.style.display = 'none'; box.style.display = 'none'; return; }
-      head.style.display = ''; box.style.display = '';
+      if (!chartsReady || !windows.length || !monthly.length) { head.style.display = 'none'; if (wrap.classList.contains('fs')) closeChartFs(); wrap.style.display = 'none'; return; }
+      head.style.display = ''; wrap.style.display = '';
 
       // total pot per month for the current view
       function potOf(r) {
@@ -1035,14 +1076,15 @@
 
     function drawCashModelChart() {
       const head = document.getElementById('cashModelHead'), box = document.getElementById('cashModelChart');
+      const wrap = box.closest('.chart-wrap');
       const monthly = zMonths(drawdownRows.monthly || []);
       const acctList = drawdownRows.savingsAccountList || [];
-      if (!chartsReady || !acctList.length || !monthly.length) { head.style.display = 'none'; box.style.display = 'none'; return; }
+      if (!chartsReady || !acctList.length || !monthly.length) { head.style.display = 'none'; if (wrap.classList.contains('fs')) closeChartFs(); wrap.style.display = 'none'; return; }
 
       // which accounts belong in this view
       const showAccts = acctList.filter(a => currentView === 'Joint' || a.member === currentView);
-      if (!showAccts.length) { head.style.display = 'none'; box.style.display = 'none'; return; }
-      head.style.display = ''; box.style.display = '';
+      if (!showAccts.length) { head.style.display = 'none'; if (wrap.classList.contains('fs')) closeChartFs(); wrap.style.display = 'none'; return; }
+      head.style.display = ''; wrap.style.display = '';
 
       // sample one row per year (year-end: last month present for that year)
       const byYear = {};
