@@ -36,6 +36,11 @@
   #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
   .table-wrap { overflow-x:auto; }
+  .zoom-bar { display:flex; gap:18px; align-items:flex-end; flex-wrap:wrap; margin:0 0 10px; padding:12px 14px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; max-width:680px; }
+  .zoom-ctrl { display:flex; flex-direction:column; gap:4px; flex:1 1 170px; min-width:150px; }
+  .zoom-ctrl label { font-size:12px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; }
+  .zoom-ctrl label b { color:var(--accent-dark); }
+  .zoom-ctrl input[type=range] { width:100%; margin:0; }
   .savb-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 14px; }
   .sw-pill { display:inline-flex; align-items:center; gap:8px; font-size:13px; padding:6px 12px; border:1px solid var(--line); border-radius:7px; background:var(--surface-2); color:var(--ink); }
   .sw-pill b.on { color:#16a34a; } .sw-pill b.off { color:#e67e22; }
@@ -114,7 +119,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v14)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v15)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
 
   <div class="savb-bar">
@@ -130,6 +135,17 @@
     <span class="msg" id="msg"></span>
   </div>
 
+  <div id="zoomBar" class="zoom-bar" style="display:none;">
+    <div class="zoom-ctrl">
+      <label>Zoom from <b id="zFromV">&ndash;</b></label>
+      <input type="range" id="zFrom" min="0" max="0" value="0" step="1" oninput="onZoomFrom()">
+    </div>
+    <div class="zoom-ctrl">
+      <label>Zoom to <b id="zToV">&ndash;</b></label>
+      <input type="range" id="zTo" min="0" max="0" value="0" step="1" oninput="onZoomTo()">
+    </div>
+    <button type="button" class="btn btn-reload" style="padding:8px 14px; font-size:13px;" onclick="zoomReset()">Reset zoom</button>
+  </div>
   <div id="cashChart" style="width:100%; height:340px; margin-bottom:10px;"></div>
   <p class="note" id="chartHint" style="display:none;">Projected savings balance from retirement, updating live as you edit. Purchase deposits are drawn from instant-access savings on their month (marked &#9660;); with &ldquo;savings fund bills&rdquo; off, an unaffordable purchase is skipped and flagged in the table below.</p>
 
@@ -461,14 +477,50 @@
     return { totals, depAnnot, bad };
   }
 
+  // ---- Year-range zoom for the savings chart (two single sliders; reliable on iPad Safari) ----
+  let zoomSig = null;
+  function setupZoom(sy, ey) {
+    const bar = document.getElementById('zoomBar'), zf = document.getElementById('zFrom'), zt = document.getElementById('zTo');
+    if (!bar || !zf || !zt) return;
+    if (ey <= sy) { bar.style.display = 'none'; return; }      // single year -> nothing to zoom
+    const sig = sy + ':' + ey;
+    if (zoomSig !== sig) {                                     // span changed -> (re)init to full range
+      zoomSig = sig;
+      zf.min = sy; zf.max = ey; zf.value = sy;
+      zt.min = sy; zt.max = ey; zt.value = ey;
+    }
+    bar.style.display = 'flex';
+    syncZoomLabels();
+  }
+  function syncZoomLabels() {
+    const zf = document.getElementById('zFrom'), zt = document.getElementById('zTo');
+    if (zf) document.getElementById('zFromV').textContent = zf.value;
+    if (zt) document.getElementById('zToV').textContent = zt.value;
+  }
+  function zoomWindow(sy, ey) {
+    const bar = document.getElementById('zoomBar'), zf = document.getElementById('zFrom'), zt = document.getElementById('zTo');
+    if (!bar || bar.style.display === 'none' || !zf || !zt) return [sy, ey];
+    let lo = Number(zf.value), hi = Number(zt.value);
+    if (lo > hi) { const t = lo; lo = hi; hi = t; }
+    return [Math.max(sy, lo), Math.min(ey, hi)];
+  }
+  function onZoomFrom() { const zf = document.getElementById('zFrom'), zt = document.getElementById('zTo'); if (Number(zf.value) > Number(zt.value)) zt.value = zf.value; syncZoomLabels(); scheduleChart(); }
+  function onZoomTo() { const zf = document.getElementById('zFrom'), zt = document.getElementById('zTo'); if (Number(zt.value) < Number(zf.value)) zf.value = zt.value; syncZoomLabels(); scheduleChart(); }
+  function zoomReset() { const zf = document.getElementById('zFrom'), zt = document.getElementById('zTo'); zf.value = zf.min; zt.value = zt.max; syncZoomLabels(); scheduleChart(); }
+
   function drawCashChart() {
     const box = document.getElementById('cashChart'), hint = document.getElementById('chartHint');
     if (!chartsReady) return;
     if (!retireDate || endMonthIdx == null || !accounts.length) {
-      box.style.display = 'none'; hint.style.display = 'none'; return;
+      box.style.display = 'none'; hint.style.display = 'none';
+      const zb = document.getElementById('zoomBar'); if (zb) zb.style.display = 'none';
+      return;
     }
     box.style.display = ''; hint.style.display = '';
     const startIdx = retireDate.getFullYear()*12 + retireDate.getMonth();
+    const startYear = Math.floor(startIdx/12), endYear = Math.floor(endMonthIdx/12);
+    setupZoom(startYear, endYear);
+    const win = zoomWindow(startYear, endYear);
     const sim = simulateSavings();
 
     const dt = new google.visualization.DataTable();
@@ -477,18 +529,21 @@
     dt.addColumn({ type:'string', role:'annotation' });
     dt.addColumn({ type:'string', role:'annotationText' });
 
+    let shown = 0;
     for (let idx = startIdx; idx <= endMonthIdx; idx++) {
+      const yr = Math.floor(idx/12);
+      if (yr < win[0] || yr > win[1]) continue;
       const total = sim.totals[idx] || 0;
       const dep = sim.depAnnot[idx];
-      const yr = Math.floor(idx/12), mo = idx%12;
-      const label = MONTHS[mo] + ' ' + yr;
+      const label = MONTHS[idx%12] + ' ' + yr;
       const note = dep ? '▼' : null;
       const noteText = dep ? (dep.names.join(', ') + ' — deposit ' + fmt(dep.amount)) : null;
       dt.addRow([label, Math.round(total), note, noteText]);
+      shown++;
     }
 
     const phone = window.innerWidth <= 600;
-    const months = endMonthIdx - startIdx + 1;
+    const months = Math.max(1, shown);
     new google.visualization.LineChart(box).draw(dt, {
       title: 'Projected total savings balance (all accounts)',
       legend: { position:'none' }, curveType:'function', lineWidth:3, colors:['#2c7a7b'],
