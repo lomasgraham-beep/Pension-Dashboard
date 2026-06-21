@@ -189,6 +189,15 @@
     #mssBlock .mss-control input[type=range] { margin:0; width:100%; }
     #mssBlock .mss-control label.switch { margin:0; }
 
+    /* Optimiser panels: side by side on wide screens, stacked below 820px */
+    .opt-pair { display:block; margin:0 0 14px; }
+    .opt-pair > .params { margin:0; }
+    .opt-pair > .params + .params { margin-top:14px; }
+    @media (min-width: 820px) {
+      .opt-pair { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
+      .opt-pair > .params + .params { margin-top:0; }
+    }
+
     .params .actions { margin-top:18px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
     .params .pbtn { padding:13px 22px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:15px; color:#fff; }
     .pbtn-save { background:#27ae60; } .pbtn-save:hover { background:#219150; }
@@ -360,6 +369,7 @@
   <div id="Crashes" class="tabcontent"><iframe id="frame-Crashes" class="app-frame" title="Market Crashes"></iframe></div>
 
   <div id="Modelling" class="tabcontent">
+    <div class="opt-pair">
     <div class="params" id="mssBlock">
       <h3 style="margin:0 0 12px; color:var(--ink); font-size:16px;">Maximum sustainable spend</h3>
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 18px; align-items:start;">
@@ -387,7 +397,7 @@
       <div id="mss_result" style="margin-top:10px;"></div>
     </div>
     <div class="params" id="eraBlock">
-      <h3 style="margin:0 0 12px; color:var(--ink); font-size:16px;">Earliest retirement age</h3>
+      <h3 style="margin:0 0 12px; color:var(--ink); font-size:16px;">Earliest retirement age<button type="button" class="info-btn" onclick="toggleInfo(event,'era_info')" aria-label="About earliest retirement age">i</button></h3>
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 18px; align-items:start;">
         <div class="ctrl">
           <label class="switch">Nest-egg floor at state pension <span id="era_floor_v" class="sv">&pound;0</span></label>
@@ -402,8 +412,9 @@
         <button class="pbtn pbtn-mss" onclick="findEarliest()">Find my earliest retirement age</button>
         <span class="msg" id="era_msg"></span>
       </div>
-      <div class="hint" style="margin-top:6px;">The earliest date you can fully retire while the DC pot&rsquo;s lowest point anywhere in retirement stays at or above your nest-egg floor (and the essentials are always covered). <strong>Combine retirement</strong> on: both of you retire on the found date &mdash; the earliest you can stop work together. Off: only your date moves and Julie stays on her saved plan. Set the floor to the reserve you want kept available throughout &mdash; for the 80s/90s or a large purchase. Searched across the retirement slider&rsquo;s range using your current growth, spend and ratio settings.</div>
+      <div class="info-text" id="era_info">The earliest date you can fully retire while the DC pot&rsquo;s lowest point anywhere in retirement stays at or above your nest-egg floor (and the essentials are always covered). <strong>Combine retirement</strong> on: both of you retire on the found date &mdash; the earliest you can stop work together. Off: only your date moves and Julie stays on her saved plan. Set the floor to the reserve you want kept available throughout &mdash; for the 80s/90s or a large purchase. Searched across the retirement slider&rsquo;s range using your current growth, spend and ratio settings.</div>
       <div id="era_result" style="margin-top:10px;"></div>
+    </div>
     </div>
     <div class="model-layout">
     <div class="rail-slot" id="railSlot-Modelling"></div><div class="rail-strip" onclick="expandRail()" title="Show controls"><span>Controls &#9654;</span></div>
@@ -564,7 +575,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-213</span>
+    <span class="build-stamp">build: LC-214</span>
   </div>
 
   <script>
