@@ -73,7 +73,7 @@
     .chart-fs-btn { position:absolute; top:8px; right:8px; z-index:6; display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; padding:0; border:1px solid var(--line-strong); border-radius:8px; background:var(--surface); color:var(--ink-soft); cursor:pointer; opacity:0.8; box-shadow:var(--shadow); }
     .chart-fs-btn:hover { opacity:1; color:var(--accent); border-color:var(--accent-border); }
     .chart-wrap.fs { position:fixed; inset:0; z-index:10000; margin:0; padding:12px 12px 16px; background:var(--surface); overflow:auto; }
-    .chart-wrap.fs .chart-box { height:calc(100vh - 52px); margin:0; }
+    .chart-wrap.fs .chart-box { height:calc(var(--fs-h, 100vh) - 28px); margin:0; }
     .chart-wrap.fs .chart-fs-btn { position:fixed; top:14px; right:18px; width:44px; height:44px; opacity:1; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
     .toggle-switch { appearance:none; -webkit-appearance:none; width:48px; height:28px; background:#cbd5e1; border-radius:999px; position:relative; cursor:pointer; outline:none; transition:background 0.2s; flex:none; vertical-align:middle; }
@@ -553,7 +553,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-210</span>
+    <span class="build-stamp">build: LC-211</span>
   </div>
 
   <script>
@@ -687,6 +687,7 @@
       wrap.classList.add('fs');
       fsWrap = wrap;
       document.body.style.overflow = 'hidden';
+      wrap.style.setProperty('--fs-h', window.innerHeight + 'px');   // real visible height (iOS-safe)
       btn.innerHTML = FS_CLOSE_SVG; btn.title = 'Exit full screen'; btn.setAttribute('aria-label', 'Exit full screen');
       // redraw after the overlay has taken its full size so Google Charts measures it
       requestAnimationFrame(() => { if (chartsReady) drawCharts(); });
@@ -703,6 +704,14 @@
     }
 
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && fsWrap) closeChartFs(); });
+    // keep a full-screen chart fitted to the visible viewport on rotate / toolbar show-hide
+    let __fsResizeT;
+    window.addEventListener('resize', () => {
+      if (!fsWrap) return;
+      fsWrap.style.setProperty('--fs-h', window.innerHeight + 'px');
+      clearTimeout(__fsResizeT);
+      __fsResizeT = setTimeout(() => { if (chartsReady && fsWrap) drawCharts(); }, 150);
+    });
 
     google.charts.load('current', { packages: ['corechart'] });
     google.charts.setOnLoadCallback(() => { chartsReady = true; initChartFsButtons(); if (drawdownRows.length) drawCharts(); });
@@ -1650,7 +1659,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=kpifs1';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=kpifs2';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html' };
     function sizeFrame(f) {
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }

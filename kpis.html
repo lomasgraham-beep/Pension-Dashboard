@@ -25,7 +25,7 @@
   .chart-fs-btn { position:absolute; top:8px; right:8px; z-index:6; display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; padding:0; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#64748b; cursor:pointer; opacity:0.85; box-shadow:0 1px 3px rgba(0,0,0,0.12); }
   .chart-fs-btn:hover { opacity:1; color:#2c3e50; border-color:#94a3b8; }
   .chart-wrap.fs { position:fixed; inset:0; z-index:10000; margin:0; padding:12px 12px 16px; background:#fff; overflow:auto; flex:none; min-width:0; }
-  .chart-wrap.fs .chart-box { height:calc(100vh - 52px) !important; width:100%; }
+  .chart-wrap.fs .chart-box { height:calc(var(--fs-h, 100vh) - 28px) !important; width:100%; }
   .chart-wrap.fs .chart-fs-btn { position:fixed; top:14px; right:18px; width:44px; height:44px; opacity:1; }
   table { width:auto; border-collapse:collapse; font-size:14px; }
   th,td { padding:9px 16px 9px 10px; border-bottom:1px solid #e2e8f0; text-align:right; }
@@ -92,7 +92,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr6)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr7)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
     <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span> expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
@@ -143,6 +143,7 @@
     wrap.classList.add('fs');
     fsWrap = wrap;
     document.body.style.overflow = 'hidden';
+    wrap.style.setProperty('--fs-h', window.innerHeight + 'px');   // real visible height (iOS-safe)
     btn.innerHTML = FS_CLOSE_SVG; btn.title = 'Exit full screen'; btn.setAttribute('aria-label', 'Exit full screen');
     requestAnimationFrame(() => { if (chartsReady) drawCharts(); });
   }
@@ -156,6 +157,14 @@
     requestAnimationFrame(() => { if (chartsReady) drawCharts(); });
   }
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && fsWrap) closeChartFs(); });
+  // keep a full-screen chart fitted to the visible viewport on rotate / toolbar show-hide
+  let __fsResizeT;
+  window.addEventListener('resize', () => {
+    if (!fsWrap) return;
+    fsWrap.style.setProperty('--fs-h', window.innerHeight + 'px');
+    clearTimeout(__fsResizeT);
+    __fsResizeT = setTimeout(() => { if (chartsReady && fsWrap) drawCharts(); }, 150);
+  });
 
   // Expected working-days for a log, taken from the working TIERS (bd_working_tiers) — the
   // live source the contribution rows are keyed to — not the legacy shorter-week params.
