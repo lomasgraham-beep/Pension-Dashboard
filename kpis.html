@@ -20,7 +20,13 @@
   .filter-bar label { display:block; font-size:12px; color:#64748b; font-weight:bold; margin-bottom:4px; }
   .filter-bar select { padding:8px; border:1px solid #ccc; border-radius:6px; font-size:14px; }
   .charts { display:flex; gap:20px; flex-wrap:wrap; margin-bottom:25px; }
-  .chart-box { flex:1; min-width:380px; height:350px; }
+  .chart-wrap { position:relative; flex:1; min-width:380px; }
+  .chart-box { width:100%; height:350px; }
+  .chart-fs-btn { position:absolute; top:8px; right:8px; z-index:6; display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; padding:0; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#64748b; cursor:pointer; opacity:0.85; box-shadow:0 1px 3px rgba(0,0,0,0.12); }
+  .chart-fs-btn:hover { opacity:1; color:#2c3e50; border-color:#94a3b8; }
+  .chart-wrap.fs { position:fixed; inset:0; z-index:10000; margin:0; padding:12px 12px 16px; background:#fff; overflow:auto; flex:none; min-width:0; }
+  .chart-wrap.fs .chart-box { height:calc(100vh - 52px) !important; width:100%; }
+  .chart-wrap.fs .chart-fs-btn { position:fixed; top:14px; right:18px; width:44px; height:44px; opacity:1; }
   table { width:auto; border-collapse:collapse; font-size:14px; }
   th,td { padding:9px 16px 9px 10px; border-bottom:1px solid #e2e8f0; text-align:right; }
   th { white-space:normal; text-align:center; vertical-align:bottom; line-height:1.2; max-width:90px; }
@@ -86,17 +92,17 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr5)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr6)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
     <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span> expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
     <div class="card" id="kpiCardP2"><h3><span class="nm-p2">Julie</span> expected monthly growth</h3><div id="kpiJ" class="value">£0</div></div>
   </div>
   <div class="filter-bar">
-    <div><label>Isolate by member</label><select id="fMember" onchange="updatePensionFilter()"><option value="All">All Members</option></select></div>
-    <div><label>Isolate by pension</label><select id="fPension" onchange="drawCharts()"><option value="All">All Pensions</option></select></div>
+    <div><label>Filter Member</label><select id="fMember" onchange="updatePensionFilter()"><option value="All">All Members</option></select></div>
+    <div><label>Filter Pension</label><select id="fPension" onchange="drawCharts()"><option value="All">All Pensions</option></select></div>
   </div>
-  <div class="charts"><div id="chartValue" class="chart-box"></div><div id="chartGrowth" class="chart-box"></div></div>
+  <div class="charts"><div class="chart-wrap"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="chartValue" class="chart-box"></div></div><div class="chart-wrap"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="chartGrowth" class="chart-box"></div></div></div>
   <div style="display:flex; align-items:center; gap:8px; margin:4px 0 8px;">
     <span style="font-size:12px; color:#64748b; font-weight:bold;">Accumulated growth unit</span>
     <span id="cumToggle" style="display:inline-flex; border:1px solid #cbd5e1; border-radius:6px; overflow:hidden;">
@@ -104,7 +110,7 @@
       <button type="button" id="cumPctBtn" onclick="setCumMode('pct')" style="border:none; padding:6px 16px; font-size:14px; cursor:pointer; background:transparent; color:#64748b;">%</button>
     </span>
   </div>
-  <div class="charts"><div id="chartCumGrowth" class="chart-box" style="min-width:100%; height:380px;"></div></div>
+  <div class="charts"><div class="chart-wrap" style="min-width:100%;"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="chartCumGrowth" class="chart-box" style="height:380px;"></div></div></div>
   <table id="kpiTable">
     <thead><tr><th>Member</th><th>Pension</th><th>Current Value</th><th>Latest Monthly Growth</th><th>Expected (Median)</th><th>Avg Monthly £</th><th>Median Monthly %</th></tr></thead>
     <tbody><tr><td colspan="7">Crunching…</td></tr></tbody>
@@ -119,7 +125,37 @@
   let chartsReady = false;
   let cumMode = 'gbp';   // accumulated-growth chart unit: 'gbp' (£) or 'pct' (% of starting value)
   google.charts.load('current', { packages:['corechart'] });
-  google.charts.setOnLoadCallback(() => { chartsReady = true; if (allLogs.length) drawCharts(); });
+  google.charts.setOnLoadCallback(() => { chartsReady = true; initChartFsButtons(); if (allLogs.length) drawCharts(); });
+
+  // ---- Chart full-screen (one chart at a time, via a fixed CSS overlay) ----
+  // Inline SVGs so the icon never depends on a font glyph rendering on iPad Safari.
+  const FS_EXPAND_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
+  const FS_CLOSE_SVG  = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+  let fsWrap = null;   // the chart-wrap currently full-screen, or null
+
+  function initChartFsButtons() {
+    document.querySelectorAll('.chart-fs-btn').forEach(b => { if (!b.innerHTML.trim()) b.innerHTML = FS_EXPAND_SVG; });
+  }
+  function toggleChartFs(btn) {
+    const wrap = btn.closest('.chart-wrap'); if (!wrap) return;
+    if (wrap.classList.contains('fs')) { closeChartFs(); return; }
+    if (fsWrap && fsWrap !== wrap) closeChartFs();   // only one at a time
+    wrap.classList.add('fs');
+    fsWrap = wrap;
+    document.body.style.overflow = 'hidden';
+    btn.innerHTML = FS_CLOSE_SVG; btn.title = 'Exit full screen'; btn.setAttribute('aria-label', 'Exit full screen');
+    requestAnimationFrame(() => { if (chartsReady) drawCharts(); });
+  }
+  function closeChartFs() {
+    if (!fsWrap) return;
+    const wrap = fsWrap, btn = fsWrap.querySelector('.chart-fs-btn');
+    wrap.classList.remove('fs');
+    fsWrap = null;
+    document.body.style.overflow = '';
+    if (btn) { btn.innerHTML = FS_EXPAND_SVG; btn.title = 'Full screen'; btn.setAttribute('aria-label', 'Full screen'); }
+    requestAnimationFrame(() => { if (chartsReady) drawCharts(); });
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && fsWrap) closeChartFs(); });
 
   // Expected working-days for a log, taken from the working TIERS (bd_working_tiers) — the
   // live source the contribution rows are keyed to — not the legacy shorter-week params.
