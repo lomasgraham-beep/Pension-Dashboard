@@ -114,7 +114,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v13)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v14)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
 
   <div class="savb-bar">
@@ -131,7 +131,7 @@
   </div>
 
   <div id="cashChart" style="width:100%; height:340px; margin-bottom:10px;"></div>
-  <p class="note" id="chartHint" style="display:none;">Projected balance from retirement, updated when you reload after saving. Deposit months are marked.</p>
+  <p class="note" id="chartHint" style="display:none;">Projected savings balance from retirement, updating live as you edit. Purchase deposits are drawn from instant-access savings on their month (marked &#9660;); with &ldquo;savings fund bills&rdquo; off, an unaffordable purchase is skipped and flagged in the table below.</p>
 
   <h3>Savings Accounts <button class="btn btn-add" style="font-size:13px; padding:8px 14px; margin-left:8px;" onclick="addAcct()">+ Add account</button></h3>
   <p class="note">Each account belongs to a member. <strong>Instant access</strong> accounts can be drawn on to cover living costs (the cap feature) and purchase deposits; non-instant accounts (e.g. fixed-term ISAs) still grow but can't be tapped. Interest can compound monthly, pay annually, or only at the end of the term.</p>
@@ -193,32 +193,10 @@
   }
   function toggleSavb() { const n = document.getElementById('savbNote'); if (n) n.classList.toggle('show'); }
 
-  // Set of purchase indices whose deposit can't be met from instant-access savings at their month.
-  // Only populated when "Savings fund bills" is OFF (when ON, the pension backstops the deposit).
-  // Conservative approximation: ignores surplus-salary top-ups the full model adds in retirement.
-  function computeUnaffordable() {
-    const bad = new Set();
-    if (savFundBills || !retireDate || endMonthIdx == null) return bad;
-    const startIdx = retireDate.getFullYear()*12 + retireDate.getMonth();
-    const inst = accounts.filter(a => a.instant_access !== false);
-    const dateIdx = p => { const d = p.purchase_date ? new Date(p.purchase_date) : null; return d ? (d.getFullYear()*12 + d.getMonth()) : null; };
-    if (!inst.length) {
-      purchases.forEach((p, i) => { const ix = dateIdx(p); if (ix != null && ix >= startIdx && ix <= endMonthIdx && num(p.deposit) > 0) bad.add(i); });
-      return bad;
-    }
-    const proj = inst.map(a => projectAccount(a, startIdx, endMonthIdx));
-    const order = purchases.map((p, i) => { const ix = dateIdx(p); return ix == null ? null : { i, idx: ix, deposit: num(p.deposit) }; })
-      .filter(Boolean).sort((a, b) => a.idx - b.idx);
-    let spent = 0;   // deposits already committed by earlier affordable purchases
-    for (const o of order) {
-      if (o.idx < startIdx || o.idx > endMonthIdx) continue;
-      let avail = 0; proj.forEach(m => { avail += (m[o.idx] || 0); });
-      avail -= spent;
-      if (avail + 1e-6 < o.deposit) bad.add(o.i);
-      else spent += o.deposit;
-    }
-    return bad;
-  }
+  // Indices of purchases that can't be funded from instant-access savings at their month.
+  // Shares one simulation with the chart, so the line and the row flags can never disagree.
+  // Empty when "Savings fund bills" is ON (the pension backstops the deposit).
+  function computeUnaffordable() { return simulateSavings().bad; }
 
   // Live update of the per-row warning without re-rendering (keeps input focus while typing).
   function refreshAfford() {
@@ -263,7 +241,9 @@
     const bad = computeUnaffordable();
     tbody.innerHTML = purchases.length ? purchases.map((p, i) => rowHtml(p, i, bad)).join('') : '<tr><td colspan="8">No purchases. Use \u201cAdd purchase\u201d.</td></tr>';
   }
-  function mark() { syncDom(); setDirty(); refreshAfford(); }
+  let __chartT = null;
+  function scheduleChart() { clearTimeout(__chartT); __chartT = setTimeout(drawCashChart, 250); }
+  function mark() { syncDom(); setDirty(); refreshAfford(); scheduleChart(); }
   function rowCalc(el) {
     const tr = el.closest('tr');
     const pay = monthlyPayment(tr.querySelector('.f-total').value, tr.querySelector('.f-deposit').value, tr.querySelector('.f-apr').value, tr.querySelector('.f-term').value);
@@ -284,13 +264,13 @@
   function addRow() {
     syncDom();
     purchases.push({ id: undefined, purchase_name: '', purchase_date: null, total_cost: 0, deposit: 0, apr: 0, term_months: 0 });
-    render(); setDirty();
+    render(); setDirty(); scheduleChart();
   }
   function delRow(btn) {
     syncDom();
     const tr = btn.closest('tr'); const i = Number(tr.dataset.i); const p = purchases[i];
     if (p && p.id != null) deleted.push(p.id);
-    purchases.splice(i, 1); render(); setDirty();
+    purchases.splice(i, 1); render(); setDirty(); scheduleChart();
   }
 
   // ---- Savings accounts ----
@@ -317,7 +297,7 @@
   function renderAccts() {
     acctBody.innerHTML = accounts.length ? accounts.map(acctRowHtml).join('') : '<tr><td colspan="13">No savings accounts. Use \u201cAdd account\u201d.</td></tr>';
   }
-  function markAcct() { syncAccts(); setDirty(); refreshAfford(); }
+  function markAcct() { syncAccts(); setDirty(); refreshAfford(); scheduleChart(); }
   function syncAccts() {
     acctBody.querySelectorAll('tr[data-i]').forEach(tr => {
       const i = Number(tr.dataset.i); if (!accounts[i]) return;
@@ -338,13 +318,13 @@
   function addAcct() {
     syncAccts();
     accounts.push({ id: undefined, account_name: '', member_name: members[0] || '', start_balance: 0, monthly_amount: 0, contribution_growth_rate: 0, savings_cap: 0, start_date: null, end_date: null, apr: 0, interest_frequency: 'monthly', interest_type: 'compound', instant_access: true });
-    renderAccts(); setDirty();
+    renderAccts(); setDirty(); scheduleChart();
   }
   function delAcct(btn) {
     syncAccts();
     const tr = btn.closest('tr'); const i = Number(tr.dataset.i); const a = accounts[i];
     if (a && a.id != null) deletedAccts.push(a.id);
-    accounts.splice(i, 1); renderAccts(); setDirty();
+    accounts.splice(i, 1); renderAccts(); setDirty(); scheduleChart();
   }
 
   async function saveAll() {
@@ -408,41 +388,77 @@
   google.charts.load('current', { packages:['corechart'] });
   google.charts.setOnLoadCallback(() => { chartsReady = true; drawCashChart(); });
 
-  // project one account's balance to a map of monthIdx -> balance, honouring dates/frequency/type
-  function projectAccount(a, startIdx, endMonthIdx) {
-    const out = {};
-    const aprM = num(a.apr) / 100 / 12;
-    const aprA = num(a.apr) / 100;
-    const monthlyAmt = num(a.monthly_amount);
-    const contribGrowth = num(a.contribution_growth_rate);   // already decimal in DB; editor stores decimal
-    const cgr = contribGrowth > 1 ? contribGrowth / 100 : contribGrowth;  // tolerate either
-    const cStart = a.start_date ? (new Date(a.start_date).getFullYear()*12 + new Date(a.start_date).getMonth()) : startIdx;
-    const cEnd = a.end_date ? (new Date(a.end_date).getFullYear()*12 + new Date(a.end_date).getMonth()) : endMonthIdx;
-    const freq = a.interest_frequency || 'monthly';
-    const simple = (a.interest_type === 'simple');
-    let bal = num(a.start_balance);
-    let accruedSimple = 0;                 // simple interest accrues on principal, paid per frequency
-    let principalBase = bal;               // for simple interest
+  // One month-by-month simulation of all savings accounts that also DRAWS purchase deposits from
+  // instant-access savings at their month, honouring the "Savings fund bills" switch. Returns
+  //   { totals:{idx->balance}, depAnnot:{idx->{amount,names}}, bad:Set(purchaseArrayIndex) }
+  // ON  : the month's deposits are drawn up to what instant savings can cover (rest is pension).
+  // OFF : each purchase is fully funded from savings or it's SKIPPED (and flagged unaffordable).
+  // Conservative approximation: ignores surplus-salary top-ups the full model adds in retirement.
+  function simulateSavings() {
+    const totals = {}, depAnnot = {}, bad = new Set();
+    if (!retireDate || endMonthIdx == null) return { totals, depAnnot, bad };
+    const startIdx = retireDate.getFullYear()*12 + retireDate.getMonth();
+    const accts = accounts.map(a => {
+      const cgr0 = num(a.contribution_growth_rate);
+      return {
+        instant: (a.instant_access !== false),
+        bal: num(a.start_balance), monthly: num(a.monthly_amount),
+        cgr: cgr0 > 1 ? cgr0 / 100 : cgr0,
+        aprM: num(a.apr)/100/12, aprA: num(a.apr)/100,
+        freq: a.interest_frequency || 'monthly', simple: (a.interest_type === 'simple'),
+        cStart: a.start_date ? (new Date(a.start_date).getFullYear()*12 + new Date(a.start_date).getMonth()) : startIdx,
+        cEnd: a.end_date ? (new Date(a.end_date).getFullYear()*12 + new Date(a.end_date).getMonth()) : endMonthIdx,
+        accruedSimple: 0, principalBase: num(a.start_balance)
+      };
+    });
+    const purByIdx = {};
+    purchases.forEach((p, i) => {
+      const d = p.purchase_date ? new Date(p.purchase_date) : null;
+      if (!d) return;
+      const ix = d.getFullYear()*12 + d.getMonth();
+      (purByIdx[ix] = purByIdx[ix] || []).push({ i, deposit: num(p.deposit), name: p.purchase_name || 'Purchase' });
+    });
+    const instTotal = () => accts.reduce((s, a) => s + (a.instant ? a.bal : 0), 0);
+    const drawInstant = amt => {
+      const avail = instTotal(), take = Math.min(amt, avail);
+      if (take > 0 && avail > 0) for (const a of accts) if (a.instant && a.bal > 0) a.bal -= take * (a.bal / avail);
+      return take;
+    };
     for (let idx = startIdx; idx <= endMonthIdx; idx++) {
-      // contribution first (within contribution window)
-      if (idx >= cStart && idx <= cEnd && monthlyAmt) {
-        const yrsIn = Math.floor((idx - startIdx) / 12);
-        bal += monthlyAmt * Math.pow(1 + cgr, yrsIn);
-        principalBase += monthlyAmt * Math.pow(1 + cgr, yrsIn);
+      for (const a of accts) {
+        if (idx >= a.cStart && idx <= a.cEnd && a.monthly) {
+          const add = a.monthly * Math.pow(1 + a.cgr, Math.floor((idx - startIdx) / 12));
+          a.bal += add; a.principalBase += add;
+        }
+        if (a.simple) {
+          a.accruedSimple += a.principalBase * a.aprM;
+          const payNow = (a.freq === 'monthly') || (a.freq === 'annually' && (idx - startIdx + 1) % 12 === 0) || (a.freq === 'end_of_term' && idx === a.cEnd);
+          if (payNow) { a.bal += a.accruedSimple; a.accruedSimple = 0; }
+        } else {
+          if (a.freq === 'monthly') a.bal *= (1 + a.aprM);
+          else if (a.freq === 'annually' && (idx - startIdx + 1) % 12 === 0) a.bal *= (1 + a.aprA);
+          else if (a.freq === 'end_of_term' && idx === a.cEnd) { const yrs = Math.max(0, (a.cEnd - a.cStart + 1) / 12); a.bal *= Math.pow(1 + a.aprA, yrs); }
+        }
       }
-      // interest
-      if (simple) {
-        accruedSimple += principalBase * aprM;          // accrue monthly on principal
-        const payNow = (freq === 'monthly') || (freq === 'annually' && (idx - startIdx + 1) % 12 === 0) || (freq === 'end_of_term' && idx === cEnd);
-        if (payNow) { bal += accruedSimple; accruedSimple = 0; }
-      } else {
-        if (freq === 'monthly') bal *= (1 + aprM);
-        else if (freq === 'annually' && (idx - startIdx + 1) % 12 === 0) bal *= (1 + aprA);
-        else if (freq === 'end_of_term' && idx === cEnd) { const yrs = Math.max(0, (cEnd - cStart + 1) / 12); bal *= Math.pow(1 + aprA, yrs); }
+      const ps = purByIdx[idx];
+      if (ps && ps.length) {
+        const names = []; let applied = 0;
+        if (savFundBills) {
+          const D = ps.reduce((s, p) => s + p.deposit, 0);
+          drawInstant(D);
+          ps.forEach(p => { if (p.deposit > 0) names.push(p.name); });
+          applied = D;
+        } else {
+          for (const p of ps) {
+            if (instTotal() + 1e-6 >= p.deposit) { drawInstant(p.deposit); applied += p.deposit; if (p.deposit > 0) names.push(p.name); }
+            else bad.add(p.i);
+          }
+        }
+        if (applied > 0) depAnnot[idx] = { amount: applied, names: names };
       }
-      out[idx] = bal;
+      totals[idx] = accts.reduce((s, a) => s + a.bal, 0);
     }
-    return out;
+    return { totals, depAnnot, bad };
   }
 
   function drawCashChart() {
@@ -453,13 +469,7 @@
     }
     box.style.display = ''; hint.style.display = '';
     const startIdx = retireDate.getFullYear()*12 + retireDate.getMonth();
-    const deps = purchases.map(p => {
-      const d = p.purchase_date ? new Date(p.purchase_date) : null;
-      return d ? { idx: d.getFullYear()*12 + d.getMonth(), deposit: num(p.deposit), name: (p.purchase_name||'Purchase') } : null;
-    }).filter(Boolean);
-
-    // sum all accounts' projected balances per month (single total line for now; stacked bar is the next step)
-    const perAcct = accounts.map(a => projectAccount(a, startIdx, endMonthIdx));
+    const sim = simulateSavings();
 
     const dt = new google.visualization.DataTable();
     dt.addColumn('string','Month');
@@ -468,13 +478,12 @@
     dt.addColumn({ type:'string', role:'annotationText' });
 
     for (let idx = startIdx; idx <= endMonthIdx; idx++) {
-      let total = 0; perAcct.forEach(m => { total += (m[idx] || 0); });
-      let depThis = 0, names = [];
-      deps.forEach(d => { if (d.idx === idx) { depThis += d.deposit; names.push(d.name); } });
+      const total = sim.totals[idx] || 0;
+      const dep = sim.depAnnot[idx];
       const yr = Math.floor(idx/12), mo = idx%12;
       const label = MONTHS[mo] + ' ' + yr;
-      const note = depThis > 0 ? '▼' : null;
-      const noteText = depThis > 0 ? (names.join(', ') + ' — deposit ' + fmt(depThis)) : null;
+      const note = dep ? '▼' : null;
+      const noteText = dep ? (dep.names.join(', ') + ' — deposit ' + fmt(dep.amount)) : null;
       dt.addRow([label, Math.round(total), note, noteText]);
     }
 
