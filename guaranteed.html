@@ -76,8 +76,8 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading…</div>
-  <h2>Guaranteed Incomes</h2>
-  <p class="note">Edit guaranteed income streams. For <strong>State Pension</strong> rows, enter <strong>today's</strong> annual value — the model grows it forward to your claim date at 2.5%. Other pensions should hold their value at the start date.</p>
+  <h2>Guaranteed Incomes <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(build: esc1)</span></h2>
+  <p class="note">Edit guaranteed income streams. For <strong>State Pension</strong> rows, enter <strong>today's</strong> annual value — the model grows it forward to your claim date at the State Pension rate (set by the slider on the Modelling page). Other pensions hold their value at the start date and grow each year at the <strong>Escalation %/yr</strong> you set per row (0 = a flat, non-increasing pension).</p>
   <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">↺ Reload</button>
@@ -86,7 +86,7 @@
     <span class="msg" id="msg"></span>
   </div>
   <table id="tbl">
-    <thead><tr><th>Member</th><th>Income Name</th><th>Start Date</th><th>End Date</th><th>Today's Annual Value (£)</th><th>Inflation Linked</th><th></th></tr></thead>
+    <thead><tr><th>Member</th><th>Income Name</th><th>Start Date</th><th>End Date</th><th>Today's Annual Value (£)</th><th>Escalation %/yr</th><th></th></tr></thead>
     <tbody><tr><td colspan="7">Loading…</td></tr></tbody>
   </table>
 
@@ -132,13 +132,18 @@
       <td><input type="date" class="f-start" value="${r.start_date?String(r.start_date).split('T')[0]:''}" onchange="mark()"></td>
       <td><input type="date" class="f-end" value="${r.end_date?String(r.end_date).split('T')[0]:''}" onchange="mark()"></td>
       <td><input type="number" class="f-value val-input" step="0.01" value="${r.initial_annual_value!=null?r.initial_annual_value:0}" oninput="mark()"></td>
-      <td><input type="checkbox" class="f-infl" ${r.inflation_linked?'checked':''} onchange="mark()" style="width:auto;"></td>
+      <td><input type="number" class="f-esc" step="0.1" min="0" value="${r.escalation_pct!=null ? +(Number(r.escalation_pct)*100).toFixed(2) : 2.5}" oninput="mark()" style="width:80px; display:${isState(r.income_name)?'none':'inline-block'}"><span class="hint-state f-esc-note" style="display:${isState(r.income_name)?'inline':'none'}">via State Pension slider</span></td>
       <td><button class="del" onclick="delRow(this)">Delete</button></td>
     </tr>`;
   }
   function render() { tbody.innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="7">No guaranteed incomes. Use “Add income”.</td></tr>'; }
   function mark() { setDirty(); }
-  function flagState(inp) { const span = inp.parentElement.querySelector('.hint-state'); if (span) span.style.display = isState(inp.value) ? 'inline' : 'none'; }
+  function flagState(inp) {
+    const tr = inp.closest('tr'); const st = isState(inp.value);
+    const span = inp.parentElement.querySelector('.hint-state'); if (span) span.style.display = st ? 'inline' : 'none';
+    const esc = tr.querySelector('.f-esc'); if (esc) esc.style.display = st ? 'none' : 'inline-block';
+    const note = tr.querySelector('.f-esc-note'); if (note) note.style.display = st ? 'inline' : 'none';
+  }
 
   function collect() {
     return [...tbody.querySelectorAll('tr[data-i]')].map(tr => {
@@ -151,14 +156,15 @@
         start_date: tr.querySelector('.f-start').value || null,
         end_date: tr.querySelector('.f-end').value || null,
         initial_annual_value: parseFloat(tr.querySelector('.f-value').value) || 0,
-        inflation_linked: tr.querySelector('.f-infl').checked
+        escalation_pct: (parseFloat(tr.querySelector('.f-esc').value) || 0) / 100,
+        inflation_linked: base.inflation_linked != null ? base.inflation_linked : true
       };
     });
   }
 
   function addRow() {
     const current = collect();
-    current.push({ id: undefined, member_name: members[0] || 'Graham', income_name: '', start_date: null, end_date: null, initial_annual_value: 0, inflation_linked: true });
+    current.push({ id: undefined, member_name: members[0] || 'Graham', income_name: '', start_date: null, end_date: null, initial_annual_value: 0, escalation_pct: 0.025, inflation_linked: true });
     rows = current; render(); setDirty();
   }
   function delRow(btn) {
@@ -174,7 +180,7 @@
     try {
       for (const id of deleted) await App.write('DELETE', 'bd_guaranteed_incomes?id=eq.' + id, undefined);
       for (const r of data) {
-        const payload = { member_name: r.member_name, income_name: r.income_name, start_date: r.start_date, end_date: r.end_date, initial_annual_value: r.initial_annual_value, inflation_linked: r.inflation_linked };
+        const payload = { member_name: r.member_name, income_name: r.income_name, start_date: r.start_date, end_date: r.end_date, initial_annual_value: r.initial_annual_value, escalation_pct: r.escalation_pct, inflation_linked: r.inflation_linked };
         if (r.id != null) await App.write('PATCH', 'bd_guaranteed_incomes?id=eq.' + r.id, payload);
         else await App.write('POST', 'bd_guaranteed_incomes', payload);
       }

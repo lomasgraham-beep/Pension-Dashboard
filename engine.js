@@ -415,8 +415,11 @@
           const monthly = (Number(g.initial_annual_value) || 0) / 12 * Math.pow(1 + sp.spRate, Math.floor(preRetireYears + elapsed));
           stateGross += monthly;
         } else {
-          // stored as value at retirement → grow only across whole years since retirement
-          const monthly = (Number(g.initial_annual_value) || 0) / 12 * Math.pow(1 + INFL, elapsedYrs);
+          // stored as value at retirement → grow across whole years since retirement at THIS
+          // income's own escalation rate (DB scheme rule); falls back to INFL (2.5%) if unset.
+          const escRaw = (g.escalation_pct != null) ? Number(g.escalation_pct) : INFL;
+          const escR = escRaw > 1 ? escRaw / 100 : escRaw;   // tolerate decimal or percent
+          const monthly = (Number(g.initial_annual_value) || 0) / 12 * Math.pow(1 + escR, elapsedYrs);
           otherGross += monthly;
         }
       });
