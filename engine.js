@@ -28,6 +28,7 @@
   function latestPots(data) {
     const map = {};
     (data.pensions || []).forEach(p => {
+      if (p.active === false) return;   // closed/consolidated pot — excluded from the seed
       let best = null;
       (data.logs || []).forEach(l => {
         if (l.member_name === p.member_name && l.pension_name === p.pension_name) {

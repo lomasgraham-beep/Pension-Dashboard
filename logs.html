@@ -113,7 +113,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
 
-  <h2>Log New Balances <span class="buildtag">build row8</span></h2>
+  <h2>Log New Balances <span class="buildtag">build active1</span></h2>
   <div class="entry-grid" id="entryGrid">
     <div class="form-group"><label>Whose accounts are you updating?</label><select id="logMember" onchange="renderInputs()"></select></div>
     <div class="form-group"><label>Date</label><div class="date-box"><input type="date" id="entryDate"></div></div>
@@ -175,7 +175,7 @@
     const grid = document.getElementById('entryGrid');
     grid.querySelectorAll('.pot-field, .pot-hint, .pot-msg').forEach(el => el.remove());
     const member = document.getElementById('logMember').value;
-    const pots = userPensions.filter(p => p.member_name === member && p.pension_type === 'Defined Contributions');
+    const pots = userPensions.filter(p => p.member_name === member && p.pension_type === 'Defined Contributions' && p.active !== false);
     if (!pots.length) { grid.insertAdjacentHTML('beforeend', '<p class="pot-msg">No DC pots found for ' + member + '.</p>'); return; }
     grid.insertAdjacentHTML('beforeend', pots.map(p => `
       <div class="pot-field">
