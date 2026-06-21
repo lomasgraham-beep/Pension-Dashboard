@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=auth01"></script>
-  <script src="engine.js?v=fNet1"></script>
+  <script src="engine.js?v=savb1"></script>
   <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
@@ -197,6 +197,13 @@
       .opt-pair { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
       .opt-pair > .params + .params { margin-top:0; }
     }
+    .opt-toggle { display:inline-flex; align-items:center; gap:8px; margin:0 0 14px; padding:10px 16px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); color:var(--ink); font-weight:bold; font-size:15px; cursor:pointer; }
+    .opt-toggle:hover { border-color:var(--accent-border); background:var(--accent-soft); }
+    .opt-caret { display:inline-block; font-size:11px; color:var(--accent); transition:transform .12s; }
+    .opt-toggle[aria-expanded="true"] .opt-caret { transform:rotate(90deg); }
+    .sw-pill { display:inline-flex; align-items:center; gap:8px; font-size:13px; padding:6px 12px; border:1px solid var(--line); border-radius:7px; background:var(--surface-2); color:var(--ink); }
+    .sw-pill b { font-weight:bold; }
+    .sw-on { color:var(--pos); } .sw-off { color:var(--warn); }
 
     .params .actions { margin-top:18px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
     .params .pbtn { padding:13px 22px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:15px; color:#fff; }
@@ -369,7 +376,8 @@
   <div id="Crashes" class="tabcontent"><iframe id="frame-Crashes" class="app-frame" title="Market Crashes"></iframe></div>
 
   <div id="Modelling" class="tabcontent">
-    <div class="opt-pair">
+    <button type="button" class="opt-toggle" id="optToggle" onclick="toggleOptPair()" aria-expanded="false"><span class="opt-caret" aria-hidden="true">&#9654;</span> Intelligent modelling</button>
+    <div class="opt-pair" id="optPair" style="display:none;">
     <div class="params" id="mssBlock">
       <h3 style="margin:0 0 12px; color:var(--ink); font-size:16px;">Maximum sustainable spend</h3>
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 18px; align-items:start;">
@@ -443,6 +451,11 @@
             <div class="hint">% of each taxable pot's value at retirement.</div>
           </div>
         </div>
+        <div class="ctrl ctrl-wide">
+          <label class="switch"><input type="checkbox" id="m_savebills" checked onchange="onParam()"><span class="track"></span><span class="switch-text">Savings fund bills</span>
+            <button type="button" class="info-btn" onclick="toggleInfo(event,'info_savb')" aria-label="What does Savings fund bills do?">i</button></label>
+          <div class="info-text" id="info_savb">On (default): savings can offset bills and the pension covers any purchase deposit your savings can&rsquo;t. Off: savings never subsidise bills and grow on their own &mdash; a purchase whose deposit your savings can&rsquo;t cover is flagged &ldquo;not enough savings&rdquo; on the Cash &amp; Purchases page instead of drawing the pension.</div>
+        </div>
       </div>
       <div class="actions">
         <button class="pbtn pbtn-save" onclick="savePlan()">Save as my plan</button>
@@ -492,6 +505,10 @@
     <div class="rail-slot" id="railSlot-Retirement"></div><div class="rail-strip" onclick="expandRail()" title="Show controls"><span>Controls &#9654;</span></div>
     <div class="model-main">
     <h2><span class="viewlabel">Joint</span> Retirement Drawdown</h2>
+    <div style="margin:0 0 12px;">
+      <span class="sw-pill">Savings fund bills: <b id="ret_savb_state">&hellip;</b><button type="button" class="info-btn" onclick="toggleInfo(event,'info_savb_ret')" aria-label="About Savings fund bills">i</button></span>
+      <div class="info-text" id="info_savb_ret">When off, savings don&rsquo;t subsidise bills and grow on their own; an unaffordable purchase is flagged on the Cash &amp; Purchases page rather than drawing the pension. Change this on the Modelling page, in the left-hand controls rail.</div>
+    </div>
     <div class="scope-toggle">
       <span class="scope-lbl">Show:</span>
       <div class="view-toggle">
@@ -575,7 +592,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-214</span>
+    <span class="build-stamp">build: LC-215</span>
   </div>
 
   <script>
@@ -1418,6 +1435,7 @@
         spendRed: parseFloat(document.getElementById('m_spend').value) / 100,
         gRatio: p2Name ? (parseFloat(document.getElementById('m_ratio').value) / 100) : 1,
         dynamic: document.getElementById('m_dynamic').checked,
+        savingsFundBills: document.getElementById('m_savebills').checked,
         gFloorPct: (parseFloat(document.getElementById('m_gfloor').value) || 0) / 100,
         jFloorPct: (parseFloat(document.getElementById('m_jfloor').value) || 0) / 100,
         spRate: parseFloat(document.getElementById('m_sprate').value) / 100,
@@ -1427,6 +1445,7 @@
     }
     function applyControls(plan) {
       document.getElementById('m_retire').value = dateToIdx(plan.retirementDate);
+      document.getElementById('m_savebills').checked = (plan.savingsFundBills !== false);
       document.getElementById('m_growth').value = (plan.growthRate * 100).toFixed(2);
       document.getElementById('m_spend').value = Math.round(plan.spendRed * 100);
       document.getElementById('m_ratio').value = Math.round(plan.gRatio * 100);
@@ -1451,6 +1470,17 @@
       syncTierLabels();
     }
     function toggleInfo(evt, id) { evt.preventDefault(); const el = document.getElementById(id); if (el) el.classList.toggle('show'); }
+    function toggleOptPair() {
+      const p = document.getElementById('optPair'), b = document.getElementById('optToggle');
+      const open = (p.style.display === 'none');
+      p.style.display = open ? '' : 'none';
+      b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    function updateSavbIndicator() {
+      const on = document.getElementById('m_savebills').checked;
+      const el = document.getElementById('ret_savb_state');
+      if (el) { el.textContent = on ? 'On' : 'Off'; el.className = on ? 'sw-on' : 'sw-off'; }
+    }
     function onParam() { applyDynamicMaxes(); syncLabels(); document.getElementById('m_floors').classList.toggle('show', document.getElementById('m_dynamic').checked); recomputeAll(); }
 
     // wire the segmented day buttons (delegated)
@@ -1472,6 +1502,7 @@
         pension_growth_rate: c.growthRate,
         spending_reduction_pct: c.spendRed,
         drawdown_ratio_graham: c.gRatio,
+        savings_fund_bills: c.savingsFundBills,
         updated_at: new Date().toISOString()
       };
       msg.style.color = '#1e3a8a'; msg.textContent = 'Saving…';
@@ -1510,6 +1541,7 @@
         retireByMember: plan.retireByMember || null,
         tierDateOverrides: plan.tierDateOverrides || null,
         dynamic: plan.dynamic, gFloorPct: plan.gFloorPct, jFloorPct: plan.jFloorPct,
+        savingsFundBills: plan.savingsFundBills,
         sp: sp
       };
     }
@@ -1520,6 +1552,7 @@
       livePots = lastDrawdownCfg.pots;
       drawdownRows = PensionEngine.drawdown(data, lastDrawdownCfg);
       updateEraFloorMax();
+      updateSavbIndicator();
       renderOverview();
       renderRetirementTable();
       if (chartsReady) drawCharts();
@@ -1681,7 +1714,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=kpifs3';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=savb1';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -1840,7 +1873,8 @@
           phase2Date: App.parseLocalDate(p.shorter_week_date_2), phase2Days: p.working_days_2 ? Number(p.working_days_2) : 5,
           p2phase: p2phase,
           spendRed: p.spending_reduction_pct != null ? Number(p.spending_reduction_pct) : 1.0,
-          gRatio: p.drawdown_ratio_graham != null ? Number(p.drawdown_ratio_graham) : 0.5
+          gRatio: p.drawdown_ratio_graham != null ? Number(p.drawdown_ratio_graham) : 0.5,
+          savingsFundBills: p.savings_fund_bills != null ? !!p.savings_fund_bills : true
         };
 
         // The browser engine is the single source of truth — no server RPC, no calibration.

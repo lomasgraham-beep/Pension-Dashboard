@@ -218,6 +218,11 @@
   // cfg: { pots:{graham,julie}, gRatio, spendRed, startYear, retirementDate, sp }
   function drawdown(data, cfg) {
     const gRatio = cfg.gRatio, spendRed = cfg.spendRed, jRatio = 1 - gRatio, sp = cfg.sp;
+    // When false, savings never subsidise bills and a purchase whose deposit can't be met from
+    // instant-access savings at its month is SKIPPED (not financed, never spills to drawdown).
+    // Default true preserves the original behaviour byte-for-byte.
+    const savingsFundBills = (cfg.savingsFundBills !== false);
+    const unaffordable = [];   // purchases skipped under savingsFundBills=false
     const members = data.members || [], bills = data.bills || [], dining = data.dining || [], guaranteed = data.guaranteed || [];
     // person 1 / person 2 derived from the members table, alphabetically by name.
     // Single-member instances leave p2 empty, so all j_* contributions are zero.
@@ -344,7 +349,7 @@
       const r = (Number(p.apr) || 0) / 100 / 12;
       let pay = 0;
       if (term > 0) pay = (r === 0) ? financed / term : financed * r / (1 - Math.pow(1 + r, -term));
-      return { name: p.purchase_name, pIdx: pIdx, deposit: deposit, pay: pay, term: term };
+      return { name: p.purchase_name, pIdx: pIdx, deposit: deposit, pay: pay, term: term, skipped: false };
     }).filter(p => p.pIdx != null);
 
     // ---- Market crashes (PruFund smoothed) ----
@@ -541,12 +546,31 @@
 
       // purchase deposits dated this month come from INSTANT-ACCESS accounts (proportionally);
       // shortfall spills to drawdown. finance payments for any purchase active this month.
+      // When savingsFundBills is false, each purchase's deposit must be fully met from instant
+      // savings at its month; if not, the purchase is SKIPPED (no deposit, no finance, no drawdown
+      // spill) and recorded as unaffordable.
       let depositThisMonth = 0, financeThisMonth = 0, depositShortfall = 0;
       for (const p of purchases) {
-        if (p.pIdx === idx) depositThisMonth += p.deposit;
-        if (idx >= p.pIdx && idx < p.pIdx + p.term) financeThisMonth += p.pay;
+        if (p.pIdx === idx) {
+          if (savingsFundBills) {
+            depositThisMonth += p.deposit;                 // ON: as before (shortfall spills below)
+          } else {
+            const availNow = instantCash();
+            if (availNow + 1e-6 >= p.deposit) {
+              // OFF & affordable: fund the deposit immediately from instant accounts (proportional)
+              if (p.deposit > 0 && availNow > 0) {
+                for (const a of savingsAccts) if (a.instant && a.bal > 0) a.bal -= p.deposit * (a.bal / availNow);
+              }
+              depositThisMonth += p.deposit;               // reported only; savings already reduced
+            } else {
+              p.skipped = true;                             // OFF & unaffordable: purchase does not happen
+              unaffordable.push({ name: p.name, idx: idx, deposit: p.deposit, available: availNow });
+            }
+          }
+        }
+        if (!p.skipped && idx >= p.pIdx && idx < p.pIdx + p.term) financeThisMonth += p.pay;
       }
-      if (depositThisMonth > 0) {
+      if (savingsFundBills && depositThisMonth > 0) {
         const avail = instantCash();
         const fromCash = Math.min(depositThisMonth, avail);
         // draw proportionally from instant-access accounts
@@ -566,7 +590,7 @@
       // Withheld contributions from instant-access accounts cover living costs, reducing drawdown
       // (capped so drawdown can't go below zero across the household).
       let capDrawFromSavings = 0;
-      if (capRedirectInstant > 0) {
+      if (savingsFundBills && capRedirectInstant > 0) {
         capDrawFromSavings = Math.min(capRedirectInstant, outM);
         outM -= capDrawFromSavings;
       }
@@ -697,7 +721,8 @@
     rows.monthly = monthlyRows;
     rows.savingsAccountList = savingsAccts.map(a => ({ name: a.name, member: a.member, instant: a.instant }));
     rows.crashWindows = crashes.map(c => ({ startIdx: c.startIdx, troughIdx: c.startIdx + c.D, endIdx: c.endIdx }));
-    rows.purchaseWindows = purchases.map(p => ({ name: p.name, depositIdx: p.pIdx, payoffIdx: p.pIdx + p.term, term: p.term, deposit: p.deposit, pay: p.pay }));
+    rows.purchaseWindows = purchases.map(p => ({ name: p.name, depositIdx: p.pIdx, payoffIdx: p.pIdx + p.term, term: p.term, deposit: p.deposit, pay: p.pay, skipped: p.skipped }));
+    rows.unaffordable = unaffordable;
     return rows;
   }
 

@@ -36,6 +36,13 @@
   #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
   .table-wrap { overflow-x:auto; }
+  .savb-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 14px; }
+  .sw-pill { display:inline-flex; align-items:center; gap:8px; font-size:13px; padding:6px 12px; border:1px solid var(--line); border-radius:7px; background:var(--surface-2); color:var(--ink); }
+  .sw-pill b.on { color:#16a34a; } .sw-pill b.off { color:#e67e22; }
+  .sw-info { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border:none; border-radius:50%; background:var(--accent); color:#fff; font-style:italic; font-weight:bold; font-size:12px; font-family:Georgia,serif; cursor:pointer; }
+  .savb-note { display:none; font-size:12px; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:8px 10px; flex-basis:100%; }
+  .savb-note.show { display:block; }
+  .afford-warn { color:#c0392b; font-size:11px; font-weight:bold; margin-top:4px; white-space:normal; max-width:150px; line-height:1.3; }
   @media (max-width: 600px) {
     body { padding:12px; }
     /* savings: all three on one line, compact */
@@ -97,6 +104,9 @@
     .crash-info { background:#dc2626 !important; color:#fff !important; }
     .topbar { color:#94a3b8 !important; }
     a, .topbar a { color:#60a5fa !important; }
+    .sw-pill, .savb-note { background:#1e293b !important; border-color:#334155 !important; color:#94a3b8 !important; }
+    .sw-pill b.on { color:#4ade80 !important; } .sw-pill b.off { color:#fbbf24 !important; }
+    .afford-warn { color:#f87171 !important; }
   }
 
 
@@ -104,8 +114,14 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v12)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v13)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
+
+  <div class="savb-bar">
+    <span class="sw-pill">Savings fund bills: <b id="savbState">&hellip;</b></span>
+    <button type="button" class="sw-info" onclick="toggleSavb()" aria-label="About this setting">i</button>
+    <span class="savb-note" id="savbNote">When off, your savings don&rsquo;t subsidise household bills and grow on their own, and each purchase must be covered by your savings &mdash; otherwise it shows &ldquo;Not Enough Savings To Fund the Purchase&rdquo; below. Change this on the Modelling page, in the left-hand controls rail.</span>
+  </div>
 
   <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
@@ -165,10 +181,59 @@
   const fmt = App.fmt;
   let settingsRow = null, purchases = [], dirty = false, deleted = [];
   let accounts = [], deletedAccts = [], members = [];
+  let savFundBills = true;   // saved "Savings fund bills" plan flag; gates the affordability message
   const tbody = document.querySelector('#pTbl tbody');
   const acctBody = document.querySelector('#acctTbl tbody');
   const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
   function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+  function updateSavbPill() {
+    const el = document.getElementById('savbState');
+    if (el) { el.textContent = savFundBills ? 'On' : 'Off'; el.className = savFundBills ? 'on' : 'off'; }
+  }
+  function toggleSavb() { const n = document.getElementById('savbNote'); if (n) n.classList.toggle('show'); }
+
+  // Set of purchase indices whose deposit can't be met from instant-access savings at their month.
+  // Only populated when "Savings fund bills" is OFF (when ON, the pension backstops the deposit).
+  // Conservative approximation: ignores surplus-salary top-ups the full model adds in retirement.
+  function computeUnaffordable() {
+    const bad = new Set();
+    if (savFundBills || !retireDate || endMonthIdx == null) return bad;
+    const startIdx = retireDate.getFullYear()*12 + retireDate.getMonth();
+    const inst = accounts.filter(a => a.instant_access !== false);
+    const dateIdx = p => { const d = p.purchase_date ? new Date(p.purchase_date) : null; return d ? (d.getFullYear()*12 + d.getMonth()) : null; };
+    if (!inst.length) {
+      purchases.forEach((p, i) => { const ix = dateIdx(p); if (ix != null && ix >= startIdx && ix <= endMonthIdx && num(p.deposit) > 0) bad.add(i); });
+      return bad;
+    }
+    const proj = inst.map(a => projectAccount(a, startIdx, endMonthIdx));
+    const order = purchases.map((p, i) => { const ix = dateIdx(p); return ix == null ? null : { i, idx: ix, deposit: num(p.deposit) }; })
+      .filter(Boolean).sort((a, b) => a.idx - b.idx);
+    let spent = 0;   // deposits already committed by earlier affordable purchases
+    for (const o of order) {
+      if (o.idx < startIdx || o.idx > endMonthIdx) continue;
+      let avail = 0; proj.forEach(m => { avail += (m[o.idx] || 0); });
+      avail -= spent;
+      if (avail + 1e-6 < o.deposit) bad.add(o.i);
+      else spent += o.deposit;
+    }
+    return bad;
+  }
+
+  // Live update of the per-row warning without re-rendering (keeps input focus while typing).
+  function refreshAfford() {
+    const bad = computeUnaffordable();
+    tbody.querySelectorAll('tr[data-i]').forEach(tr => {
+      const i = Number(tr.dataset.i);
+      const cell = tr.querySelector('td[data-label="Name"]');
+      if (!cell) return;
+      let warn = cell.querySelector('.afford-warn');
+      if (bad.has(i)) {
+        if (!warn) { warn = document.createElement('div'); warn.className = 'afford-warn'; cell.appendChild(warn); }
+        warn.textContent = 'Not Enough Savings To Fund the Purchase';
+      } else if (warn) { warn.remove(); }
+    });
+  }
 
   // Standard amortising monthly payment: financed = total - deposit; at APR over term months.
   function monthlyPayment(total, deposit, aprPct, term) {
@@ -180,11 +245,12 @@
     return financed * r / (1 - Math.pow(1 + r, -n));
   }
 
-  function rowHtml(p, i) {
+  function rowHtml(p, i, bad) {
     const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
     const pay = monthlyPayment(p.total_cost, p.deposit, p.apr, p.term_months);
+    const warn = (bad && bad.has(i)) ? '<div class="afford-warn">Not Enough Savings To Fund the Purchase</div>' : '';
     return '<tr data-i="' + i + '">' +
-      '<td data-label="Name"><input type="text" class="f-name" value="' + esc(p.purchase_name) + '" oninput="mark()"></td>' +
+      '<td data-label="Name"><input type="text" class="f-name" value="' + esc(p.purchase_name) + '" oninput="mark()">' + warn + '</td>' +
       '<td data-label="Date"><input type="date" class="f-date" value="' + (p.purchase_date ? String(p.purchase_date).split('T')[0] : '') + '" onchange="mark()"></td>' +
       '<td data-label="Total Cost"><input type="number" class="f-total" step="1" value="' + (p.total_cost != null ? p.total_cost : 0) + '" oninput="rowCalc(this)"></td>' +
       '<td data-label="Deposit"><input type="number" class="f-deposit" step="1" value="' + (p.deposit != null ? p.deposit : 0) + '" oninput="rowCalc(this)"></td>' +
@@ -194,9 +260,10 @@
       '<td><button class="del" onclick="delRow(this)">Delete</button></td></tr>';
   }
   function render() {
-    tbody.innerHTML = purchases.length ? purchases.map(rowHtml).join('') : '<tr><td colspan="8">No purchases. Use \u201cAdd purchase\u201d.</td></tr>';
+    const bad = computeUnaffordable();
+    tbody.innerHTML = purchases.length ? purchases.map((p, i) => rowHtml(p, i, bad)).join('') : '<tr><td colspan="8">No purchases. Use \u201cAdd purchase\u201d.</td></tr>';
   }
-  function mark() { syncDom(); setDirty(); }
+  function mark() { syncDom(); setDirty(); refreshAfford(); }
   function rowCalc(el) {
     const tr = el.closest('tr');
     const pay = monthlyPayment(tr.querySelector('.f-total').value, tr.querySelector('.f-deposit').value, tr.querySelector('.f-apr').value, tr.querySelector('.f-term').value);
@@ -250,7 +317,7 @@
   function renderAccts() {
     acctBody.innerHTML = accounts.length ? accounts.map(acctRowHtml).join('') : '<tr><td colspan="13">No savings accounts. Use \u201cAdd account\u201d.</td></tr>';
   }
-  function markAcct() { syncAccts(); setDirty(); }
+  function markAcct() { syncAccts(); setDirty(); refreshAfford(); }
   function syncAccts() {
     acctBody.querySelectorAll('tr[data-i]').forEach(tr => {
       const i = Number(tr.dataset.i); if (!accounts[i]) return;
@@ -325,6 +392,8 @@
       purchases = pRows || [];
       // timeline: retirement date -> latest end-of-life
       retireDate = (mRows && mRows[0] && mRows[0].retirement_date) ? new Date(mRows[0].retirement_date) : null;
+      savFundBills = (mRows && mRows[0] && mRows[0].savings_fund_bills != null) ? !!mRows[0].savings_fund_bills : true;
+      updateSavbPill();
       let endIdx = null;
       (memRows || []).forEach(m => { if (m.end_of_life_date) { const d = new Date(m.end_of_life_date); const ix = d.getFullYear()*12 + d.getMonth(); if (endIdx == null || ix > endIdx) endIdx = ix; } });
       endMonthIdx = endIdx;
