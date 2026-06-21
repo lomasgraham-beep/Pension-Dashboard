@@ -67,6 +67,17 @@
     .perf-measure-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:8px; }
     .card .value.pos-growth { color:#27ae60; }
     .card .value.neg-growth { color:#c0392b; }
+    /* Overview compaction (light touch): tighter padding, fonts and margins so it fits without scrolling */
+    #Overview { padding:14px 18px; }
+    #Overview h2 { margin-top:14px; padding-bottom:4px; }
+    #Overview .card { padding:10px 12px; }
+    #Overview .card h3 { margin:0 0 4px; font-size:11px; }
+    #Overview .card .value { font-size:20px; }
+    #Overview .card-grid { gap:10px; margin-bottom:6px; }
+    #Overview .perf-member { margin:12px 0 2px; font-size:17px; }
+    #Overview .perf-pension { margin:8px 0 4px; font-size:14px; }
+    #Overview .perf-measure-grid { gap:8px; margin-bottom:6px; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); }
+    #Overview #status { margin-bottom:8px; }
 
     .chart-box { width:100%; height:400px; margin-bottom:20px; }
     .chart-wrap { position:relative; }
@@ -335,13 +346,13 @@
       <div class="card" id="cardP1Now"><h3><span class="nm-p1">Graham</span> now</h3><div id="ovGraham" class="value">£0</div></div>
       <div class="card" id="cardP2Now"><h3><span class="nm-p2">Julie</span> now</h3><div id="ovJulie" class="value">£0</div></div>
     </div>
-    <h2 style="margin-top:25px;">Projected at Retirement</h2>
+    <h2 style="margin-top:12px;">Projected at Retirement</h2>
     <div class="card-grid">
       <div class="card hl" id="cardCombinedRet"><h3>Combined pot at retirement</h3><div id="ovProjCombined" class="value">£0</div></div>
       <div class="card" id="cardP1Ret"><h3><span class="nm-p1">Graham</span> at retirement</h3><div id="ovProjGraham" class="value">£0</div></div>
       <div class="card" id="cardP2Ret"><h3><span class="nm-p2">Julie</span> at retirement</h3><div id="ovProjJulie" class="value">£0</div></div>
     </div>
-    <p class="note" id="ovNote" style="margin-top:14px;"></p>
+    <p class="note" id="ovNote" style="margin-top:8px;"></p>
     <div id="ovPerf"></div>
   </div>
 
@@ -553,7 +564,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-212</span>
+    <span class="build-stamp">build: LC-213</span>
   </div>
 
   <script>
@@ -1294,7 +1305,7 @@
         if (pensionsHtml) inner += '<h3 class="perf-member">' + member + '</h3>' + pensionsHtml;
       });
       host.innerHTML = inner
-        ? '<h2 style="margin-top:25px;">Pension Performance</h2>' + inner
+        ? '<h2 style="margin-top:12px;">Pension Performance</h2>' + inner
         : '';
     }
 
