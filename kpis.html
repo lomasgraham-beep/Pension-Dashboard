@@ -92,7 +92,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr7)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr8)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
     <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span> expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
@@ -140,12 +140,16 @@
     const wrap = btn.closest('.chart-wrap'); if (!wrap) return;
     if (wrap.classList.contains('fs')) { closeChartFs(); return; }
     if (fsWrap && fsWrap !== wrap) closeChartFs();   // only one at a time
+    enterFrameFs();   // lift this iframe to fill the actual browser screen (no-op if not framed)
     wrap.classList.add('fs');
     fsWrap = wrap;
     document.body.style.overflow = 'hidden';
-    wrap.style.setProperty('--fs-h', window.innerHeight + 'px');   // real visible height (iOS-safe)
     btn.innerHTML = FS_CLOSE_SVG; btn.title = 'Exit full screen'; btn.setAttribute('aria-label', 'Exit full screen');
-    requestAnimationFrame(() => { if (chartsReady) drawCharts(); });
+    // after the iframe has been resized to the screen, window.innerHeight is the true visible height
+    requestAnimationFrame(() => {
+      if (fsWrap) fsWrap.style.setProperty('--fs-h', window.innerHeight + 'px');
+      if (chartsReady) drawCharts();
+    });
   }
   function closeChartFs() {
     if (!fsWrap) return;
@@ -153,8 +157,35 @@
     wrap.classList.remove('fs');
     fsWrap = null;
     document.body.style.overflow = '';
+    exitFrameFs();
     if (btn) { btn.innerHTML = FS_EXPAND_SVG; btn.title = 'Full screen'; btn.setAttribute('aria-label', 'Full screen'); }
     requestAnimationFrame(() => { if (chartsReady) drawCharts(); });
+  }
+  // This page is loaded inside an iframe in app.html, which sizes the frame to its full content
+  // height. So full-screen must first make the iframe itself fill the real viewport (same-origin,
+  // so we can reach window.frameElement and the parent), otherwise "full screen" fills the tall
+  // frame and the page has to be scrolled. No-op when opened stand-alone (frameElement is null).
+  function enterFrameFs() {
+    const fe = window.frameElement; if (!fe) return;
+    try {
+      const pdoc = window.parent.document;
+      fe.__fsLock = true;   // tell app.html's ResizeObserver to leave the frame height alone
+      fe.__fsOld = { css: fe.style.cssText, htmlOv: pdoc.documentElement.style.overflow, bodyOv: pdoc.body.style.overflow };
+      pdoc.documentElement.style.overflow = 'hidden';
+      pdoc.body.style.overflow = 'hidden';
+      fe.style.cssText += ';position:fixed !important;top:0 !important;left:0 !important;width:100% !important;height:100% !important;max-width:none !important;z-index:99999 !important;border:0;margin:0;';
+    } catch (e) { /* parent unreachable — fall back to in-frame overlay */ }
+  }
+  function exitFrameFs() {
+    const fe = window.frameElement; if (!fe || !fe.__fsOld) return;
+    try {
+      const pdoc = window.parent.document;
+      fe.style.cssText = fe.__fsOld.css;
+      pdoc.documentElement.style.overflow = fe.__fsOld.htmlOv;
+      pdoc.body.style.overflow = fe.__fsOld.bodyOv;
+    } catch (e) { /* ignore */ }
+    fe.__fsOld = null;
+    fe.__fsLock = false;   // let the frame resume auto-sizing to its content
   }
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && fsWrap) closeChartFs(); });
   // keep a full-screen chart fitted to the visible viewport on rotate / toolbar show-hide
