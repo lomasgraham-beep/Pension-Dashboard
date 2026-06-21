@@ -592,7 +592,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-215</span>
+    <span class="build-stamp">build: LC-216</span>
   </div>
 
   <script>
@@ -1511,6 +1511,11 @@
         if (existing.length) await App.write('PATCH', 'op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name), payload);
         else await App.write('POST', 'op_modelling_parameters', payload);
         savedPlan = c;
+        // tell already-loaded framed pages (e.g. Cash & Purchases) to re-pull the saved plan,
+        // so the savings-fund-bills switch is reflected without a browser refresh.
+        document.querySelectorAll('iframe.app-frame').forEach(f => {
+          try { if (f.contentWindow && f.getAttribute('src')) f.contentWindow.postMessage('refresh-data', '*'); } catch (e) {}
+        });
         msg.style.color = '#065f46'; msg.textContent = '✓ Saved as your plan.';
       } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
     }
@@ -1798,7 +1803,7 @@
       const title = document.getElementById('appTitle'); if (title) title.style.display = (id === 'Overview') ? '' : 'none';
       if (id === 'Modelling') setTimeout(drawCharts, 40);
       if (id === 'Modelling' || id === 'Retirement') placeRail(id);
-      if (id === 'Cash') ensureFrame('frame-Cash', 'cash.html' + FV);
+      if (id === 'Cash') { ensureFrame('frame-Cash', 'cash.html' + FV); pingFrame('frame-Cash'); }
       if (id === 'Crashes') ensureFrame('frame-Crashes', 'crashes.html' + FV);
       if (id === 'KPIs') { ensureFrame('frame-kpis', 'kpis.html' + FV); pingFrame('frame-kpis'); }
       if (id === 'Forecast') { ensureFrame('frame-forecast', 'forecast.html' + FV); pingFrame('frame-forecast'); }
