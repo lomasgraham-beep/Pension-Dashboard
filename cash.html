@@ -36,11 +36,15 @@
   #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
   .table-wrap { overflow-x:auto; }
-  .zoom-bar { display:flex; gap:18px; align-items:flex-end; flex-wrap:wrap; margin:0 0 10px; padding:12px 14px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; max-width:680px; }
-  .zoom-ctrl { display:flex; flex-direction:column; gap:4px; flex:1 1 170px; min-width:150px; }
-  .zoom-ctrl label { font-size:12px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; }
-  .zoom-ctrl label b { color:var(--accent-dark); }
-  .zoom-ctrl input[type=range] { width:100%; margin:0; }
+  .zoom-bar { display:flex; gap:24px; align-items:flex-end; flex-wrap:wrap; margin:0 0 12px; padding:16px 20px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; max-width:680px; }
+  .zoom-ctrl { display:flex; flex-direction:column; gap:8px; flex:1 1 230px; min-width:200px; }
+  .zoom-ctrl label { font-size:14px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; }
+  .zoom-ctrl label b { color:var(--accent-dark); font-size:16px; }
+  .zoom-ctrl input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:30px; margin:0; background:transparent; cursor:pointer; accent-color:var(--accent); }
+  .zoom-ctrl input[type=range]::-webkit-slider-runnable-track { height:8px; border-radius:4px; background:var(--line-strong); }
+  .zoom-ctrl input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:30px; height:30px; margin-top:-11px; border-radius:50%; background:var(--accent); border:3px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
+  .zoom-ctrl input[type=range]::-moz-range-track { height:8px; border-radius:4px; background:var(--line-strong); }
+  .zoom-ctrl input[type=range]::-moz-range-thumb { width:30px; height:30px; border-radius:50%; background:var(--accent); border:3px solid #fff; }
   .savb-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 14px; }
   .sw-pill { display:inline-flex; align-items:center; gap:8px; font-size:13px; padding:6px 12px; border:1px solid var(--line); border-radius:7px; background:var(--surface-2); color:var(--ink); }
   .sw-pill b.on { color:#16a34a; } .sw-pill b.off { color:#e67e22; }
@@ -112,6 +116,8 @@
     .sw-pill, .savb-note { background:#1e293b !important; border-color:#334155 !important; color:#94a3b8 !important; }
     .sw-pill b.on { color:#4ade80 !important; } .sw-pill b.off { color:#fbbf24 !important; }
     .afford-warn { color:#f87171 !important; }
+    .zoom-ctrl input[type=range]::-webkit-slider-runnable-track { background:#475569 !important; }
+    .zoom-ctrl input[type=range]::-moz-range-track { background:#475569 !important; }
   }
 
 
@@ -119,7 +125,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v15)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v16)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
 
   <div class="savb-bar">
@@ -144,9 +150,9 @@
       <label>Zoom to <b id="zToV">&ndash;</b></label>
       <input type="range" id="zTo" min="0" max="0" value="0" step="1" oninput="onZoomTo()">
     </div>
-    <button type="button" class="btn btn-reload" style="padding:8px 14px; font-size:13px;" onclick="zoomReset()">Reset zoom</button>
+    <button type="button" class="btn btn-reload" style="padding:11px 18px; font-size:14px;" onclick="zoomReset()">Reset zoom</button>
   </div>
-  <div id="cashChart" style="width:100%; height:340px; margin-bottom:10px;"></div>
+  <div id="cashChart" style="width:100%; height:425px; margin-bottom:10px;"></div>
   <p class="note" id="chartHint" style="display:none;">Projected savings balance from retirement, updating live as you edit. Purchase deposits are drawn from instant-access savings on their month (marked &#9660;); with &ldquo;savings fund bills&rdquo; off, an unaffordable purchase is skipped and flagged in the table below.</p>
 
   <h3>Savings Accounts <button class="btn btn-add" style="font-size:13px; padding:8px 14px; margin-left:8px;" onclick="addAcct()">+ Add account</button></h3>
