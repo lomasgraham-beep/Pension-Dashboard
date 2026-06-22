@@ -328,6 +328,7 @@
   <div class="topbar">
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
+      <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -345,7 +346,6 @@
     <option value="LivingCosts">Living Costs</option>
     <option value="BasicData">Basic Data</option>
   </select>
-  <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
   <div class="tab-buttons">
     <button class="tab-link active-btn" onclick="showTab(event,'Overview')">Overview</button>
     <button class="tab-link" onclick="showTab(event,'Logs')">Log Entry</button>
@@ -597,7 +597,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-224</span>
+    <span class="build-stamp">build: LC-225</span>
   </div>
 
   <script>
