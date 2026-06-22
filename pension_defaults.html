@@ -134,7 +134,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: siblingsync)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
+<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: retired1)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -162,6 +162,10 @@
     <label><span class="nm-p2">Julie</span> fully retires on</label>
     <span class="hint">The point <span class="nm-p2">Julie</span>'s contributions stop. Can differ from <span class="nm-p1">Graham</span>'s.</span>
     <input type="date" id="d_retire_p2" oninput="markDirty()">
+  </div>
+  <div class="field">
+    <label><input type="checkbox" id="d_retired" onchange="markDirty()" style="width:auto; margin-right:8px;">Retired mode &mdash; household fully retired</label>
+    <span class="hint">Turn on only once <span class="nm-p1">Graham</span> and <span class="nm-p2">Julie</span> have <strong>both</strong> fully retired. Drawdown then seeds from your latest logged pots and projects from now, and the dashboard hides the Forecast, Performance KPIs, Contributions and Workplace Income sections. Takes effect when you reopen the dashboard.</span>
   </div>
 </div>
 
@@ -281,6 +285,7 @@
     setVal('d_spend', spend); document.getElementById('v_spend').innerText = spend + '%';
     const ratio = Math.round((r.drawdown_ratio_graham != null ? r.drawdown_ratio_graham : 0.5) * 100);
     setVal('d_ratio', ratio); updateRatioHint();
+    document.getElementById('d_retired').checked = !!r.retired_mode;
   }
 
   function populateP2() { /* per-person phasing now lives in the Working-days tiers panel */ }
@@ -625,6 +630,7 @@
       retirement_date: val('d_retire') || null,
       spending_reduction_pct: parseFloat(val('d_spend')) / 100,
       drawdown_ratio_graham: parseFloat(val('d_ratio')) / 100,
+      retired_mode: document.getElementById('d_retired').checked,
       updated_at: new Date().toISOString()
     };
 

@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=auth01"></script>
-  <script src="engine.js?v=pact1"></script>
+  <script src="engine.js?v=ret1"></script>
   <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
@@ -198,6 +198,10 @@
       .opt-pair > .params + .params { margin-top:0; }
     }
     .opt-toggle { display:inline-flex; align-items:center; gap:8px; margin:0 0 14px; padding:10px 16px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); color:var(--ink); font-weight:bold; font-size:15px; cursor:pointer; }
+    .retired-badge { display:inline-block; margin-left:10px; padding:4px 10px; border-radius:6px; background:var(--accent); color:#fff; font-size:11px; font-weight:bold; letter-spacing:0.06em; vertical-align:middle; }
+    body.retired #tabbtn-Forecast, body.retired #tabbtn-KPIs,
+    body.retired #subbtn-Contributions, body.retired #subbtn-Income,
+    body.retired #ctrl_retire { display:none !important; }
     .opt-toggle:hover { border-color:var(--accent-border); background:var(--accent-soft); }
     .opt-caret { display:inline-block; font-size:11px; color:var(--accent); transition:transform .12s; }
     .opt-toggle[aria-expanded="true"] .opt-caret { transform:rotate(90deg); }
@@ -341,11 +345,12 @@
     <option value="LivingCosts">Living Costs</option>
     <option value="BasicData">Basic Data</option>
   </select>
+  <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
   <div class="tab-buttons">
     <button class="tab-link active-btn" onclick="showTab(event,'Overview')">Overview</button>
     <button class="tab-link" onclick="showTab(event,'Logs')">Log Entry</button>
-    <button class="tab-link" onclick="showTab(event,'KPIs')">Performance KPIs</button>
-    <button class="tab-link" onclick="showTab(event,'Forecast')">Monthly Forecast</button>
+    <button class="tab-link" id="tabbtn-KPIs" onclick="showTab(event,'KPIs')">Performance KPIs</button>
+    <button class="tab-link" id="tabbtn-Forecast" onclick="showTab(event,'Forecast')">Monthly Forecast</button>
     <button class="tab-link" onclick="showTab(event,'Modelling')">Modelling</button>
     <button class="tab-link" onclick="showTab(event,'Retirement')">Retirement</button>
     <button class="tab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
@@ -430,7 +435,7 @@
       <button type="button" class="rail-collapse" onclick="collapseRail()" title="Hide controls" aria-label="Hide controls">Controls &#9664;</button>
       <div class="grid">
         <!-- Row 1 -->
-        <div class="ctrl"><label>Fully retire <span id="m_retire_v" class="sv">—</span></label><input type="range" id="m_retire" min="0" max="120" step="1" value="60" oninput="onParam()"></div>
+        <div class="ctrl" id="ctrl_retire"><label>Fully retire <span id="m_retire_v" class="sv">—</span></label><input type="range" id="m_retire" min="0" max="120" step="1" value="60" oninput="onParam()"></div>
         <div class="ctrl phone-hide"><label>Pension growth <span id="m_growth_v" class="sv">5.0%</span></label><input type="range" id="m_growth" min="0" max="10" step="0.25" value="5" oninput="onParam()"></div>
         <div id="tierSliders" style="display:contents;"></div>
         <div class="ctrl"><label>State pension growth <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
@@ -592,7 +597,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-221</span>
+    <span class="build-stamp">build: LC-222</span>
   </div>
 
   <script>
@@ -1436,6 +1441,7 @@
         gRatio: p2Name ? (parseFloat(document.getElementById('m_ratio').value) / 100) : 1,
         dynamic: document.getElementById('m_dynamic').checked,
         savingsFundBills: document.getElementById('m_savebills').checked,
+        retired: savedPlan ? !!savedPlan.retired : false,
         gFloorPct: (parseFloat(document.getElementById('m_gfloor').value) || 0) / 100,
         jFloorPct: (parseFloat(document.getElementById('m_jfloor').value) || 0) / 100,
         spRate: parseFloat(document.getElementById('m_sprate').value) / 100,
@@ -1480,6 +1486,13 @@
       const on = document.getElementById('m_savebills').checked;
       const el = document.getElementById('ret_savb_state');
       if (el) { el.textContent = on ? 'On' : 'Off'; el.className = on ? 'sw-on' : 'sw-off'; }
+    }
+    function applyRetiredMode() {
+      const on = savedPlan ? !!savedPlan.retired : false;
+      document.body.classList.toggle('retired', on);
+      const badge = document.getElementById('retiredBadge'); if (badge) badge.style.display = on ? 'inline-block' : 'none';
+      const sel = document.getElementById('tabSelect');
+      if (sel) Array.from(sel.options).forEach(o => { if (o.value === 'Forecast' || o.value === 'KPIs') o.hidden = on; });
     }
     function onParam() { applyDynamicMaxes(); syncLabels(); document.getElementById('m_floors').classList.toggle('show', document.getElementById('m_dynamic').checked); recomputeAll(); }
 
@@ -1527,12 +1540,20 @@
       const stateNames = new Set((data.guaranteed || []).map(x => x.income_name).filter(n => n && n.toLowerCase().indexOf('state') >= 0));
       const js = PensionEngine.forecast(data, plan, 1);
       const pots = { graham: js.graham * calib.g, julie: js.julie * calib.j };
+      // Retired mode: the projection runs from THIS month off the latest logged pots, and both
+      // members are treated as already retired (no staggered gap). The saved retirement date is
+      // historical and ignored.
+      const retired = !!plan.retired;
+      const nowFirst = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const baseRetire = retired ? nowFirst : plan.retirementDate;
+      let retireByMember = plan.retireByMember || null;
+      if (retired) { retireByMember = {}; if (p1Name) retireByMember[p1Name] = nowFirst; if (p2Name) retireByMember[p2Name] = nowFirst; }
       // Stage F 4b: pots valued at each person's OWN retirement (for the staggered gap handoff).
       // For equal dates these equal the peak, so this is a no-op for the equal-date case.
       const ownRetirePots = js.potsAtOwnRetire
         ? { graham: js.potsAtOwnRetire.p1 * calib.g, julie: js.potsAtOwnRetire.p2 * calib.j }
         : pots;
-      const startYr = plan.retirementDate ? plan.retirementDate.getFullYear() : new Date().getFullYear();
+      const startYr = baseRetire ? baseRetire.getFullYear() : new Date().getFullYear();
       const sp = PensionEngine.baselineSP(stateNames);
       if (plan.spRate != null) sp.spRate = plan.spRate;
       const dly = plan.spDelay || 0;
@@ -1542,8 +1563,8 @@
       return {
         pots: pots, potsAtOwnRetire: ownRetirePots,
         gRatio: plan.gRatio, spendRed: plan.spendRed,
-        startYear: startYr, retirementDate: plan.retirementDate,
-        retireByMember: plan.retireByMember || null,
+        startYear: startYr, retirementDate: baseRetire,
+        retireByMember: retireByMember,
         tierDateOverrides: plan.tierDateOverrides || null,
         dynamic: plan.dynamic, gFloorPct: plan.gFloorPct, jFloorPct: plan.jFloorPct,
         savingsFundBills: plan.savingsFundBills,
@@ -1719,7 +1740,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=pact1';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=ret1';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -1879,7 +1900,8 @@
           p2phase: p2phase,
           spendRed: p.spending_reduction_pct != null ? Number(p.spending_reduction_pct) : 1.0,
           gRatio: p.drawdown_ratio_graham != null ? Number(p.drawdown_ratio_graham) : 0.5,
-          savingsFundBills: p.savings_fund_bills != null ? !!p.savings_fund_bills : true
+          savingsFundBills: p.savings_fund_bills != null ? !!p.savings_fund_bills : true,
+          retired: p.retired_mode != null ? !!p.retired_mode : false
         };
 
         // The browser engine is the single source of truth — no server RPC, no calibration.
@@ -1897,6 +1919,7 @@
         buildTierSliders();
         buildColChooser();
         applyControls(savedPlan);
+        applyRetiredMode();
         applyDynamicMaxes();
         recomputeAll();
         status.className = 's-ok';

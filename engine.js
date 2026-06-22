@@ -87,6 +87,14 @@
     const fMembers = (data.members || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const fp1 = fMembers[0] ? fMembers[0].name : 'Graham';
     const fp2 = fMembers[1] ? fMembers[1].name : null;
+    // Retired mode: the household is fully retired — skip accumulation entirely and seed the
+    // pots straight from the latest logged balances (no contributions, no growth-to-retirement).
+    if (plan && plan.retired) {
+      const lp = latestPots(data);
+      const g = sumMember(data, lp, fp1);
+      const j = fp2 ? sumMember(data, lp, fp2) : 0;
+      return { graham: g, julie: j, series: [], p1Name: fp1, p2Name: fp2, potsAtOwnRetire: { p1: g, p2: j } };
+    }
     const fp1Retire = personRetire(fp1);
     const fp2Retire = fp2 ? personRetire(fp2) : null;
     const retire = fp2Retire
