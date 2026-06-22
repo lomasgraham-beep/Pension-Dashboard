@@ -597,7 +597,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-225</span>
+    <span class="build-stamp">build: LC-226</span>
   </div>
 
   <script>
@@ -1821,7 +1821,7 @@
       // keep the phone dropdown in sync
       const sel = document.getElementById('tabSelect'); if (sel && sel.value !== id) sel.value = id;
       // the main title shows only on Overview, freeing space elsewhere
-      const title = document.getElementById('appTitle'); if (title) title.style.display = (id === 'Overview') ? '' : 'none';
+      const title = document.getElementById('appTitle'); if (title) title.style.display = '';
       if (id === 'Modelling') setTimeout(drawCharts, 40);
       if (id === 'Modelling' || id === 'Retirement') placeRail(id);
       if (id === 'Cash') { ensureFrame('frame-Cash', 'cash.html' + FV); pingFrame('frame-Cash'); }
