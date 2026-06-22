@@ -13,14 +13,13 @@
   .form-group input, .form-group select { padding:14px; border:1px solid #ccc; border-radius:6px; font-size:18px; box-sizing:border-box; max-width:480px; width:100%; }
   .btn { background:#3498db; color:#fff; border:none; padding:13px 22px; border-radius:8px; font-weight:bold; font-size:15px; cursor:pointer; }
   .btn-clear { background:#64748b; padding:9px 16px; font-size:14px; }
-  .entry-top, .entry-vals { display:flex; flex-wrap:wrap; gap:14px 24px; align-items:flex-start; max-width:1000px; }
-  .entry-top { margin-bottom:16px; }
-  .entry-vals { margin-bottom:15px; }
-  .entry-top .form-group, .entry-vals .form-group, .entry-vals .pot-field { margin-bottom:0; min-width:0; }
-  .entry-top .form-group > select { width:230px; }
-  .entry-top .date-box { width:190px; }
-  .entry-top select, .entry-top .date-box, .pot-input, .submit-cell .btn { min-height:54px; box-sizing:border-box; }
+  .entry-grid3 { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:16px 24px; align-items:start; max-width:920px; margin-bottom:15px; }
+  .entry-grid3 .form-group, .entry-grid3 .pot-field { margin-bottom:0; min-width:0; }
+  .entry-grid3 .form-group > select { width:230px; max-width:100%; }
+  .entry-grid3 .date-box { width:190px; max-width:100%; }
+  .entry-grid3 select, .entry-grid3 .date-box, .pot-input, .submit-cell .btn { min-height:54px; box-sizing:border-box; }
   .submit-cell label { visibility:hidden; }
+  .entry-grid3 .pot-hint { font-size:13px; color:#94a3b8; margin:0; }
   .entry-grid .form-group { margin-bottom:0; min-width:0; }
   .pot-field { min-width:0; }
   .pot-label { display:block; font-weight:bold; font-size:15px; color:#2c3e50; margin-bottom:6px; }
@@ -60,8 +59,8 @@
     .form-group { margin-bottom:10px; }
     .form-group label { font-size:12px; margin-bottom:3px; }
     .form-group input, .form-group select { padding:9px; font-size:15px; max-width:none; }
-    .entry-top, .entry-vals { flex-direction:column; align-items:stretch; gap:12px; }
-    .entry-top .form-group > select, .entry-top .date-box, .pot-input { width:100%; max-width:none; }
+    .entry-grid3 { grid-template-columns:1fr; gap:12px; }
+    .entry-grid3 .form-group > select, .entry-grid3 .date-box, .pot-input { width:100%; max-width:none; }
     .pot-label { font-size:13px; }
     .pot-input { font-size:16px; padding:11px; }
     .pot-hint { font-size:12px; }
@@ -121,15 +120,13 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
 
-  <h2>Log New Balances <span class="buildtag">build logfit2</span></h2>
-  <div class="entry-top">
+  <h2>Log New Balances <span class="buildtag">build logfit3</span></h2>
+  <div class="entry-grid3" id="entryGrid">
     <div class="form-group"><label>Whose accounts are you updating?</label><select id="logMember" onchange="renderInputs()"></select></div>
     <div class="form-group"><label>Date</label><div class="date-box"><input type="date" id="entryDate"></div></div>
-  </div>
-  <div class="entry-vals" id="entryGrid">
     <div class="form-group submit-cell" id="submitCell"><label>Submit</label><button class="btn" onclick="submitEntry()">Submit to Cloud Database</button></div>
+    <p class="pot-hint" id="potHint" style="display:none;">Leave a pension at 0 to record no change for it — only boxes with a new value are saved.</p>
   </div>
-  <p class="pot-hint" id="potHint" style="display:none;">Leave a pension at 0 to record no change for it — only boxes with a new value are saved.</p>
   <div class="msg" id="entryMsg"></div>
 
   <h2 style="margin-top:35px;">Recent Logs</h2>
@@ -186,15 +183,14 @@
     const grid = document.getElementById('entryGrid');
     grid.querySelectorAll('.pot-field, .pot-msg').forEach(el => el.remove());
     const hint = document.getElementById('potHint');
-    const submitCell = document.getElementById('submitCell');
     const member = document.getElementById('logMember').value;
     const pots = userPensions.filter(p => p.member_name === member && p.pension_type === 'Defined Contributions' && p.active !== false);
     if (!pots.length) {
-      submitCell.insertAdjacentHTML('beforebegin', '<p class="pot-msg">No DC pots found for ' + member + '.</p>');
+      hint.insertAdjacentHTML('beforebegin', '<p class="pot-msg">No DC pots found for ' + member + '.</p>');
       hint.style.display = 'none';
       return;
     }
-    submitCell.insertAdjacentHTML('beforebegin', pots.map(p => `
+    hint.insertAdjacentHTML('beforebegin', pots.map(p => `
       <div class="pot-field">
         <label class="pot-label">${p.pension_name} Value (£)</label>
         <input type="number" class="pot-input" data-pension="${p.pension_name}" step="1" value="0" onfocus="if(this.value==='0'){this.value='';}" onblur="if(this.value.trim()===''){this.value='0';}">
