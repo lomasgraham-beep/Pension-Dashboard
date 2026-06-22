@@ -15,11 +15,12 @@
   .btn-clear { background:#64748b; padding:9px 16px; font-size:14px; }
   .entry-grid3 { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:16px 24px; align-items:start; max-width:920px; margin-bottom:15px; }
   .entry-grid3 .form-group, .entry-grid3 .pot-field { margin-bottom:0; min-width:0; }
-  .entry-grid3 .form-group > select { width:230px; max-width:100%; }
-  .entry-grid3 .date-box { width:190px; max-width:100%; }
+  .entry-grid3 .form-group > select { width:150px; max-width:100%; }
+  .entry-grid3 .date-box { width:150px; max-width:100%; }
   .entry-grid3 select, .entry-grid3 .date-box, .pot-input, .submit-cell .btn { min-height:54px; box-sizing:border-box; }
+  .submit-cell { grid-column:3; grid-row:1; }
   .submit-cell label { visibility:hidden; }
-  .entry-grid3 .pot-hint { font-size:13px; color:#94a3b8; margin:0; }
+  .entry-grid3 .pot-hint { grid-column:3; grid-row:2; font-size:13px; color:#94a3b8; margin:0; }
   .entry-grid .form-group { margin-bottom:0; min-width:0; }
   .pot-field { min-width:0; }
   .pot-label { display:block; font-weight:bold; font-size:15px; color:#2c3e50; margin-bottom:6px; }
@@ -61,6 +62,7 @@
     .form-group input, .form-group select { padding:9px; font-size:15px; max-width:none; }
     .entry-grid3 { grid-template-columns:1fr; gap:12px; }
     .entry-grid3 .form-group > select, .entry-grid3 .date-box, .pot-input { width:100%; max-width:none; }
+    .entry-grid3 .submit-cell, .entry-grid3 .pot-hint { grid-column:auto; grid-row:auto; }
     .pot-label { font-size:13px; }
     .pot-input { font-size:16px; padding:11px; }
     .pot-hint { font-size:12px; }
@@ -120,7 +122,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
 
-  <h2>Log New Balances <span class="buildtag">build logfit3</span></h2>
+  <h2>Log New Balances <span class="buildtag">build logfit4</span></h2>
   <div class="entry-grid3" id="entryGrid">
     <div class="form-group"><label>Whose accounts are you updating?</label><select id="logMember" onchange="renderInputs()"></select></div>
     <div class="form-group"><label>Date</label><div class="date-box"><input type="date" id="entryDate"></div></div>
