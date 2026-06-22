@@ -13,10 +13,13 @@
   .form-group input, .form-group select { padding:14px; border:1px solid #ccc; border-radius:6px; font-size:18px; box-sizing:border-box; max-width:480px; width:100%; }
   .btn { background:#3498db; color:#fff; border:none; padding:13px 22px; border-radius:8px; font-weight:bold; font-size:15px; cursor:pointer; }
   .btn-clear { background:#64748b; padding:9px 16px; font-size:14px; }
-  .entry-grid { display:flex; flex-wrap:wrap; gap:16px 18px; align-items:flex-start; max-width:1000px; margin-bottom:15px; }
-  .entry-grid .form-group > select { width:230px; }
-  .entry-grid .date-box { width:190px; }
-  .entry-grid select, .entry-grid .date-box, .pot-input, .submit-cell .btn { min-height:54px; box-sizing:border-box; }
+  .entry-top, .entry-vals { display:flex; flex-wrap:wrap; gap:14px 24px; align-items:flex-start; max-width:1000px; }
+  .entry-top { margin-bottom:16px; }
+  .entry-vals { margin-bottom:15px; }
+  .entry-top .form-group, .entry-vals .form-group, .entry-vals .pot-field { margin-bottom:0; min-width:0; }
+  .entry-top .form-group > select { width:230px; }
+  .entry-top .date-box { width:190px; }
+  .entry-top select, .entry-top .date-box, .pot-input, .submit-cell .btn { min-height:54px; box-sizing:border-box; }
   .submit-cell label { visibility:hidden; }
   .entry-grid .form-group { margin-bottom:0; min-width:0; }
   .pot-field { min-width:0; }
@@ -57,8 +60,8 @@
     .form-group { margin-bottom:10px; }
     .form-group label { font-size:12px; margin-bottom:3px; }
     .form-group input, .form-group select { padding:9px; font-size:15px; max-width:none; }
-    .entry-grid { flex-direction:column; align-items:stretch; gap:12px; }
-    .entry-grid .form-group > select, .entry-grid .date-box, .pot-input { width:100%; max-width:none; }
+    .entry-top, .entry-vals { flex-direction:column; align-items:stretch; gap:12px; }
+    .entry-top .form-group > select, .entry-top .date-box, .pot-input { width:100%; max-width:none; }
     .pot-label { font-size:13px; }
     .pot-input { font-size:16px; padding:11px; }
     .pot-hint { font-size:12px; }
@@ -118,10 +121,12 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
 
-  <h2>Log New Balances <span class="buildtag">build logfit1</span></h2>
-  <div class="entry-grid" id="entryGrid">
+  <h2>Log New Balances <span class="buildtag">build logfit2</span></h2>
+  <div class="entry-top">
     <div class="form-group"><label>Whose accounts are you updating?</label><select id="logMember" onchange="renderInputs()"></select></div>
     <div class="form-group"><label>Date</label><div class="date-box"><input type="date" id="entryDate"></div></div>
+  </div>
+  <div class="entry-vals" id="entryGrid">
     <div class="form-group submit-cell" id="submitCell"><label>Submit</label><button class="btn" onclick="submitEntry()">Submit to Cloud Database</button></div>
   </div>
   <p class="pot-hint" id="potHint" style="display:none;">Leave a pension at 0 to record no change for it — only boxes with a new value are saved.</p>
