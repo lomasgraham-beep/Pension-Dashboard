@@ -134,7 +134,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: retired1)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
+<h1>Pension Defaults <span style="font-size:13px;color:#94a3b8;font-weight:normal;">(defaults build: retired2)</span> <span id="dirtyFlag" class="dirty-flag">Unsaved changes</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel">
@@ -164,7 +164,7 @@
     <input type="date" id="d_retire_p2" oninput="markDirty()">
   </div>
   <div class="field">
-    <label><input type="checkbox" id="d_retired" onchange="markDirty()" style="width:auto; margin-right:8px;">Retired mode &mdash; household fully retired</label>
+    <label class="pen-chk"><input type="checkbox" id="d_retired" onchange="markDirty()">Retired mode &mdash; household fully retired</label>
     <span class="hint">Turn on only once <span class="nm-p1">Graham</span> and <span class="nm-p2">Julie</span> have <strong>both</strong> fully retired. Drawdown then seeds from your latest logged pots and projects from now, and the dashboard hides the Forecast, Performance KPIs, Contributions and Workplace Income sections. Takes effect when you reopen the dashboard.</span>
   </div>
 </div>
