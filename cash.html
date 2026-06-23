@@ -36,16 +36,23 @@
   #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
   .table-wrap { overflow-x:auto; }
-  .zoom-bar { display:flex; gap:24px; align-items:flex-end; flex-wrap:wrap; margin:0 0 12px; padding:16px 20px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; max-width:680px; }
-  .zoom-ctrl { display:flex; flex-direction:column; gap:8px; flex:1 1 230px; min-width:200px; }
-  .zoom-ctrl label { font-size:14px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; }
-  .zoom-ctrl label b { color:var(--accent-dark); font-size:16px; }
-  .zoom-ctrl input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:30px; margin:0; background:transparent; cursor:pointer; accent-color:var(--accent); }
-  .zoom-ctrl input[type=range]::-webkit-slider-runnable-track { height:8px; border-radius:4px; background:var(--line-strong); }
-  .zoom-ctrl input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:30px; height:30px; margin-top:-11px; border-radius:50%; background:var(--accent); border:3px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
-  .zoom-ctrl input[type=range]::-moz-range-track { height:8px; border-radius:4px; background:var(--line-strong); }
-  .zoom-ctrl input[type=range]::-moz-range-thumb { width:30px; height:30px; border-radius:50%; background:var(--accent); border:3px solid #fff; }
-  .savb-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 14px; }
+  /* inline zoom: lives on the same control row as the buttons, stretches to the right edge */
+  .zoom-wrap { display:flex; align-items:center; gap:10px; flex:1 1 300px; min-width:240px; padding:6px 12px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; }
+  .zoom-readout { font-size:12px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; white-space:nowrap; }
+  .zoom-readout b { color:var(--accent-dark); font-size:14px; }
+  /* dual-handle range slider: two overlapped inputs on one track, with a filled band between thumbs */
+  .dual { position:relative; flex:1 1 auto; height:36px; min-width:120px; }
+  .dual-track, .dual-fill { position:absolute; top:50%; transform:translateY(-50%); height:8px; border-radius:4px; pointer-events:none; }
+  .dual-track { left:15px; right:15px; background:var(--line-strong); }
+  .dual-fill { left:15px; width:0; background:var(--accent); }
+  .dual input[type=range] { position:absolute; top:0; left:0; width:100%; height:36px; margin:0; -webkit-appearance:none; appearance:none; background:transparent; pointer-events:none; }
+  .dual input[type=range]::-webkit-slider-runnable-track { height:36px; background:transparent; border:none; }
+  .dual input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; pointer-events:auto; width:30px; height:30px; margin-top:3px; border-radius:50%; background:var(--accent); border:3px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.3); cursor:pointer; }
+  .dual input[type=range]::-moz-range-track { height:36px; background:transparent; border:none; }
+  .dual input[type=range]::-moz-range-thumb { pointer-events:auto; width:30px; height:30px; border-radius:50%; background:var(--accent); border:3px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,0.3); cursor:pointer; }
+  .zoom-reset { flex:0 0 auto; width:34px; height:34px; border:none; border-radius:8px; background:#64748b; color:#fff; font-size:16px; line-height:1; cursor:pointer; }
+  .zoom-reset:hover { background:#475569; }
+  .ctrl-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 14px; }
   .sw-pill { display:inline-flex; align-items:center; gap:8px; font-size:13px; padding:6px 12px; border:1px solid var(--line); border-radius:7px; background:var(--surface-2); color:var(--ink); }
   .sw-pill b.on { color:#16a34a; } .sw-pill b.off { color:#e67e22; }
   .sw-info { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border:none; border-radius:50%; background:var(--accent); color:#fff; font-style:italic; font-weight:bold; font-size:12px; font-family:Georgia,serif; cursor:pointer; }
@@ -116,8 +123,8 @@
     .sw-pill, .savb-note { background:#1e293b !important; border-color:#334155 !important; color:#94a3b8 !important; }
     .sw-pill b.on { color:#4ade80 !important; } .sw-pill b.off { color:#fbbf24 !important; }
     .afford-warn { color:#f87171 !important; }
-    .zoom-ctrl input[type=range]::-webkit-slider-runnable-track { background:#475569 !important; }
-    .zoom-ctrl input[type=range]::-moz-range-track { background:#475569 !important; }
+    .zoom-wrap { background:#1e293b !important; border-color:#334155 !important; }
+    .dual-track { background:#475569 !important; }
   }
 
 
@@ -125,33 +132,29 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v16)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v17)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
 
-  <div class="savb-bar">
+  <div class="ctrl-row">
     <span class="sw-pill">Savings fund bills: <b id="savbState">&hellip;</b></span>
     <button type="button" class="sw-info" onclick="toggleSavb()" aria-label="About this setting">i</button>
-    <span class="savb-note" id="savbNote">When off, your savings don&rsquo;t subsidise household bills and grow on their own, and each purchase must be covered by your savings &mdash; otherwise it shows &ldquo;Not Enough Savings To Fund the Purchase&rdquo; below. Change this on the Modelling page, in the left-hand controls rail.</span>
-  </div>
-
-  <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
     <span class="unsaved" id="unsaved">&#9679; Unsaved changes</span>
     <span class="msg" id="msg"></span>
+    <div id="zoomWrap" class="zoom-wrap" style="display:none;">
+      <span class="zoom-readout">Years <b id="zFromV">&ndash;</b> &ndash; <b id="zToV">&ndash;</b></span>
+      <div class="dual" id="dual">
+        <div class="dual-track"></div>
+        <div class="dual-fill" id="dualFill"></div>
+        <input type="range" id="zFrom" min="0" max="0" value="0" step="1" oninput="onZoomFrom()">
+        <input type="range" id="zTo" min="0" max="0" value="0" step="1" oninput="onZoomTo()">
+      </div>
+      <button type="button" class="zoom-reset" onclick="zoomReset()" aria-label="Reset zoom" title="Reset zoom">&#8634;</button>
+    </div>
+    <span class="savb-note" id="savbNote">When off, your savings don&rsquo;t subsidise household bills and grow on their own, and each purchase must be covered by your savings &mdash; otherwise it shows &ldquo;Not Enough Savings To Fund the Purchase&rdquo; below. Change this on the Modelling page, in the left-hand controls rail.</span>
   </div>
 
-  <div id="zoomBar" class="zoom-bar" style="display:none;">
-    <div class="zoom-ctrl">
-      <label>Zoom from <b id="zFromV">&ndash;</b></label>
-      <input type="range" id="zFrom" min="0" max="0" value="0" step="1" oninput="onZoomFrom()">
-    </div>
-    <div class="zoom-ctrl">
-      <label>Zoom to <b id="zToV">&ndash;</b></label>
-      <input type="range" id="zTo" min="0" max="0" value="0" step="1" oninput="onZoomTo()">
-    </div>
-    <button type="button" class="btn btn-reload" style="padding:11px 18px; font-size:14px;" onclick="zoomReset()">Reset zoom</button>
-  </div>
   <div id="cashChart" style="width:100%; height:425px; margin-bottom:10px;"></div>
   <p class="note" id="chartHint" style="display:none;">Projected savings balance from retirement, updating live as you edit. Purchase deposits are drawn from instant-access savings on their month (marked &#9660;); with &ldquo;savings fund bills&rdquo; off, an unaffordable purchase is skipped and flagged in the table below.</p>
 
@@ -486,7 +489,7 @@
   // ---- Year-range zoom for the savings chart (two single sliders; reliable on iPad Safari) ----
   let zoomSig = null;
   function setupZoom(sy, ey) {
-    const bar = document.getElementById('zoomBar'), zf = document.getElementById('zFrom'), zt = document.getElementById('zTo');
+    const bar = document.getElementById('zoomWrap'), zf = document.getElementById('zFrom'), zt = document.getElementById('zTo');
     if (!bar || !zf || !zt) return;
     if (ey <= sy) { bar.style.display = 'none'; return; }      // single year -> nothing to zoom
     const sig = sy + ':' + ey;
@@ -502,9 +505,24 @@
     const zf = document.getElementById('zFrom'), zt = document.getElementById('zTo');
     if (zf) document.getElementById('zFromV').textContent = zf.value;
     if (zt) document.getElementById('zToV').textContent = zt.value;
+    syncDual();
+  }
+  // Paint the accent band between the two thumbs, and keep whichever thumb sits
+  // near the top of the range grabbable when the handles bunch up together.
+  function syncDual() {
+    const dual = document.getElementById('dual'), zf = document.getElementById('zFrom'),
+          zt = document.getElementById('zTo'), fill = document.getElementById('dualFill');
+    if (!dual || !zf || !zt || !fill) return;
+    const w = dual.clientWidth; if (!w) return;
+    const PAD = 15, min = Number(zf.min), max = Number(zf.max), span = Math.max(1, max - min);
+    const x = v => PAD + ((Number(v) - min) / span) * (w - 2 * PAD);
+    let lo = x(zf.value), hi = x(zt.value); if (hi < lo) { const t = lo; lo = hi; hi = t; }
+    fill.style.left = lo + 'px'; fill.style.width = Math.max(0, hi - lo) + 'px';
+    zf.style.zIndex = ((Number(zf.value) - min) / span > 0.5) ? 5 : 3;
+    zt.style.zIndex = 4;
   }
   function zoomWindow(sy, ey) {
-    const bar = document.getElementById('zoomBar'), zf = document.getElementById('zFrom'), zt = document.getElementById('zTo');
+    const bar = document.getElementById('zoomWrap'), zf = document.getElementById('zFrom'), zt = document.getElementById('zTo');
     if (!bar || bar.style.display === 'none' || !zf || !zt) return [sy, ey];
     let lo = Number(zf.value), hi = Number(zt.value);
     if (lo > hi) { const t = lo; lo = hi; hi = t; }
@@ -519,7 +537,7 @@
     if (!chartsReady) return;
     if (!retireDate || endMonthIdx == null || !accounts.length) {
       box.style.display = 'none'; hint.style.display = 'none';
-      const zb = document.getElementById('zoomBar'); if (zb) zb.style.display = 'none';
+      const zb = document.getElementById('zoomWrap'); if (zb) zb.style.display = 'none';
       return;
     }
     box.style.display = ''; hint.style.display = '';
