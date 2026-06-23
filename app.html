@@ -504,7 +504,7 @@
         </div>
         <div class="ov-prog">
           <div class="prow">
-            <div class="big"><span id="ovProgNow">&pound;0</span> <span class="ov-microsub">of <span id="ovProgTarget">&pound;0</span> projected</span></div>
+            <div class="big"><span class="ov-microsub">Towards your </span><span id="ovProgTarget">&pound;0</span><span class="ov-microsub"> retirement target</span></div>
             <div class="pct" id="ovProgPct">&mdash;</div>
           </div>
           <div class="ov-bar"><span id="ovProgFill" style="width:0%;"></span></div>
@@ -532,6 +532,14 @@
         <div>
           <div class="sv-num" id="ovSurviveNum">&mdash;</div>
           <div class="sv-sub" id="ovSurviveSub"></div>
+        </div>
+      </div>
+
+      <div class="ov-survive" id="ovCoverage" style="display:none; margin-top:10px;">
+        <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><path d="M6 28 L6 18 L13 18 L13 28 Z M16 28 L16 12 L23 12 L23 28 Z M26 28 L26 20 L33 20 L33 28 Z" fill="var(--accent)" opacity="0.85"/></svg>
+        <div>
+          <div class="sv-num" id="ovCoverageNum">&mdash;</div>
+          <div class="sv-sub" id="ovCoverageSub"></div>
         </div>
       </div>
 
@@ -764,7 +772,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-235</span>
+    <span class="build-stamp">build: LC-236</span>
   </div>
 
   <script>
@@ -1545,7 +1553,8 @@
         ring.innerHTML = '<circle cx="42" cy="42" r="' + r + '" fill="none" stroke="' + ovTrack() + '" stroke-width="8"/>' +
           '<circle cx="42" cy="42" r="' + r + '" fill="none" stroke="' + ovAccent() + '" stroke-width="8" stroke-linecap="round" stroke-dasharray="' +
           dash.toFixed(1) + ' ' + (circ - dash).toFixed(1) + '" transform="rotate(-90 42 42)"/>' +
-          '<text x="42" y="46" text-anchor="middle" font-size="12" font-weight="700" fill="' + ovAccent() + '">' + Math.round(tFrac * 100) + '%</text>';
+          '<text x="42" y="40" text-anchor="middle" font-size="12" font-weight="700" fill="' + ovAccent() + '">' + Math.round(tFrac * 100) + '%</text>' +
+          '<text x="42" y="52" text-anchor="middle" font-size="8" fill="' + ovInkSoft() + '">elapsed</text>';
       }
     }
     function ovNiceStep(range, ticks){
@@ -1599,6 +1608,33 @@
         sub = 'Trough in ' + minYear + ', then ' + dir + fmt(Math.max(0, lastPot)) + ' by ' + endYear + '. Uses the minimum across the whole retirement, not the end point.';
       }
       ovSet('ovSurviveSub', sub);
+      tile.style.display = 'flex';
+    }
+    function ovRenderCoverage(){
+      const tile = document.getElementById('ovCoverage'); if (!tile) return;
+      const rows = (typeof drawdownRows !== 'undefined' && drawdownRows && drawdownRows.length) ? drawdownRows : [];
+      if (!rows.length){ tile.style.display = 'none'; return; }
+      let minC = Infinity, maxC = -Infinity, maxYr = null, any = false;
+      rows.forEach(r => {
+        const out = Number(r.outgoings) || 0; if (out <= 0) return;
+        const gi = (Number(r.g_otherNet) || 0) + (Number(r.j_otherNet) || 0);
+        const c = gi / out * 100; any = true;
+        if (c < minC) minC = c;
+        if (c > maxC){ maxC = c; maxYr = r.year; }
+      });
+      if (!any){ tile.style.display = 'none'; return; }
+      const lo = Math.round(minC), hi = Math.round(maxC);
+      tile.classList.remove('warn', 'danger');
+      if (lo === hi){
+        ovSet('ovCoverageNum', 'Guaranteed income covers ' + lo + '% of essential spending');
+        ovSet('ovCoverageSub', 'Fairly steady across retirement \u2014 your pots fund the rest. Essential spending = the bills/outgoings the plan must meet, net of tax.');
+      } else {
+        ovSet('ovCoverageNum', 'Guaranteed income covers ' + lo + '\u2013' + hi + '% of essential spending');
+        let sub = lo + '% in the early years, rising to about ' + hi + '% by ' + maxYr + ' once state pensions are in payment \u2014 your pots cover the gap.';
+        if (hi >= 100 && lo < 100) sub += ' Later on it fully covers the essentials.';
+        ovSet('ovCoverageSub', sub);
+      }
+      if (hi < 50) tile.classList.add('warn');
       tile.style.display = 'flex';
     }
     function ovRenderTrajectory(cs, now, target, retDate){
@@ -1669,6 +1705,7 @@
       ovRenderTrajectory(csComb, combinedNow, projCombined, c.retirementDate);
       ovRenderRealTerms(projCombined, c.retirementDate);
       ovRenderSurvive();
+      ovRenderCoverage();
 
       renderPerfBlocks();
     }
@@ -1798,7 +1835,7 @@
                 '<div class="rows">' +
                   '<div class="r"><span>Latest monthly growth</span><b class="' + cls(s.latest) + '">' + App.fmtDiff(s.latest) + '</b></div>' +
                   '<div class="r"><span>Expected growth</span><b class="' + cls(s.expected) + '">' + App.fmtDiff(s.expected) + '</b></div>' +
-                  '<div class="r"><span>Average monthly</span><b class="' + cls(s.avgPct) + '">' + fmtPct(s.avgPct) + '</b></div>' +
+                  '<div class="r"><span>Avg monthly %</span><b class="' + cls(s.avgPct) + '">' + fmtPct(s.avgPct) + '</b></div>' +
                 '</div>' +
               '</div>';
           });
