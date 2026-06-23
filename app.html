@@ -734,7 +734,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-233</span>
+    <span class="build-stamp">build: LC-234</span>
   </div>
 
   <script>
@@ -1367,13 +1367,76 @@
       }
       return series;
     }
-    function ovDeltaInfo(series){
-      if (!series || series.length < 2) return null;
-      const last = series[series.length - 1], prev = series[series.length - 2];
-      let base = series[0];
-      for (let i = 0; i < series.length; i++){ if (series[i].idx <= last.idx - 12) base = series[i]; }
-      const yDiff = last.v - base.v;
-      return { mDiff: last.v - prev.v, prev: prev, yDiff: yDiff, yPct: base.v ? yDiff / base.v * 100 : 0, months: Math.max(1, last.idx - base.idx) };
+    function ovEnsurePerfState(){
+      _perfContribs = data.contributions || [];
+      _perfExceptions = data.contributionExceptions || [];
+      _perfParams = data.paramsByMember || {};
+      _perfTiers = {};
+      (data.workingTiers || []).forEach(t => {
+        if (!t.member_name) return;
+        (_perfTiers[t.member_name] = _perfTiers[t.member_name] || []).push({ from: t.from_date ? new Date(t.from_date) : null, days: Number(t.days) });
+      });
+      Object.keys(_perfTiers).forEach(m => _perfTiers[m].sort((a, b) => (a.from || 0) - (b.from || 0)));
+    }
+    // True (contribution-stripped) growth for one pension over a trailing window, using the
+    // same bucket/contribution logic as perfStats but summed across the window rather than averaged.
+    function ovPensionWindow(rawLogs, windowMonths){
+      const logs = rawLogs.slice().sort((a, b) => new Date(a.log_date) - new Date(b.log_date));
+      if (logs.length < 2) return null;
+      const md = perfBuckets(logs), mk = Object.keys(md).sort();
+      const lastLog = a => Number(a.logs[a.logs.length - 1].pot_value);
+      if (mk.length < 2){
+        const ml = md[mk[0]].logs, fv = Number(ml[0].pot_value), cv = Number(ml[ml.length - 1].pot_value);
+        const sc = md[mk[0]].hasContrib ? md[mk[0]].expectedAmt : 0;
+        return { organic: cv - fv - sc, startVal: fv, months: 1 };
+      }
+      const abs = key => { const p = key.split('-'); return Number(p[0]) * 12 + Number(p[1]); };
+      const lastAbs = abs(mk[mk.length - 1]), winStart = lastAbs - windowMonths;
+      let organic = 0, startVal = null, firstPrev = null;
+      for (let i = 1; i < mk.length; i++){
+        const prevAbs = abs(mk[i - 1]);
+        if (prevAbs < winStart) continue;
+        const cur = lastLog(md[mk[i]]), prev = lastLog(md[mk[i - 1]]);
+        const monthDiff = Math.max(1, abs(mk[i]) - prevAbs);
+        const contrib = (md[mk[i]].hasContrib ? md[mk[i]].expectedAmt : 0) * monthDiff;
+        organic += (cur - prev - contrib);
+        if (startVal === null){ startVal = prev; firstPrev = prevAbs; }
+      }
+      if (startVal === null){   // last step is older than the window — fall back to it
+        const i = mk.length - 1, prevAbs = abs(mk[i - 1]);
+        const cur = lastLog(md[mk[i]]), prev = lastLog(md[mk[i - 1]]);
+        const monthDiff = Math.max(1, abs(mk[i]) - prevAbs);
+        const contrib = (md[mk[i]].hasContrib ? md[mk[i]].expectedAmt : 0) * monthDiff;
+        return { organic: cur - prev - contrib, startVal: prev, months: monthDiff };
+      }
+      return { organic: organic, startVal: startVal, months: lastAbs - firstPrev };
+    }
+    // Aggregate true growth across a member's pensions (memberPred null = everyone).
+    function ovMemberTrueGrowth(memberPred, windowMonths){
+      ovEnsurePerfState();
+      const dict = {};
+      (data.logs || []).forEach(l => { if (memberPred && !memberPred(l.member_name)) return; const k = l.member_name + '|' + l.pension_name; (dict[k] = dict[k] || []).push(l); });
+      let amt = 0, start = 0, months = 0, any = false;
+      Object.keys(dict).forEach(k => {
+        const w = ovPensionWindow(dict[k], windowMonths);
+        if (!w) return;
+        amt += w.organic; start += w.startVal; any = true; if (w.months > months) months = w.months;
+      });
+      if (!any || start <= 0) return null;
+      return { amt: amt, pct: amt / start * 100, months: months || windowMonths };
+    }
+    function ovRenderDelta(id, memberPred, full){
+      const el = document.getElementById(id); if (!el) return;
+      if (memberPred === false){ el.innerHTML = ''; return; }   // no second member
+      const tg = ovMemberTrueGrowth(memberPred, 12);
+      if (!tg){ el.innerHTML = '<span class="ov-microsub">Not enough logs yet</span>'; return; }
+      const cls = tg.amt >= 0 ? 'pos' : 'neg', arrow = tg.amt >= 0 ? '\u25B2' : '\u25BC';
+      const span = tg.months >= 12 ? 'over 12m' : ('over ' + tg.months + 'm');
+      const pctPart = '<span class="' + cls + '">' + arrow + ' ' + ovSignPct(tg.pct) + '</span> growth ' + span;
+      const amtPart = ovSignMoney(tg.amt) + ' growth';
+      el.innerHTML = full
+        ? pctPart + '<div class="ov-microsub">' + amtPart + ' \u00B7 contributions removed</div>'
+        : pctPart + '<div class="ov-microsub">' + amtPart + '</div>';
     }
     function ovSparkInto(el, vals){
       if (!el) return;
@@ -1391,19 +1454,6 @@
     }
     function ovRenderSpark(id, series){ ovSparkInto(document.getElementById(id), (series || []).map(p => p.v)); }
     function ovRenderSparkVals(id, vals){ ovSparkInto(document.getElementById(id), vals); }
-    function ovRenderDelta(id, series, full){
-      const el = document.getElementById(id); if (!el) return;
-      const info = ovDeltaInfo(series);
-      if (!info){ el.innerHTML = '<span class="ov-microsub">Not enough logs yet</span>'; return; }
-      const yCls = info.yDiff >= 0 ? 'pos' : 'neg', arrow = info.yDiff >= 0 ? '\u25B2' : '\u25BC';
-      const yPart = '<span class="' + yCls + '">' + arrow + ' ' + ovSignPct(info.yPct) + '</span> over ' + info.months + 'm';
-      if (full){
-        const mCls = info.mDiff >= 0 ? 'pos' : 'neg';
-        el.innerHTML = '<span class="' + mCls + '">' + ovSignMoney(info.mDiff) + '</span> last month<div class="ov-microsub">' + yPart + '</div>';
-      } else {
-        el.innerHTML = yPart;
-      }
-    }
     function ovRenderStrip(cs){
       const strip = document.getElementById('ovStrip'), txt = document.getElementById('ovStripText'), stamp = document.getElementById('ovStamp');
       const dates = (data.logs || []).map(l => new Date(l.log_date)).filter(d => !isNaN(d));
@@ -1515,9 +1565,9 @@
       document.getElementById('ovNote').textContent = 'Projected figures assume retirement in ' + ry + ', at the growth rate, contributions and working-pattern shown on the Modelling tab.';
 
       const csComb = ovCombinedSeries(null);
-      ovRenderSpark('ovSparkCombined', csComb); ovRenderDelta('ovDeltaCombined', csComb, true);
-      const csG = ovCombinedSeries(m => m === p1Name); ovRenderSpark('ovSparkGraham', csG); ovRenderDelta('ovDeltaGraham', csG, false);
-      const csJ = p2Name ? ovCombinedSeries(m => m === p2Name) : []; ovRenderSpark('ovSparkJulie', csJ); ovRenderDelta('ovDeltaJulie', csJ, false);
+      ovRenderSpark('ovSparkCombined', csComb); ovRenderDelta('ovDeltaCombined', null, true);
+      const csG = ovCombinedSeries(m => m === p1Name); ovRenderSpark('ovSparkGraham', csG); ovRenderDelta('ovDeltaGraham', m => m === p1Name, false);
+      const csJ = p2Name ? ovCombinedSeries(m => m === p2Name) : []; ovRenderSpark('ovSparkJulie', csJ); ovRenderDelta('ovDeltaJulie', p2Name ? (m => m === p2Name) : false, false);
       ovRenderStrip(csComb);
       ovRenderDonut(g, j);
       ovRenderCountProg(combinedNow, projCombined, c.retirementDate);
@@ -1614,16 +1664,7 @@
     function renderPerfBlocks() {
       const host = document.getElementById('ovPerf');
       if (!host) return;
-      _perfContribs = data.contributions || [];
-      _perfExceptions = data.contributionExceptions || [];
-      _perfParams = data.paramsByMember || {};
-      _perfTiers = {};
-      (data.workingTiers || []).forEach(t => {
-        if (!t.member_name) return;
-        (_perfTiers[t.member_name] = _perfTiers[t.member_name] || []).push({ from: t.from_date ? new Date(t.from_date) : null, days: Number(t.days) });
-      });
-      Object.keys(_perfTiers).forEach(m => _perfTiers[m].sort((a, b) => (a.from || 0) - (b.from || 0)));
-
+      ovEnsurePerfState();
       const dict = {};
       (data.logs || []).forEach(l => { const k = l.member_name + '|' + l.pension_name; (dict[k] = dict[k] || []).push(l); });
 
