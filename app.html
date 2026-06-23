@@ -36,6 +36,9 @@
     .btn-toggle:hover { background:var(--accent-soft); }
     .btn-toggle.active-toggle { background:var(--accent); color:#fff; }
     .scope-toggle { display:flex; align-items:center; gap:10px; margin:0 0 14px; flex-wrap:wrap; }
+    .ret-controls { display:flex; flex-wrap:wrap; align-items:center; gap:12px 28px; margin:0 0 14px; }
+    .ret-controls > div { margin:0; }
+    .ret-controls .scope-toggle { margin:0; }
     .scope-lbl { font-weight:bold; color:var(--ink); font-size:14px; }
     .who { font-size:13px; color:var(--ink-soft); }
     .who a { color:var(--accent); font-weight:600; cursor:pointer; text-decoration:none; margin-left:10px; }
@@ -514,6 +517,7 @@
       <span class="sw-pill">Savings fund bills: <b id="ret_savb_state">&hellip;</b><button type="button" class="info-btn" onclick="toggleInfo(event,'info_savb_ret')" aria-label="About Savings fund bills">i</button></span>
       <div class="info-text" id="info_savb_ret">When off, savings don&rsquo;t subsidise bills and grow on their own; an unaffordable purchase is flagged on the Cash &amp; Purchases page rather than drawing the pension. Change this on the Modelling page, in the left-hand controls rail.</div>
     </div>
+    <div class="ret-controls">
     <div class="scope-toggle">
       <span class="scope-lbl">Show:</span>
       <div class="view-toggle">
@@ -522,20 +526,21 @@
         <button class="btn-toggle vt" data-view="p2" onclick="setView(p2Name)">Julie</button>
       </div>
     </div>
-    <div style="margin:0 0 12px; font-size:14px;">
+    <div style="font-size:14px;">
       <strong style="color:#2c3e50; margin-right:10px;">View:</strong>
       <label style="margin-right:16px; cursor:pointer;"><input type="radio" name="retGran" value="year" checked onchange="setRetGran('year')"> Annual</label>
       <label style="cursor:pointer;"><input type="radio" name="retGran" value="month" onchange="setRetGran('month')"> Monthly</label>
     </div>
-    <div style="margin:0 0 12px; font-size:14px;">
+    <div style="font-size:14px;">
       <label style="cursor:pointer; display:inline-flex; align-items:center; gap:8px;"><input type="checkbox" id="retGrowthToggle" class="toggle-switch" onchange="toggleRetGrowth()"> <span>Show investment growth on each pot</span></label>
     </div>
-    <div style="margin:0 0 12px;">
+    <div style="position:relative;">
       <button type="button" id="colChooserBtn" onclick="toggleColChooser()" style="padding:9px 14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); color:var(--ink); font-weight:bold; font-size:14px; cursor:pointer;">Columns &#9662;</button>
-      <div id="colChooser" style="display:none; margin-top:8px; padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); max-width:520px;">
+      <div id="colChooser" style="display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:20; padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); max-width:520px; box-shadow:0 6px 20px rgba(0,0,0,0.25);">
         <div style="font-size:13px; color:var(--ink-soft); margin-bottom:10px;">Tick the columns to show. Year and Total Gross Income always stay.</div>
         <div id="colChooserList" style="display:grid; grid-template-columns:1fr 1fr; gap:8px 18px;"></div>
       </div>
+    </div>
     </div>
     <div class="table-wrap">
       <table id="rTable">
@@ -597,7 +602,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-230</span>
+    <span class="build-stamp">build: LC-231</span>
   </div>
 
   <script>
