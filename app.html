@@ -82,6 +82,73 @@
     #Overview .perf-measure-grid { gap:8px; margin-bottom:6px; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); }
     #Overview #status { margin-bottom:8px; }
 
+    /* ===== Overview dashboard ===== */
+    .ov-section { margin:0 0 22px; }
+    .ov-head { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 12px; padding-bottom:6px; border-bottom:2px solid var(--line); }
+    .ov-head .ttl { display:flex; align-items:center; gap:9px; font-size:17px; font-weight:700; color:var(--ink); }
+    .ov-head .ttl .bar4 { width:4px; height:18px; border-radius:3px; background:var(--accent); }
+    .ov-stamp { font-size:11px; color:#94a3b8; }
+    .ov-sub { font-size:12px; color:var(--ink-soft); margin:0 0 12px; }
+
+    .ov-spark { width:100%; height:34px; margin:8px 0 4px; display:block; }
+    .ov-delta { font-size:12.5px; font-weight:600; }
+    .ov-microsub { font-size:11px; color:var(--ink-soft); }
+    .pos { color:var(--pos); } .neg { color:var(--neg); }
+
+    /* since-last-log strip */
+    .ov-strip { display:flex; align-items:center; gap:11px; background:var(--accent-soft); border:1px solid var(--accent-border); border-radius:var(--radius); padding:10px 14px; font-size:13.5px; margin:0 0 14px; }
+    .ov-strip .dot { flex:0 0 auto; width:9px; height:9px; border-radius:50%; background:var(--pos); }
+    .ov-strip b { color:var(--ink); }
+
+    /* hero band */
+    .ov-hero { display:grid; grid-template-columns:1.7fr 1fr 1fr; gap:12px; align-items:stretch; margin-bottom:14px; }
+    .ov-hero .lead { background:linear-gradient(135deg,var(--accent-soft),#f3fafa); border:1px solid var(--accent-border); border-radius:var(--radius); padding:16px 18px; text-align:left; }
+    .ov-hero .lead h3 { color:var(--accent-dark); margin:0 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:0.04em; }
+    .ov-hero .lead .value { font-size:34px; font-weight:700; color:var(--accent-dark); line-height:1.05; }
+    .ov-hero .mtile { text-align:left; padding:14px 15px; }
+    .ov-hero .mtile h3 { text-align:left; }
+    .ov-hero .mtile .value { font-size:21px; }
+
+    /* composition donut */
+    .ov-donut-card { display:flex; align-items:center; gap:24px; flex-wrap:wrap; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:14px 18px; }
+    .ov-legend { display:flex; flex-direction:column; gap:8px; font-size:13px; }
+    .ov-legend .li { display:flex; align-items:center; gap:9px; }
+    .ov-legend .sw { width:13px; height:13px; border-radius:3px; flex:0 0 auto; }
+    .ov-legend .amt { color:var(--ink-soft); margin-left:4px; }
+
+    /* countdown + progress */
+    .ov-path-top { display:grid; grid-template-columns:minmax(220px,1fr) 2fr; gap:12px; margin-bottom:14px; }
+    .ov-count { display:flex; align-items:center; gap:16px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; }
+    .ov-count .cnum { font-size:26px; font-weight:700; color:var(--accent-dark); line-height:1; }
+    .ov-count .csub { font-size:12.5px; color:var(--ink-soft); margin-top:5px; }
+    .ov-prog { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; }
+    .ov-prog .prow { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+    .ov-prog .prow .big { font-size:16px; font-weight:700; }
+    .ov-prog .prow .pct { font-size:18px; font-weight:700; color:var(--accent-dark); }
+    .ov-bar { height:16px; background:#e7edee; border-radius:9px; overflow:hidden; border:1px solid var(--line); }
+    .ov-bar > span { display:block; height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-dark)); border-radius:9px; }
+    .ov-bar-legend { display:flex; justify-content:space-between; font-size:11px; color:var(--ink-soft); margin-top:6px; }
+
+    .ov-traj { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px 10px; margin-bottom:14px; }
+    .ov-traj-legend { display:flex; gap:18px; font-size:12px; color:var(--ink-soft); margin-top:8px; flex-wrap:wrap; }
+
+    /* performance tiles */
+    .ov-perf-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; margin-bottom:8px; }
+    .ov-perf-card { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:14px; }
+    .ov-perf-card .pname { font-size:13px; font-weight:700; color:var(--ink); display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    .ov-perf-card .pcur { font-size:23px; font-weight:700; margin:4px 0 2px; }
+    .ov-perf-card .rows { margin-top:8px; border-top:1px solid var(--line); padding-top:8px; display:flex; flex-direction:column; gap:5px; }
+    .ov-perf-card .r { display:flex; justify-content:space-between; font-size:12px; }
+    .ov-perf-card .r span:first-child { color:var(--ink-soft); }
+    .ov-pill { font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:10px; white-space:nowrap; }
+    .ov-pill.up { background:#e7f4ec; color:var(--pos); } .ov-pill.down { background:#fbeaea; color:var(--neg); }
+
+    @media (max-width:680px){
+      .ov-hero { grid-template-columns:1fr 1fr; }
+      .ov-hero .lead { grid-column:1 / -1; }
+      .ov-path-top { grid-template-columns:1fr; }
+    }
+
     .chart-box { width:100%; height:400px; margin-bottom:20px; }
     .chart-wrap { position:relative; }
     .chart-fs-btn { position:absolute; top:8px; right:8px; z-index:6; display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; padding:0; border:1px solid var(--line-strong); border-radius:8px; background:var(--surface); color:var(--ink-soft); cursor:pointer; opacity:0.8; box-shadow:var(--shadow); }
@@ -364,19 +431,84 @@
 
   <div id="Overview" class="tabcontent active">
     <div id="status" class="s-load">Loading…</div>
-    <h2>Current Position</h2>
-    <div class="card-grid">
-      <div class="card hl" id="cardCombinedNow"><h3>Combined pot now</h3><div id="ovCombined" class="value">£0</div></div>
-      <div class="card" id="cardP1Now"><h3><span class="nm-p1">Graham</span> now</h3><div id="ovGraham" class="value">£0</div></div>
-      <div class="card" id="cardP2Now"><h3><span class="nm-p2">Julie</span> now</h3><div id="ovJulie" class="value">£0</div></div>
+
+    <!-- ===== Section 1: where things stand now ===== -->
+    <div class="ov-section">
+      <div class="ov-head">
+        <div class="ttl"><span class="bar4"></span> Current position</div>
+        <div class="ov-stamp" id="ovStamp"></div>
+      </div>
+
+      <div class="ov-strip" id="ovStrip" style="display:none;">
+        <span class="dot"></span><div id="ovStripText"></div>
+      </div>
+
+      <div class="ov-hero">
+        <div class="lead" id="cardCombinedNow">
+          <h3>Combined pot now</h3>
+          <div class="value" id="ovCombined">&pound;0</div>
+          <svg class="ov-spark" id="ovSparkCombined" style="height:46px;"></svg>
+          <div class="ov-delta" id="ovDeltaCombined"></div>
+        </div>
+        <div class="card mtile">
+          <h3><span class="nm-p1">Graham</span> now</h3>
+          <div class="value" id="ovGraham">&pound;0</div>
+          <svg class="ov-spark" id="ovSparkGraham"></svg>
+          <div class="ov-delta" id="ovDeltaGraham"></div>
+        </div>
+        <div class="card mtile" id="cardP2Now">
+          <h3><span class="nm-p2">Julie</span> now</h3>
+          <div class="value" id="ovJulie">&pound;0</div>
+          <svg class="ov-spark" id="ovSparkJulie"></svg>
+          <div class="ov-delta" id="ovDeltaJulie"></div>
+        </div>
+      </div>
+
+      <div class="ov-donut-card" id="ovDonutCard" style="display:none;">
+        <div id="ovDonutHost"></div>
+        <div class="ov-legend" id="ovDonutLegend"></div>
+      </div>
     </div>
-    <h2 style="margin-top:12px;">Projected at Retirement</h2>
-    <div class="card-grid">
-      <div class="card hl" id="cardCombinedRet"><h3>Combined pot at retirement</h3><div id="ovProjCombined" class="value">£0</div></div>
-      <div class="card" id="cardP1Ret"><h3><span class="nm-p1">Graham</span> at retirement</h3><div id="ovProjGraham" class="value">£0</div></div>
-      <div class="card" id="cardP2Ret"><h3><span class="nm-p2">Julie</span> at retirement</h3><div id="ovProjJulie" class="value">£0</div></div>
+
+    <!-- ===== Section 2: where it's heading ===== -->
+    <div class="ov-section" id="ovPathSection">
+      <div class="ov-head"><div class="ttl"><span class="bar4"></span> Path to retirement</div></div>
+
+      <div class="ov-path-top">
+        <div class="ov-count">
+          <svg id="ovCountRing" width="84" height="84" viewBox="0 0 84 84"></svg>
+          <div>
+            <div class="cnum" id="ovCountNum">&mdash;</div>
+            <div class="csub" id="ovCountSub">&mdash;</div>
+          </div>
+        </div>
+        <div class="ov-prog">
+          <div class="prow">
+            <div class="big"><span id="ovProgNow">&pound;0</span> <span class="ov-microsub">of <span id="ovProgTarget">&pound;0</span> projected</span></div>
+            <div class="pct" id="ovProgPct">&mdash;</div>
+          </div>
+          <div class="ov-bar"><span id="ovProgFill" style="width:0%;"></span></div>
+          <div class="ov-bar-legend"><span>Today</span><span id="ovProgRetLabel">Target at retirement</span></div>
+        </div>
+      </div>
+
+      <div class="ov-traj">
+        <div id="ovTrajHost"></div>
+        <div class="ov-traj-legend">
+          <span><span style="display:inline-block; width:18px; height:3px; background:var(--accent); vertical-align:middle; margin-right:6px;"></span>Logged history</span>
+          <span><span style="display:inline-block; width:18px; height:0; border-top:3px dashed #7cb9ba; vertical-align:middle; margin-right:6px;"></span>Projected to retirement</span>
+        </div>
+      </div>
+
+      <div class="card-grid">
+        <div class="card hl" id="cardCombinedRet"><h3>Combined pot at retirement</h3><div id="ovProjCombined" class="value">&pound;0</div></div>
+        <div class="card"><h3><span class="nm-p1">Graham</span> at retirement</h3><div id="ovProjGraham" class="value">&pound;0</div></div>
+        <div class="card" id="cardP2Ret"><h3><span class="nm-p2">Julie</span> at retirement</h3><div id="ovProjJulie" class="value">&pound;0</div></div>
+      </div>
+      <p class="ov-sub" id="ovNote" style="margin-top:8px;"></p>
     </div>
-    <p class="note" id="ovNote" style="margin-top:8px;"></p>
+
+    <!-- ===== Section 3: per-pension detail ===== -->
     <div id="ovPerf"></div>
   </div>
 
@@ -602,7 +734,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-232</span>
+    <span class="build-stamp">build: LC-233</span>
   </div>
 
   <script>
@@ -1194,19 +1326,203 @@
       });
     }
 
+    let _ovSparkSeq = 0;
+    function ovTok(n){ return (getComputedStyle(document.documentElement).getPropertyValue(n) || '').trim(); }
+    function ovAccent(){ return ovTok('--accent') || '#2c7a7b'; }
+    function ovInk(){ return ovTok('--ink') || '#26333a'; }
+    function ovInkSoft(){ return ovTok('--ink-soft') || '#64748b'; }
+    function ovTrack(){ return ovTok('--line') || '#e2e8f0'; }
+    const ovMon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function ovMonthIdx(d){ const x = new Date(d); return isNaN(x) ? NaN : x.getFullYear() * 12 + x.getMonth(); }
+    function ovMonthLabel(idx){ return ovMon[((idx % 12) + 12) % 12] + ' ' + Math.floor(idx / 12); }
+    function ovFmtDate(d){ return d ? (d.getDate() + ' ' + ovMon[d.getMonth()] + ' ' + d.getFullYear()) : ''; }
+    function ovSignPct(v){ return (v >= 0 ? '+' : '') + v.toFixed(1) + '%'; }
+    function ovSignMoney(v){ return (v >= 0 ? '+' : '\u2212') + fmt(Math.abs(v)); }
+    function ovShortMoney(v){ const a = Math.abs(v); if (a >= 1e6) return '\u00A3' + (v / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'm'; if (a >= 1e3) return '\u00A3' + Math.round(v / 1e3) + 'k'; return fmt(v); }
+
+    // Carry-forward monthly series of the combined pot from logged values.
+    // memberPred(name) optionally restricts to one member; null = everyone.
+    function ovCombinedSeries(memberPred){
+      const logs = (data.logs || []).slice()
+        .filter(l => l.pot_value !== null && l.pot_value !== '' && (!memberPred || memberPred(l.member_name)))
+        .sort((a, b) => new Date(a.log_date) - new Date(b.log_date));
+      const byPen = {};
+      logs.forEach(l => {
+        const idx = ovMonthIdx(l.log_date); if (isNaN(idx)) return;
+        const k = l.member_name + '|' + l.pension_name;
+        (byPen[k] = byPen[k] || {})[idx] = Number(l.pot_value);   // latest in month wins (sorted asc)
+      });
+      const pens = Object.keys(byPen); if (!pens.length) return [];
+      const sorted = {}; let lo = Infinity, hi = -Infinity;
+      pens.forEach(k => { const a = Object.keys(byPen[k]).map(Number).sort((x, y) => x - y); sorted[k] = a; lo = Math.min(lo, a[0]); hi = Math.max(hi, a[a.length - 1]); });
+      const series = [];
+      for (let idx = lo; idx <= hi; idx++){
+        let sum = 0, any = false;
+        pens.forEach(k => {
+          const a = sorted[k]; let v = null;
+          for (let m = 0; m < a.length; m++){ if (a[m] <= idx) v = byPen[k][a[m]]; else break; }
+          if (v != null){ sum += v; any = true; }
+        });
+        if (any) series.push({ idx: idx, label: ovMonthLabel(idx), v: sum });
+      }
+      return series;
+    }
+    function ovDeltaInfo(series){
+      if (!series || series.length < 2) return null;
+      const last = series[series.length - 1], prev = series[series.length - 2];
+      let base = series[0];
+      for (let i = 0; i < series.length; i++){ if (series[i].idx <= last.idx - 12) base = series[i]; }
+      const yDiff = last.v - base.v;
+      return { mDiff: last.v - prev.v, prev: prev, yDiff: yDiff, yPct: base.v ? yDiff / base.v * 100 : 0, months: Math.max(1, last.idx - base.idx) };
+    }
+    function ovSparkInto(el, vals){
+      if (!el) return;
+      if (!vals || vals.length < 2){ el.innerHTML = ''; return; }
+      const W = 240, H = 40, pad = 3;
+      const min = Math.min.apply(null, vals), max = Math.max.apply(null, vals), span = (max - min) || 1;
+      const step = W / (vals.length - 1);
+      const pts = vals.map((v, i) => [i * step, H - pad - ((v - min) / span) * (H - 2 * pad)]);
+      const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+      const col = ovAccent();
+      el.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      el.setAttribute('preserveAspectRatio', 'none');
+      el.innerHTML = '<path d="' + d + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z" fill="' + col + '" opacity="0.10"/>' +
+        '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/>';
+    }
+    function ovRenderSpark(id, series){ ovSparkInto(document.getElementById(id), (series || []).map(p => p.v)); }
+    function ovRenderSparkVals(id, vals){ ovSparkInto(document.getElementById(id), vals); }
+    function ovRenderDelta(id, series, full){
+      const el = document.getElementById(id); if (!el) return;
+      const info = ovDeltaInfo(series);
+      if (!info){ el.innerHTML = '<span class="ov-microsub">Not enough logs yet</span>'; return; }
+      const yCls = info.yDiff >= 0 ? 'pos' : 'neg', arrow = info.yDiff >= 0 ? '\u25B2' : '\u25BC';
+      const yPart = '<span class="' + yCls + '">' + arrow + ' ' + ovSignPct(info.yPct) + '</span> over ' + info.months + 'm';
+      if (full){
+        const mCls = info.mDiff >= 0 ? 'pos' : 'neg';
+        el.innerHTML = '<span class="' + mCls + '">' + ovSignMoney(info.mDiff) + '</span> last month<div class="ov-microsub">' + yPart + '</div>';
+      } else {
+        el.innerHTML = yPart;
+      }
+    }
+    function ovRenderStrip(cs){
+      const strip = document.getElementById('ovStrip'), txt = document.getElementById('ovStripText'), stamp = document.getElementById('ovStamp');
+      const dates = (data.logs || []).map(l => new Date(l.log_date)).filter(d => !isNaN(d));
+      const latest = dates.length ? new Date(Math.max.apply(null, dates.map(d => d.getTime()))) : null;
+      if (stamp) stamp.textContent = latest ? ('Updated from your last log \u00B7 ' + ovFmtDate(latest)) : '';
+      if (!strip || !txt) return;
+      if (!cs || cs.length < 2 || !latest){ strip.style.display = 'none'; return; }
+      const last = cs[cs.length - 1], prev = cs[cs.length - 2], diff = last.v - prev.v, pct = prev.v ? diff / prev.v * 100 : 0;
+      txt.innerHTML = 'Last logged <b>' + ovFmtDate(latest) + '</b> \u2014 combined pot ' + (diff >= 0 ? 'up' : 'down') +
+        ' <b class="' + (diff >= 0 ? 'pos' : 'neg') + '">' + ovSignMoney(diff) + ' (' + ovSignPct(pct) + ')</b> since ' + prev.label + '.';
+      strip.style.display = 'flex';
+    }
+    function ovRenderDonut(g, j){
+      const card = document.getElementById('ovDonutCard'), host = document.getElementById('ovDonutHost'), leg = document.getElementById('ovDonutLegend');
+      if (!card || !host) return;
+      const total = g + j;
+      if (!total || !p2Name || (g <= 0 && j <= 0)){ card.style.display = 'none'; return; }
+      const segs = [{ v: g, color: ovAccent(), label: p1Name }, { v: j, color: '#7cb9ba', label: p2Name }];
+      const r = 52, c = 2 * Math.PI * r; let off = 0, rings = '';
+      segs.forEach(s => {
+        const len = s.v / total * c;
+        rings += '<circle cx="70" cy="70" r="' + r + '" fill="none" stroke="' + s.color + '" stroke-width="18" stroke-dasharray="' +
+          len.toFixed(2) + ' ' + (c - len).toFixed(2) + '" stroke-dashoffset="' + (-off).toFixed(2) + '" transform="rotate(-90 70 70)"/>';
+        off += len;
+      });
+      host.innerHTML = '<svg width="140" height="140" viewBox="0 0 140 140">' + rings +
+        '<text x="70" y="65" text-anchor="middle" font-size="11" fill="' + ovInkSoft() + '">Combined</text>' +
+        '<text x="70" y="86" text-anchor="middle" font-size="18" font-weight="700" fill="' + ovInk() + '">' + ovShortMoney(total) + '</text></svg>';
+      if (leg) leg.innerHTML = segs.map(s =>
+        '<div class="li"><span class="sw" style="background:' + s.color + ';"></span> ' + s.label +
+        ' <span class="amt">' + fmt(s.v) + ' \u00B7 ' + Math.round(s.v / total * 100) + '%</span></div>').join('');
+      card.style.display = 'flex';
+    }
+    function ovSet(id, t){ const e = document.getElementById(id); if (e) e.textContent = t; }
+    function ovRenderCountProg(now, target, retDate){
+      const pct = target > 0 ? Math.max(0, Math.min(100, now / target * 100)) : 0;
+      ovSet('ovProgNow', fmt(now)); ovSet('ovProgTarget', fmt(target)); ovSet('ovProgPct', Math.round(pct) + '%');
+      const fill = document.getElementById('ovProgFill'); if (fill) fill.style.width = pct.toFixed(0) + '%';
+      if (retDate){
+        const today = new Date();
+        let months = (retDate.getFullYear() - today.getFullYear()) * 12 + (retDate.getMonth() - today.getMonth());
+        if (months < 0) months = 0;
+        const yrs = Math.floor(months / 12), mo = months % 12;
+        ovSet('ovCountNum', months <= 0 ? 'Retired' : (yrs + ' yr' + (yrs !== 1 ? 's' : '') + (mo ? ' ' + mo + ' mo' : '')));
+        ovSet('ovCountSub', months <= 0 ? 'planned date reached' : ('until retirement \u00B7 ' + ovMon[retDate.getMonth()] + ' ' + retDate.getFullYear()));
+        ovSet('ovProgRetLabel', 'Target at retirement \u2014 ' + ovMon[retDate.getMonth()] + ' ' + retDate.getFullYear());
+      } else { ovSet('ovCountNum', '\u2014'); ovSet('ovCountSub', 'set a retirement date on Modelling'); }
+      const ring = document.getElementById('ovCountRing');
+      if (ring){
+        const r = 34, circ = 2 * Math.PI * r, dash = circ * (pct / 100);
+        ring.innerHTML = '<circle cx="42" cy="42" r="' + r + '" fill="none" stroke="' + ovTrack() + '" stroke-width="8"/>' +
+          '<circle cx="42" cy="42" r="' + r + '" fill="none" stroke="' + ovAccent() + '" stroke-width="8" stroke-linecap="round" stroke-dasharray="' +
+          dash.toFixed(1) + ' ' + (circ - dash).toFixed(1) + '" transform="rotate(-90 42 42)"/>' +
+          '<text x="42" y="46" text-anchor="middle" font-size="13" font-weight="700" fill="' + ovAccent() + '">' + Math.round(pct) + '%</text>';
+      }
+    }
+    function ovRenderTrajectory(cs, now, target, retDate){
+      const host = document.getElementById('ovTrajHost'); if (!host) return;
+      const yr = {}; (cs || []).forEach(p => { yr[Math.floor(p.idx / 12)] = p.v; });
+      let actual = Object.keys(yr).map(Number).sort((a, b) => a - b).map(y => [y, yr[y]]);
+      const nowYear = new Date().getFullYear();
+      if (!actual.length) actual = [[nowYear, now]];
+      if (actual[actual.length - 1][0] < nowYear) actual.push([nowYear, now]); else actual[actual.length - 1] = [nowYear, now];
+      let proj = []; const retYear = retDate ? retDate.getFullYear() : null;
+      if (retYear && retYear > nowYear && target > 0){
+        const n = retYear - nowYear, s = Math.max(1, now);
+        for (let i = 0; i <= n; i++){ const f = i / n; proj.push([nowYear + i, s * Math.pow(target / s, f)]); }
+      }
+      const xs = actual.map(p => p[0]).concat(proj.map(p => p[0]));
+      const ys = actual.map(p => p[1]).concat(proj.map(p => p[1])).concat([0]);
+      const xmin = Math.min.apply(null, xs), xmax = Math.max.apply(null, xs), ymax = (Math.max.apply(null, ys) * 1.10) || 1;
+      const W = 1000, H = 230, padL = 58, padR = 16, padT = 14, padB = 28;
+      const px = x => (xmax === xmin) ? padL : padL + (x - xmin) / (xmax - xmin) * (W - padL - padR);
+      const py = y => H - padB - (y / ymax) * (H - padT - padB);
+      const path = arr => arr.map((p, i) => (i ? 'L' : 'M') + px(p[0]).toFixed(1) + ' ' + py(p[1]).toFixed(1)).join(' ');
+      let grid = '';
+      for (let k = 0; k <= 4; k++){ const gv = ymax * k / 4, Y = py(gv); grid +=
+        '<line x1="' + padL + '" y1="' + Y + '" x2="' + (W - padR) + '" y2="' + Y + '" stroke="' + ovTrack() + '" stroke-width="1"/>' +
+        '<text x="' + (padL - 8) + '" y="' + (Y + 4) + '" text-anchor="end" font-size="12" fill="' + ovInkSoft() + '">' + ovShortMoney(gv) + '</text>'; }
+      let xl = ''; const stepY = Math.max(1, Math.round((xmax - xmin) / 5));
+      for (let y = xmin; y <= xmax; y += stepY) xl += '<text x="' + px(y) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="12" fill="' + ovInkSoft() + '">' + y + '</text>';
+      const accent = ovAccent();
+      let markers = '<circle cx="' + px(nowYear) + '" cy="' + py(now) + '" r="5" fill="' + accent + '"/>' +
+        '<text x="' + px(nowYear) + '" y="' + (py(now) - 12) + '" text-anchor="middle" font-size="12" font-weight="700" fill="' + accent + '">now</text>';
+      if (retYear && retYear > nowYear) markers +=
+        '<line x1="' + px(retYear) + '" y1="' + padT + '" x2="' + px(retYear) + '" y2="' + (H - padB) + '" stroke="' + ovTrack() + '" stroke-dasharray="3 4"/>' +
+        '<circle cx="' + px(retYear) + '" cy="' + py(target) + '" r="5" fill="' + accent + '"/>' +
+        '<text x="' + (px(retYear) - 4) + '" y="' + (py(target) - 12) + '" text-anchor="end" font-size="12" font-weight="700" fill="' + accent + '">retire</text>';
+      host.innerHTML = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" style="display:block">' +
+        grid + xl +
+        (proj.length ? '<path d="' + path(proj) + '" fill="none" stroke="#7cb9ba" stroke-width="2.5" stroke-dasharray="6 6" stroke-linecap="round"/>' : '') +
+        '<path d="' + path(actual) + '" fill="none" stroke="' + accent + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' +
+        markers + '</svg>';
+    }
+
     function renderOverview() {
       const pots = PensionEngine.latestPots(data);
       let g = 0, j = 0;
       Object.keys(pots).forEach(k => { if (k.indexOf(p1Name + '|') === 0) g += pots[k]; if (p2Name && k.indexOf(p2Name + '|') === 0) j += pots[k]; });
+      const combinedNow = g + j, projCombined = livePots.graham + livePots.julie;
       document.getElementById('ovGraham').textContent = fmt(g);
       document.getElementById('ovJulie').textContent = fmt(j);
-      document.getElementById('ovCombined').textContent = fmt(g + j);
+      document.getElementById('ovCombined').textContent = fmt(combinedNow);
       document.getElementById('ovProjGraham').textContent = fmt(livePots.graham);
       document.getElementById('ovProjJulie').textContent = fmt(livePots.julie);
-      document.getElementById('ovProjCombined').textContent = fmt(livePots.graham + livePots.julie);
+      document.getElementById('ovProjCombined').textContent = fmt(projCombined);
       const c = readControls();
-      const ry = c.retirementDate ? c.retirementDate.getFullYear() : '—';
+      const ry = c.retirementDate ? c.retirementDate.getFullYear() : '\u2014';
       document.getElementById('ovNote').textContent = 'Projected figures assume retirement in ' + ry + ', at the growth rate, contributions and working-pattern shown on the Modelling tab.';
+
+      const csComb = ovCombinedSeries(null);
+      ovRenderSpark('ovSparkCombined', csComb); ovRenderDelta('ovDeltaCombined', csComb, true);
+      const csG = ovCombinedSeries(m => m === p1Name); ovRenderSpark('ovSparkGraham', csG); ovRenderDelta('ovDeltaGraham', csG, false);
+      const csJ = p2Name ? ovCombinedSeries(m => m === p2Name) : []; ovRenderSpark('ovSparkJulie', csJ); ovRenderDelta('ovDeltaJulie', csJ, false);
+      ovRenderStrip(csComb);
+      ovRenderDonut(g, j);
+      ovRenderCountProg(combinedNow, projCombined, c.retirementDate);
+      ovRenderTrajectory(csComb, combinedNow, projCombined, c.retirementDate);
+
       renderPerfBlocks();
     }
 
@@ -1316,8 +1632,9 @@
       const rank = x => x === p1Name ? 0 : (x === p2Name ? 1 : 2);
       membersInData.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 
-      const cls = v => v >= 0 ? 'pos-growth' : 'neg-growth';
+      const cls = v => v >= 0 ? 'pos' : 'neg';
       const fmtPct = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+      const perfSparks = [];
       let inner = '';
       membersInData.forEach(member => {
         let pensionsHtml = '';
@@ -1327,24 +1644,32 @@
             const s = perfStats(dict[k]);
             if (!s) return;   // skip pensions with fewer than two logs
             const name = k.split('|').slice(1).join('|');
-            // one card per measure; the pension name heads the row
-            const measures = [
-              ['Current Value', fmt(s.current), ''],
-              ['Latest Monthly Growth', App.fmtDiff(s.latest), cls(s.latest)],
-              ['Expected Growth', App.fmtDiff(s.expected), cls(s.expected)],
-              ['Average Monthly £', App.fmtDiff(s.avgAmt), cls(s.avgAmt)],
-              ['Average Monthly %', fmtPct(s.avgPct), cls(s.avgPct)]
-            ];
-            const cardsHtml = measures.map(m =>
-              '<div class="card"><h3>' + m[0] + '</h3><div class="value ' + m[2] + '">' + m[1] + '</div></div>'
-            ).join('');
-            pensionsHtml += '<h4 class="perf-pension">' + name + '</h4><div class="perf-measure-grid">' + cardsHtml + '</div>';
+            const vals = dict[k].slice()
+              .sort((a, b) => new Date(a.log_date) - new Date(b.log_date))
+              .map(l => Number(l.pot_value)).filter(v => !isNaN(v));
+            const sparkId = 'ovps_' + (_ovSparkSeq++);
+            perfSparks.push({ id: sparkId, vals: vals });
+            const pill = s.avgPct >= 0
+              ? '<span class="ov-pill up">\u25B2 ' + fmtPct(s.avgPct) + '</span>'
+              : '<span class="ov-pill down">\u25BC ' + fmtPct(s.avgPct) + '</span>';
+            pensionsHtml +=
+              '<div class="ov-perf-card">' +
+                '<div class="pname"><span>' + name + '</span>' + pill + '</div>' +
+                '<div class="pcur">' + fmt(s.current) + '</div>' +
+                '<svg class="ov-spark" id="' + sparkId + '"></svg>' +
+                '<div class="rows">' +
+                  '<div class="r"><span>Latest monthly growth</span><b class="' + cls(s.latest) + '">' + App.fmtDiff(s.latest) + '</b></div>' +
+                  '<div class="r"><span>Expected growth</span><b class="' + cls(s.expected) + '">' + App.fmtDiff(s.expected) + '</b></div>' +
+                  '<div class="r"><span>Average monthly</span><b class="' + cls(s.avgPct) + '">' + fmtPct(s.avgPct) + '</b></div>' +
+                '</div>' +
+              '</div>';
           });
-        if (pensionsHtml) inner += '<h3 class="perf-member">' + member + '</h3>' + pensionsHtml;
+        if (pensionsHtml) inner += '<h3 class="perf-member">' + member + '</h3><div class="ov-perf-grid">' + pensionsHtml + '</div>';
       });
       host.innerHTML = inner
-        ? '<h2 style="margin-top:12px;">Pension Performance</h2>' + inner
+        ? '<div class="ov-head"><div class="ttl"><span class="bar4"></span> Pension performance</div></div>' + inner
         : '';
+      perfSparks.forEach(p => ovRenderSparkVals(p.id, p.vals));
     }
 
     // ---- live controls on the Modelling tab ----
