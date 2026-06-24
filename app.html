@@ -612,7 +612,7 @@
         <div class="ctrl phone-hide"><label>Pension growth <span id="m_growth_v" class="sv">5.0%</span></label><input type="range" id="m_growth" min="0" max="10" step="0.25" value="5" oninput="onParam()">
           <select id="m_growth_src" onchange="refreshRecentGrowthBtn()" style="display:none; margin-top:7px; width:100%; padding:6px 8px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--ink); font-size:12px;"></select>
           <button type="button" id="m_growth_avg" onclick="applyRecentGrowth()" style="display:none; margin-top:6px; padding:6px 10px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--accent-dark); font-weight:600; font-size:12px; cursor:pointer;">Set growth</button>
-          <div class="hint" id="m_growth_hint" style="display:none;">Annualised growth of the chosen pension over the last 24 months, contributions removed. <span style="color:var(--ink-soft);">What-if only until you Save.</span></div>
+          <div class="hint" id="m_growth_hint" style="display:none;">Median monthly growth of the chosen pension over the last 24 months, annualised and contribution-stripped &mdash; so one-off spikes are ignored. <span style="color:var(--ink-soft);">What-if only until you Save.</span></div>
         </div>
         <div id="tierSliders" style="display:contents;"></div>
         <div class="ctrl"><label>State pension growth <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
@@ -777,7 +777,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-240</span>
+    <span class="build-stamp">build: LC-241</span>
   </div>
 
   <script>
@@ -1485,9 +1485,9 @@
       return Math.pow(1 + totalFrac, 12 / tg.months) - 1;  // annualised
     }
     function ovRecentGrowthDefault(windowMonths, fallback){
-      const a = ovRecentGrowthRate(windowMonths);
-      if (a == null || !isFinite(a)) return fallback;
-      const clamped = Math.max(0, Math.min(0.10, a));
+      const r = (typeof ovGrowthForSelection === 'function') ? ovGrowthForSelection('ALL', windowMonths) : null;
+      if (!r || !isFinite(r.rate)) return fallback;
+      const clamped = Math.max(0, Math.min(0.10, r.rate));
       return Math.round(clamped / 0.0025) * 0.0025;        // align to the slider's 0.25% step
     }
     function ovRenderDelta(id, memberPred, full){
@@ -2010,17 +2010,49 @@
     }
     // Annualise a total true-growth % measured over `months` months.
     function ovAnnualise(pct, months){ const f = pct / 100; if (f <= -0.99) return null; return Math.pow(1 + f, 12 / Math.max(1, months)) - 1; }
-    // Growth for a chosen source: 'ALL' = household, 'M::<member>' = one person's pots, 'P::<member>|<pension>' = single pension.
-    function ovGrowthForSelection(sel, windowMonths){
-      if (!sel || sel === 'ALL'){ const tg = ovMemberTrueGrowth(null, windowMonths); if (!tg) return null; const a = ovAnnualise(tg.pct, tg.months); return a == null ? null : { rate: a, months: tg.months }; }
-      if (sel.indexOf('M::') === 0){ const m = sel.slice(3); const tg = ovMemberTrueGrowth(x => x === m, windowMonths); if (!tg) return null; const a = ovAnnualise(tg.pct, tg.months); return a == null ? null : { rate: a, months: tg.months }; }
-      if (sel.indexOf('P::') === 0){
-        const key = sel.slice(3);
-        const logs = (data.logs || []).filter(l => (l.member_name + '|' + l.pension_name) === key);
-        const w = ovPensionWindow(logs, windowMonths); if (!w || w.startVal <= 0) return null;
-        const a = ovAnnualise(w.organic / w.startVal * 100, w.months); return a == null ? null : { rate: a, months: w.months };
+    // Per-month true-growth % readings for one pension over a trailing window (mirrors perfStats' per-step calc).
+    function ovPensionMonthlyPcts(rawLogs, windowMonths){
+      const logs = rawLogs.slice().sort((a, b) => new Date(a.log_date) - new Date(b.log_date));
+      if (logs.length < 2) return [];
+      const md = perfBuckets(logs), mk = Object.keys(md).sort();
+      const lastLog = a => Number(a.logs[a.logs.length - 1].pot_value);
+      if (mk.length < 2){
+        const ml = md[mk[0]].logs, fv = Number(ml[0].pot_value), cv = Number(ml[ml.length - 1].pot_value);
+        const sc = md[mk[0]].hasContrib ? md[mk[0]].expectedAmt : 0;
+        return fv > 0 ? [(cv - fv - sc) / fv * 100] : [];
       }
-      return null;
+      const abs = key => { const p = key.split('-'); return Number(p[0]) * 12 + Number(p[1]); };
+      const lastAbs = abs(mk[mk.length - 1]), winStart = lastAbs - windowMonths;
+      const out = [];
+      for (let i = 1; i < mk.length; i++){
+        const prevAbs = abs(mk[i - 1]); if (prevAbs < winStart) continue;
+        const cur = lastLog(md[mk[i]]), prev = lastLog(md[mk[i - 1]]); if (prev <= 0) continue;
+        const monthDiff = Math.max(1, abs(mk[i]) - prevAbs);
+        const contrib = (md[mk[i]].hasContrib ? md[mk[i]].expectedAmt : 0) * monthDiff;
+        out.push(((cur - prev - contrib) / monthDiff) / prev * 100);
+      }
+      if (!out.length){   // window excluded every step — fall back to the most recent one
+        const i = mk.length - 1, prevAbs = abs(mk[i - 1]), cur = lastLog(md[mk[i]]), prev = lastLog(md[mk[i - 1]]);
+        if (prev > 0){ const monthDiff = Math.max(1, abs(mk[i]) - prevAbs); const contrib = (md[mk[i]].hasContrib ? md[mk[i]].expectedAmt : 0) * monthDiff; out.push(((cur - prev - contrib) / monthDiff) / prev * 100); }
+      }
+      return out;
+    }
+    // Median monthly true-growth, annualised, for a chosen source. Median ignores one-off spikes.
+    // 'ALL' = household, 'M::<member>' = one person's pots, 'P::<member>|<pension>' = single pension.
+    function ovGrowthForSelection(sel, windowMonths){
+      ovEnsurePerfState();
+      const groups = {};
+      (data.logs || []).forEach(l => {
+        if (!l.member_name || !l.pension_name) return;
+        if (sel && sel.indexOf('M::') === 0 && l.member_name !== sel.slice(3)) return;
+        if (sel && sel.indexOf('P::') === 0 && (l.member_name + '|' + l.pension_name) !== sel.slice(3)) return;
+        const k = l.member_name + '|' + l.pension_name; (groups[k] = groups[k] || []).push(l);
+      });
+      let pcts = [];
+      Object.keys(groups).forEach(k => { pcts = pcts.concat(ovPensionMonthlyPcts(groups[k], windowMonths)); });
+      if (!pcts.length) return null;
+      const a = ovAnnualise(perfMedian(pcts), 1);   // median is a per-month %, compound over 12
+      return (a == null || !isFinite(a)) ? null : { rate: a, n: pcts.length };
     }
     function ovBuildGrowthSrc(sel){
       const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -2047,7 +2079,7 @@
       if (!r || !isFinite(r.rate)){ btn.style.display = 'none'; if (hint) hint.style.display = 'none'; return; }
       const pct = Math.round(Math.max(0, Math.min(10, r.rate * 100)) / 0.25) * 0.25;
       btn.dataset.val = pct.toFixed(2);
-      btn.textContent = 'Set growth to ' + pct.toFixed(2) + '%' + (r.months < 24 ? ' (' + r.months + 'm)' : '');
+      btn.textContent = 'Set growth to ' + pct.toFixed(2) + '% \u00B7 median of ' + r.n + ' reading' + (r.n !== 1 ? 's' : '');
       btn.style.display = ''; if (hint) hint.style.display = '';
     }
     function applyRecentGrowth() {
