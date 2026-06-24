@@ -609,7 +609,9 @@
       <div class="grid">
         <!-- Row 1 -->
         <div class="ctrl" id="ctrl_retire"><label>Fully retire <span id="m_retire_v" class="sv">—</span></label><input type="range" id="m_retire" min="0" max="120" step="1" value="60" oninput="onParam()"></div>
-        <div class="ctrl phone-hide"><label>Pension growth <span id="m_growth_v" class="sv">5.0%</span></label><input type="range" id="m_growth" min="0" max="10" step="0.25" value="5" oninput="onParam()"></div>
+        <div class="ctrl phone-hide"><label>Pension growth <span id="m_growth_v" class="sv">5.0%</span></label><input type="range" id="m_growth" min="0" max="10" step="0.25" value="5" oninput="onParam()">
+          <button type="button" id="m_growth_avg" onclick="applyRecentGrowth()" style="display:none; margin-top:7px; padding:6px 10px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--accent-dark); font-weight:600; font-size:12px; cursor:pointer;">Use 24-month average</button>
+        </div>
         <div id="tierSliders" style="display:contents;"></div>
         <div class="ctrl"><label>State pension growth <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
           <div class="hint">Annual rise on the State Pension. Default 2.5%. Drag down for the triple lock weakened, capped, or frozen (0%). <span style="color:var(--ink-soft);">What-if only, never saved.</span></div></div>
@@ -773,7 +775,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-238</span>
+    <span class="build-stamp">build: LC-239</span>
   </div>
 
   <script>
@@ -2002,6 +2004,26 @@
       const dly = parseInt(document.getElementById('m_spdelay').value) || 0;
       document.getElementById('m_spdelay_v').textContent = dly + (dly === 1 ? ' yr' : ' yrs');
       syncTierLabels();
+      refreshRecentGrowthBtn();
+    }
+    // Show the recent-average button with the computed figure, and let the user snap the slider to it.
+    function refreshRecentGrowthBtn() {
+      const btn = document.getElementById('m_growth_avg'); if (!btn) return;
+      const a = (typeof ovRecentGrowthRate === 'function') ? ovRecentGrowthRate(24) : null;
+      if (a == null || !isFinite(a)) { btn.style.display = 'none'; return; }
+      const pct = Math.round(Math.max(0, Math.min(10, a * 100)) / 0.25) * 0.25;
+      btn.dataset.val = pct.toFixed(2);
+      btn.textContent = 'Use 24-month average (' + pct.toFixed(2) + '%)';
+      btn.style.display = '';
+    }
+    function applyRecentGrowth() {
+      const btn = document.getElementById('m_growth_avg'), sl = document.getElementById('m_growth');
+      if (!sl) return;
+      let pct = (btn && btn.dataset.val != null) ? parseFloat(btn.dataset.val) : null;
+      if (pct == null) { const a = ovRecentGrowthRate(24); if (a == null) return; pct = Math.round(Math.max(0, Math.min(10, a * 100)) / 0.25) * 0.25; }
+      sl.value = pct.toFixed(2);
+      const v = document.getElementById('m_growth_v'); if (v) v.textContent = parseFloat(sl.value).toFixed(1) + '%';
+      if (typeof onParam === 'function') onParam();
     }
     function toggleInfo(evt, id) { evt.preventDefault(); const el = document.getElementById(id); if (el) el.classList.toggle('show'); }
     function toggleOptPair() {
