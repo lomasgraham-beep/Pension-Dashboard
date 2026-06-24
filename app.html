@@ -773,7 +773,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-237</span>
+    <span class="build-stamp">build: LC-238</span>
   </div>
 
   <script>
@@ -1472,6 +1472,19 @@
       });
       if (!any || start <= 0) return null;
       return { amt: amt, pct: amt / start * 100, months: months || windowMonths };
+    }
+    function ovRecentGrowthRate(windowMonths){
+      const tg = ovMemberTrueGrowth(null, windowMonths);   // pooled across the household, contributions stripped
+      if (!tg || !(tg.months > 0)) return null;
+      const totalFrac = tg.pct / 100;                      // total true growth over the window
+      if (totalFrac <= -0.99) return null;
+      return Math.pow(1 + totalFrac, 12 / tg.months) - 1;  // annualised
+    }
+    function ovRecentGrowthDefault(windowMonths, fallback){
+      const a = ovRecentGrowthRate(windowMonths);
+      if (a == null || !isFinite(a)) return fallback;
+      const clamped = Math.max(0, Math.min(0.10, a));
+      return Math.round(clamped / 0.0025) * 0.0025;        // align to the slider's 0.25% step
     }
     function ovRenderDelta(id, memberPred, full){
       const el = document.getElementById(id); if (!el) return;
@@ -2409,7 +2422,7 @@
         savedPlan = {
           retirementDate: latestRetire,
           retireByMember: retireByMember,
-          growthRate: p.pension_growth_rate != null ? Number(p.pension_growth_rate) : 0.05,
+          growthRate: p.pension_growth_rate != null ? Number(p.pension_growth_rate) : ovRecentGrowthDefault(24, 0.05),
           phase1Date: App.parseLocalDate(p.shorter_week_date_1), phase1Days: p.working_days_1 ? Number(p.working_days_1) : 5,
           phase2Date: App.parseLocalDate(p.shorter_week_date_2), phase2Days: p.working_days_2 ? Number(p.working_days_2) : 5,
           p2phase: p2phase,
