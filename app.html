@@ -610,9 +610,10 @@
         <!-- Row 1 -->
         <div class="ctrl" id="ctrl_retire"><label>Fully retire <span id="m_retire_v" class="sv">—</span></label><input type="range" id="m_retire" min="0" max="120" step="1" value="60" oninput="onParam()"></div>
         <div class="ctrl phone-hide"><label>Pension growth <span id="m_growth_v" class="sv">5.0%</span></label><input type="range" id="m_growth" min="0" max="10" step="0.25" value="5" oninput="onParam()">
-          <select id="m_growth_src" onchange="refreshRecentGrowthBtn()" style="display:none; margin-top:7px; width:100%; padding:6px 8px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--ink); font-size:12px;"></select>
+          <select id="m_growth_src" onchange="onGrowthSrcChange()" style="display:none; margin-top:7px; width:100%; padding:6px 8px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--ink); font-size:12px;"></select>
           <button type="button" id="m_growth_avg" onclick="applyRecentGrowth()" style="display:none; margin-top:6px; padding:6px 10px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--accent-dark); font-weight:600; font-size:12px; cursor:pointer;">Set growth</button>
           <div class="hint" id="m_growth_hint" style="display:none;">Median monthly growth of the chosen pension over the last 24 months, annualised and contribution-stripped &mdash; so one-off spikes are ignored. <span style="color:var(--ink-soft);">What-if only until you Save.</span></div>
+          <div id="m_growth_saved" style="display:none; margin-top:6px; font-size:12px; font-weight:600; color:var(--accent-dark);"></div>
         </div>
         <div id="tierSliders" style="display:contents;"></div>
         <div class="ctrl"><label>State pension growth <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
@@ -777,7 +778,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-241</span>
+    <span class="build-stamp">build: LC-242</span>
   </div>
 
   <script>
@@ -2067,6 +2068,10 @@
         pens.forEach(p => { html += '<option value="P::' + esc(m + '|' + p) + '">' + esc(m + ' \u00B7 ' + p) + '</option>'; });
       });
       sel.innerHTML = html; sel.style.display = '';
+      try {
+        const saved = localStorage.getItem(GROWTH_SRC_KEY);
+        if (saved){ for (let i = 0; i < sel.options.length; i++){ if (sel.options[i].value === saved){ sel.value = saved; break; } } }
+      } catch (e) {}
       return true;
     }
     // Show the chosen source's recent average and let the user snap the slider to it.
@@ -2082,12 +2087,20 @@
       btn.textContent = 'Set growth to ' + pct.toFixed(2) + '% \u00B7 median of ' + r.n + ' reading' + (r.n !== 1 ? 's' : '');
       btn.style.display = ''; if (hint) hint.style.display = '';
     }
+    const GROWTH_SRC_KEY = 'mpm_growthSrc';
+    function onGrowthSrcChange(){
+      const sel = document.getElementById('m_growth_src');
+      try { if (sel) localStorage.setItem(GROWTH_SRC_KEY, sel.value); } catch (e) {}
+      refreshRecentGrowthBtn();
+    }
     function applyRecentGrowth() {
       const btn = document.getElementById('m_growth_avg'), sl = document.getElementById('m_growth');
       if (!sl || !btn || btn.dataset.val == null) return;
       const pct = parseFloat(btn.dataset.val);
       sl.value = pct.toFixed(2);
       const v = document.getElementById('m_growth_v'); if (v) v.textContent = parseFloat(sl.value).toFixed(1) + '%';
+      const note = document.getElementById('m_growth_saved');
+      if (note){ note.textContent = '\u2713 Applied \u2014 tap \u201CSave as my plan\u201D to keep it.'; note.style.display = ''; }
       if (typeof onParam === 'function') onParam();
     }
     function toggleInfo(evt, id) { evt.preventDefault(); const el = document.getElementById(id); if (el) el.classList.toggle('show'); }
@@ -2145,6 +2158,7 @@
           try { if (f.contentWindow && f.getAttribute('src')) f.contentWindow.postMessage('refresh-data', '*'); } catch (e) {}
         });
         msg.style.color = '#065f46'; msg.textContent = '✓ Saved as your plan.';
+        const gn = document.getElementById('m_growth_saved'); if (gn) gn.style.display = 'none';
       } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
     }
 
