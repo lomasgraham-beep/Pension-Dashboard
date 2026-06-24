@@ -610,7 +610,9 @@
         <!-- Row 1 -->
         <div class="ctrl" id="ctrl_retire"><label>Fully retire <span id="m_retire_v" class="sv">—</span></label><input type="range" id="m_retire" min="0" max="120" step="1" value="60" oninput="onParam()"></div>
         <div class="ctrl phone-hide"><label>Pension growth <span id="m_growth_v" class="sv">5.0%</span></label><input type="range" id="m_growth" min="0" max="10" step="0.25" value="5" oninput="onParam()">
-          <button type="button" id="m_growth_avg" onclick="applyRecentGrowth()" style="display:none; margin-top:7px; padding:6px 10px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--accent-dark); font-weight:600; font-size:12px; cursor:pointer;">Use 24-month average</button>
+          <select id="m_growth_src" onchange="refreshRecentGrowthBtn()" style="display:none; margin-top:7px; width:100%; padding:6px 8px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--ink); font-size:12px;"></select>
+          <button type="button" id="m_growth_avg" onclick="applyRecentGrowth()" style="display:none; margin-top:6px; padding:6px 10px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--accent-dark); font-weight:600; font-size:12px; cursor:pointer;">Set growth</button>
+          <div class="hint" id="m_growth_hint" style="display:none;">Annualised growth of the chosen pension over the last 24 months, contributions removed. <span style="color:var(--ink-soft);">What-if only until you Save.</span></div>
         </div>
         <div id="tierSliders" style="display:contents;"></div>
         <div class="ctrl"><label>State pension growth <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
@@ -775,7 +777,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-239</span>
+    <span class="build-stamp">build: LC-240</span>
   </div>
 
   <script>
@@ -2006,21 +2008,52 @@
       syncTierLabels();
       refreshRecentGrowthBtn();
     }
-    // Show the recent-average button with the computed figure, and let the user snap the slider to it.
+    // Annualise a total true-growth % measured over `months` months.
+    function ovAnnualise(pct, months){ const f = pct / 100; if (f <= -0.99) return null; return Math.pow(1 + f, 12 / Math.max(1, months)) - 1; }
+    // Growth for a chosen source: 'ALL' = household, 'M::<member>' = one person's pots, 'P::<member>|<pension>' = single pension.
+    function ovGrowthForSelection(sel, windowMonths){
+      if (!sel || sel === 'ALL'){ const tg = ovMemberTrueGrowth(null, windowMonths); if (!tg) return null; const a = ovAnnualise(tg.pct, tg.months); return a == null ? null : { rate: a, months: tg.months }; }
+      if (sel.indexOf('M::') === 0){ const m = sel.slice(3); const tg = ovMemberTrueGrowth(x => x === m, windowMonths); if (!tg) return null; const a = ovAnnualise(tg.pct, tg.months); return a == null ? null : { rate: a, months: tg.months }; }
+      if (sel.indexOf('P::') === 0){
+        const key = sel.slice(3);
+        const logs = (data.logs || []).filter(l => (l.member_name + '|' + l.pension_name) === key);
+        const w = ovPensionWindow(logs, windowMonths); if (!w || w.startVal <= 0) return null;
+        const a = ovAnnualise(w.organic / w.startVal * 100, w.months); return a == null ? null : { rate: a, months: w.months };
+      }
+      return null;
+    }
+    function ovBuildGrowthSrc(sel){
+      const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const byMember = {};
+      (data.logs || []).forEach(l => { if (!l.member_name || !l.pension_name) return; (byMember[l.member_name] = byMember[l.member_name] || new Set()).add(l.pension_name); });
+      const members = Object.keys(byMember).sort();
+      if (!members.length){ sel.innerHTML = ''; sel.style.display = 'none'; return false; }
+      let html = '<option value="ALL">All pensions (combined)</option>';
+      members.forEach(m => {
+        const pens = Array.from(byMember[m]).sort();
+        if (pens.length > 1) html += '<option value="M::' + esc(m) + '">' + esc(m) + ' \u2014 all pensions</option>';
+        pens.forEach(p => { html += '<option value="P::' + esc(m + '|' + p) + '">' + esc(m + ' \u00B7 ' + p) + '</option>'; });
+      });
+      sel.innerHTML = html; sel.style.display = '';
+      return true;
+    }
+    // Show the chosen source's recent average and let the user snap the slider to it.
     function refreshRecentGrowthBtn() {
-      const btn = document.getElementById('m_growth_avg'); if (!btn) return;
-      const a = (typeof ovRecentGrowthRate === 'function') ? ovRecentGrowthRate(24) : null;
-      if (a == null || !isFinite(a)) { btn.style.display = 'none'; return; }
-      const pct = Math.round(Math.max(0, Math.min(10, a * 100)) / 0.25) * 0.25;
+      const sel = document.getElementById('m_growth_src'), btn = document.getElementById('m_growth_avg'), hint = document.getElementById('m_growth_hint');
+      if (!btn) return;
+      if (sel && !sel.dataset.built){ ovBuildGrowthSrc(sel); sel.dataset.built = '1'; }
+      const choice = sel ? sel.value : 'ALL';
+      const r = (typeof ovGrowthForSelection === 'function') ? ovGrowthForSelection(choice, 24) : null;
+      if (!r || !isFinite(r.rate)){ btn.style.display = 'none'; if (hint) hint.style.display = 'none'; return; }
+      const pct = Math.round(Math.max(0, Math.min(10, r.rate * 100)) / 0.25) * 0.25;
       btn.dataset.val = pct.toFixed(2);
-      btn.textContent = 'Use 24-month average (' + pct.toFixed(2) + '%)';
-      btn.style.display = '';
+      btn.textContent = 'Set growth to ' + pct.toFixed(2) + '%' + (r.months < 24 ? ' (' + r.months + 'm)' : '');
+      btn.style.display = ''; if (hint) hint.style.display = '';
     }
     function applyRecentGrowth() {
       const btn = document.getElementById('m_growth_avg'), sl = document.getElementById('m_growth');
-      if (!sl) return;
-      let pct = (btn && btn.dataset.val != null) ? parseFloat(btn.dataset.val) : null;
-      if (pct == null) { const a = ovRecentGrowthRate(24); if (a == null) return; pct = Math.round(Math.max(0, Math.min(10, a * 100)) / 0.25) * 0.25; }
+      if (!sl || !btn || btn.dataset.val == null) return;
+      const pct = parseFloat(btn.dataset.val);
       sl.value = pct.toFixed(2);
       const v = document.getElementById('m_growth_v'); if (v) v.textContent = parseFloat(sl.value).toFixed(1) + '%';
       if (typeof onParam === 'function') onParam();
