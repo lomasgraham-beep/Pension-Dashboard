@@ -656,8 +656,9 @@
         <button type="button" id="yfBtn" onclick="toggleYearFilter()" style="padding:9px 14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); color:var(--ink); font-weight:bold; font-size:14px; cursor:pointer;">Filter years &#9662;</button>
         <span id="yfStatus" style="font-size:13px; color:var(--ink-soft);">All years shown</span>
       </div>
-      <div id="yfPanel" style="display:none; margin-top:8px; padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); max-width:640px;">
-        <div style="font-size:13px; color:var(--ink-soft); margin-bottom:12px;">Tick the years to show on every chart on this page. With none ticked, all years are shown. Press <strong>Save filter</strong> to remember this selection on this device.</div>
+      <div id="yfPanel" style="display:none; position:relative; margin-top:8px; padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); max-width:640px;">
+        <button type="button" onclick="closeYearFilter()" aria-label="Close year filter" title="Close filter" style="position:absolute; top:8px; right:10px; width:28px; height:28px; border:1px solid var(--line); border-radius:7px; background:var(--surface); color:var(--ink-soft); font-size:17px; line-height:1; cursor:pointer;">&times;</button>
+        <div style="font-size:13px; color:var(--ink-soft); margin-bottom:12px; padding-right:34px;">Tick the years to show on every chart on this page. With none ticked, all years are shown. Press <strong>Save filter</strong> to remember this selection on this device.</div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px;">
           <button type="button" onclick="yfSetAll(true)" style="padding:7px 14px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--ink); font-weight:600; font-size:13px; cursor:pointer;">All</button>
           <button type="button" onclick="yfSetAll(false)" style="padding:7px 14px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--ink); font-weight:600; font-size:13px; cursor:pointer;">None</button>
@@ -772,7 +773,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-236</span>
+    <span class="build-stamp">build: LC-237</span>
   </div>
 
   <script>
@@ -854,7 +855,16 @@
 
     function toggleYearFilter() {
       const box = document.getElementById('yfPanel');
-      box.style.display = (box.style.display === 'none') ? 'block' : 'none';
+      const open = (box.style.display === 'none');
+      box.style.display = open ? 'block' : 'none';
+      const btn = document.getElementById('yfBtn');
+      if (btn) btn.innerHTML = 'Filter years ' + (open ? '&#9652;' : '&#9662;');
+    }
+    function closeYearFilter() {
+      const box = document.getElementById('yfPanel');
+      if (box) box.style.display = 'none';
+      const btn = document.getElementById('yfBtn');
+      if (btn) btn.innerHTML = 'Filter years &#9662;';
     }
 
     function saveYearFilter() {
