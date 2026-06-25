@@ -40,6 +40,16 @@
 
   @media (max-width: 760px) { #cols { grid-template-columns:1fr; } }
 
+  .navbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 16px; padding:10px 12px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; }
+  .nav-btn { border:1px solid #cbd5e1; background:#fff; color:#2c3e50; border-radius:8px; padding:8px 13px; font-size:14px; font-weight:bold; cursor:pointer; min-height:38px; }
+  .nav-btn:hover { background:#f1f5f9; }
+  .nav-btn.now.away { background:#f59e0b; color:#1a1a1a; border-color:#f59e0b; }
+  .nav-btn:disabled { opacity:0.4; cursor:default; }
+  .nav-view { font-weight:bold; color:#2c3e50; }
+  .nav-jump { display:flex; gap:6px; align-items:center; margin-left:auto; }
+  .nav-jump select { padding:7px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; min-height:38px; }
+  .muted2 { color:#94a3b8; font-weight:normal; font-size:13px; }
+
   @media (prefers-color-scheme: dark) {
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
     h1 { color:#f1f5f9 !important; } .note { color:#94a3b8 !important; }
@@ -54,13 +64,30 @@
     tr.avail td { background:#b45309 !important; color:#fff !important; }
     .acct-box { border-color:#334155 !important; }
     #status { background:#1e293b !important; color:#93c5fd !important; }
+    .navbar { background:#1e293b !important; border-color:#334155 !important; }
+    .nav-btn { background:#0f172a !important; color:#cbd5e1 !important; border-color:#475569 !important; }
+    .nav-btn.now.away { background:#b45309 !important; color:#fff !important; border-color:#b45309 !important; }
+    .nav-view { color:#f1f5f9 !important; }
+    .nav-jump select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
   }
 </style>
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Today's budget per person: net income in, bills out in coloured boxes by account, and what's left each month. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. The Credit Card box is an estimate for reference only and is not part of any total here. Income is the current working-tier salary from Workplace Income. <span style="color:#94a3b8;">(budget build: v21)</span></p>
+  <p class="note">Per-person budget for the month you're viewing: net income in, the bills that actually leave each account that month, and what's left. Use the controls to step to next month or jump ahead; the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box is an estimate for reference only and is not part of any total here. <span style="color:#94a3b8;">(budget build: v22)</span></p>
   <div id="status">Loading&hellip;</div>
+  <div id="nav" class="navbar" style="display:none;">
+    <button class="nav-btn" id="prevBtn" onclick="stepMonth(-1)">&#9664; Prev</button>
+    <button class="nav-btn now" id="nowBtn" onclick="goNow()">This Month</button>
+    <button class="nav-btn" onclick="stepMonth(1)">Next &#9654;</button>
+    <span class="nav-view" id="navView"></span>
+    <span class="nav-jump">
+      <label class="muted2">Go to</label>
+      <select id="jMonth"></select>
+      <select id="jYear"></select>
+      <button class="nav-btn" onclick="goJump()">Go</button>
+    </span>
+  </div>
   <div id="cols" style="display:none;">
     <div class="col-stack" id="colLeft"></div>
     <div class="col-stack" id="colRight"></div>
@@ -77,6 +104,26 @@
     if (frequency === 'Weekly') return p * 52 / 12;
     if (frequency === 'Annual') return p / 12;
     return p;   // Monthly (or default)
+  }
+
+  // which calendar months (1-12 -> index 0-11) a bill is actually charged in.
+  // Mirrors bills.html: Annual uses bill_month; Monthly uses pay_months (12-char mask, null=all); Weekly = every month.
+  function activeMonthsB(b) {
+    if (b.frequency === 'Annual') {
+      let m = Number(b.bill_month);
+      if ((!m || m < 1 || m > 12) && b.pay_months) { const i = b.pay_months.indexOf('1'); if (i >= 0) m = i + 1; }
+      const a = new Array(12).fill(false); if (m >= 1 && m <= 12) a[m - 1] = true; return a;
+    }
+    if (b.frequency === 'Weekly') return new Array(12).fill(true);
+    if (!b.pay_months || !/^[01]{12}$/.test(b.pay_months)) return new Array(12).fill(true);
+    return b.pay_months.split('').map(c => c === '1');
+  }
+  // actual cash a bill takes in a specific calendar month (1-12)
+  function monthCharge(b, month) {
+    const p = Number(b.premium) || 0;
+    if (b.frequency === 'Weekly') return p * 52 / 12;     // weekly smears evenly across every month
+    if (!activeMonthsB(b)[month - 1]) return 0;
+    return p;   // Annual = full annual amount in its month; Monthly = the monthly premium
   }
 
   function currentTierDays(member, tiers) {
@@ -97,6 +144,37 @@
 
   let DATA = null;
   const selectedTier = {};
+
+  // ---- month navigation ----
+  const TODAY = new Date();
+  const CUR_Y = TODAY.getFullYear(), CUR_M = TODAY.getMonth() + 1;
+  let viewY = CUR_Y, viewM = CUR_M, navReady = false;
+  const MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const MABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthLabelShort = () => MABBR[viewM - 1] + ' ' + viewY;
+  const isThisMonth = () => (viewY === CUR_Y && viewM === CUR_M);
+  // never step earlier than the current month — the budget runs from now forward
+  function clampView(y, m) { const v = Math.max(y * 12 + (m - 1), CUR_Y * 12 + (CUR_M - 1)); return { y: Math.floor(v / 12), m: (v % 12) + 1 }; }
+  function setView(y, m) { const c = clampView(y, m); viewY = c.y; viewM = c.m; updateNav(); rebuild(); }
+  function stepMonth(delta) { setView(viewY, viewM + delta); }
+  function goNow() { setView(CUR_Y, CUR_M); }
+  function goJump() { setView(Number(document.getElementById('jYear').value), Number(document.getElementById('jMonth').value)); }
+  function initNav() {
+    if (navReady) return; navReady = true;
+    document.getElementById('jMonth').innerHTML = MONTHS_FULL.map((nm, k) => '<option value="' + (k + 1) + '">' + nm + '</option>').join('');
+    let yrs = ''; for (let y = CUR_Y; y <= CUR_Y + 40; y++) yrs += '<option value="' + y + '">' + y + '</option>';
+    document.getElementById('jYear').innerHTML = yrs;
+    document.getElementById('nav').style.display = 'flex';
+    updateNav();
+  }
+  function updateNav() {
+    if (!navReady) return;
+    document.getElementById('navView').textContent = 'Viewing: ' + MONTHS_FULL[viewM - 1] + ' ' + viewY;
+    document.getElementById('nowBtn').classList.toggle('away', !isThisMonth());
+    document.getElementById('prevBtn').disabled = isThisMonth();
+    document.getElementById('jMonth').value = String(viewM);
+    document.getElementById('jYear').value = String(viewY);
+  }
 
   async function load() {
     const status = document.getElementById('status');
@@ -121,6 +199,7 @@
       DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual };
       names.forEach(n => { selectedTier[n] = currentTierDays(n, DATA.tiers); });
       status.style.display = 'none';
+      initNav();
       rebuild();
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
@@ -163,10 +242,10 @@
     const meta = buildAccountMeta(d);
     const shown = {};   // bill row index -> true, so we can detect leftovers
 
-    const avails = {};
+    const avails = {}, avgAvails = {};
     const blocks = d.names.map(name => {
       const r = personBlock(name, d, meta, shown);
-      avails[name] = r.avail;
+      avails[name] = r.avail; avgAvails[name] = r.availAvg;
       return r.html;
     });
 
@@ -177,10 +256,10 @@
     if (leftovers.length) {
       let rows = '', tot = 0;
       leftovers.forEach(b => {
-        const m = annualToMonthly(b.premium, b.frequency); tot += m;
+        const m = monthCharge(b, viewM); if (m <= 0) return; tot += m;
         rows += '<tr><td>' + esc(b.bill_name || '\u2014') + ' <span class="muted">(' + esc(b.paid_account || 'no account') + ')</span></td><td class="amt">' + fmt(m) + '</td></tr>';
       });
-      leftoverHtml =
+      if (rows) leftoverHtml =
         '<div class="panelcard">' +
           '<div class="blocktitle">Unassigned bills</div>' +
           '<div class="subtitle">Not tied to anyone\u2019s account</div>' +
@@ -190,7 +269,7 @@
     }
 
     const pens = pensionBlock(d);
-    const cash = cashSummary(avails, pens.total);
+    const cash = cashSummary(avails, avgAvails, pens.total);
     const cc = creditCardBox(d);
 
     // two stacked columns: left = first person + pensions; right = second person + credit card + cash summary
@@ -222,33 +301,36 @@
       .filter(a => a.account_holder === name && a.account_id && !meta.isPot[a.account_id])
       .sort((a, b) => a.account_id.localeCompare(b.account_id));
 
-    let boxesHtml = '', totalBills = 0;
+    let boxesHtml = '', totalBills = 0, totalBillsAvg = 0;
     held.forEach(a => {
       const acctId = a.account_id;
-      let rows = '', boxTotal = 0, paypalSum = 0;
+      let rows = '', boxTotal = 0, boxAvg = 0, paypalSum = 0, paypalAvg = 0;
       // bills paid from this account (any payer except Credit card)
       (d.bills || []).forEach((b, i) => {
         if ((b.paid_account || '').trim() !== acctId) return;
         if (b.paid_by === 'Credit card') return;
         shown[i] = true;
-        const m = annualToMonthly(b.premium, b.frequency);
-        if (b.paid_by === 'PayPal') { paypalSum += m; return; }   // collapse PayPal into one line
-        boxTotal += m;
-        rows += '<tr><td>' + esc(b.bill_name || '\u2014') + '</td><td class="amt">' + fmt(m) + '</td></tr>';
+        const m = monthCharge(b, viewM);                    // actual cash this calendar month
+        const av = annualToMonthly(b.premium, b.frequency); // smoothed 12-month average
+        if (b.paid_by === 'PayPal') { paypalSum += m; paypalAvg += av; return; }   // collapse PayPal into one line
+        boxAvg += av;
+        if (m > 0) { boxTotal += m; rows += '<tr><td>' + esc(b.bill_name || '\u2014') + '</td><td class="amt">' + fmt(m) + '</td></tr>'; }
       });
       // PayPal drawn from this account, shown as one connected line (counts in the total)
       if (paypalSum > 0) {
         rows += '<tr class="pot-line"><td>PayPal</td><td class="amt">' + fmt(paypalSum) + '</td></tr>';
         boxTotal += paypalSum;
       }
-      // savings-pot set-aside: if this account funds any pot(s), add one summed line
+      boxAvg += paypalAvg;
+      // savings-pot set-aside: smoothed monthly regardless of which month is being viewed
       const pots = meta.fundingToPots[acctId] || [];
       const potSum = pots.reduce((s, pid) => s + (meta.potMonthly[pid] || 0), 0);
       if (potSum > 0) {
         rows += '<tr class="pot-line"><td>Insurance/car savings</td><td class="amt">' + fmt(potSum) + '</td></tr>';
-        boxTotal += potSum;
+        boxTotal += potSum; boxAvg += potSum;
       }
-      if (!rows) return;   // skip empty boxes
+      totalBillsAvg += boxAvg;     // count the average even if nothing is charged this particular month
+      if (!rows) return;           // nothing actually leaves this account this month → no box
       totalBills += boxTotal;
       const title = esc(a.bank_name ? (a.bank_name + ' \u00b7 ' + acctId) : acctId);
       boxesHtml +=
@@ -259,9 +341,13 @@
           '<table><tbody>' + rows + '</tbody></table>' +
         '</div>';
     });
-    if (!boxesHtml) boxesHtml = '<div class="acct-box"><table><tbody><tr><td colspan="2" style="color:#94a3b8;">No bills assigned to ' + esc(name) + '\u2019s accounts</td></tr></tbody></table></div>';
+    if (!boxesHtml) boxesHtml = '<div class="acct-box"><table><tbody><tr><td colspan="2" style="color:#94a3b8;">' +
+      (totalBillsAvg > 0 ? ('Nothing leaves ' + esc(name) + '\u2019s accounts in ' + monthLabelShort()) : ('No bills assigned to ' + esc(name) + '\u2019s accounts')) +
+      '</td></tr></tbody></table></div>';
 
     const avail = totalIn - totalBills;
+    const availAvg = totalIn - totalBillsAvg;
+    const billsAvgNote = Math.abs(totalBills - totalBillsAvg) > 0.5 ? ' <span class="muted2">avg ' + fmt(totalBillsAvg) + '/mo</span>' : '';
     const html =
       '<div class="person">' +
         '<div class="blocktitle">' + esc(name) + '</div>' +
@@ -271,11 +357,11 @@
         '<div class="subtitle">Out &mdash; by account</div>' +
         boxesHtml +
         '<table><tbody>' +
-          '<tr class="total"><td>Total bills</td><td class="amt">' + fmt(totalBills) + '</td></tr>' +
-          '<tr class="avail"><td>' + esc(name) + ' available per month</td><td class="amt">' + fmt(avail) + '</td></tr>' +
+          '<tr class="total"><td>Total bills' + billsAvgNote + '</td><td class="amt">' + fmt(totalBills) + '</td></tr>' +
+          '<tr class="avail"><td>' + esc(name) + ' available in ' + monthLabelShort() + '</td><td class="amt">' + fmt(avail) + '</td></tr>' +
         '</tbody></table>' +
       '</div>';
-    return { html: html, avail: avail };
+    return { html: html, avail: avail, availAvg: availAvg };
   }
 
   // global pensions block — net cost (private ÷1.25; Aegon/workplace at gross), using each owner's tier
@@ -312,30 +398,35 @@
   function creditCardBox(d) {
     let total = 0;
     (d.bills || []).filter(b => b.paid_by === 'Credit card').forEach(b => {
-      total += annualToMonthly(b.premium, b.frequency);
+      total += monthCharge(b, viewM);
     });
-    total += (Number(d.diningAnnual) || 0) / 12;   // dining is paid on the card
+    total += (Number(d.diningAnnual) || 0) / 12;   // dining is paid on the card (smoothed)
     return '<div class="panelcard">' +
       '<div class="blocktitle">Credit Card</div>' +
-      '<div class="subtitle">Estimated monthly cost &mdash; not included in totals</div>' +
+      '<div class="subtitle">Estimated for ' + monthLabelShort() + ' &mdash; not included in totals</div>' +
       '<table><tbody>' +
         '<tr class="total"><td>Estimated total</td><td class="amt">' + fmt(total) + '</td></tr></tbody></table>' +
     '</div>';
   }
 
-  function cashSummary(avails, pensTotal) {
+  function cashSummary(avails, avgAvails, pensTotal) {
     const names = Object.keys(avails);
     const sumAvail = names.reduce((s, n) => s + (avails[n] || 0), 0);
+    const sumAvgAvail = names.reduce((s, n) => s + (avgAvails[n] || 0), 0);
     const pens = Number(pensTotal) || 0;
     const totalCash = sumAvail - pens;
+    const totalCashAvg = sumAvgAvail - pens;
     let availRows = names.map(n => '<tr><td>' + esc(n) + ' available</td><td class="amt">' + fmt(avails[n] || 0) + '</td></tr>').join('');
+    const avgRow = Math.abs(totalCash - totalCashAvg) > 0.5
+      ? '<tr><td class="muted2">Average month (reference)</td><td class="amt muted2">' + fmt(totalCashAvg) + '</td></tr>' : '';
     return '<div class="panelcard">' +
       '<div class="blocktitle">Cash Summary</div>' +
       '<table><tbody>' +
         availRows +
         '<tr class="total"><td>Sum of available</td><td class="amt">' + fmt(sumAvail) + '</td></tr>' +
         '<tr class="total"><td>Less pensions</td><td class="amt neg">\u2212' + fmt(pens) + '</td></tr>' +
-        '<tr class="avail"><td>Total cash available</td><td class="amt">' + fmt(totalCash) + '</td></tr>' +
+        '<tr class="avail"><td>Total cash available in ' + monthLabelShort() + '</td><td class="amt">' + fmt(totalCash) + '</td></tr>' +
+        avgRow +
       '</tbody></table>' +
     '</div>';
   }
