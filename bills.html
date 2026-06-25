@@ -27,6 +27,18 @@
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
   .proj { background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-top:18px; font-size:13px; color:var(--ink-soft); }
 
+  /* ---- "Paid in" month-schedule picker ---- */
+  td.sched, th.sched { width:150px; }
+  .sched-btn { background:var(--surface-2); border:1px solid var(--line-strong); border-radius:6px; padding:7px 10px; font-size:13px; font-weight:bold; color:var(--ink); cursor:pointer; min-width:64px; }
+  .sched-static { color:var(--ink-soft); font-size:13px; }
+  .sched-panel { margin-top:6px; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); width:150px; box-sizing:border-box; }
+  .mgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; }
+  .mchip { border:1px solid var(--line-strong); background:#fff; color:var(--ink-soft); border-radius:6px; padding:9px 0; font-size:12px; font-weight:bold; cursor:pointer; }
+  .mchip.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .msc { display:flex; gap:6px; margin-top:6px; }
+  .mscbtn { flex:1; border:1px solid var(--line-strong); background:#fff; color:var(--accent-dark); border-radius:6px; padding:7px 0; font-size:12px; font-weight:bold; cursor:pointer; }
+  .mhint { margin-top:6px; font-size:11px; color:var(--ink-soft); }
+
   /* ---- Automatic dark mode (follows device setting) ---- */
   @media (prefers-color-scheme: dark) {
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
@@ -67,6 +79,12 @@
     .crash-info { background:#dc2626 !important; color:#fff !important; }
     .topbar { color:#94a3b8 !important; }
     a, .topbar a { color:#60a5fa !important; }
+    .sched-btn { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    .sched-panel { background:#162132 !important; border-color:#334155 !important; }
+    .mchip { background:#0f172a !important; color:#94a3b8 !important; border-color:#475569 !important; }
+    .mchip.on { background:#2c7a7b !important; color:#fff !important; border-color:#2c7a7b !important; }
+    .mscbtn { background:#0f172a !important; color:#5eead4 !important; border-color:#475569 !important; }
+    .sched-static { color:#94a3b8 !important; }
   }
 
 
@@ -75,7 +93,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: acctsel)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Paid in</strong> sets which months a bill is actually charged &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar). <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: paymonths1)</span></p>
   <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -88,8 +106,8 @@
     <select id="filterCat" onchange="render()" style="padding:8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px;"><option value="All">All categories</option></select>
   </div>
   <table id="tbl">
-    <thead><tr><th>Bill Name</th><th>Category</th><th>Paid by</th><th>Account</th><th>Premium &pound;</th><th>Frequency</th><th>Annual &pound;</th><th>Month<br><span style="font-weight:normal;font-size:11px;">(annual only)</span></th><th>Reduce?</th><th>Taper 70</th><th>Taper 80</th><th>Taper 90</th><th></th></tr></thead>
-    <tbody><tr><td colspan="10">Loading&hellip;</td></tr></tbody>
+    <thead><tr><th>Bill Name</th><th>Category</th><th>Paid by</th><th>Account</th><th>Premium &pound;</th><th>Frequency</th><th>Annual &pound;</th><th class="sched">Paid in<br><span style="font-weight:normal;font-size:11px;">(months)</span></th><th>Reduce?</th><th>Taper 70</th><th>Taper 80</th><th>Taper 90</th><th></th></tr></thead>
+    <tbody><tr><td colspan="13">Loading&hellip;</td></tr></tbody>
   </table>
   <div class="proj" id="proj"></div>
 
@@ -124,6 +142,7 @@
   let rows = [], dirty = false, deleted = [], categoryCodes = [], memberNames = [], bankAccounts = [];
   const tbody = document.querySelector('#tbl tbody');
   const fmt = App.fmt;
+  const MABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
 
   // Exact replica of the database's generated formula for total_annual.
@@ -157,11 +176,87 @@
     return opts;
   }
 
+  // ---- "Paid in" month schedule ----
+  // Canonical storage: Annual bills use bill_month (single 1-12, pay_months null);
+  // Monthly bills use pay_months (12-char '1'/'0' mask, pos1=Jan; null = all months);
+  // Weekly bills always apply every month (both null).
+  function activeMonths(r) {
+    if (r.frequency === 'Annual') {
+      let m = Number(r.bill_month);
+      if ((!m || m < 1 || m > 12) && r.pay_months) { const idx = r.pay_months.indexOf('1'); if (idx >= 0) m = idx + 1; }
+      const arr = new Array(12).fill(false);
+      if (m >= 1 && m <= 12) arr[m - 1] = true;
+      return arr;
+    }
+    if (r.frequency === 'Weekly') return new Array(12).fill(true);
+    if (!r.pay_months || !/^[01]{12}$/.test(r.pay_months)) return new Array(12).fill(true);  // Monthly, null/invalid = all
+    return r.pay_months.split('').map(c => c === '1');
+  }
+  const maskFromArr = arr => arr.map(b => b ? '1' : '0').join('');
+  function schedLabel(r) {
+    if (r.frequency === 'Weekly') return 'All';
+    const arr = activeMonths(r); const on = arr.filter(Boolean).length;
+    if (r.frequency === 'Annual') { const i = arr.indexOf(true); return i >= 0 ? MABBR[i] : '\u2014'; }
+    if (on >= 12) return 'All';
+    if (on === 0) return 'None';
+    if (on === 1) return MABBR[arr.indexOf(true)];
+    return on + ' mo';
+  }
+  // Force a row's schedule fields to be valid for its current frequency.
+  function reconcileSchedule(r) {
+    if (r.frequency === 'Annual') {
+      let m = Number(r.bill_month);
+      if ((!m || m < 1 || m > 12) && r.pay_months) { const idx = r.pay_months.indexOf('1'); if (idx >= 0) m = idx + 1; }
+      r.bill_month = (m >= 1 && m <= 12) ? m : null; r.pay_months = null;
+    } else if (r.frequency === 'Weekly') {
+      r.bill_month = null; r.pay_months = null;
+    } else { // Monthly
+      r.bill_month = null;
+      if (r.pay_months && /^[01]{12}$/.test(r.pay_months)) { if (r.pay_months === '111111111111') r.pay_months = null; }
+      else r.pay_months = null;
+    }
+  }
+  function scheduleCellHtml(r) {
+    if (r.frequency === 'Weekly') return '<span class="sched-static" title="Weekly bills apply every month">All</span>';
+    const arr = activeMonths(r), single = (r.frequency === 'Annual');
+    const chips = MABBR.map((nm, k) => '<button type="button" class="mchip' + (arr[k] ? ' on' : '') + '" onclick="pickMonth(this,' + k + ')">' + nm + '</button>').join('');
+    const shortcuts = single ? '' : '<div class="msc"><button type="button" class="mscbtn" onclick="setAllMonths(this,true)">All</button><button type="button" class="mscbtn" onclick="setAllMonths(this,false)">None</button></div>';
+    const hint = single ? '<div class="mhint">Pick the single month it\u2019s paid.</div>' : '<div class="mhint">Tap months it\u2019s charged.</div>';
+    return '<button type="button" class="sched-btn" onclick="toggleSched(this)">' + schedLabel(r) + ' \u25be</button>' +
+      '<div class="sched-panel" style="display:none;"><div class="mgrid">' + chips + '</div>' + shortcuts + hint + '</div>';
+  }
+  // open/close the panel
+  function toggleSched(btn) { const p = btn.nextElementSibling; if (p) p.style.display = (p.style.display === 'none' ? 'block' : 'none'); }
+  // refresh just the chips' on/off state and the button label after a change (no full re-render)
+  function refreshSchedCell(td, r) {
+    const arr = activeMonths(r);
+    td.querySelectorAll('.mchip').forEach((c, k) => c.classList.toggle('on', !!arr[k]));
+    const b = td.querySelector('.sched-btn'); if (b) b.textContent = schedLabel(r) + ' \u25be';
+  }
+  function pickMonth(btn, k) {
+    const tr = btn.closest('tr'), td = btn.closest('td'), i = Number(tr.dataset.i), r = rows[i]; if (!r) return;
+    if (r.frequency === 'Annual') { r.bill_month = k + 1; r.pay_months = null; }
+    else {
+      const arr = activeMonths(r); arr[k] = !arr[k];
+      r.pay_months = arr.every(Boolean) ? null : maskFromArr(arr); r.bill_month = null;
+    }
+    refreshSchedCell(td, r); setDirty(); updateProj();
+  }
+  function setAllMonths(btn, on) {
+    const tr = btn.closest('tr'), td = btn.closest('td'), i = Number(tr.dataset.i), r = rows[i]; if (!r) return;
+    r.pay_months = on ? null : '000000000000'; r.bill_month = null;
+    refreshSchedCell(td, r); setDirty(); updateProj();
+  }
+  // frequency change: re-validate the schedule and re-render the whole row (annual + schedule cells)
+  function onFreq(sel) {
+    const tr = sel.closest('tr'), i = Number(tr.dataset.i);
+    syncDom(); reconcileSchedule(rows[i]);
+    tr.outerHTML = rowHtml(rows[i], i); setDirty(); updateProj();
+  }
+
   function rowHtml(r, i) {
     const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
     const freqOpt = f => ['Annual', 'Monthly', 'Weekly'].map(o => '<option' + (r.frequency === o ? ' selected' : '') + '>' + o + '</option>').join('');
-    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    const monthOpt = m => '<option value="">\u2014</option>' + MONTHS.map((nm, k) => '<option value="' + (k + 1) + '"' + (Number(r.bill_month) === (k + 1) ? ' selected' : '') + '>' + nm + '</option>').join('');
     const payerOpt = sel => '<option value="">\u2014</option>' + (memberNames || []).map(n => '<option' + (n === sel ? ' selected' : '') + '>' + n.replace(/"/g, '&quot;') + '</option>').join('') + '<option' + (sel === 'Credit card' ? ' selected' : '') + '>Credit card</option>' + '<option' + (sel === 'PayPal' ? ' selected' : '') + '>PayPal</option>';
     return '<tr data-i="' + i + '">' +
       '<td><input type="text" class="f-name" value="' + esc(r.bill_name) + '" oninput="mark()"></td>' +
@@ -169,9 +264,9 @@
       '<td><select class="f-paidby" onchange="mark()" style="min-width:90px;">' + payerOpt(r.paid_by) + '</select></td>' +
       '<td><select class="f-account" onchange="mark()" style="min-width:120px;">' + acctOptions(r.paid_account) + '</select></td>' +
       '<td><input type="number" class="f-premium" step="1" value="' + (r.premium != null ? r.premium : 0) + '" oninput="rowCalc(this)"></td>' +
-      '<td><select class="f-freq" onchange="rowCalc(this)">' + freqOpt(r.frequency) + '</select></td>' +
+      '<td><select class="f-freq" onchange="onFreq(this)">' + freqOpt(r.frequency) + '</select></td>' +
       '<td class="annual-cell" style="font-weight:bold; color:var(--accent-dark);">' + fmt(annualOf(r.premium, r.frequency)) + '</td>' +
-      '<td><select class="f-month" onchange="mark()" title="Month an annual bill is paid">' + monthOpt(r.bill_month) + '</select></td>' +
+      '<td class="sched">' + scheduleCellHtml(r) + '</td>' +
       '<td style="text-align:center;"><input type="checkbox" class="f-red" ' + (r.spend_reduction ? 'checked' : '') + ' onchange="mark()" style="width:auto;"></td>' +
       '<td><input type="number" class="f-t70 taper" step="0.05" min="0" max="1" value="' + (r.taper_at_70 != null ? r.taper_at_70 : 1) + '" oninput="mark()"></td>' +
       '<td><input type="number" class="f-t80 taper" step="0.05" min="0" max="1" value="' + (r.taper_at_80 != null ? r.taper_at_80 : 1) + '" oninput="mark()"></td>' +
@@ -197,8 +292,6 @@
       rows[i].paid_account = tr.querySelector('.f-account').value.trim() || null;
       rows[i].premium = Math.round(parseFloat(tr.querySelector('.f-premium').value) || 0);
       rows[i].frequency = tr.querySelector('.f-freq').value;
-      const mv = tr.querySelector('.f-month').value;
-      rows[i].bill_month = mv === '' ? null : parseInt(mv);
       rows[i].spend_reduction = tr.querySelector('.f-red').checked;
       rows[i].taper_at_70 = parseFloat(tr.querySelector('.f-t70').value);
       rows[i].taper_at_80 = parseFloat(tr.querySelector('.f-t80').value);
@@ -219,7 +312,7 @@
     const html = rows.map((r, i) => ({ r, i }))
       .filter(x => cat === 'All' || (x.r.category_code || '') === cat)
       .map(x => rowHtml(x.r, x.i)).join('');
-    tbody.innerHTML = html || '<tr><td colspan="10">No bills in this view. Use \u201cAdd bill\u201d or change the filter.</td></tr>';
+    tbody.innerHTML = html || '<tr><td colspan="13">No bills in this view. Use \u201cAdd bill\u201d or change the filter.</td></tr>';
     updateProj();
   }
   function mark() { syncDom(); setDirty(); updateProj(); }
@@ -236,7 +329,7 @@
 
   function addRow() {
     syncDom();
-    rows.push({ id: undefined, bill_name: '', category_code: document.getElementById('filterCat').value === 'All' ? '' : document.getElementById('filterCat').value, premium: 0, frequency: 'Monthly', spend_reduction: false, taper_at_70: 1, taper_at_80: 1, taper_at_90: 1 });
+    rows.push({ id: undefined, bill_name: '', category_code: document.getElementById('filterCat').value === 'All' ? '' : document.getElementById('filterCat').value, premium: 0, frequency: 'Monthly', bill_month: null, pay_months: null, spend_reduction: false, taper_at_70: 1, taper_at_80: 1, taper_at_90: 1 });
     populateCatFilter(); render(); setDirty();
   }
   function delRow(btn) {
@@ -253,8 +346,9 @@
     try {
       for (const id of deleted) await App.write('DELETE', 'bd_household_bills?id=eq.' + id, undefined);
       for (const r of rows) {
+        reconcileSchedule(r);
         // total_annual is a GENERATED column — never write it; the DB computes it from premium + frequency
-        const payload = { bill_name: r.bill_name, category_code: r.category_code, paid_by: r.paid_by || null, paid_account: r.paid_account || null, premium: r.premium, frequency: r.frequency, bill_month: r.bill_month != null ? r.bill_month : null, spend_reduction: r.spend_reduction, taper_at_70: r.taper_at_70, taper_at_80: r.taper_at_80, taper_at_90: r.taper_at_90 };
+        const payload = { bill_name: r.bill_name, category_code: r.category_code, paid_by: r.paid_by || null, paid_account: r.paid_account || null, premium: r.premium, frequency: r.frequency, bill_month: r.bill_month != null ? r.bill_month : null, pay_months: r.pay_months || null, spend_reduction: r.spend_reduction, taper_at_70: r.taper_at_70, taper_at_80: r.taper_at_80, taper_at_90: r.taper_at_90 };
         if (r.id != null) await App.write('PATCH', 'bd_household_bills?id=eq.' + r.id, payload);
         else await App.write('POST', 'bd_household_bills', payload);
       }
