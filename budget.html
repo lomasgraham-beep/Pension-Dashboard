@@ -74,7 +74,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Per-person budget for the month you're viewing: net income in, the bills that actually leave each account that month, and what's left. Use the controls to step to next month or jump ahead; the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box is an estimate for reference only and is not part of any total here. <span style="color:#94a3b8;">(budget build: v22)</span></p>
+  <p class="note">Per-person budget for the month you're viewing: net income in, the bills that actually leave each account that month, and what's left. Use the controls to step to next month or jump ahead; the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box is an estimate for reference only and is not part of any total here. Insurances due in the month shown are listed under Cash Summary. <span style="color:#94a3b8;">(budget build: v23)</span></p>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
     <button class="nav-btn" id="prevBtn" onclick="stepMonth(-1)">&#9664; Prev</button>
@@ -272,9 +272,9 @@
     const cash = cashSummary(avails, avgAvails, pens.total);
     const cc = creditCardBox(d);
 
-    // two stacked columns: left = first person + pensions; right = second person + credit card + cash summary
+    // two stacked columns: left = first person + pensions; right = second person + credit card + cash summary + insurances due
     const left = (blocks[0] || '') + blocks.slice(2).join('') + pens.html + leftoverHtml;
-    const right = (blocks[1] || '') + cc + cash;
+    const right = (blocks[1] || '') + cc + cash + insurancesDueBox(d);
     document.getElementById('colLeft').innerHTML = left;
     document.getElementById('colRight').innerHTML = right;
     document.getElementById('cols').style.display = 'grid';
@@ -428,6 +428,28 @@
         '<tr class="avail"><td>Total cash available in ' + monthLabelShort() + '</td><td class="amt">' + fmt(totalCash) + '</td></tr>' +
         avgRow +
       '</tbody></table>' +
+    '</div>';
+  }
+
+  // Insurances falling due in the viewed month. Matches any bill whose category contains "insurance"
+  // (case-insensitive), across every account/payer — so pot-funded and card insurances show too.
+  function insurancesDueBox(d) {
+    const due = (d.bills || [])
+      .filter(b => /insurance/i.test(b.category_code || ''))
+      .map(b => ({ name: b.bill_name || '\u2014', amt: monthCharge(b, viewM) }))
+      .filter(x => x.amt > 0)
+      .sort((a, b) => b.amt - a.amt);
+    let rows, total = 0;
+    if (due.length) {
+      rows = due.map(x => { total += x.amt; return '<tr><td>' + esc(x.name) + '</td><td class="amt">' + fmt(x.amt) + '</td></tr>'; }).join('') +
+        '<tr class="total"><td>Total due</td><td class="amt">' + fmt(total) + '</td></tr>';
+    } else {
+      rows = '<tr><td colspan="2" style="color:#94a3b8;">No insurances due in ' + monthLabelShort() + '</td></tr>';
+    }
+    return '<div class="panelcard">' +
+      '<div class="blocktitle">Insurances Due</div>' +
+      '<div class="subtitle">Falling due in ' + monthLabelShort() + '</div>' +
+      '<table><tbody>' + rows + '</tbody></table>' +
     '</div>';
   }
 
