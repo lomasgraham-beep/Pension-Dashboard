@@ -64,7 +64,7 @@
 </head>
 <body>
   <h1>Card Spending</h1>
-  <p class="note">Actual card transactions imported from a statement CSV, saved and categorised. Suggestions come from what you&rsquo;ve categorised before (the app learns), with a few common UK merchants seeded. Review every row before saving. <span class="mini">(card spending build: v1)</span></p>
+  <p class="note">Actual card transactions imported from a statement CSV, saved and categorised. Suggestions come from what you&rsquo;ve categorised before (the app learns), with a few common UK merchants seeded. Review every row before saving. <span class="mini">(card spending build: v2)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <!-- ============ IMPORT ============ -->
@@ -218,11 +218,11 @@
     let t = String(s).trim();
     if (t === '') return null;
     let neg = false;
-    if (/^\(.*\)$/.test(t)) { neg = true; t = t.slice(1, -1); }
-    if (/(^|\s)(cr)\b/i.test(t)) neg = true;          // credit marker
-    t = t.replace(/dr/ig, '').replace(/cr/ig, '');
-    t = t.replace(/[£$,\s]/g, '');
-    if (t.startsWith('-')) { neg = true; t = t.slice(1); }
+    if (/^\(.*\)$/.test(t)) neg = true;               // (12.34) = negative
+    if (/\bcr\b/i.test(t)) neg = true;                // trailing CR credit marker
+    if (t.indexOf('-') !== -1) neg = true;            // any minus = negative
+    t = t.replace(/[^0-9.]/g, '');                    // keep digits + dot only; drops £, symbols, mis-decoded bytes
+    if (t === '' || t === '.') return null;
     const v = parseFloat(t);
     if (isNaN(v)) return null;
     return neg ? -v : v;
@@ -547,9 +547,18 @@
   function handleFile(file) {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => { ingest(parseCSV(reader.result)); };
+    reader.onload = () => {
+      let text;
+      try {
+        const buf = new Uint8Array(reader.result);
+        try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+        catch (e) { text = new TextDecoder('windows-1252').decode(buf); }  // legacy bank exports (£ = 0xA3)
+      } catch (e2) { text = ''; }
+      if (!text) { setStatus('Could not read that file.', 's-err'); return; }
+      ingest(parseCSV(text));
+    };
     reader.onerror = () => setStatus('Could not read that file.', 's-err');
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   }
   function wire() {
     document.getElementById('fileIn').addEventListener('change', e => handleFile(e.target.files[0]));
