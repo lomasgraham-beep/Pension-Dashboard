@@ -64,7 +64,7 @@
 </head>
 <body>
   <h1>Card Spending</h1>
-  <p class="note">Actual card transactions imported from a statement CSV, saved and categorised. Suggestions come from what you&rsquo;ve categorised before (the app learns), with a few common UK merchants seeded. Review every row before saving. <span class="mini">(card spending build: v3)</span></p>
+  <p class="note">Actual card transactions imported from a statement CSV, saved and categorised. Suggestions come from what you&rsquo;ve categorised before (the app learns), with a few common UK merchants seeded. Review every row before saving. <span class="mini">(card spending build: v4)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <!-- ============ IMPORT ============ -->
@@ -135,6 +135,27 @@
       <thead><tr><th class="l">Date</th><th class="l">Description</th><th>Amount</th><th class="l">Category</th><th></th></tr></thead>
       <tbody></tbody>
     </table>
+  </div>
+
+  <!-- ============ CATEGORY MATCHING ============ -->
+  <div id="matchPanel" class="panel" style="display:none;">
+    <div class="row" style="justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">Category matching</h2>
+      <button class="btn btn-ghost" id="matchToggle" type="button">Hide</button>
+    </div>
+    <div id="matchBody">
+      <p class="hint">How a blank row gets a suggestion: the app checks what you&rsquo;ve taught it first (learned), then these starter rules. A rule only suggests if it resolves to one of your own categories.</p>
+      <h3 style="font-size:15px; color:#475569; margin:16px 0 4px;">Starter rules &rarr; your categories</h3>
+      <table id="ruleTable">
+        <thead><tr><th class="l">Spending type</th><th class="l">Resolves to</th><th class="l">Recognises</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <h3 style="font-size:15px; color:#475569; margin:18px 0 4px;">Learned from you</h3>
+      <table id="memTable">
+        <thead><tr><th class="l">Merchant key</th><th class="l">Category</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 
 <script>
@@ -280,18 +301,16 @@
   }
   function suggestCategory(desc) {
     const key = merchantKey(desc);
-    if (merchantMap[key]) return merchantMap[key];                       // learned exact
+    if (merchantMap[key]) return { code: merchantMap[key], source: 'learned' };       // learned exact
     const nd = normDesc(desc);
-    // learned substring (forgiving)
-    for (const k in merchantMap) { if (k && nd.indexOf(k) !== -1) return merchantMap[k]; }
-    // starter rules -> resolved code
+    for (const k in merchantMap) { if (k && nd.indexOf(k) !== -1) return { code: merchantMap[k], source: 'learned' }; }
     for (const rule of STARTER) {
       if (rule.needles.some(n => nd.indexOf(n) !== -1)) {
         const code = conceptCode[rule.concept];
-        if (code) return code;
+        if (code) return { code: code, source: 'rule: ' + rule.concept };
       }
     }
-    return '';
+    return { code: '', source: '' };
   }
 
   // ---------- load ----------
@@ -313,9 +332,11 @@
       members = (mem && mem.all) ? mem.all : [];
       buildPayerSelect();
       renderLedger();
+      renderMatching();
       document.getElementById('status').style.display = 'none';
       document.getElementById('importPanel').style.display = 'block';
       document.getElementById('ledgerPanel').style.display = 'block';
+      document.getElementById('matchPanel').style.display = 'block';
     } catch (e) {
       setStatus('Could not load: ' + (e && e.message ? e.message : e), 's-err');
     }
@@ -372,9 +393,10 @@
         hash = base + '|' + k;
         dup = existingHashes.has(hash);
       }
+      const sug = errFlag ? { code: '', source: '' } : suggestCategory(rawDesc);
       preview.push({
         date: date, desc: rawDesc, amount: amount,
-        code: errFlag ? '' : suggestCategory(rawDesc),
+        code: sug.code, src: sug.source,
         hash: hash, dup: dup, err: errFlag,
         include: !errFlag && !dup
       });
@@ -406,7 +428,8 @@
                 : p.dup ? '<span class="tag tag-dup">already saved</span>'
                 : '<span class="tag tag-new">new</span>';
       const cat = p.err ? '\u2014'
-        : '<select class="cat" data-i="' + i + '" onchange="onCat(this)">' + catOptions(p.code) + '</select>';
+        : '<select class="cat" data-i="' + i + '" onchange="onCat(this)">' + catOptions(p.code) + '</select>' +
+          '<div class="mini">' + (p.src ? 'via ' + escapeHtml(p.src) : 'no match') + '</div>';
       return '<tr class="' + cls + '">' +
         '<td class="l"><input type="checkbox" data-i="' + i + '" onchange="onInc(this)"' + chk + dis + '></td>' +
         '<td class="l">' + escapeHtml(p.date || '?') + '</td>' +
@@ -577,6 +600,52 @@
     }
   }
 
+  // ---------- category matching panel ----------
+  function renderMatching() {
+    // starter rules -> resolved category
+    const rb = document.querySelector('#ruleTable tbody');
+    rb.innerHTML = STARTER.map(rule => {
+      const code = conceptCode[rule.concept];
+      const resolved = code
+        ? escapeHtml(catByCode[code] || code)
+        : '<span style="color:#c0392b;">no matching category</span>';
+      const sample = rule.needles.slice(0, 6).map(n => n.trim()).join(', ') + (rule.needles.length > 6 ? '\u2026' : '');
+      return '<tr><td class="l">' + escapeHtml(rule.concept) + '</td><td class="l">' + resolved +
+             '</td><td class="l mini">' + escapeHtml(sample) + '</td></tr>';
+    }).join('');
+
+    // learned memory
+    const mb = document.querySelector('#memTable tbody');
+    const keys = Object.keys(merchantMap).sort();
+    if (!keys.length) {
+      mb.innerHTML = '<tr><td class="empty" colspan="3">Nothing learned yet. Categorise a merchant and save, and it\u2019ll appear here.</td></tr>';
+    } else {
+      mb.innerHTML = keys.map(k => {
+        const code = merchantMap[k];
+        return '<tr><td class="l">' + escapeHtml(k) + '</td>' +
+               '<td class="l">' + escapeHtml(catByCode[code] || code || '\u2014') + '</td>' +
+               '<td><button class="btn-del" onclick="delMerchant(\'' + encodeURIComponent(k) + '\')">\u2715</button></td></tr>';
+      }).join('');
+    }
+  }
+  async function delMerchant(encKey) {
+    const key = decodeURIComponent(encKey);
+    if (!confirm('Forget this learned mapping?\n' + key + ' \u2192 ' + (catByCode[merchantMap[key]] || merchantMap[key]))) return;
+    try {
+      await App.write('DELETE', 'bd_merchant_map?match_text=eq.' + encodeURIComponent(key));
+      delete merchantMap[key];
+      setStatus('Forgotten: ' + key, 's-ok');
+      renderMatching();
+    } catch (e) { setStatus('Could not delete: ' + (e && e.message ? e.message : e), 's-err'); }
+  }
+  function toggleMatch() {
+    const body = document.getElementById('matchBody');
+    const btn = document.getElementById('matchToggle');
+    const hidden = body.style.display === 'none';
+    body.style.display = hidden ? 'block' : 'none';
+    btn.textContent = hidden ? 'Hide' : 'Show';
+  }
+
   // ---------- wiring ----------
   function handleFile(file) {
     if (!file) return;
@@ -616,6 +685,7 @@
     document.getElementById('cancelBtn').addEventListener('click', discard);
     document.getElementById('chkAll').addEventListener('change', onChkAll);
     document.getElementById('monthSel').addEventListener('change', e => drawMonth(e.target.value));
+    document.getElementById('matchToggle').addEventListener('click', toggleMatch);
   }
 
   window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
