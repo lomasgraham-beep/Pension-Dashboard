@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Card Categories</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err85"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:820px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  h2 { color:#2c3e50; font-size:18px; margin:0 0 12px; }
+  h3 { font-size:15px; color:#475569; margin:18px 0 4px; }
+  .btn-del { background:#fff5f5; color:#c0392b; border:1px solid #f5c6cb; padding:6px 10px; min-height:0; font-size:13px; border-radius:6px; cursor:pointer; }
+  table { border-collapse:collapse; width:100%; margin-top:6px; }
+  th, td { padding:8px 10px; border-bottom:1px solid #e2e8f0; text-align:right; vertical-align:middle; }
+  th:first-child, td:first-child, th.l, td.l { text-align:left; }
+  th { background:#f8fafc; color:#475569; font-size:13px; }
+  td.empty { text-align:left; color:#94a3b8; font-style:italic; }
+  .mini { font-size:12px; color:#94a3b8; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+  .s-ok { background:#d1fae5 !important; color:#065f46 !important; }
+  .hint { font-size:13px; color:#64748b; margin:4px 0 0; }
+  .warn { color:#c0392b; }
+
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1, h2, h3, h4 { color:#f1f5f9 !important; }
+    .panel { background:#1e293b !important; border-color:#334155 !important; box-shadow:0 2px 4px rgba(0,0,0,0.4) !important; }
+    .note, .hint, .mini { color:#94a3b8 !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    .btn-del { background:#3a1a1a !important; color:#f87171 !important; border-color:#7f1d1d !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+    td.empty { color:#94a3b8 !important; }
+    .warn { color:#f87171 !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Card Categories</h1>
+  <p class="note">How the Card Entry page chooses a category for each transaction: it uses what you&rsquo;ve taught it first, then these starter rules. <span class="mini">(card categories build: v1)</span></p>
+  <div id="status">Loading&hellip;</div>
+
+  <div id="matchPanel" class="panel" style="display:none;">
+    <h2>Category matching</h2>
+    <p class="hint">A starter rule only produces a suggestion if it resolves to one of your own categories. Anything marked in red won&rsquo;t auto-fill until you have a matching category or teach it yourself.</p>
+    <h3>Starter rules &rarr; your categories</h3>
+    <table id="ruleTable">
+      <thead><tr><th class="l">Spending type</th><th class="l">Resolves to</th><th class="l">Recognises</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <h3>Learned from you</h3>
+    <table id="memTable">
+      <thead><tr><th class="l">Merchant key</th><th class="l">Category</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+<script>
+  // ---------- state ----------
+  let billCats = [];
+  let catByCode = {};
+  let merchantMap = {};
+
+  // ---------- helpers ----------
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function setStatus(msg, cls) {
+    const s = document.getElementById('status');
+    s.style.display = 'block'; s.className = cls || ''; s.textContent = msg;
+  }
+  function notifyChanged() {
+    try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {}
+  }
+
+  // ---------- starter rules ----------
+  const STARTER = [
+    { needles: ['TESCO','SAINSBURY','ASDA','ALDI','LIDL','MORRISON','WAITROSE','MARKS SPENCER','M S ','ICELAND','CO OP','COOP','OCADO'], concept: 'grocery' },
+    { needles: ['SHELL','ESSO','BP ','TEXACO','GULF','JET ','MOTO ','MFG ','EURO GARAGES','APPLEGREEN'], concept: 'fuel' },
+    { needles: ['AMAZON','AMZN','EBAY','ARGOS','JOHN LEWIS','CURRYS','IKEA','NEXT '], concept: 'shopping' },
+    { needles: ['UBER','BOLT','TRAINLINE','TFL','LNER','AVANTI','NATIONAL RAIL','RINGGO','PARKING'], concept: 'transport' },
+    { needles: ['NETFLIX','SPOTIFY','DISNEY','PRIME VIDEO','NOW TV','AUDIBLE'], concept: 'subscription' },
+    { needles: ['GREGGS','MCDONALD','COSTA','STARBUCKS','NANDO','PIZZA','DOMINO','JUST EAT','DELIVEROO','UBER EATS','WETHERSPOON','PUB '], concept: 'dining' },
+    { needles: ['BOOTS','SUPERDRUG','PHARMACY','LLOYDS PHARM'], concept: 'health' }
+  ];
+  const CONCEPT_KW = {
+    grocery: ['grocer','food','supermarket'], fuel: ['fuel','petrol','diesel','motor'],
+    shopping: ['shopping','general','household','misc'], transport: ['transport','travel','train','rail','bus','car '],
+    subscription: ['subscription','streaming','media','tv'], dining: ['dining','eating','restaurant','takeaway','meal'],
+    health: ['health','medical','pharmacy','chemist']
+  };
+  let conceptCode = {};
+  function resolveConcepts() {
+    conceptCode = {};
+    Object.keys(CONCEPT_KW).forEach(concept => {
+      const kws = CONCEPT_KW[concept];
+      const hit = billCats.find(c => { const d = String(c.description || '').toLowerCase(); return kws.some(k => d.indexOf(k) !== -1); });
+      if (hit) conceptCode[concept] = hit.code;
+    });
+  }
+
+  // ---------- load ----------
+  async function load() {
+    try {
+      setStatus('Loading\u2026');
+      const [cats, mm] = await Promise.all([
+        App.rest('bd_bill_category?order=code.asc'),
+        App.rest('bd_merchant_map')
+      ]);
+      billCats = cats || [];
+      catByCode = {}; billCats.forEach(c => { catByCode[c.code] = c.description || c.code; });
+      resolveConcepts();
+      merchantMap = {}; (mm || []).forEach(r => { merchantMap[r.match_text] = r.category_code; });
+      document.getElementById('status').style.display = 'none';
+      document.getElementById('matchPanel').style.display = 'block';
+      renderMatching();
+    } catch (e) {
+      setStatus('Could not load: ' + (e && e.message ? e.message : e), 's-err');
+    }
+  }
+
+  // ---------- render ----------
+  function renderMatching() {
+    const rb = document.querySelector('#ruleTable tbody');
+    rb.innerHTML = STARTER.map(rule => {
+      const code = conceptCode[rule.concept];
+      const resolved = code ? escapeHtml(catByCode[code] || code) : '<span class="warn">no matching category</span>';
+      const sample = rule.needles.slice(0, 6).map(n => n.trim()).join(', ') + (rule.needles.length > 6 ? '\u2026' : '');
+      return '<tr><td class="l">' + escapeHtml(rule.concept) + '</td><td class="l">' + resolved +
+             '</td><td class="l mini">' + escapeHtml(sample) + '</td></tr>';
+    }).join('');
+
+    const mb = document.querySelector('#memTable tbody');
+    const keys = Object.keys(merchantMap).sort();
+    if (!keys.length) {
+      mb.innerHTML = '<tr><td class="empty" colspan="3">Nothing learned yet. Categorise a merchant on Card Entry or Card Statements and it\u2019ll appear here.</td></tr>';
+    } else {
+      mb.innerHTML = keys.map(k => {
+        const code = merchantMap[k];
+        return '<tr><td class="l">' + escapeHtml(k) + '</td>' +
+               '<td class="l">' + escapeHtml(catByCode[code] || code || '\u2014') + '</td>' +
+               '<td><button class="btn-del" onclick="delMerchant(\'' + encodeURIComponent(k) + '\')">\u2715</button></td></tr>';
+      }).join('');
+    }
+  }
+  async function delMerchant(encKey) {
+    const key = decodeURIComponent(encKey);
+    if (!confirm('Forget this learned mapping?\n' + key + ' \u2192 ' + (catByCode[merchantMap[key]] || merchantMap[key]))) return;
+    try {
+      await App.write('DELETE', 'bd_merchant_map?match_text=eq.' + encodeURIComponent(key));
+      delete merchantMap[key];
+      setStatus('Forgotten: ' + key, 's-ok');
+      notifyChanged();
+      renderMatching();
+    } catch (e) { setStatus('Could not delete: ' + (e && e.message ? e.message : e), 's-err'); }
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+
+  if (typeof App === 'undefined' || !App.requireLogin) {
+    document.getElementById('status').textContent = 'Error: common.js did not load (App is undefined).';
+  } else {
+    try { App.requireLogin(load, { title: 'Card Categories' }); }
+    catch (err) { document.getElementById('status').textContent = 'Error during startup: ' + (err && err.message ? err.message : err); }
+  }
+</script>
+</body>
+</html>

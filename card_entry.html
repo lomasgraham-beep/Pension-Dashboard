@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Card Entry</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err85"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:820px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  h2 { color:#2c3e50; font-size:18px; margin:0 0 12px; }
+  .row { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:10px; }
+  label { display:block; font-weight:bold; font-size:13px; color:#475569; margin-bottom:5px; }
+  input[type=file] { font-size:15px; }
+  textarea { width:100%; min-height:120px; padding:11px; border:1px solid #cbd5e1; border-radius:6px; font-family:'SF Mono',Menlo,Consolas,monospace; font-size:13px; box-sizing:border-box; }
+  select, input[type=text] { padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:15px; box-sizing:border-box; background:#fff; }
+  .btn { border:none; border-radius:8px; padding:12px 18px; font-size:15px; font-weight:bold; cursor:pointer; min-height:48px; }
+  .btn-go { background:#3498db; color:#fff; }
+  .btn-save { background:#27ae60; color:#fff; }
+  .btn-ghost { background:#fff; color:#3498db; border:1px solid #bfdbfe; }
+  .btn[disabled] { opacity:0.5; cursor:default; }
+  table { border-collapse:collapse; width:100%; margin-top:6px; }
+  th, td { padding:8px 10px; border-bottom:1px solid #e2e8f0; text-align:right; vertical-align:middle; }
+  th:first-child, td:first-child, th.l, td.l { text-align:left; }
+  th { background:#f8fafc; color:#475569; font-size:13px; }
+  td.desc { max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  tr.dup td { color:#94a3b8; font-style:italic; }
+  tr.err td { background:#fdecea; color:#c0392b; }
+  .tag { display:inline-block; font-size:11px; font-weight:bold; padding:2px 7px; border-radius:10px; }
+  .tag-dup { background:#f1f5f9; color:#64748b; }
+  .tag-err { background:#fde2e2; color:#c0392b; }
+  .tag-new { background:#dcfce7; color:#166534; }
+  .mini { font-size:12px; color:#94a3b8; }
+  select.cat { font-size:14px; padding:6px; max-width:180px; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+  .s-ok { background:#d1fae5 !important; color:#065f46 !important; }
+  .hint { font-size:13px; color:#64748b; margin:4px 0 0; }
+
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1, h2, h3, h4 { color:#f1f5f9 !important; }
+    .panel { background:#1e293b !important; border-color:#334155 !important; box-shadow:0 2px 4px rgba(0,0,0,0.4) !important; }
+    .note, .hint, .mini { color:#94a3b8 !important; }
+    label { color:#cbd5e1 !important; }
+    textarea, select, input[type=text] { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    tr.err td { background:#3a1a1a !important; color:#f87171 !important; }
+    .btn-ghost { background:#0f172a !important; color:#93c5fd !important; border-color:#1e3a8a !important; }
+    .tag-dup { background:#334155 !important; color:#cbd5e1 !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Card Entry</h1>
+  <p class="note">Import a credit-card statement CSV: review the rows, adjust any categories, and save them. Saved transactions appear on the Card Statements page. <span class="mini">(card entry build: v1)</span></p>
+  <div id="status">Loading&hellip;</div>
+
+  <div id="importPanel" class="panel" style="display:none;">
+    <h2>Import a statement</h2>
+    <div class="row">
+      <div>
+        <label for="fileIn">CSV file</label>
+        <input type="file" id="fileIn" accept=".csv,text/csv,text/plain">
+      </div>
+      <div>
+        <label for="payerIn">Paid by (whole import)</label>
+        <select id="payerIn"></select>
+      </div>
+      <div>
+        <button class="btn btn-ghost" id="pasteToggle" type="button">Paste instead</button>
+      </div>
+    </div>
+    <div id="pasteWrap" style="display:none; margin-top:4px;">
+      <label for="pasteIn">Paste rows (include the header line)</label>
+      <textarea id="pasteIn" placeholder="Date,Description,Amount&#10;01/04/2026,TESCO STORES 2843,42.10"></textarea>
+      <div class="row" style="margin-top:8px;">
+        <button class="btn btn-go" id="parsePaste" type="button">Parse pasted rows</button>
+      </div>
+    </div>
+    <p class="hint" id="mapHint" style="display:none;"></p>
+    <div id="mapWrap" class="row" style="display:none;">
+      <div><label>Date column</label><select id="mapDate"></select></div>
+      <div><label>Description column</label><select id="mapDesc"></select></div>
+      <div><label>Amount column</label><select id="mapAmt"></select></div>
+      <div><button class="btn btn-go" id="reparseBtn" type="button">Re-read with these</button></div>
+    </div>
+  </div>
+
+  <div id="previewPanel" class="panel" style="display:none;">
+    <h2>Review &amp; save</h2>
+    <p class="hint" id="previewSummary"></p>
+    <table id="previewTable">
+      <thead><tr>
+        <th class="l"><input type="checkbox" id="chkAll" checked></th>
+        <th class="l">Date</th><th class="l">Description</th><th>Amount</th>
+        <th class="l">Category</th><th class="l">Status</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="row" style="margin-top:14px;">
+      <button class="btn btn-save" id="saveBtn" type="button">Save selected</button>
+      <button class="btn btn-ghost" id="cancelBtn" type="button">Discard</button>
+    </div>
+  </div>
+
+<script>
+  // ---------- state ----------
+  let billCats = [];
+  let catByCode = {};
+  let merchantMap = {};
+  let existingHashes = new Set();
+  let members = [];
+  let preview = [];
+  let lastRawRows = null;
+  let lastHeader = null;
+
+  // ---------- helpers ----------
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function setStatus(msg, cls) {
+    const s = document.getElementById('status');
+    s.style.display = 'block'; s.className = cls || ''; s.textContent = msg;
+  }
+  function notifyChanged() {
+    try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {}
+  }
+  function normDesc(s) {
+    return String(s || '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  function merchantKey(s) {
+    let n = normDesc(s);
+    n = n.replace(/^(PAYPAL|SQ|SUMUP|IZ|IZETTLE|ZTL|WWW|TFL|GOOGLE|GOOGL|APL|APPLE PAY)\s+/, '');
+    const toks = n.split(' ').filter(Boolean);
+    if (!toks.length) return n;
+    let key = toks[0];
+    if (key.length <= 3 && toks[1]) key += ' ' + toks[1];
+    return key;
+  }
+  function parseCSV(text) {
+    const rows = [];
+    let field = '', row = [], inQ = false;
+    const s = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (inQ) {
+        if (c === '"') { if (s[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+        else field += c;
+      } else {
+        if (c === '"') inQ = true;
+        else if (c === ',') { row.push(field); field = ''; }
+        else if (c === '\n') { row.push(field); rows.push(row); field = ''; row = []; }
+        else field += c;
+      }
+    }
+    if (field.length || row.length) { row.push(field); rows.push(row); }
+    return rows.filter(r => r.some(c => String(c).trim() !== ''));
+  }
+  function detect(header) {
+    const h = header.map(x => String(x).toLowerCase().trim());
+    const find = (preds) => { for (let i = 0; i < h.length; i++) { if (preds(h[i])) return i; } return -1; };
+    const dateIdx = find(v => /date/.test(v));
+    const descIdx = find(v => /(desc|detail|merchant|narrative|payee|reference|transaction)/.test(v) && !/date/.test(v));
+    const amtIdx  = find(v => /(amount|value)/.test(v));
+    const debIdx  = find(v => /(debit|money out|paid out|^out$)/.test(v));
+    const credIdx = find(v => /(credit|money in|paid in|^in$)/.test(v));
+    return { dateIdx, descIdx, amtIdx, debIdx, credIdx };
+  }
+  function parseAmount(s) {
+    if (s == null) return null;
+    let t = String(s).trim();
+    if (t === '') return null;
+    let neg = false;
+    if (/^\(.*\)$/.test(t)) neg = true;
+    if (/\bcr\b/i.test(t)) neg = true;
+    if (t.indexOf('-') !== -1) neg = true;
+    t = t.replace(/[^0-9.]/g, '');
+    if (t === '' || t === '.') return null;
+    const v = parseFloat(t);
+    if (isNaN(v)) return null;
+    return neg ? -v : v;
+  }
+  const MON = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+  function pad(n) { return ('0' + n).slice(-2); }
+  function parseDate(s) {
+    if (!s) return null;
+    const t = String(s).trim(); let m;
+    if ((m = t.match(/^(\d{4})-(\d{2})-(\d{2})/))) return m[1] + '-' + m[2] + '-' + m[3];
+    if ((m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/))) {
+      let d = +m[1], mo = +m[2], y = +m[3]; if (y < 100) y += 2000;
+      if (mo > 12 && d <= 12) { const tmp = d; d = mo; mo = tmp; }
+      if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) return y + '-' + pad(mo) + '-' + pad(d);
+    }
+    if ((m = t.match(/^(\d{1,2})[ \-]([A-Za-z]{3})[A-Za-z]*[ \-](\d{2,4})$/))) {
+      const mo = MON[m[2].toLowerCase()]; let y = +m[3]; if (y < 100) y += 2000;
+      if (mo) return y + '-' + pad(mo) + '-' + pad(+m[1]);
+    }
+    return null;
+  }
+
+  // ---------- category suggestion ----------
+  const STARTER = [
+    { needles: ['TESCO','SAINSBURY','ASDA','ALDI','LIDL','MORRISON','WAITROSE','MARKS SPENCER','M S ','ICELAND','CO OP','COOP','OCADO'], concept: 'grocery' },
+    { needles: ['SHELL','ESSO','BP ','TEXACO','GULF','JET ','MOTO ','MFG ','EURO GARAGES','APPLEGREEN'], concept: 'fuel' },
+    { needles: ['AMAZON','AMZN','EBAY','ARGOS','JOHN LEWIS','CURRYS','IKEA','NEXT '], concept: 'shopping' },
+    { needles: ['UBER','BOLT','TRAINLINE','TFL','LNER','AVANTI','NATIONAL RAIL','RINGGO','PARKING'], concept: 'transport' },
+    { needles: ['NETFLIX','SPOTIFY','DISNEY','PRIME VIDEO','NOW TV','AUDIBLE'], concept: 'subscription' },
+    { needles: ['GREGGS','MCDONALD','COSTA','STARBUCKS','NANDO','PIZZA','DOMINO','JUST EAT','DELIVEROO','UBER EATS','WETHERSPOON','PUB '], concept: 'dining' },
+    { needles: ['BOOTS','SUPERDRUG','PHARMACY','LLOYDS PHARM'], concept: 'health' }
+  ];
+  const CONCEPT_KW = {
+    grocery: ['grocer','food','supermarket'], fuel: ['fuel','petrol','diesel','motor'],
+    shopping: ['shopping','general','household','misc'], transport: ['transport','travel','train','rail','bus','car '],
+    subscription: ['subscription','streaming','media','tv'], dining: ['dining','eating','restaurant','takeaway','meal'],
+    health: ['health','medical','pharmacy','chemist']
+  };
+  let conceptCode = {};
+  function resolveConcepts() {
+    conceptCode = {};
+    Object.keys(CONCEPT_KW).forEach(concept => {
+      const kws = CONCEPT_KW[concept];
+      const hit = billCats.find(c => { const d = String(c.description || '').toLowerCase(); return kws.some(k => d.indexOf(k) !== -1); });
+      if (hit) conceptCode[concept] = hit.code;
+    });
+  }
+  function suggestCategory(desc) {
+    const key = merchantKey(desc);
+    if (merchantMap[key]) return { code: merchantMap[key], source: 'learned' };
+    const nd = normDesc(desc);
+    for (const k in merchantMap) { if (k && nd.indexOf(k) !== -1) return { code: merchantMap[k], source: 'learned' }; }
+    for (const rule of STARTER) {
+      if (rule.needles.some(n => nd.indexOf(n) !== -1)) { const code = conceptCode[rule.concept]; if (code) return { code: code, source: 'rule: ' + rule.concept }; }
+    }
+    return { code: '', source: '' };
+  }
+  function catOptions(selected) {
+    let html = '<option value="">\u2014</option>';
+    billCats.forEach(c => {
+      const sel = c.code === selected ? ' selected' : '';
+      html += '<option value="' + escapeHtml(c.code) + '"' + sel + '>' + escapeHtml(c.description || c.code) + '</option>';
+    });
+    return html;
+  }
+  function buildPayerSelect() {
+    const sel = document.getElementById('payerIn');
+    sel.innerHTML = '<option value="">\u2014 (not set)</option>' +
+      members.map(n => '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>').join('');
+  }
+
+  // ---------- load ----------
+  async function load() {
+    try {
+      setStatus('Loading\u2026');
+      const [cats, hashes, mm, mem] = await Promise.all([
+        App.rest('bd_bill_category?order=code.asc'),
+        App.rest('bd_card_txn?select=dedupe_hash'),
+        App.rest('bd_merchant_map'),
+        App.memberNames().catch(() => ({ all: [] }))
+      ]);
+      billCats = cats || [];
+      catByCode = {}; billCats.forEach(c => { catByCode[c.code] = c.description || c.code; });
+      resolveConcepts();
+      existingHashes = new Set((hashes || []).map(t => t.dedupe_hash).filter(Boolean));
+      merchantMap = {}; (mm || []).forEach(r => { merchantMap[r.match_text] = r.category_code; });
+      members = (mem && mem.all) ? mem.all : [];
+      buildPayerSelect();
+      document.getElementById('status').style.display = 'none';
+      document.getElementById('importPanel').style.display = 'block';
+    } catch (e) {
+      setStatus('Could not load: ' + (e && e.message ? e.message : e), 's-err');
+    }
+  }
+
+  // ---------- ingest ----------
+  function ingest(rawRows, mapping) {
+    if (!rawRows || rawRows.length < 2) { setStatus('No data rows found in that file.', 's-err'); return; }
+    lastRawRows = rawRows; lastHeader = rawRows[0];
+    let map = mapping || detect(rawRows[0]);
+    const single = map.amtIdx >= 0;
+    const pair = !single && map.debIdx >= 0;
+    if (map.dateIdx < 0 || map.descIdx < 0 || (!single && !pair)) {
+      showMapper(rawRows[0], map);
+      setStatus('Couldn\u2019t auto-detect every column \u2014 pick them below.', 's-err');
+      return;
+    }
+    document.getElementById('mapWrap').style.display = 'none';
+    document.getElementById('mapHint').style.display = 'none';
+    const occ = {};
+    preview = [];
+    for (let i = 1; i < rawRows.length; i++) {
+      const r = rawRows[i];
+      const rawDesc = (r[map.descIdx] || '').trim();
+      const date = parseDate(r[map.dateIdx]);
+      let amount;
+      if (single) amount = parseAmount(r[map.amtIdx]);
+      else { const deb = parseAmount(r[map.debIdx]) || 0; const cr = parseAmount(r[map.credIdx]) || 0; amount = Math.abs(deb) - Math.abs(cr); }
+      const errFlag = (!date) || (amount == null) || (!rawDesc);
+      let hash = '', dup = false;
+      if (!errFlag) {
+        const base = date + '|' + amount.toFixed(2) + '|' + normDesc(rawDesc);
+        const k = (occ[base] = (occ[base] || 0)); occ[base] = k + 1;
+        hash = base + '|' + k; dup = existingHashes.has(hash);
+      }
+      const sug = errFlag ? { code: '', source: '' } : suggestCategory(rawDesc);
+      preview.push({ date: date, desc: rawDesc, amount: amount, code: sug.code, src: sug.source, hash: hash, dup: dup, err: errFlag, include: !errFlag && !dup });
+    }
+    renderPreview();
+  }
+  function showMapper(header, map) {
+    const opts = header.map((h, i) => '<option value="' + i + '">' + escapeHtml(h || ('Column ' + (i + 1))) + '</option>').join('');
+    const sel = (id, idx) => { const el = document.getElementById(id); el.innerHTML = '<option value="-1">\u2014</option>' + opts; el.value = String(idx); };
+    sel('mapDate', map.dateIdx); sel('mapDesc', map.descIdx); sel('mapAmt', map.amtIdx);
+    document.getElementById('mapWrap').style.display = 'flex';
+    const hint = document.getElementById('mapHint');
+    hint.style.display = 'block';
+    hint.textContent = 'If amounts are split across Debit/Credit columns, set Amount to \u2014 and re-read; the importer will combine them automatically when it detects them.';
+  }
+
+  // ---------- preview ----------
+  function renderPreview() {
+    const panel = document.getElementById('previewPanel');
+    const tb = document.querySelector('#previewTable tbody');
+    if (!preview.length) { panel.style.display = 'none'; return; }
+    const fmt2 = v => (v < 0 ? '\u2212£' : '£') + Math.abs(v).toFixed(2);
+    tb.innerHTML = preview.map((p, i) => {
+      const cls = p.err ? 'err' : (p.dup ? 'dup' : '');
+      const chk = (p.include && !p.err && !p.dup) ? ' checked' : '';
+      const dis = (p.err || p.dup) ? ' disabled' : '';
+      const tag = p.err ? '<span class="tag tag-err">check</span>'
+                : p.dup ? '<span class="tag tag-dup">already saved</span>'
+                : '<span class="tag tag-new">new</span>';
+      const cat = p.err ? '\u2014'
+        : '<select class="cat" data-i="' + i + '" onchange="onCat(this)">' + catOptions(p.code) + '</select>' +
+          '<div class="mini">' + (p.src ? 'via ' + escapeHtml(p.src) : 'no match') + '</div>';
+      return '<tr class="' + cls + '">' +
+        '<td class="l"><input type="checkbox" data-i="' + i + '" onchange="onInc(this)"' + chk + dis + '></td>' +
+        '<td class="l">' + escapeHtml(p.date || '?') + '</td>' +
+        '<td class="l desc" title="' + escapeHtml(p.desc) + '">' + escapeHtml(p.desc) + '</td>' +
+        '<td>' + (p.amount == null ? '?' : fmt2(p.amount)) + '</td>' +
+        '<td class="l">' + cat + '</td>' +
+        '<td class="l">' + tag + '</td></tr>';
+    }).join('');
+    const nNew = preview.filter(p => !p.err && !p.dup).length;
+    const nDup = preview.filter(p => p.dup).length;
+    const nErr = preview.filter(p => p.err).length;
+    document.getElementById('previewSummary').textContent =
+      preview.length + ' rows: ' + nNew + ' new, ' + nDup + ' already saved' + (nErr ? ', ' + nErr + ' need attention' : '') + '.';
+    document.getElementById('chkAll').checked = true;
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function onInc(el) { preview[+el.dataset.i].include = el.checked; }
+  function onCat(el) { preview[+el.dataset.i].code = el.value; }
+  function onChkAll() {
+    const on = document.getElementById('chkAll').checked;
+    preview.forEach((p) => { if (!p.err && !p.dup) { p.include = on; } });
+    document.querySelectorAll('#previewTable tbody input[type=checkbox]').forEach(c => { if (!c.disabled) c.checked = on; });
+  }
+
+  // ---------- save ----------
+  async function save() {
+    const payer = document.getElementById('payerIn').value || null;
+    const rows = preview.filter(p => p.include && !p.err && !p.dup);
+    if (!rows.length) { setStatus('Nothing selected to save.', 's-err'); return; }
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true; btn.textContent = 'Saving\u2026';
+    try {
+      const payload = rows.map(p => ({ txn_date: p.date, description: p.desc, amount: p.amount, category_code: p.code || null, paid_by: payer, dedupe_hash: p.hash }));
+      await App.write('POST', 'bd_card_txn', payload);
+      for (const p of rows) {
+        if (!p.code) continue;
+        const key = merchantKey(p.desc); if (!key) continue;
+        if (!(key in merchantMap)) { await App.write('POST', 'bd_merchant_map', { match_text: key, category_code: p.code }); merchantMap[key] = p.code; }
+        else if (merchantMap[key] !== p.code) { await App.write('PATCH', 'bd_merchant_map?match_text=eq.' + encodeURIComponent(key), { category_code: p.code, updated_at: new Date().toISOString() }); merchantMap[key] = p.code; }
+      }
+      setStatus('Saved ' + rows.length + ' transaction' + (rows.length === 1 ? '' : 's') + '. View them on Card Statements.', 's-ok');
+      preview = [];
+      document.getElementById('previewPanel').style.display = 'none';
+      document.getElementById('fileIn').value = '';
+      document.getElementById('pasteIn').value = '';
+      notifyChanged();
+      await load();
+    } catch (e) {
+      setStatus('Save failed: ' + (e && e.message ? e.message : e), 's-err');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save selected';
+    }
+  }
+  function discard() {
+    preview = [];
+    document.getElementById('previewPanel').style.display = 'none';
+    document.getElementById('fileIn').value = '';
+  }
+
+  // ---------- wiring ----------
+  function handleFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let text;
+      try {
+        const buf = new Uint8Array(reader.result);
+        try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+        catch (e) { text = new TextDecoder('windows-1252').decode(buf); }
+      } catch (e2) { text = ''; }
+      if (!text) { setStatus('Could not read that file.', 's-err'); return; }
+      ingest(parseCSV(text));
+    };
+    reader.onerror = () => setStatus('Could not read that file.', 's-err');
+    reader.readAsArrayBuffer(file);
+  }
+  function wire() {
+    document.getElementById('fileIn').addEventListener('change', e => handleFile(e.target.files[0]));
+    document.getElementById('pasteToggle').addEventListener('click', () => {
+      const w = document.getElementById('pasteWrap'); w.style.display = (w.style.display === 'none') ? 'block' : 'none';
+    });
+    document.getElementById('parsePaste').addEventListener('click', () => {
+      const txt = document.getElementById('pasteIn').value || '';
+      if (!txt.trim()) { setStatus('Paste some rows first.', 's-err'); return; }
+      ingest(parseCSV(txt));
+    });
+    document.getElementById('reparseBtn').addEventListener('click', () => {
+      if (!lastRawRows) return;
+      const gi = id => parseInt(document.getElementById(id).value, 10);
+      const map = detect(lastHeader);
+      map.dateIdx = gi('mapDate'); map.descIdx = gi('mapDesc'); map.amtIdx = gi('mapAmt');
+      ingest(lastRawRows, map);
+    });
+    document.getElementById('saveBtn').addEventListener('click', save);
+    document.getElementById('cancelBtn').addEventListener('click', discard);
+    document.getElementById('chkAll').addEventListener('change', onChkAll);
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+
+  if (typeof App === 'undefined' || !App.requireLogin) {
+    document.getElementById('status').textContent = 'Error: common.js did not load (App is undefined).';
+  } else {
+    try { wire(); App.requireLogin(load, { title: 'Card Entry' }); }
+    catch (err) { document.getElementById('status').textContent = 'Error during startup: ' + (err && err.message ? err.message : err); }
+  }
+</script>
+</body>
+</html>

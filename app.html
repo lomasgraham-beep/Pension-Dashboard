@@ -736,7 +736,9 @@
       <button id="subbtn-Budget" class="subtab-link active-sub" onclick="showSub(event,'Budget')">Budget</button>
       <button id="subbtn-Bills" class="subtab-link" onclick="showSub(event,'Bills')">Household Bills</button>
       <button id="subbtn-CreditCard" class="subtab-link" onclick="showSub(event,'CreditCard')">Credit Card</button>
-      <button id="subbtn-CardSpend" class="subtab-link" onclick="showSub(event,'CardSpend')">Card Spending</button>
+      <button id="subbtn-CardEntry" class="subtab-link" onclick="showSub(event,'CardEntry')">Card Entry</button>
+      <button id="subbtn-CardStatements" class="subtab-link" onclick="showSub(event,'CardStatements')">Card Statements</button>
+      <button id="subbtn-CardCats" class="subtab-link" onclick="showSub(event,'CardCats')">Card Categories</button>
       <button id="subbtn-PayPal" class="subtab-link" onclick="showSub(event,'PayPal')">PayPal</button>
       <button id="subbtn-InsSavings" class="subtab-link" onclick="showSub(event,'InsSavings')">Insurance Savings</button>
       <button id="subbtn-DiningNew" class="subtab-link" onclick="showSub(event,'DiningNew')">Dining</button>
@@ -747,7 +749,9 @@
     <div id="sub-Budget" class="subtabcontent"><iframe id="frame-Budget" class="app-frame" title="Monthly Budget"></iframe></div>
     <div id="sub-Bills" class="subtabcontent"><iframe id="frame-Bills" class="app-frame" title="Household Bills"></iframe></div>
     <div id="sub-CreditCard" class="subtabcontent"><iframe id="frame-CreditCard" class="app-frame" title="Credit Card"></iframe></div>
-    <div id="sub-CardSpend" class="subtabcontent"><iframe id="frame-CardSpend" class="app-frame" title="Card Spending"></iframe></div>
+    <div id="sub-CardEntry" class="subtabcontent"><iframe id="frame-CardEntry" class="app-frame" title="Card Entry"></iframe></div>
+    <div id="sub-CardStatements" class="subtabcontent"><iframe id="frame-CardStatements" class="app-frame" title="Card Statements"></iframe></div>
+    <div id="sub-CardCats" class="subtabcontent"><iframe id="frame-CardCats" class="app-frame" title="Card Categories"></iframe></div>
     <div id="sub-PayPal" class="subtabcontent"><iframe id="frame-PayPal" class="app-frame" title="PayPal"></iframe></div>
     <div id="sub-InsSavings" class="subtabcontent"><iframe id="frame-InsSavings" class="app-frame" title="Insurance Savings"></iframe></div>
     <div id="sub-DiningNew" class="subtabcontent"><iframe id="frame-DiningNew" class="app-frame" title="Dining"></iframe></div>
@@ -780,7 +784,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-249</span>
+    <span class="build-stamp">build: LC-250</span>
   </div>
 
   <script>
@@ -2371,8 +2375,8 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=cardspend4';   // frame-file cache-buster: bump when any framed page changes
-    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardSpend:'card_spending.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html' };
+    const FV = '?v=cards3pages1';   // frame-file cache-buster: bump when any framed page changes
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
