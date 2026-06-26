@@ -64,7 +64,7 @@
 </head>
 <body>
   <h1>Card Spending</h1>
-  <p class="note">Actual card transactions imported from a statement CSV, saved and categorised. Suggestions come from what you&rsquo;ve categorised before (the app learns), with a few common UK merchants seeded. Review every row before saving. <span class="mini">(card spending build: v2)</span></p>
+  <p class="note">Actual card transactions imported from a statement CSV, saved and categorised. Suggestions come from what you&rsquo;ve categorised before (the app learns), with a few common UK merchants seeded. Review every row before saving. <span class="mini">(card spending build: v3)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <!-- ============ IMPORT ============ -->
@@ -528,7 +528,7 @@
       '<tr><td class="l">' + escapeHtml(t.txn_date) + '</td>' +
       '<td class="l desc" title="' + escapeHtml(t.description) + '">' + escapeHtml(t.description) + '</td>' +
       '<td>' + fmt2(t.amount) + '</td>' +
-      '<td class="l">' + escapeHtml(t.category_code ? (catByCode[t.category_code] || t.category_code) : '\u2014') + '</td>' +
+      '<td class="l"><select class="cat" data-id="' + t.id + '" onchange="onLedgerCat(this)">' + catOptions(t.category_code) + '</select></td>' +
       '<td><button class="btn-del" onclick="delTxn(' + t.id + ')">\u2715</button></td></tr>'
     ).join('');
   }
@@ -541,6 +541,40 @@
       setStatus('Transaction deleted.', 's-ok');
       await load();
     } catch (e) { setStatus('Delete failed: ' + (e && e.message ? e.message : e), 's-err'); }
+  }
+
+  // Edit a saved transaction's category in place; PATCH it and teach the memory (newest wins).
+  async function onLedgerCat(el) {
+    const id = +el.dataset.id;
+    const code = el.value || null;
+    const t = txns.find(x => x.id === id);
+    if (!t) return;
+    const prev = t.category_code;
+    if (code === (prev || null)) return;
+    el.disabled = true;
+    try {
+      await App.write('PATCH', 'bd_card_txn?id=eq.' + id, { category_code: code });
+      t.category_code = code;
+      if (code) {
+        const key = merchantKey(t.description);
+        if (key) {
+          if (!(key in merchantMap)) {
+            await App.write('POST', 'bd_merchant_map', { match_text: key, category_code: code });
+            merchantMap[key] = code;
+          } else if (merchantMap[key] !== code) {
+            await App.write('PATCH', 'bd_merchant_map?match_text=eq.' + encodeURIComponent(key),
+              { category_code: code, updated_at: new Date().toISOString() });
+            merchantMap[key] = code;
+          }
+        }
+      }
+      setStatus('Category updated.', 's-ok');
+      drawMonth(document.getElementById('monthSel').value);
+    } catch (e) {
+      setStatus('Update failed: ' + (e && e.message ? e.message : e), 's-err');
+      el.value = prev || '';
+      el.disabled = false;
+    }
   }
 
   // ---------- wiring ----------
