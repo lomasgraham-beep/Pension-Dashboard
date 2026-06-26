@@ -193,14 +193,28 @@
     idleTimer = setTimeout(idleLogout, IDLE_MS);
   }
 
+  // When we are the top-level shell, fan an "active" signal out to every frame
+  // so hidden sub-pages don't run independent idle countdowns that your activity
+  // never resets. Frames only bump on receipt (they don't re-broadcast), so no loop.
+  const isTopShell = (window.parent === window);
+  function relayActivityToFrames() {
+    if (!isTopShell) return;
+    try {
+      document.querySelectorAll('iframe').forEach(function (f) {
+        try { if (f.contentWindow) f.contentWindow.postMessage('app-activity', '*'); } catch (e) {}
+      });
+    } catch (e) {}
+  }
+
   function startIdleWatch() {
     ['click', 'keydown', 'mousemove', 'scroll', 'touchstart', 'touchmove'].forEach(function (ev) {
       window.addEventListener(ev, onLocalActivity, { passive: true });
     });
     // If we're embedded in a parent (iframe), tell the parent we're active too.
-    // If we're the parent, accept activity pings from our frames.
+    // If we're the parent, accept activity pings from our frames and pass them on
+    // to all the other frames so the whole app stays alive together.
     window.addEventListener('message', function (e) {
-      if (e && e.data === 'app-activity') bumpActivity();
+      if (e && e.data === 'app-activity') { bumpActivity(); relayActivityToFrames(); }
     });
     bumpActivity(); // start the clock
   }
@@ -209,6 +223,8 @@
     bumpActivity();
     // notify parent (no-op if we're not embedded)
     try { if (window.parent && window.parent !== window) window.parent.postMessage('app-activity', '*'); } catch (e) {}
+    // if we're the shell, keep every frame alive too
+    relayActivityToFrames();
   }
 
   function requireLogin(onReady, opts) {

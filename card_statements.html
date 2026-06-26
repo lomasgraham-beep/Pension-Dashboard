@@ -14,15 +14,24 @@
   .row { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:10px; }
   label { display:block; font-weight:bold; font-size:13px; color:#475569; margin-bottom:5px; }
   select { padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:15px; box-sizing:border-box; background:#fff; }
+  .btn { border:none; border-radius:8px; padding:12px 18px; font-size:15px; font-weight:bold; cursor:pointer; min-height:48px; }
+  .btn-save { background:#27ae60; color:#fff; }
+  .btn-ghost { background:#fff; color:#3498db; border:1px solid #bfdbfe; }
+  .btn[disabled] { opacity:0.5; cursor:default; }
   .btn-del { background:#fff5f5; color:#c0392b; border:1px solid #f5c6cb; padding:6px 10px; min-height:0; font-size:13px; border-radius:6px; cursor:pointer; }
+  .btn-undo { background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; padding:6px 10px; min-height:0; font-size:13px; border-radius:6px; cursor:pointer; }
   table { border-collapse:collapse; width:100%; margin-top:6px; }
   th, td { padding:8px 10px; border-bottom:1px solid #e2e8f0; text-align:right; vertical-align:middle; }
   th:first-child, td:first-child, th.l, td.l { text-align:left; }
   th { background:#f8fafc; color:#475569; font-size:13px; }
   td.desc { max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   tr.total-row td { font-weight:bold; border-top:2px solid #cbd5e1; color:#2c3e50; }
+  tr.pdel td { color:#b91c1c; text-decoration:line-through; background:#fef2f2; }
+  tr.pedit td.catcell { box-shadow: inset 3px 0 0 #f59e0b; }
   td.empty { text-align:left; color:#94a3b8; font-style:italic; }
   select.cat { font-size:14px; padding:6px; max-width:180px; }
+  #actionBar { display:none; align-items:center; gap:12px; flex-wrap:wrap; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:10px 14px; margin:6px 0 14px; }
+  #actionBar .count { font-weight:bold; color:#92400e; }
   #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
   .s-err { background:#fdecea !important; color:#c0392b !important; }
   .s-ok { background:#d1fae5 !important; color:#065f46 !important; }
@@ -38,7 +47,12 @@
     th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
     td { border-color:#334155 !important; color:#cbd5e1 !important; }
     tr.total-row td { color:#f1f5f9 !important; border-top-color:#475569 !important; }
+    tr.pdel td { color:#fca5a5 !important; background:#3a1a1a !important; }
     .btn-del { background:#3a1a1a !important; color:#f87171 !important; border-color:#7f1d1d !important; }
+    .btn-undo { background:#0f172a !important; color:#93c5fd !important; border-color:#1e3a8a !important; }
+    .btn-ghost { background:#0f172a !important; color:#93c5fd !important; border-color:#1e3a8a !important; }
+    #actionBar { background:#3a2f12 !important; border-color:#a16207 !important; }
+    #actionBar .count { color:#fde68a !important; }
     #status { background:#1e293b !important; color:#93c5fd !important; }
     td.empty { color:#94a3b8 !important; }
   }
@@ -46,7 +60,7 @@
 </head>
 <body>
   <h1>Card Statements</h1>
-  <p class="note">Saved card transactions, by month. Change a category inline (it&rsquo;s remembered for next time) or delete a wrong import. Add transactions on the Card Entry page. <span class="mini">(card statements build: v1)</span></p>
+  <p class="note">Saved card transactions, by month. Change a category or mark a row to delete, then press <strong>Save changes</strong> &mdash; nothing is written until you do. Add transactions on the Card Entry page. <span class="mini">(card statements build: v2)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="ledgerPanel" class="panel" style="display:none;">
@@ -57,6 +71,13 @@
         <select id="monthSel"></select>
       </div>
     </div>
+
+    <div id="actionBar">
+      <span class="count" id="pendCount"></span>
+      <button class="btn btn-save" id="saveBtn" type="button">Save changes</button>
+      <button class="btn btn-ghost" id="discardBtn" type="button">Discard</button>
+    </div>
+
     <table id="catTable">
       <thead><tr><th class="l">Category</th><th>Spent</th></tr></thead>
       <tbody></tbody>
@@ -76,6 +97,8 @@
   let catByCode = {};
   let txns = [];
   let merchantMap = {};
+  let pendingCat = {};            // String(id) -> new code (or null), only when differs from saved
+  let pendingDel = new Set();     // String(id) marked for deletion
 
   // ---------- helpers ----------
   function escapeHtml(s) {
@@ -109,6 +132,12 @@
     });
     return html;
   }
+  function currentMonth() { return document.getElementById('monthSel').value; }
+  function pendingTotal() { return Object.keys(pendingCat).length + pendingDel.size; }
+  function effCat(t) {
+    const k = String(t.id);
+    return Object.prototype.hasOwnProperty.call(pendingCat, k) ? pendingCat[k] : t.category_code;
+  }
 
   // ---------- load ----------
   async function load() {
@@ -123,6 +152,7 @@
       catByCode = {}; billCats.forEach(c => { catByCode[c.code] = c.description || c.code; });
       txns = tx || [];
       merchantMap = {}; (mm || []).forEach(r => { merchantMap[r.match_text] = r.category_code; });
+      pendingCat = {}; pendingDel = new Set();
       document.getElementById('status').style.display = 'none';
       document.getElementById('ledgerPanel').style.display = 'block';
       renderLedger();
@@ -145,6 +175,7 @@
       document.querySelector('#catTable tbody').innerHTML = '<tr><td class="empty" colspan="2">No transactions saved yet. Import a statement on the Card Entry page.</td></tr>';
       document.querySelector('#txnTable tbody').innerHTML = '';
       monthSel.innerHTML = '<option value="ALL">All months</option>';
+      renderActionBar();
       return;
     }
     const monthsPresent = Array.from(new Set(txns.map(t => monthOf(t.txn_date)))).sort().reverse();
@@ -154,12 +185,22 @@
     monthSel.value = (prev && (prev === 'ALL' || monthsPresent.indexOf(prev) !== -1)) ? prev : monthsPresent[0];
     drawMonth(monthSel.value);
   }
+  function rowsForMonth(ym) {
+    return (ym === 'ALL') ? txns : txns.filter(t => monthOf(t.txn_date) === ym);
+  }
   function drawMonth(ym) {
-    const rows = (ym === 'ALL') ? txns : txns.filter(t => monthOf(t.txn_date) === ym);
+    renderRollup(ym);
+    renderList(ym);
+    renderActionBar();
+  }
+  function renderRollup(ym) {
+    const rows = rowsForMonth(ym);
     const byCat = {}; let total = 0;
     rows.forEach(t => {
+      if (pendingDel.has(String(t.id))) return;        // excluded from preview totals
       const a = Number(t.amount) || 0;
-      const label = t.category_code ? (catByCode[t.category_code] || t.category_code) : 'Uncategorised';
+      const code = effCat(t);
+      const label = code ? (catByCode[code] || code) : 'Uncategorised';
       byCat[label] = (byCat[label] || 0) + a; total += a;
     });
     const catBody = Object.keys(byCat).sort((a, b) => byCat[b] - byCat[a])
@@ -167,62 +208,127 @@
     document.querySelector('#catTable tbody').innerHTML =
       (catBody || '<tr><td class="empty" colspan="2">No transactions in this month.</td></tr>') +
       (catBody ? '<tr class="total-row"><td class="l">Net total</td><td>' + fmt(total) + '</td></tr>' : '');
+  }
+  function renderList(ym) {
     const fmt2 = v => (v < 0 ? '\u2212£' : '£') + Math.abs(Number(v) || 0).toFixed(2);
-    const list = rows.slice().sort((a, b) => String(b.txn_date).localeCompare(String(a.txn_date)));
-    document.querySelector('#txnTable tbody').innerHTML = list.map(t =>
-      '<tr><td class="l">' + escapeHtml(t.txn_date) + '</td>' +
-      '<td class="l desc" title="' + escapeHtml(t.description) + '">' + escapeHtml(t.description) + '</td>' +
-      '<td>' + fmt2(t.amount) + '</td>' +
-      '<td class="l"><select class="cat" data-id="' + t.id + '" onchange="onLedgerCat(this)">' + catOptions(t.category_code) + '</select></td>' +
-      '<td><button class="btn-del" onclick="delTxn(' + t.id + ')">\u2715</button></td></tr>'
-    ).join('');
+    const list = rowsForMonth(ym).slice().sort((a, b) => String(b.txn_date).localeCompare(String(a.txn_date)));
+    document.querySelector('#txnTable tbody').innerHTML = list.map(t => {
+      const id = String(t.id);
+      const isDel = pendingDel.has(id);
+      const isEdit = Object.prototype.hasOwnProperty.call(pendingCat, id);
+      const cls = isDel ? 'pdel' : (isEdit ? 'pedit' : '');
+      const action = isDel
+        ? '<button class="btn-undo" onclick="undoDel(' + id + ')">Undo</button>'
+        : '<button class="btn-del" onclick="markDel(' + id + ')">\u2715</button>';
+      const catCell = isDel
+        ? escapeHtml(effCat(t) ? (catByCode[effCat(t)] || effCat(t)) : '\u2014')
+        : '<select class="cat" data-id="' + id + '" onchange="onLedgerCat(this)">' + catOptions(effCat(t)) + '</select>';
+      return '<tr class="' + cls + '">' +
+        '<td class="l">' + escapeHtml(t.txn_date) + '</td>' +
+        '<td class="l desc" title="' + escapeHtml(t.description) + '">' + escapeHtml(t.description) + '</td>' +
+        '<td>' + fmt2(t.amount) + '</td>' +
+        '<td class="l catcell">' + catCell + '</td>' +
+        '<td>' + action + '</td></tr>';
+    }).join('');
+  }
+  function renderActionBar() {
+    const bar = document.getElementById('actionBar');
+    const n = pendingTotal();
+    if (!n) { bar.style.display = 'none'; return; }
+    const nEdit = Object.keys(pendingCat).length, nDel = pendingDel.size;
+    const parts = [];
+    if (nEdit) parts.push(nEdit + ' categor' + (nEdit === 1 ? 'y' : 'ies') + ' changed');
+    if (nDel) parts.push(nDel + ' to delete');
+    document.getElementById('pendCount').textContent = 'Unsaved: ' + parts.join(', ') + '.';
+    bar.style.display = 'flex';
   }
 
-  async function onLedgerCat(el) {
-    const id = +el.dataset.id;
+  // ---------- staged edits (no DB writes until Save) ----------
+  function onLedgerCat(el) {
+    const id = el.dataset.id;
     const code = el.value || null;
-    const t = txns.find(x => x.id === id);
+    const t = txns.find(x => String(x.id) === id);
     if (!t) return;
-    const prev = t.category_code;
-    if (code === (prev || null)) return;
-    el.disabled = true;
-    try {
-      await App.write('PATCH', 'bd_card_txn?id=eq.' + id, { category_code: code });
-      t.category_code = code;
-      if (code) {
-        const key = merchantKey(t.description);
-        if (key) {
-          if (!(key in merchantMap)) { await App.write('POST', 'bd_merchant_map', { match_text: key, category_code: code }); merchantMap[key] = code; }
-          else if (merchantMap[key] !== code) { await App.write('PATCH', 'bd_merchant_map?match_text=eq.' + encodeURIComponent(key), { category_code: code, updated_at: new Date().toISOString() }); merchantMap[key] = code; }
-        }
-      }
-      setStatus('Category updated.', 's-ok');
-      notifyChanged();
-      drawMonth(document.getElementById('monthSel').value);
-    } catch (e) {
-      setStatus('Update failed: ' + (e && e.message ? e.message : e), 's-err');
-      el.value = prev || ''; el.disabled = false;
-    }
+    if (code === (t.category_code || null)) delete pendingCat[id];
+    else pendingCat[id] = code;
+    renderRollup(currentMonth());
+    renderActionBar();
+    // reflect the amber edit marker without rebuilding the whole list
+    const tr = el.closest('tr');
+    if (tr) tr.className = Object.prototype.hasOwnProperty.call(pendingCat, id) ? 'pedit' : '';
   }
-  async function delTxn(id) {
-    const t = txns.find(x => x.id === id);
-    if (!t) return;
-    if (!confirm('Delete this transaction?\n' + t.txn_date + '  ' + t.description)) return;
-    try {
-      await App.write('DELETE', 'bd_card_txn?id=eq.' + id);
-      txns = txns.filter(x => x.id !== id);
-      setStatus('Transaction deleted.', 's-ok');
-      notifyChanged();
+  function markDel(id) {
+    pendingDel.add(String(id));
+    drawMonth(currentMonth());
+  }
+  function undoDel(id) {
+    pendingDel.delete(String(id));
+    drawMonth(currentMonth());
+  }
+  function discardChanges() {
+    if (!pendingTotal()) return;
+    if (!confirm('Discard all unsaved changes on this page?')) return;
+    pendingCat = {}; pendingDel = new Set();
+    setStatus('Changes discarded.', 's-ok');
+    drawMonth(currentMonth());
+  }
+
+  async function saveChanges() {
+    if (!pendingTotal()) return;
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true; btn.textContent = 'Saving\u2026';
+    const fails = [];
+    // 1) category edits (skip any row that's also being deleted)
+    for (const id of Object.keys(pendingCat)) {
+      if (pendingDel.has(id)) { delete pendingCat[id]; continue; }
+      const code = pendingCat[id];
+      const t = txns.find(x => String(x.id) === id);
+      try {
+        await App.write('PATCH', 'bd_card_txn?id=eq.' + id, { category_code: code });
+        if (t) t.category_code = code;
+        if (code && t) {
+          const key = merchantKey(t.description);
+          if (key) {
+            if (!(key in merchantMap)) { await App.write('POST', 'bd_merchant_map', { match_text: key, category_code: code }); merchantMap[key] = code; }
+            else if (merchantMap[key] !== code) { await App.write('PATCH', 'bd_merchant_map?match_text=eq.' + encodeURIComponent(key), { category_code: code, updated_at: new Date().toISOString() }); merchantMap[key] = code; }
+          }
+        }
+        delete pendingCat[id];
+      } catch (e) { fails.push('edit'); }
+    }
+    // 2) deletions
+    for (const id of Array.from(pendingDel)) {
+      try {
+        await App.write('DELETE', 'bd_card_txn?id=eq.' + id);
+        txns = txns.filter(x => String(x.id) !== id);
+        pendingDel.delete(id);
+      } catch (e) { fails.push('delete'); }
+    }
+    notifyChanged();
+    btn.disabled = false; btn.textContent = 'Save changes';
+    if (fails.length) {
+      setStatus(fails.length + ' change(s) could not be saved \u2014 they\u2019re still pending. ' + (pendingTotal() - fails.length) + ' saved.', 's-err');
       renderLedger();
-    } catch (e) { setStatus('Delete failed: ' + (e && e.message ? e.message : e), 's-err'); }
+    } else {
+      setStatus('All changes saved.', 's-ok');
+      await load();
+    }
   }
 
   // ---------- wiring ----------
   function wire() {
     document.getElementById('monthSel').addEventListener('change', e => drawMonth(e.target.value));
+    document.getElementById('saveBtn').addEventListener('click', saveChanges);
+    document.getElementById('discardBtn').addEventListener('click', discardChanges);
   }
 
-  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  // Don't let a background refresh wipe out edits in progress.
+  window.addEventListener('message', e => {
+    if (e && e.data === 'refresh-data') {
+      if (pendingTotal()) { setStatus('Data changed elsewhere; save or discard your changes here to refresh.', 's-err'); }
+      else load();
+    }
+  });
 
   if (typeof App === 'undefined' || !App.requireLogin) {
     document.getElementById('status').textContent = 'Error: common.js did not load (App is undefined).';
