@@ -426,9 +426,6 @@
   <select id="tabSelect" class="tab-select" onchange="showTab(null, this.value)" aria-label="Choose section">
     <option value="Overview">Overview</option>
     <option value="Modelling">Modelling</option>
-    <option value="Retirement">Retirement</option>
-    <option value="Cash">Cash &amp; Purchases</option>
-    <option value="Crashes">Market Crashes</option>
     <option value="KPI">KPI</option>
     <option value="LivingCosts">Living Costs</option>
     <option value="BasicData">Basic Data</option>
@@ -436,12 +433,17 @@
   <div class="tab-buttons">
     <button class="tab-link active-btn" onclick="showTab(event,'Overview')">Overview</button>
     <button class="tab-link" onclick="showTab(event,'Modelling')">Modelling</button>
-    <button class="tab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-    <button class="tab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
-    <button class="tab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
     <button class="tab-link" id="tabbtn-KPI" onclick="showTab(event,'KPI')">KPI</button>
     <button class="tab-link" onclick="showTab(event,'LivingCosts')">Living Costs</button>
     <button class="tab-link" onclick="showTab(event,'BasicData')">Basic Data</button>
+  </div>
+
+  <!-- second-level nav for the Modelling group; shown only while a model panel is active -->
+  <div id="modelSubNav" class="subtab-buttons" style="display:none;">
+    <button id="mdlbtn-Modelling" class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+    <button id="mdlbtn-Retirement" class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
+    <button id="mdlbtn-Cash" class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+    <button id="mdlbtn-Crashes" class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
   </div>
 
   <div id="Overview" class="tabcontent active">
@@ -791,7 +793,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-252</span>
+    <span class="build-stamp">build: LC-253</span>
   </div>
 
   <script>
@@ -2460,8 +2462,20 @@
       const el = document.getElementById(id); el.style.display = 'block'; el.classList.add('active');
       // mark the matching tab button active (works whether triggered by a button click or the dropdown)
       document.querySelectorAll('.tab-link').forEach(b => { if (b.getAttribute('onclick') && b.getAttribute('onclick').indexOf("'" + id + "'") >= 0) b.classList.add('active-btn'); });
+      // Modelling group: show the second-level nav and keep the Modelling top button lit
+      const MODEL_IDS = ['Modelling', 'Retirement', 'Cash', 'Crashes'];
+      const msn = document.getElementById('modelSubNav');
+      if (msn) {
+        const inModel = MODEL_IDS.indexOf(id) >= 0;
+        msn.style.display = inModel ? 'flex' : 'none';
+        msn.querySelectorAll('.subtab-link').forEach(b => b.classList.remove('active-sub'));
+        if (inModel) {
+          const mb = document.getElementById('mdlbtn-' + id); if (mb) mb.classList.add('active-sub');
+          document.querySelectorAll('.tab-link').forEach(b => { const oc = b.getAttribute('onclick') || ''; if (oc.indexOf("'Modelling'") >= 0) b.classList.add('active-btn'); });
+        }
+      }
       // keep the phone dropdown in sync
-      const sel = document.getElementById('tabSelect'); if (sel && sel.value !== id) sel.value = id;
+      const sel = document.getElementById('tabSelect'); const selVal = (MODEL_IDS.indexOf(id) >= 0) ? 'Modelling' : id; if (sel && sel.value !== selVal) sel.value = selVal;
       // the main title shows only on Overview, freeing space elsewhere
       const title = document.getElementById('appTitle'); if (title) title.style.display = '';
       if (id === 'Modelling') setTimeout(drawCharts, 40);
