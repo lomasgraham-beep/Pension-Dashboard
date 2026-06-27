@@ -438,14 +438,6 @@
     <button class="tab-link" onclick="showTab(event,'BasicData')">Basic Data</button>
   </div>
 
-  <!-- second-level nav for the Modelling group; shown only while a model panel is active -->
-  <div id="modelSubNav" class="subtab-buttons" style="display:none;">
-    <button id="mdlbtn-Modelling" class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
-    <button id="mdlbtn-Retirement" class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-    <button id="mdlbtn-Cash" class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
-    <button id="mdlbtn-Crashes" class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
-  </div>
-
   <div id="Overview" class="tabcontent active">
     <div id="status" class="s-load">Loading…</div>
 
@@ -550,10 +542,32 @@
     <div id="ovPerf"></div>
   </div>
 
-  <div id="Cash" class="tabcontent"><iframe id="frame-Cash" class="app-frame" title="Cash and Purchases"></iframe></div>
-  <div id="Crashes" class="tabcontent"><iframe id="frame-Crashes" class="app-frame" title="Market Crashes"></iframe></div>
+  <div id="Cash" class="tabcontent">
+    <div class="subtab-buttons">
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
+      <button class="subtab-link active-sub" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
+    </div>
+    <iframe id="frame-Cash" class="app-frame" title="Cash and Purchases"></iframe>
+  </div>
+  <div id="Crashes" class="tabcontent">
+    <div class="subtab-buttons">
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link active-sub" onclick="showTab(event,'Crashes')">Market Crashes</button>
+    </div>
+    <iframe id="frame-Crashes" class="app-frame" title="Market Crashes"></iframe>
+  </div>
 
   <div id="Modelling" class="tabcontent">
+    <div class="subtab-buttons">
+      <button class="subtab-link active-sub" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
+    </div>
     <button type="button" class="opt-toggle" id="optToggle" onclick="toggleOptPair()" aria-expanded="false"><span class="opt-caret" aria-hidden="true">&#9654;</span> Intelligent modelling</button>
     <div class="opt-pair" id="optPair" style="display:none;">
     <div class="params" id="mssBlock">
@@ -685,6 +699,12 @@
   </div>
 
   <div id="Retirement" class="tabcontent">
+    <div class="subtab-buttons">
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link active-sub" onclick="showTab(event,'Retirement')">Retirement</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
+    </div>
     <div class="model-layout">
     <div class="rail-slot" id="railSlot-Retirement"></div><div class="rail-strip" onclick="expandRail()" title="Show controls"><span>Controls &#9654;</span></div>
     <div class="model-main">
@@ -793,7 +813,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-253</span>
+    <span class="build-stamp">build: LC-254</span>
   </div>
 
   <script>
@@ -2462,17 +2482,10 @@
       const el = document.getElementById(id); el.style.display = 'block'; el.classList.add('active');
       // mark the matching tab button active (works whether triggered by a button click or the dropdown)
       document.querySelectorAll('.tab-link').forEach(b => { if (b.getAttribute('onclick') && b.getAttribute('onclick').indexOf("'" + id + "'") >= 0) b.classList.add('active-btn'); });
-      // Modelling group: show the second-level nav and keep the Modelling top button lit
+      // Modelling group: keep the Modelling top button lit while any of its panels is active
       const MODEL_IDS = ['Modelling', 'Retirement', 'Cash', 'Crashes'];
-      const msn = document.getElementById('modelSubNav');
-      if (msn) {
-        const inModel = MODEL_IDS.indexOf(id) >= 0;
-        msn.style.display = inModel ? 'flex' : 'none';
-        msn.querySelectorAll('.subtab-link').forEach(b => b.classList.remove('active-sub'));
-        if (inModel) {
-          const mb = document.getElementById('mdlbtn-' + id); if (mb) mb.classList.add('active-sub');
-          document.querySelectorAll('.tab-link').forEach(b => { const oc = b.getAttribute('onclick') || ''; if (oc.indexOf("'Modelling'") >= 0) b.classList.add('active-btn'); });
-        }
+      if (MODEL_IDS.indexOf(id) >= 0) {
+        document.querySelectorAll('.tab-link').forEach(b => { const oc = b.getAttribute('onclick') || ''; if (oc.indexOf("'Modelling'") >= 0) b.classList.add('active-btn'); });
       }
       // keep the phone dropdown in sync
       const sel = document.getElementById('tabSelect'); const selVal = (MODEL_IDS.indexOf(id) >= 0) ? 'Modelling' : id; if (sel && sel.value !== selVal) sel.value = selVal;
