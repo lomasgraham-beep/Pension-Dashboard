@@ -42,7 +42,7 @@
   .rrow { border-top:1px solid #eef2f6; }
   .rrow:first-child { border-top:none; }
   .rrow.other-row { border-top:1px solid #cbd5e1; }
-  .rbtn { display:grid; grid-template-columns:18px 150px 1fr 104px; align-items:center; gap:12px; width:100%; background:none; border:none; padding:9px 0; cursor:pointer; text-align:left; font:inherit; color:inherit; }
+  .rbtn { display:grid; grid-template-columns:18px 150px 1fr auto; align-items:center; gap:12px; width:100%; background:none; border:none; padding:9px 0; cursor:pointer; text-align:left; font:inherit; color:inherit; }
   .rcaret { width:0; height:0; border-top:5px solid transparent; border-bottom:5px solid transparent; border-left:6px solid #94a3b8; margin:0 auto; transition:transform .15s; }
   .rrow.open .rcaret { transform:rotate(90deg); }
   .rname { font-size:14px; color:#475569; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -50,7 +50,7 @@
   .rtrack { display:block; height:14px; background:#eef2f6; border-radius:4px; overflow:hidden; }
   .rfill { display:block; height:100%; background:var(--accent); border-radius:4px; }
   .rfill.other { background:var(--other); }
-  .rval { font-size:14px; color:#2c3e50; text-align:right; font-variant-numeric:tabular-nums; }
+  .rval { font-size:14px; color:#2c3e50; text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
   .rdetail { display:none; padding:2px 0 12px 30px; }
   .rrow.open .rdetail { display:block; }
   .drow { display:flex; justify-content:space-between; gap:12px; padding:5px 0; font-size:13px; border-top:1px dashed #eef2f6; }
@@ -85,7 +85,7 @@
 </head>
 <body>
   <h1>Summary of Household Bills</h1>
-  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. <span style="color:#94a3b8;">(summary build: v9)</span></p>
+  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. <span style="color:#94a3b8;">(summary build: v10)</span></p>
   <div id="status">Loading…</div>
 
   <div id="ageRow" class="agebar-row" style="display:none;">
