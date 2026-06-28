@@ -6,6 +6,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=auth01"></script>
 <style>
+  :root { --accent:#2c7a7b; --accent-dark:#236668; --accent-soft:#e6f2f2; --accent-border:#b8dadb; --on-accent:#ffffff; --other:#94a3b8; }
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:980px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin-bottom:2px; }
   .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
@@ -18,7 +19,7 @@
   .seg-control { display:inline-flex; border:1px solid #cbd5e1; border-radius:10px; overflow:hidden; }
   .seg-btn { border:none; background:#fff; color:#475569; font-size:15px; font-weight:600; padding:12px 20px; min-height:48px; cursor:pointer; border-right:1px solid #e2e8f0; }
   .seg-btn:last-child { border-right:none; }
-  .seg-btn.active { background:#3498db; color:#fff; }
+  .seg-btn.active { background:var(--accent); color:var(--on-accent); }
   .agebar-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
   .viewing { font-size:13px; color:#94a3b8; }
   .viewing b { color:#475569; font-weight:600; }
@@ -33,19 +34,22 @@
   .traj-col { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; height:100%; }
   .traj-val { font-size:12px; color:#475569; margin-bottom:5px; font-variant-numeric:tabular-nums; }
   .traj-bar { width:62%; max-width:66px; min-height:3px; background:#cbd9e8; border-radius:6px 6px 0 0; }
-  .traj-bar.sel { background:#3498db; }
+  .traj-bar.sel { background:var(--accent); }
   .traj-lbl { font-size:12px; color:#64748b; margin-top:8px; }
   .traj-col.sel .traj-lbl { color:#2c3e50; font-weight:600; }
 
   .rank-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; }
   .rrow { border-top:1px solid #eef2f6; }
   .rrow:first-child { border-top:none; }
+  .rrow.other-row { border-top:1px solid #cbd5e1; }
   .rbtn { display:grid; grid-template-columns:18px 150px 1fr 104px; align-items:center; gap:12px; width:100%; background:none; border:none; padding:9px 0; cursor:pointer; text-align:left; font:inherit; color:inherit; }
-  .rcaret { color:#94a3b8; font-size:13px; transition:transform .15s; text-align:center; }
+  .rcaret { width:0; height:0; border-top:5px solid transparent; border-bottom:5px solid transparent; border-left:6px solid #94a3b8; margin:0 auto; transition:transform .15s; }
   .rrow.open .rcaret { transform:rotate(90deg); }
   .rname { font-size:14px; color:#475569; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rrow.other-row .rname { color:#94a3b8; font-style:italic; }
   .rtrack { height:14px; background:#eef2f6; border-radius:4px; overflow:hidden; }
-  .rfill { height:100%; background:#3498db; border-radius:4px; }
+  .rfill { height:100%; background:var(--accent); border-radius:4px; }
+  .rfill.other { background:var(--other); }
   .rval { font-size:14px; color:#2c3e50; text-align:right; font-variant-numeric:tabular-nums; }
   .rdetail { display:none; padding:2px 0 12px 30px; }
   .rrow.open .rdetail { display:block; }
@@ -56,6 +60,7 @@
   .dval { color:#2c3e50; font-variant-numeric:tabular-nums; white-space:nowrap; }
 
   @media (prefers-color-scheme: dark) {
+    :root { --accent:#5eead4; --accent-dark:#2dd4bf; --accent-soft:#134e4a; --accent-border:#334155; --on-accent:#0f172a; --other:#64748b; }
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
     h1, h2, h3 { color:#f1f5f9 !important; }
     .panel, .kpi { background:#1e293b !important; border-color:#334155 !important; box-shadow:0 2px 4px rgba(0,0,0,0.4) !important; }
@@ -65,23 +70,22 @@
     #status { background:#1e293b !important; color:#93c5fd !important; }
     .seg-control { border-color:#334155 !important; }
     .seg-btn { background:#1e293b !important; color:#cbd5e1 !important; border-right-color:#334155 !important; }
-    .seg-btn.active { background:#2563eb !important; color:#fff !important; }
     .traj-bar { background:#334155 !important; }
-    .traj-bar.sel { background:#3b82f6 !important; }
     .traj-val { color:#cbd5e1 !important; }
     .traj-lbl { color:#94a3b8 !important; }
     .traj-col.sel .traj-lbl { color:#f1f5f9 !important; }
-    .rrow, .drow { border-color:#334155 !important; }
+    .rrow { border-color:#334155 !important; }
+    .rrow.other-row { border-top-color:#475569 !important; }
+    .drow { border-color:#334155 !important; }
     .rname, .dname { color:#cbd5e1 !important; }
     .rtrack { background:#0f172a !important; }
-    .rfill { background:#3b82f6 !important; }
     .rval, .dval { color:#f1f5f9 !important; }
   }
 </style>
 </head>
 <body>
   <h1>Summary of Household Bills</h1>
-  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. <span style="color:#94a3b8;">(summary build: v7)</span></p>
+  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. <span style="color:#94a3b8;">(summary build: v8)</span></p>
   <div id="status">Loading…</div>
 
   <div id="ageRow" class="agebar-row" style="display:none;">
@@ -98,7 +102,7 @@
     <div class="kpi"><div class="lbl">Total annual bills</div><div class="val" id="kpiTotal">£0</div></div>
     <div class="kpi"><div class="lbl">Monthly average</div><div class="val" id="kpiMonthly">£0</div></div>
     <div class="kpi"><div class="lbl">Largest category</div><div class="val sm" id="kpiLargest">&mdash;</div></div>
-    <div class="kpi"><div class="lbl">Change vs now</div><div class="val" id="kpiDelta">&mdash;</div></div>
+    <div class="kpi"><div class="lbl" id="kpiDeltaLbl">Change vs now</div><div class="val" id="kpiDelta">&mdash;</div></div>
   </div>
 
   <div class="panel" id="trajPanel" style="display:none;">
@@ -124,6 +128,7 @@
     { key: 80, label: 'At 80', short: 'at 80' },
     { key: 90, label: 'At 90', short: 'at 90' }
   ];
+  const OTHER_THRESHOLD = 0.02;   // categories under this share of the total roll into "Other"
 
   let allBills = [];
   let sel = 0;
@@ -143,7 +148,6 @@
     return p * 12;   // Monthly (and fallback)
   }
 
-  // aggregate annual cost per category at a given age, with the constituent bills
   function aggForAge(ageKey) {
     const map = {};
     allBills.forEach(b => {
@@ -166,6 +170,11 @@
       return 'Annual · spread evenly';
     }
     return d.frequency || 'Monthly';
+  }
+
+  function pctStr(part, whole) {
+    const p = whole > 0 ? Math.round(part / whole * 100) : 0;
+    return p < 1 ? '<1%' : p + '%';
   }
 
   function setAge(i) {
@@ -192,12 +201,18 @@
     document.getElementById('kpiTotal').textContent = fmt(grand);
     document.getElementById('kpiMonthly').textContent = fmt(grand / 12);
     const top = cats[0];
-    document.getElementById('kpiLargest').innerHTML = top ? (top.code + ' &middot; ' + fmt(top.total)) : '&mdash;';
-    const d = document.getElementById('kpiDelta');
-    if (sel === 0 || grandNow <= 0) { d.innerHTML = '&mdash;'; }
-    else {
-      const pct = Math.round((grand - grandNow) / grandNow * 100);
-      d.textContent = (pct > 0 ? '+' : '') + pct + '%';
+    document.getElementById('kpiLargest').innerHTML = top ? (esc(top.code) + ' &middot; ' + fmt(top.total)) : '&mdash;';
+    const lbl = document.getElementById('kpiDeltaLbl');
+    const val = document.getElementById('kpiDelta');
+    if (sel === 0) {
+      const grand90 = grandForAge(90);
+      lbl.textContent = 'Projected by 90';
+      if (grandNow > 0) { const p = Math.round((grand90 - grandNow) / grandNow * 100); val.textContent = (p > 0 ? '+' : '') + p + '%'; }
+      else val.innerHTML = '&mdash;';
+    } else {
+      lbl.textContent = 'Change vs now';
+      if (grandNow > 0) { const p = Math.round((grand - grandNow) / grandNow * 100); val.textContent = (p > 0 ? '+' : '') + p + '%'; }
+      else val.innerHTML = '&mdash;';
     }
   }
 
@@ -215,29 +230,50 @@
     }).join('');
   }
 
-  function renderRank() {
-    const { cats, grand } = aggForAge(AGES[sel].key);
-    document.getElementById('rankTotal').textContent = fmt(grand) + '/yr';
-    const max = cats.length ? cats[0].total : 1;
-    document.getElementById('rankBars').innerHTML = cats.map(c => {
-      const pct = grand > 0 ? Math.round(c.total / grand * 100) : 0;
-      const w = Math.round(c.total / max * 100);
-      const open = expanded.has(c.code);
-      const detail = c.bills.slice().sort((a, b) => b.annual - a.annual).map(d =>
+  function rowHtml(c, grand, max, isOther) {
+    const pct = pctStr(c.total, grand);
+    const w = Math.round(c.total / max * 100);
+    const open = expanded.has(c.code);
+    let detail;
+    if (isOther) {
+      detail = c.members.map(m =>
+        '<div class="drow"><div class="dname">' + esc(m.code) + '</div>' +
+        '<div class="dval">' + fmt(m.total) + ' · ' + pctStr(m.total, grand) + '</div></div>'
+      ).join('');
+    } else {
+      detail = c.bills.slice().sort((a, b) => b.annual - a.annual).map(d =>
         '<div class="drow"><div><div class="dname">' + esc(d.name) + '</div>' +
         '<div class="dmeta">' + freqMeta(d) + '</div></div>' +
         '<div class="dval">' + fmt(d.annual) + '/yr</div></div>'
       ).join('');
-      return '<div class="rrow' + (open ? ' open' : '') + '">' +
-        '<button class="rbtn" onclick="toggleCat(\'' + jsAttr(c.code) + '\')">' +
-          '<span class="rcaret">&#9654;</span>' +
-          '<span class="rname">' + esc(c.code) + '</span>' +
-          '<span class="rtrack"><span class="rfill" style="width:' + w + '%;"></span></span>' +
-          '<span class="rval">' + fmt(c.total) + ' · ' + pct + '%</span>' +
-        '</button>' +
-        '<div class="rdetail">' + detail + '</div>' +
-      '</div>';
-    }).join('');
+    }
+    return '<div class="rrow' + (open ? ' open' : '') + (isOther ? ' other-row' : '') + '">' +
+      '<button class="rbtn" onclick="toggleCat(\'' + jsAttr(c.code) + '\')">' +
+        '<span class="rcaret"></span>' +
+        '<span class="rname">' + esc(c.code) + '</span>' +
+        '<span class="rtrack"><span class="rfill' + (isOther ? ' other' : '') + '" style="width:' + w + '%;"></span></span>' +
+        '<span class="rval">' + fmt(c.total) + ' · ' + pct + '</span>' +
+      '</button>' +
+      '<div class="rdetail">' + detail + '</div>' +
+    '</div>';
+  }
+
+  function renderRank() {
+    const { cats, grand } = aggForAge(AGES[sel].key);
+    document.getElementById('rankTotal').textContent = fmt(grand) + '/yr';
+    const small = [], visible = [];
+    cats.forEach(c => { ((grand > 0 && c.total / grand < OTHER_THRESHOLD) ? small : visible).push(c); });
+    let rows, other = null;
+    if (small.length >= 2) {
+      rows = visible;
+      other = { code: 'Other', total: small.reduce((s, c) => s + c.total, 0), members: small, isOther: true };
+    } else {
+      rows = cats;
+    }
+    const max = rows.length ? rows[0].total : 1;
+    let html = rows.map(c => rowHtml(c, grand, max, false)).join('');
+    if (other) html += rowHtml(other, grand, max, true);
+    document.getElementById('rankBars').innerHTML = html;
   }
 
   function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
