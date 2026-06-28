@@ -288,7 +288,7 @@
     }
     .opt-toggle { display:inline-flex; align-items:center; gap:8px; margin:0 0 14px; padding:10px 16px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); color:var(--ink); font-weight:bold; font-size:15px; cursor:pointer; }
     .retired-badge { display:inline-block; margin-left:10px; padding:4px 10px; border-radius:6px; background:var(--accent); color:#fff; font-size:11px; font-weight:bold; letter-spacing:0.06em; vertical-align:middle; }
-    body.retired #subbtn-MonForecast, body.retired #subbtn-PerfKPIs,
+    body.retired #subbtn-MonForecast,
     body.retired #subbtn-Contributions, body.retired #subbtn-Income,
     body.retired #ctrl_retire { display:none !important; }
     .opt-toggle:hover { border-color:var(--accent-border); background:var(--accent-soft); }
@@ -425,6 +425,7 @@
   <div class="shell">
   <select id="tabSelect" class="tab-select" onchange="showTab(null, this.value)" aria-label="Choose section">
     <option value="Overview">Overview</option>
+    <option value="LogEntry">Log Entry</option>
     <option value="Modelling">Modelling</option>
     <option value="KPI">KPI</option>
     <option value="LivingCosts">Living Costs</option>
@@ -432,6 +433,7 @@
   </select>
   <div class="tab-buttons">
     <button class="tab-link active-btn" onclick="showTab(event,'Overview')">Overview</button>
+    <button class="tab-link" onclick="showTab(event,'LogEntry')">Log Entry</button>
     <button class="tab-link" onclick="showTab(event,'Modelling')">Modelling</button>
     <button class="tab-link" id="tabbtn-KPI" onclick="showTab(event,'KPI')">KPI</button>
     <button class="tab-link" onclick="showTab(event,'LivingCosts')">Living Costs</button>
@@ -752,11 +754,12 @@
     <div class="subtab-buttons">
       <button id="subbtn-PerfKPIs" class="subtab-link active-sub" onclick="showSub(event,'PerfKPIs')">Performance KPIs</button>
       <button id="subbtn-MonForecast" class="subtab-link" onclick="showSub(event,'MonForecast')">Monthly Forecast</button>
-      <button id="subbtn-LogEntry" class="subtab-link" onclick="showSub(event,'LogEntry')">Log Entry</button>
     </div>
     <div id="sub-PerfKPIs" class="subtabcontent"><iframe id="frame-PerfKPIs" class="app-frame" title="Performance KPIs"></iframe></div>
     <div id="sub-MonForecast" class="subtabcontent"><iframe id="frame-MonForecast" class="app-frame" title="Monthly Forecast"></iframe></div>
-    <div id="sub-LogEntry" class="subtabcontent"><iframe id="frame-LogEntry" class="app-frame" title="Log Entry and Recent Logs"></iframe></div>
+  </div>
+  <div id="LogEntry" class="tabcontent">
+    <iframe id="frame-LogEntry" class="app-frame" title="Log Entry and Recent Logs"></iframe>
   </div>
   <div id="LivingCosts" class="tabcontent">
     <div class="subtab-buttons">
@@ -813,7 +816,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-254</span>
+    <span class="build-stamp">build: LC-255</span>
   </div>
 
   <script>
@@ -2405,7 +2408,7 @@
 
     // ---------- embedded frames ----------
     const FV = '?v=menu1';   // frame-file cache-buster: bump when any framed page changes
-    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html', LogEntry:'logs.html' };
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
@@ -2494,8 +2497,9 @@
       if (id === 'Modelling') setTimeout(drawCharts, 40);
       if (id === 'Modelling' || id === 'Retirement') placeRail(id);
       if (id === 'Cash') { ensureFrame('frame-Cash', 'cash.html' + FV); pingFrame('frame-Cash'); }
+      if (id === 'LogEntry') { ensureFrame('frame-LogEntry', 'logs.html' + FV); pingFrame('frame-LogEntry'); }
       if (id === 'Crashes') ensureFrame('frame-Crashes', 'crashes.html' + FV);
-      if (id === 'KPI' && !window.__kpi) { window.__kpi = true; showSub(null, document.body.classList.contains('retired') ? 'LogEntry' : 'PerfKPIs'); }
+      if (id === 'KPI' && !window.__kpi) { window.__kpi = true; showSub(null, 'PerfKPIs'); }
       if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Budget'); }
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
     }
