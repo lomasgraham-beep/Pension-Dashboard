@@ -47,8 +47,8 @@
   .rrow.open .rcaret { transform:rotate(90deg); }
   .rname { font-size:14px; color:#475569; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .rrow.other-row .rname { color:#94a3b8; font-style:italic; }
-  .rtrack { height:14px; background:#eef2f6; border-radius:4px; overflow:hidden; }
-  .rfill { height:100%; background:var(--accent); border-radius:4px; }
+  .rtrack { display:block; height:14px; background:#eef2f6; border-radius:4px; overflow:hidden; }
+  .rfill { display:block; height:100%; background:var(--accent); border-radius:4px; }
   .rfill.other { background:var(--other); }
   .rval { font-size:14px; color:#2c3e50; text-align:right; font-variant-numeric:tabular-nums; }
   .rdetail { display:none; padding:2px 0 12px 30px; }
@@ -69,8 +69,8 @@
     .kpi .val { color:#f1f5f9 !important; }
     #status { background:#1e293b !important; color:#93c5fd !important; }
     .seg-control { border-color:#334155 !important; }
-    .seg-btn { background:#1e293b !important; color:#cbd5e1 !important; border-right-color:#334155 !important; }
-    .traj-bar { background:#334155 !important; }
+    .seg-btn { background:#1e293b; color:#cbd5e1; border-right-color:#334155; }
+    .traj-bar { background:#334155; }
     .traj-val { color:#cbd5e1 !important; }
     .traj-lbl { color:#94a3b8 !important; }
     .traj-col.sel .traj-lbl { color:#f1f5f9 !important; }
@@ -85,7 +85,7 @@
 </head>
 <body>
   <h1>Summary of Household Bills</h1>
-  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. <span style="color:#94a3b8;">(summary build: v8)</span></p>
+  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. <span style="color:#94a3b8;">(summary build: v9)</span></p>
   <div id="status">Loading…</div>
 
   <div id="ageRow" class="agebar-row" style="display:none;">
