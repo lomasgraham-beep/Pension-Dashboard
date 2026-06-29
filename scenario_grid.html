@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scenario Grid</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err45"></script>
+<script src="engine.js?v=fDine"></script>
+<script src="https://www.gstatic.com/charts/loader.js"></script>
+<style>
+  :root {
+    --accent:#2c7a7b; --amber:#d97706;
+    --ink:#2c3e50; --sub:#64748b; --line:#e2e8f0;
+    --bg:#fff; --cell:#fcfdfe; --cellborder:#e2e8f0;
+  }
+  html, body { height:100%; }
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; background:var(--bg); color:var(--ink);
+         display:flex; flex-direction:column; overflow:hidden; }
+
+  #status { position:absolute; top:8px; left:50%; transform:translateX(-50%); z-index:30;
+            padding:6px 14px; border-radius:6px; font-weight:bold; font-size:13px; }
+  .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
+
+  /* ---- slim header: spend controls + legend ---- */
+  .grid-head { flex:none; display:flex; align-items:center; justify-content:space-between;
+               gap:14px; padding:8px 12px 9px; border-bottom:2px solid var(--line); flex-wrap:wrap; }
+  .gh-left { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .gh-title { font-size:14px; font-weight:700; color:var(--ink); }
+  .gh-sub { font-size:11px; color:var(--sub); }
+  .spend-ctl { display:flex; align-items:center; gap:7px; }
+  .spend-ctl label { font-size:12px; color:var(--sub); }
+  .spend-ctl input { width:52px; padding:4px 6px; font-size:13px; text-align:right;
+                     border:1px solid #cbd5e1; border-radius:6px; background:#fff; color:var(--ink); }
+  .legend { display:flex; align-items:center; gap:14px; font-size:12px; }
+  .legend .key { display:inline-flex; align-items:center; gap:6px; }
+  .legend .sw { width:16px; height:3px; border-radius:2px; display:inline-block; }
+
+  /* ---- the matrix fills everything below the header, no scroll ---- */
+  .matrix { flex:1 1 auto; min-height:0; display:grid; gap:4px; padding:6px 8px 8px; box-sizing:border-box; }
+  .colhead { display:flex; align-items:center; justify-content:center;
+             font-size:12px; font-weight:700; color:var(--accent); }
+  .corner { }
+  .rowlabel { display:flex; flex-direction:column; align-items:flex-start; justify-content:center;
+              padding-right:6px; line-height:1.15; }
+  .rowlabel .ry { font-size:15px; font-weight:700; color:var(--ink); }
+  .rowlabel .rs { font-size:11px; color:var(--sub); }
+  .cell { position:relative; background:var(--cell); border:1px solid var(--cellborder);
+          border-radius:8px; overflow:hidden; min-width:0; min-height:0; }
+  .chart { position:absolute; inset:0; }
+
+  /* ---- automatic dark mode ---- */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --accent:#5eead4; --amber:#fbbf24;
+      --ink:#e2e8f0; --sub:#94a3b8; --line:#334155;
+      --bg:#0f172a; --cell:#1e293b; --cellborder:#334155;
+    }
+    .spend-ctl input { background:#0f172a; color:#e2e8f0; border-color:#475569; }
+    #status.s-load, .s-load { background:#1e293b; color:#93c5fd; }
+    #status.s-err, .s-err { background:#3b1d1d; color:#f87171; }
+  }
+</style>
+</head>
+<body>
+  <div id="status" class="s-load">Loading…</div>
+
+  <div class="grid-head">
+    <div class="gh-left">
+      <span class="gh-title">Scenario Grid</span>
+      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid1)</span></span>
+      <span class="spend-ctl"><label>Spend %</label>
+        <input id="sp0" type="number" min="0" max="200" step="5" value="50" inputmode="numeric">
+        <input id="sp1" type="number" min="0" max="200" step="5" value="60" inputmode="numeric">
+        <input id="sp2" type="number" min="0" max="200" step="5" value="70" inputmode="numeric">
+      </span>
+    </div>
+    <div class="legend">
+      <span class="key"><span class="sw" id="lgSw0" style="background:var(--accent);"></span><span id="lgNm0">Graham</span></span>
+      <span class="key"><span class="sw" id="lgSw1" style="background:var(--amber);"></span><span id="lgNm1">Julie</span></span>
+    </div>
+  </div>
+
+  <div class="matrix" id="matrix"><!-- built in JS --></div>
+
+<script>
+  const ROWS = 5;                       // retire now + next 4 years
+  const COLS = 3;                       // three spend-% columns
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  let data = null, p1Name = 'Graham', p2Name = null;
+  let savedBase = null;                 // { growthRate, gRatio, savingsFundBills, phase..., p2phase }
+  let retireDates = [];                 // Date[] per row
+  let CELLS = [];                       // CELLS[r][c] = { years:[], a:[], b:[] }
+  let globalMax = 0;
+  let chartsReady = false;
+
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  const isDark = () => mq.matches;
+  function lineColors() {
+    return isDark() ? ['#5eead4', '#fbbf24'] : ['#2c7a7b', '#d97706'];
+  }
+  function axisColor() { return isDark() ? '#94a3b8' : '#64748b'; }
+  function gridColor() { return isDark() ? '#334155' : '#e2e8f0'; }
+
+  function shortGBP(n) {
+    const a = Math.abs(n);
+    if (a >= 1e6) { const v = n / 1e6; return '£' + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + 'M'; }
+    if (a >= 1e3) { return '£' + Math.round(n / 1e3) + 'K'; }
+    return '£' + Math.round(n);
+  }
+  function yTicks(maxValue, steps) {
+    steps = steps || 4; const ticks = [];
+    if (maxValue <= 0) return [{ v: 0, f: '£0' }];
+    const step = maxValue / steps;
+    for (let i = 0; i <= steps; i++) { const v = Math.round(step * i); ticks.push({ v: v, f: shortGBP(v) }); }
+    return ticks;
+  }
+  function niceCeil(n) {
+    if (n <= 0) return 1000;
+    const mag = Math.pow(10, Math.floor(Math.log10(n)));
+    return Math.ceil(n / mag) * mag;
+  }
+
+  // ---- build one (retireDate, spendRed) scenario, mirroring the dashboard's cfg exactly ----
+  function buildPlan(retireDate, spendRed) {
+    const rbm = {};
+    if (p1Name) rbm[p1Name] = retireDate;
+    if (p2Name) rbm[p2Name] = retireDate;            // both retire on the row's shared date
+    return {
+      retirementDate: retireDate, retireByMember: rbm,
+      growthRate: savedBase.growthRate,
+      phase1Date: savedBase.phase1Date, phase1Days: savedBase.phase1Days,
+      phase2Date: savedBase.phase2Date, phase2Days: savedBase.phase2Days,
+      p2phase: savedBase.p2phase,
+      spendRed: spendRed, gRatio: savedBase.gRatio,
+      savingsFundBills: savedBase.savingsFundBills,
+      retired: false                                  // grid is a pre-retirement what-if
+    };
+  }
+  function buildCfg(plan) {
+    const stateNames = new Set((data.guaranteed || [])
+      .map(x => x.income_name).filter(n => n && n.toLowerCase().indexOf('state') >= 0));
+    const js = PensionEngine.forecast(data, plan, 1);
+    const pots = { graham: Math.max(0, js.graham || 0), julie: Math.max(0, js.julie || 0) };
+    const ownRetirePots = js.potsAtOwnRetire
+      ? { graham: Math.max(0, js.potsAtOwnRetire.p1 || 0), julie: Math.max(0, js.potsAtOwnRetire.p2 || 0) }
+      : pots;
+    const startYr = plan.retirementDate ? plan.retirementDate.getFullYear() : new Date().getFullYear();
+    const sp = PensionEngine.baselineSP(stateNames);
+    return {
+      pots: pots, potsAtOwnRetire: ownRetirePots,
+      gRatio: plan.gRatio, spendRed: plan.spendRed,
+      startYear: startYr, retirementDate: plan.retirementDate,
+      retireByMember: plan.retireByMember,
+      savingsFundBills: plan.savingsFundBills, sp: sp
+    };
+  }
+  function computeCell(retireDate, spendPct) {
+    const cfg = buildCfg(buildPlan(retireDate, spendPct / 100));
+    const rows = PensionEngine.drawdown(data, cfg) || [];
+    const years = [], a = [], b = [];
+    rows.forEach(r => {
+      years.push(r.year);
+      a.push(Math.max(0, Math.round((r.g_taxFree || 0) + (r.g_taxable || 0))));
+      b.push(Math.max(0, Math.round((r.j_taxFree || 0) + (r.j_taxable || 0))));
+    });
+    return { years: years, a: a, b: b };
+  }
+
+  function spendCols() {
+    return [0, 1, 2].map(i => {
+      const v = Number(document.getElementById('sp' + i).value);
+      return (isFinite(v) && v > 0) ? v : 50;
+    });
+  }
+
+  function recomputeMatrix() {
+    const cols = spendCols();
+    CELLS = []; globalMax = 0;
+    for (let r = 0; r < ROWS; r++) {
+      const row = [];
+      for (let c = 0; c < COLS; c++) {
+        const cell = computeCell(retireDates[r], cols[c]);
+        cell.years.forEach((_, i) => {
+          if (cell.a[i] > globalMax) globalMax = cell.a[i];
+          if (cell.b[i] > globalMax) globalMax = cell.b[i];
+        });
+        row.push(cell);
+      }
+      CELLS.push(row);
+    }
+    globalMax = niceCeil(globalMax * 1.04) || 1000;
+    // refresh column headers to the live percentages
+    cols.forEach((v, c) => { const el = document.getElementById('colhead' + c); if (el) el.textContent = v + '% of spend'; });
+  }
+
+  // ---- layout: header row of spend labels, left column of retire-year labels, 15 chart cells ----
+  function buildMatrixSkeleton() {
+    const m = document.getElementById('matrix');
+    m.style.gridTemplateColumns = 'minmax(56px,auto) repeat(' + COLS + ', 1fr)';
+    m.style.gridTemplateRows = 'auto repeat(' + ROWS + ', 1fr)';
+    let html = '<div class="corner"></div>';
+    for (let c = 0; c < COLS; c++) html += '<div class="colhead" id="colhead' + c + '">—</div>';
+    for (let r = 0; r < ROWS; r++) {
+      const d = retireDates[r];
+      const sub = r === 0 ? 'now' : '+' + r + ' yr';
+      html += '<div class="rowlabel"><span class="ry">' + d.getFullYear() + '</span>'
+            + '<span class="rs">' + MONTHS[d.getMonth()] + ' &middot; ' + sub + '</span></div>';
+      for (let c = 0; c < COLS; c++) {
+        html += '<div class="cell"><div class="chart" id="ch_' + r + '_' + c + '"></div></div>';
+      }
+    }
+    m.innerHTML = html;
+  }
+
+  function drawOneChart(r, c) {
+    const host = document.getElementById('ch_' + r + '_' + c);
+    if (!host) return;
+    const w = host.clientWidth, h = host.clientHeight;
+    if (w < 8 || h < 8) return;
+    const cell = CELLS[r] && CELLS[r][c];
+    if (!cell) return;
+
+    const dt = new google.visualization.DataTable();
+    dt.addColumn('number', 'Year');
+    dt.addColumn('number', p1Name);
+    if (p2Name) dt.addColumn('number', p2Name);
+    for (let i = 0; i < cell.years.length; i++) {
+      dt.addRow(p2Name ? [cell.years[i], cell.a[i], cell.b[i]] : [cell.years[i], cell.a[i]]);
+    }
+
+    const ax = axisColor(), gl = gridColor();
+    const everyX = Math.max(1, Math.round(cell.years.length / 5));
+    new google.visualization.LineChart(host).draw(dt, {
+      legend: 'none',
+      backgroundColor: 'transparent',
+      colors: lineColors(),
+      lineWidth: 2, pointSize: 0, interpolateNulls: true,
+      chartArea: { left: 46, top: 8, right: 10, bottom: 20, width: '80%', height: '76%' },
+      width: w, height: h,
+      hAxis: { format: '####', textStyle: { fontSize: 9, color: ax }, showTextEvery: everyX,
+               gridlines: { color: 'transparent' }, baselineColor: gl, textPosition: 'out' },
+      vAxis: { viewWindow: { min: 0, max: globalMax }, ticks: yTicks(globalMax),
+               textStyle: { fontSize: 9, color: ax }, gridlines: { color: gl }, baselineColor: gl }
+    });
+  }
+
+  function drawAll() {
+    if (!chartsReady || !CELLS.length) return;
+    requestAnimationFrame(() => {
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) drawOneChart(r, c);
+    });
+  }
+
+  // ---- spend input changes → recompute affected scenarios, then redraw ----
+  let spendTimer = null;
+  function onSpendChange() {
+    if (spendTimer) clearTimeout(spendTimer);
+    spendTimer = setTimeout(() => {
+      const status = document.getElementById('status');
+      status.style.display = 'block'; status.className = 's-load'; status.textContent = 'Recomputing…';
+      try { recomputeMatrix(); drawAll(); status.style.display = 'none'; }
+      catch (e) { status.className = 's-err'; status.textContent = 'Could not compute: ' + e.message; }
+    }, 250);
+  }
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      // pull exactly the dataset the dashboard engine uses
+      const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases,
+             crashes, savingsAccounts, contributionExceptions, workingTiers,
+             incomeSources, incomeAmounts, diningRota, mealCost] = await Promise.all([
+        App.rest('bd_members'), App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
+        App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
+        App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
+        App.rest('bd_purchases?order=purchase_date.asc'),
+        App.rest('bd_market_crashes?order=start_date.asc'),
+        App.rest('bd_savings_accounts?order=account_name.asc'),
+        App.rest('bd_contribution_exceptions?order=start_date.asc'),
+        App.rest('bd_working_tiers?order=from_date.asc'),
+        App.rest('bd_income_sources?order=member_name.asc'),
+        App.rest('bd_income_amounts?order=member_name.asc'),
+        App.rest('bd_dining_rota'), App.rest('bd_meal_cost')
+      ]);
+
+      // dining annual = Σ (each filled rota cell × its meal-cost lookup) — same as the shell
+      const mealCostMap = {};
+      (mealCost || []).forEach(c => { mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
+      const DAY_COLS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+      const diningAnnual = (diningRota || []).reduce((sum, r) =>
+        sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
+
+      data = { members, bills, dining, diningAnnual: diningAnnual,
+               guaranteed, pensions, contributions, logs,
+               purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [],
+               contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [],
+               incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [] };
+
+      // names (alphabetical, matching the engine); p2Name null = single-member instance
+      const sortedM = (members || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+      p1Name = sortedM[0] ? sortedM[0].name : 'Graham';
+      p2Name = sortedM[1] ? sortedM[1].name : null;
+      document.getElementById('lgNm0').textContent = p1Name;
+      if (p2Name) document.getElementById('lgNm1').textContent = p2Name;
+      else { document.getElementById('lgNm1').textContent = ''; document.getElementById('lgSw1').style.display = 'none'; }
+
+      // saved modelling parameters (held fixed; only retire-date and spend vary across the grid)
+      const pRows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name) + '&order=updated_at.desc&limit=1');
+      const p = (pRows && pRows.length) ? pRows[0] : {};
+      let p2row = null, p2phase = null;
+      if (p2Name) {
+        const p2Rows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p2Name) + '&order=updated_at.desc&limit=1');
+        p2row = (p2Rows && p2Rows.length) ? p2Rows[0] : null;
+        if (p2row) p2phase = {
+          phase1Date: App.parseLocalDate(p2row.shorter_week_date_1), phase1Days: p2row.working_days_1 ? Number(p2row.working_days_1) : 5,
+          phase2Date: App.parseLocalDate(p2row.shorter_week_date_2), phase2Days: p2row.working_days_2 ? Number(p2row.working_days_2) : 5
+        };
+      }
+      savedBase = {
+        growthRate: p.pension_growth_rate != null ? Number(p.pension_growth_rate) : 0.05,
+        gRatio: p.drawdown_ratio_graham != null ? Number(p.drawdown_ratio_graham) : 0.5,
+        savingsFundBills: p.savings_fund_bills != null ? !!p.savings_fund_bills : true,
+        phase1Date: App.parseLocalDate(p.shorter_week_date_1), phase1Days: p.working_days_1 ? Number(p.working_days_1) : 5,
+        phase2Date: App.parseLocalDate(p.shorter_week_date_2), phase2Days: p.working_days_2 ? Number(p.working_days_2) : 5,
+        p2phase: p2phase
+      };
+
+      // retire dates: this month (now), then same month +1..+4 years
+      const now = new Date();
+      const base = new Date(now.getFullYear(), now.getMonth(), 1);
+      retireDates = [];
+      for (let n = 0; n < ROWS; n++) retireDates.push(new Date(base.getFullYear() + n, base.getMonth(), 1));
+
+      buildMatrixSkeleton();
+      recomputeMatrix();
+      drawAll();
+      status.style.display = 'none';
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  // ---- redraw on resize / orientation / theme change (size only — series are cached) ----
+  let rt = null;
+  window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(drawAll, 150); });
+  if (mq.addEventListener) mq.addEventListener('change', () => setTimeout(drawAll, 60));
+  window.addEventListener('message', (ev) => { if (ev && ev.data === 'refresh-data') load(); });
+  ['sp0', 'sp1', 'sp2'].forEach(id => document.getElementById(id).addEventListener('change', onSpendChange));
+
+  google.charts.load('current', { packages: ['corechart'] });
+  google.charts.setOnLoadCallback(() => { chartsReady = true; drawAll(); });
+
+  App.requireLogin(load, { title: 'Scenario Grid' });
+</script>
+</body>
+</html>
