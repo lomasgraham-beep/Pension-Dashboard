@@ -550,6 +550,7 @@
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
+      <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
     </div>
     <iframe id="frame-Cash" class="app-frame" title="Cash and Purchases"></iframe>
   </div>
@@ -559,8 +560,20 @@
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
       <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Crashes')">Market Crashes</button>
+      <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
     </div>
     <iframe id="frame-Crashes" class="app-frame" title="Market Crashes"></iframe>
+  </div>
+
+  <div id="ScenarioGrid" class="tabcontent">
+    <div class="subtab-buttons">
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
+      <button class="subtab-link active-sub" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
+    </div>
+    <iframe id="frame-ScenarioGrid" class="app-frame" title="Scenario Grid"></iframe>
   </div>
 
   <div id="Modelling" class="tabcontent">
@@ -569,6 +582,7 @@
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
       <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
+      <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
     </div>
     <button type="button" class="opt-toggle" id="optToggle" onclick="toggleOptPair()" aria-expanded="false"><span class="opt-caret" aria-hidden="true">&#9654;</span> Intelligent modelling</button>
     <div class="opt-pair" id="optPair" style="display:none;">
@@ -706,6 +720,7 @@
       <button class="subtab-link active-sub" onclick="showTab(event,'Retirement')">Retirement</button>
       <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
+      <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
     </div>
     <div class="model-layout">
     <div class="rail-slot" id="railSlot-Retirement"></div><div class="rail-strip" onclick="expandRail()" title="Show controls"><span>Controls &#9654;</span></div>
@@ -816,7 +831,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-259</span>
+    <span class="build-stamp">build: LC-260</span>
   </div>
 
   <script>
@@ -2407,12 +2422,20 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=billsum4';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=grid1';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
       catch (e) { f.style.height = '1200px'; }
+    }
+    // Lift a frame to fill the remaining viewport so a full-screen page (Scenario Grid)
+    // sizes its own grid to the display with no internal scroll. __fsLock keeps sizeFrame off it.
+    function fillFrameToViewport(f) {
+      if (!f) return;
+      const top = f.getBoundingClientRect().top + window.scrollY;
+      const h = Math.max(360, window.innerHeight - top - 10);
+      f.style.height = h + 'px';
     }
     function hookFrame(f) {
       f.addEventListener('load', function () {
@@ -2486,7 +2509,7 @@
       // mark the matching tab button active (works whether triggered by a button click or the dropdown)
       document.querySelectorAll('.tab-link').forEach(b => { if (b.getAttribute('onclick') && b.getAttribute('onclick').indexOf("'" + id + "'") >= 0) b.classList.add('active-btn'); });
       // Modelling group: keep the Modelling top button lit while any of its panels is active
-      const MODEL_IDS = ['Modelling', 'Retirement', 'Cash', 'Crashes'];
+      const MODEL_IDS = ['Modelling', 'Retirement', 'Cash', 'Crashes', 'ScenarioGrid'];
       if (MODEL_IDS.indexOf(id) >= 0) {
         document.querySelectorAll('.tab-link').forEach(b => { const oc = b.getAttribute('onclick') || ''; if (oc.indexOf("'Modelling'") >= 0) b.classList.add('active-btn'); });
       }
@@ -2499,12 +2522,25 @@
       if (id === 'Cash') { ensureFrame('frame-Cash', 'cash.html' + FV); pingFrame('frame-Cash'); }
       if (id === 'LogEntry') { ensureFrame('frame-LogEntry', 'logs.html' + FV); pingFrame('frame-LogEntry'); }
       if (id === 'Crashes') ensureFrame('frame-Crashes', 'crashes.html' + FV);
+      if (id === 'ScenarioGrid') {
+        ensureFrame('frame-ScenarioGrid', 'scenario_grid.html' + FV);
+        const f = document.getElementById('frame-ScenarioGrid');
+        if (f) { f.__fsLock = true; setTimeout(() => fillFrameToViewport(f), 30); }
+        pingFrame('frame-ScenarioGrid');
+      }
       if (id === 'KPI' && !window.__kpi) { window.__kpi = true; showSub(null, 'PerfKPIs'); }
       if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Budget'); }
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
     }
 
     window.addEventListener('resize', () => { clearTimeout(window.__rt); window.__rt = setTimeout(() => { if (document.getElementById('Modelling').style.display === 'block') drawCharts(); }, 150); });
+    window.addEventListener('resize', () => {
+      clearTimeout(window.__sgrt);
+      window.__sgrt = setTimeout(() => {
+        const sg = document.getElementById('ScenarioGrid');
+        if (sg && sg.style.display === 'block') fillFrameToViewport(document.getElementById('frame-ScenarioGrid'));
+      }, 160);
+    });
 
     // ---------- data load (after login) ----------
     async function loadEverything() {
