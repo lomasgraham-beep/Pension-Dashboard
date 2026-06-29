@@ -22,25 +22,36 @@
             padding:6px 14px; border-radius:6px; font-weight:bold; font-size:13px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
 
-  .head { flex:none; display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
-          padding:9px 14px 10px; background:var(--headbg); border-bottom:2px solid var(--line); flex-wrap:wrap; }
-  .h-left { display:flex; flex-direction:column; gap:3px; }
+  .head { flex:none; display:flex; flex-direction:column; gap:5px;
+          padding:7px 14px 8px; background:var(--headbg); border-bottom:2px solid var(--line); }
+  .hrow { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
   .h-title { font-size:15px; font-weight:700; }
-  .h-sub { font-size:12px; color:var(--sub); max-width:62ch; line-height:1.35; }
+  .h-sub { font-size:12px; color:var(--sub); line-height:1.3; }
   .h-sub b { color:var(--ink); }
-  .legend { display:flex; align-items:center; gap:16px; font-size:12px; flex-wrap:wrap; }
+  .ctl { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--sub); }
+  .ctl input[type=range] { width:150px; accent-color:var(--accent); vertical-align:middle; }
+  .ctl b { color:var(--ink); }
+  .ctl .out { color:var(--accent); font-weight:700; }
+  .legend { display:flex; align-items:center; gap:14px; font-size:12px; flex-wrap:wrap; }
   .legend .key { display:inline-flex; align-items:center; gap:6px; }
   .legend .sw { width:14px; height:10px; border-radius:3px; display:inline-block; }
   .legend .dot { width:12px; height:12px; border-radius:50%; display:inline-block; border:2px solid #fff; box-shadow:0 0 0 1px var(--accent); }
 
   .wrap { flex:1 1 auto; min-height:0; position:relative; padding:8px 10px 10px; box-sizing:border-box; }
   #fchart { position:absolute; inset:8px 10px 10px; }
-  #marker { position:absolute; z-index:5; pointer-events:none; transform:translate(-50%,-50%); }
+  #marker { position:absolute; z-index:6; pointer-events:none; transform:translate(-50%,-50%); }
   #marker .pin { width:14px; height:14px; border-radius:50%; background:var(--accent); border:2px solid #fff;
                  box-shadow:0 0 0 1px var(--accent), 0 1px 3px rgba(0,0,0,.3); }
   #marker .tag { position:absolute; left:50%; bottom:18px; transform:translateX(-50%); white-space:nowrap;
                  font-size:11px; font-weight:700; color:var(--accent); background:var(--panel);
                  border:1px solid var(--panelborder); border-radius:6px; padding:2px 6px; box-shadow:var(--shadow); }
+  /* interactive "test spend" reference line + where it crosses the frontier */
+  #spendLine { position:absolute; z-index:4; height:0; border-top:2px dashed var(--accent); pointer-events:none; opacity:.85; }
+  #crossDot { position:absolute; z-index:5; width:12px; height:12px; border-radius:50%; background:var(--headbg);
+              border:3px solid var(--accent); transform:translate(-50%,-50%); pointer-events:none; }
+  #crossDot .ctag { position:absolute; left:50%; top:14px; transform:translateX(-50%); white-space:nowrap;
+                    font-size:11px; font-weight:700; color:var(--accent); background:var(--panel);
+                    border:1px solid var(--panelborder); border-radius:6px; padding:2px 6px; box-shadow:var(--shadow); }
 
   @media (prefers-color-scheme: dark) {
     :root {
@@ -58,19 +69,28 @@
   <div id="status" class="s-load">Loading…</div>
 
   <div class="head">
-    <div class="h-left">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front2)</span></span>
-      <span class="h-sub" id="hSub">The line is the most you could spend and still have the pots last. Below it is safe; above it runs dry.</span>
+    <div class="hrow">
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front3)</span></span>
+      <div class="legend">
+        <span class="key"><span class="sw" id="lgSafe"></span>Safe</span>
+        <span class="key"><span class="sw" id="lgMarg"></span>Marginal</span>
+        <span class="key"><span class="sw" id="lgRisk"></span>Runs dry</span>
+        <span class="key"><span class="dot"></span>Your plan</span>
+      </div>
     </div>
-    <div class="legend">
-      <span class="key"><span class="sw" style="background:var(--safe);opacity:.5;"></span>Safe</span>
-      <span class="key"><span class="sw" style="background:var(--risk);opacity:.5;"></span>Runs dry</span>
-      <span class="key"><span class="dot"></span><span id="lgPlan">Your plan</span></span>
+    <div class="hrow">
+      <span class="h-sub" id="hSub">&nbsp;</span>
+      <span class="ctl">Test spend
+        <input id="spendTest" type="range" min="20" max="200" step="1" value="70">
+        <b id="spendTestVal">70%</b> &rarr; earliest safe date <span class="out" id="crossOut">—</span>
+      </span>
     </div>
   </div>
 
   <div class="wrap">
     <div id="fchart"></div>
+    <div id="spendLine" style="display:none;"></div>
+    <div id="crossDot" style="display:none;"><div class="ctag" id="crossTag"></div></div>
     <div id="marker" style="display:none;"><div class="pin"></div><div class="tag" id="markerTag">Your plan</div></div>
   </div>
 
@@ -79,6 +99,7 @@
   const HORIZON_YEARS = 6;     // how far ahead to sweep retirement dates
   const STEP_MONTHS = 2;       // resolution of the sweep
   const SPEND_LO = 0, SPEND_HI = 200;   // bisection bounds (% of plan spend)
+  const MARGIN = 7;            // +/- % around the line shown as the amber "marginal" caution band
 
   let data = null, p1Name = 'Graham', p2Name = null, savedBase = null;
   let chartsReady = false, chart = null;
@@ -89,6 +110,7 @@
   const isDark = () => mq.matches;
 
   const decYear = (d) => d.getFullYear() + d.getMonth() / 12;
+  const ymLabel = (decY) => { const yr = Math.floor(decY + 1e-6), mo = Math.round((decY - yr) * 12); return MONTHS[(mo % 12 + 12) % 12] + ' ' + yr; };
   const shortGBP = (n) => Math.abs(n) >= 1e6 ? '£' + (n / 1e6).toFixed(1) + 'M' : (Math.abs(n) >= 1e3 ? '£' + Math.round(n / 1e3) + 'K' : '£' + Math.round(n));
 
   // ---- engine plumbing (mirrors the dashboard cfg; both members retire on the swept date) ----
@@ -167,18 +189,33 @@
 
   function buildSubline() {
     const sub = document.getElementById('hSub');
-    let t = 'The line is the most you could spend (as % of your plan) and still have both pots last to <b>'
-          + (endYear || '?') + '</b>. Below the line is safe; above it the money runs out first.';
+    let t = 'Safe = both pots last to <b>' + (endYear || '?') + '</b>.';
     if (plan) {
       const diff = Math.round(plan.headroom - plan.pct);
-      const when = MONTHS[plan.date.getMonth()] + ' ' + plan.date.getFullYear();
-      if (diff >= 0) t += ' Your current plan (retire <b>' + when + '</b>, spend <b>' + plan.pct + '%</b>) sits <b>'
-                        + diff + '%</b> below the line — you could spend up to <b>' + Math.round(plan.headroom) + '%</b>.';
-      else t += ' Your current plan (retire <b>' + when + '</b>, spend <b>' + plan.pct + '%</b>) is <b>'
-              + (-diff) + '%</b> over the line — the pots fall short at that date.';
+      const when = ymLabel(plan.year);
+      t += ' Plan: retire <b>' + when + '</b> · spend <b>' + plan.pct + '%</b> · '
+         + (diff >= 0 ? 'room to <b>' + Math.round(plan.headroom) + '%</b> (+' + diff + ')'
+                      : '<b>' + (-diff) + '%</b> over the line');
     }
     sub.innerHTML = t;
     if (plan) document.getElementById('markerTag').textContent = 'Your plan · ' + plan.pct + '%';
+  }
+
+  // earliest retirement date at which a given spend % becomes safe (where it crosses the frontier).
+  // returns { year:decimal|null, status:'now'|'cross'|'never' }
+  function crossingFor(spendPct) {
+    if (!frontier.length) return { year: null, status: 'never' };
+    if (spendPct <= frontier[0].pct) return { year: frontier[0].year, status: 'now' };
+    const top = frontier[frontier.length - 1];
+    if (spendPct > top.pct + 0.01) return { year: null, status: 'never' };
+    for (let i = 1; i < frontier.length; i++) {
+      if (frontier[i].pct >= spendPct) {
+        const a = frontier[i - 1], b = frontier[i];
+        const tt = (b.pct === a.pct) ? 0 : (spendPct - a.pct) / (b.pct - a.pct);
+        return { year: a.year + tt * (b.year - a.year), status: 'cross' };
+      }
+    }
+    return { year: top.year, status: 'cross' };
   }
 
   function draw() {
@@ -189,34 +226,43 @@
 
     const dark = isDark();
     const ax = dark ? '#94a3b8' : '#64748b';
-    const gl = dark ? '#475569' : '#cbd5e1';        // stronger so gridlines read through the fills
-    const safeC = dark ? '#34d399' : '#10b981';
-    const riskC = dark ? '#f87171' : '#ef4444';
+    const gl = dark ? '#64748b' : '#94a3b8';        // strong so gridlines read over the bolder fills
+    const safeC = dark ? '#22c55e' : '#16a34a';
+    const margC = dark ? '#fbbf24' : '#f59e0b';
+    const riskC = dark ? '#f87171' : '#dc2626';
     const tipBg = dark ? '#0f172a' : '#ffffff';
     const tipInk = dark ? '#e2e8f0' : '#2c3e50';
 
-    const dateLabel = (decY) => {
-      const yr = Math.floor(decY + 1e-6), mo = Math.round((decY - yr) * 12);
-      return MONTHS[(mo % 12 + 12) % 12] + ' ' + yr;
-    };
+    // colour the legend swatches to match
+    document.getElementById('lgSafe').style.background = safeC;
+    document.getElementById('lgMarg').style.background = margC;
+    document.getElementById('lgRisk').style.background = riskC;
+
     const tip = (decY, pct, kind) => {
-      const lab = dateLabel(decY), v = Math.round(pct);
-      const line = kind === 'safe'
-        ? '<span style="color:' + safeC + ';font-weight:700;">Safe</span> — you could spend up to <b>' + v + '%</b> of plan'
-        : '<span style="color:' + riskC + ';font-weight:700;">Runs dry</span> — spending above <b>' + v + '%</b> empties the pots before ' + (endYear || '?');
+      const lab = ymLabel(decY), v = Math.round(pct);
+      let line;
+      if (kind === 'safe') line = '<span style="color:' + safeC + ';font-weight:700;">Safe</span> — spend up to <b>' + (v - MARGIN) + '%</b> with room to spare';
+      else if (kind === 'marg') line = '<span style="color:' + margC + ';font-weight:700;">Marginal</span> — around <b>' + v + '%</b> the pots only just last';
+      else line = '<span style="color:' + riskC + ';font-weight:700;">Runs dry</span> — above <b>' + v + '%</b> the pots empty before ' + (endYear || '?');
       return '<div style="padding:7px 10px;font-family:Segoe UI,sans-serif;font-size:12px;line-height:1.5;'
-           + 'white-space:nowrap;background:' + tipBg + ';color:' + tipInk + ';">'
-           + '<b>Retire ' + lab + '</b><br>' + line + '</div>';
+           + 'white-space:nowrap;background:' + tipBg + ';color:' + tipInk + ';"><b>Retire ' + lab + '</b><br>' + line + '</div>';
     };
 
     const dt = new google.visualization.DataTable();
     dt.addColumn('number', 'Retire year');
     dt.addColumn('number', 'Safe');
     dt.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
-    dt.addColumn('number', 'At risk');
+    dt.addColumn('number', 'Marginal');
     dt.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
-    frontier.forEach(p => dt.addRow([p.year, p.pct, tip(p.year, p.pct, 'safe'),
-                                     Math.max(0, yMax - p.pct), tip(p.year, p.pct, 'risk')]));
+    dt.addColumn('number', 'Runs dry');
+    dt.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
+    frontier.forEach(p => {
+      const g = Math.max(0, Math.min(yMax, p.pct - MARGIN));
+      const aTop = Math.max(0, Math.min(yMax, p.pct + MARGIN));
+      const a = Math.max(0, aTop - g);
+      const r = Math.max(0, yMax - (g + a));
+      dt.addRow([p.year, g, tip(p.year, p.pct, 'safe'), a, tip(p.year, p.pct, 'marg'), r, tip(p.year, p.pct, 'risk')]);
+    });
 
     const x0 = frontier[0].year, x1 = frontier[frontier.length - 1].year;
     const xticks = [];
@@ -225,14 +271,14 @@
     for (let v = 0; v <= yMax + 0.001; v += 20) yticks.push({ v: v, f: v + '%' });
 
     chart = new google.visualization.AreaChart(host);
-    google.visualization.events.addListener(chart, 'ready', placeMarker);
+    google.visualization.events.addListener(chart, 'ready', placeOverlays);
     chart.draw(dt, {
       isStacked: true, backgroundColor: 'transparent', legend: 'none',
-      colors: [safeC, riskC], areaOpacity: 0.16,
-      lineWidth: 0, series: { 0: { lineWidth: 3 }, 1: { lineWidth: 0 } },
+      colors: [safeC, margC, riskC], areaOpacity: 0.5,
+      lineWidth: 0, series: { 0: { lineWidth: 0 }, 1: { lineWidth: 0 }, 2: { lineWidth: 0 } },
       tooltip: { isHtml: true },
       width: w, height: h,
-      chartArea: { left: 56, top: 16, right: 18, bottom: 36, width: '86%', height: '80%' },
+      chartArea: { left: 56, top: 14, right: 18, bottom: 34, width: '86%', height: '82%' },
       hAxis: { title: 'Retirement date', ticks: xticks, format: '####',
                textStyle: { fontSize: 11, color: ax }, titleTextStyle: { fontSize: 11, color: ax, italic: false },
                gridlines: { color: gl }, minorGridlines: { count: 0 }, baselineColor: gl, viewWindow: { min: x0, max: x1 } },
@@ -241,19 +287,52 @@
                gridlines: { color: gl }, minorGridlines: { count: 0 }, baselineColor: gl } });
   }
 
-  function placeMarker() {
+  function placeOverlays() {
+    if (!chart) return;
+    let cli;
+    try { cli = chart.getChartLayoutInterface(); } catch (e) { return; }
+    const wrapR = document.querySelector('.wrap').getBoundingClientRect();
+    const hostR = document.getElementById('fchart').getBoundingClientRect();
+    const baseX = hostR.left - wrapR.left, baseY = hostR.top - wrapR.top;
+    let area = null; try { area = cli.getChartAreaBoundingBox(); } catch (e) { area = null; }
+
+    // your-plan marker
     const mk = document.getElementById('marker');
-    if (!plan || !chart) { mk.style.display = 'none'; return; }
-    try {
-      const cli = chart.getChartLayoutInterface();
+    if (plan) {
       const px = cli.getXLocation(plan.year), py = cli.getYLocation(plan.pct);
-      if (!isFinite(px) || !isFinite(py)) { mk.style.display = 'none'; return; }
-      const wrap = document.querySelector('.wrap').getBoundingClientRect();
-      const host = document.getElementById('fchart').getBoundingClientRect();
-      mk.style.left = (host.left - wrap.left + px) + 'px';
-      mk.style.top = (host.top - wrap.top + py) + 'px';
-      mk.style.display = 'block';
-    } catch (e) { mk.style.display = 'none'; }
+      if (isFinite(px) && isFinite(py)) {
+        mk.style.left = (baseX + px) + 'px'; mk.style.top = (baseY + py) + 'px'; mk.style.display = 'block';
+      } else mk.style.display = 'none';
+    } else mk.style.display = 'none';
+
+    // interactive "test spend" line + crossing dot + readout
+    const spend = Number(document.getElementById('spendTest').value);
+    document.getElementById('spendTestVal').textContent = spend + '%';
+    const line = document.getElementById('spendLine');
+    const dot = document.getElementById('crossDot');
+    const out = document.getElementById('crossOut');
+    const ly = cli.getYLocation(spend);
+    if (area && isFinite(ly)) {
+      line.style.left = (baseX + area.left) + 'px';
+      line.style.width = area.width + 'px';
+      line.style.top = (baseY + ly) + 'px';
+      line.style.display = 'block';
+    } else line.style.display = 'none';
+
+    const cross = crossingFor(spend);
+    if (cross.status === 'now') {
+      out.textContent = 'any date'; dot.style.display = 'none';
+      document.getElementById('crossTag').textContent = '';
+    } else if (cross.status === 'never') {
+      out.textContent = 'not within ' + HORIZON_YEARS + ' yrs'; dot.style.display = 'none';
+    } else {
+      out.textContent = ymLabel(cross.year);
+      const cx = cli.getXLocation(cross.year);
+      if (area && isFinite(cx) && isFinite(ly)) {
+        dot.style.left = (baseX + cx) + 'px'; dot.style.top = (baseY + ly) + 'px'; dot.style.display = 'block';
+        document.getElementById('crossTag').textContent = ymLabel(cross.year);
+      } else dot.style.display = 'none';
+    }
   }
 
   async function load() {
@@ -316,6 +395,11 @@
       };
 
       computeFrontier();
+      if (plan) {
+        const st = document.getElementById('spendTest');
+        st.value = Math.max(20, Math.min(200, plan.pct));
+        document.getElementById('spendTestVal').textContent = st.value + '%';
+      }
       buildSubline();
       draw();
       status.style.display = 'none';
@@ -325,6 +409,7 @@
   let rt = null;
   window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(draw, 160); });
   if (mq.addEventListener) mq.addEventListener('change', () => setTimeout(draw, 60));
+  document.getElementById('spendTest').addEventListener('input', placeOverlays);
   window.addEventListener('message', (ev) => { if (ev && ev.data === 'refresh-data') load(); });
 
   google.charts.load('current', { packages: ['corechart'] });
