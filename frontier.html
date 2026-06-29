@@ -59,7 +59,7 @@
 
   <div class="head">
     <div class="h-left">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front1)</span></span>
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front2)</span></span>
       <span class="h-sub" id="hSub">The line is the most you could spend and still have the pots last. Below it is safe; above it runs dry.</span>
     </div>
     <div class="legend">
@@ -189,35 +189,56 @@
 
     const dark = isDark();
     const ax = dark ? '#94a3b8' : '#64748b';
-    const gl = dark ? '#334155' : '#e2e8f0';
+    const gl = dark ? '#475569' : '#cbd5e1';        // stronger so gridlines read through the fills
     const safeC = dark ? '#34d399' : '#10b981';
     const riskC = dark ? '#f87171' : '#ef4444';
+    const tipBg = dark ? '#0f172a' : '#ffffff';
+    const tipInk = dark ? '#e2e8f0' : '#2c3e50';
+
+    const dateLabel = (decY) => {
+      const yr = Math.floor(decY + 1e-6), mo = Math.round((decY - yr) * 12);
+      return MONTHS[(mo % 12 + 12) % 12] + ' ' + yr;
+    };
+    const tip = (decY, pct, kind) => {
+      const lab = dateLabel(decY), v = Math.round(pct);
+      const line = kind === 'safe'
+        ? '<span style="color:' + safeC + ';font-weight:700;">Safe</span> — you could spend up to <b>' + v + '%</b> of plan'
+        : '<span style="color:' + riskC + ';font-weight:700;">Runs dry</span> — spending above <b>' + v + '%</b> empties the pots before ' + (endYear || '?');
+      return '<div style="padding:7px 10px;font-family:Segoe UI,sans-serif;font-size:12px;line-height:1.5;'
+           + 'white-space:nowrap;background:' + tipBg + ';color:' + tipInk + ';">'
+           + '<b>Retire ' + lab + '</b><br>' + line + '</div>';
+    };
 
     const dt = new google.visualization.DataTable();
     dt.addColumn('number', 'Retire year');
     dt.addColumn('number', 'Safe');
+    dt.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
     dt.addColumn('number', 'At risk');
-    frontier.forEach(p => dt.addRow([p.year, p.pct, Math.max(0, yMax - p.pct)]));
+    dt.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
+    frontier.forEach(p => dt.addRow([p.year, p.pct, tip(p.year, p.pct, 'safe'),
+                                     Math.max(0, yMax - p.pct), tip(p.year, p.pct, 'risk')]));
 
     const x0 = frontier[0].year, x1 = frontier[frontier.length - 1].year;
     const xticks = [];
     for (let y = Math.ceil(x0); y <= Math.floor(x1) + 0.001; y++) xticks.push({ v: y, f: String(y) });
+    const yticks = [];
+    for (let v = 0; v <= yMax + 0.001; v += 20) yticks.push({ v: v, f: v + '%' });
 
     chart = new google.visualization.AreaChart(host);
     google.visualization.events.addListener(chart, 'ready', placeMarker);
     chart.draw(dt, {
       isStacked: true, backgroundColor: 'transparent', legend: 'none',
-      colors: [safeC, riskC], areaOpacity: 0.20,
+      colors: [safeC, riskC], areaOpacity: 0.16,
       lineWidth: 0, series: { 0: { lineWidth: 3 }, 1: { lineWidth: 0 } },
+      tooltip: { isHtml: true },
       width: w, height: h,
       chartArea: { left: 56, top: 16, right: 18, bottom: 36, width: '86%', height: '80%' },
       hAxis: { title: 'Retirement date', ticks: xticks, format: '####',
                textStyle: { fontSize: 11, color: ax }, titleTextStyle: { fontSize: 11, color: ax, italic: false },
-               gridlines: { color: gl }, baselineColor: gl, viewWindow: { min: x0, max: x1 } },
-      vAxis: { title: 'Spend (% of plan)', viewWindow: { min: 0, max: yMax },
+               gridlines: { color: gl }, minorGridlines: { count: 0 }, baselineColor: gl, viewWindow: { min: x0, max: x1 } },
+      vAxis: { title: 'Spend (% of plan)', viewWindow: { min: 0, max: yMax }, ticks: yticks,
                textStyle: { fontSize: 11, color: ax }, titleTextStyle: { fontSize: 11, color: ax, italic: false },
-               gridlines: { color: gl }, baselineColor: gl, format: "#'%'" }
-    });
+               gridlines: { color: gl }, minorGridlines: { count: 0 }, baselineColor: gl } });
   }
 
   function placeMarker() {
