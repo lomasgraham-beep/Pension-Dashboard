@@ -102,14 +102,14 @@
   <div class="grid-head">
     <div class="gh-left">
       <span class="gh-title">Scenario Grid</span>
-      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid4)</span></span>
+      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid5)</span></span>
       <span class="spend-ctl"><label>Spend %</label>
         <input id="sp0" type="number" min="0" max="200" step="5" value="50" inputmode="numeric">
         <input id="sp1" type="number" min="0" max="200" step="5" value="60" inputmode="numeric">
         <input id="sp2" type="number" min="0" max="200" step="5" value="70" inputmode="numeric">
       </span>
       <span class="spend-ctl"><label>Y-max £K</label>
-        <input id="ymax" type="number" min="0" step="50" inputmode="numeric" placeholder="auto" style="width:74px;">
+        <input id="ymax" type="number" min="0" step="50" inputmode="numeric" placeholder="auto" style="width:74px;" title="Blank = fit each row to its own data. Enter a value (£K) to put every card on one shared scale.">
       </span>
     </div>
     <div class="legend">
@@ -143,12 +143,11 @@
   let savedBase = null;                 // { growthRate, gRatio, savingsFundBills, phase..., p2phase }
   let retireDates = [];                 // Date[] per row
   let CELLS = [];                       // CELLS[r][c] = { years:[], a:[], b:[] }
-  let globalMax = 0;
   let chartsReady = false;
   let lastCols = [50, 60, 70];          // spend % actually used in the current matrix
   let fsOpen = null;                    // {r,c} of the card shown full-screen, or null
-  let yMaxOverride = null;              // manual y-axis ceiling (£), or null = auto (shared max)
-  const currentYMax = () => (yMaxOverride != null ? yMaxOverride : globalMax);
+  let yMaxOverride = null;              // manual y-axis ceiling (£) clamping ALL cards, or null
+  let rowMax = [];                      // per-row data ceiling (£) when auto — maximises visibility
 
   // inline SVGs so the icons never depend on a font glyph rendering on iPad Safari
   const FS_EXPAND_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
@@ -168,17 +167,17 @@
     if (a >= 1e3) { return '£' + Math.round(n / 1e3) + 'K'; }
     return '£' + Math.round(n);
   }
-  function yTicks(maxValue, steps) {
-    steps = steps || 4; const ticks = [];
-    if (maxValue <= 0) return [{ v: 0, f: '£0' }];
-    const step = maxValue / steps;
-    for (let i = 0; i <= steps; i++) { const v = Math.round(step * i); ticks.push({ v: v, f: shortGBP(v) }); }
-    return ticks;
-  }
-  function niceCeil(n) {
-    if (n <= 0) return 1000;
-    const mag = Math.pow(10, Math.floor(Math.log10(n)));
-    return Math.ceil(n / mag) * mag;
+  // build a clean axis for a data max: pick a nice step so there are ~4 gridlines and
+  // the ceiling sits just above the data (no more 1.4M -> 2M waste).
+  function axisFor(maxVal) {
+    if (!(maxVal > 0)) return { max: 1000, ticks: [{ v: 0, f: '£0' }] };
+    const steps = [5e3, 10e3, 20e3, 25e3, 50e3, 100e3, 200e3, 250e3, 500e3, 1e6, 2e6, 5e6];
+    let step = steps[steps.length - 1];
+    for (let i = 0; i < steps.length; i++) { if (maxVal / steps[i] <= 4) { step = steps[i]; break; } }
+    const max = Math.ceil(maxVal / step) * step;
+    const ticks = [];
+    for (let v = 0; v <= max + 1; v += step) ticks.push({ v: v, f: shortGBP(v) });
+    return { max: max, ticks: ticks };
   }
 
   // ---- build one (retireDate, spendRed) scenario, mirroring the dashboard's cfg exactly ----
@@ -251,25 +250,18 @@
   function recomputeMatrix() {
     const cols = spendCols();
     lastCols = cols.slice();
-    CELLS = [];
-    const peaks = [];
+    CELLS = []; rowMax = [];
     for (let r = 0; r < ROWS; r++) {
       const row = [];
+      let rm = 0;
       for (let c = 0; c < COLS; c++) {
         const cell = computeCell(retireDates[r], cols[c]);
-        peaks.push(cell.peak);
+        if (cell.peak > rm) rm = cell.peak;
         row.push(cell);
       }
       CELLS.push(row);
+      rowMax.push(rm * 1.05);   // a touch of headroom above the row's tallest line
     }
-    // shared ceiling = highest cell peak, but drop a single outlier spike (>1.4x the next) so
-    // one runaway scenario doesn't squash every other card into the bottom of its panel.
-    peaks.sort((x, y) => y - x);
-    let ceilSrc = peaks.length ? peaks[0] : 1000;
-    if (peaks.length >= 3 && peaks[0] > peaks[1] * 1.4) ceilSrc = peaks[1];
-    globalMax = niceCeil(ceilSrc * 1.05) || 1000;
-    const ym = document.getElementById('ymax');
-    if (ym) ym.placeholder = 'auto ' + Math.round(globalMax / 1000);
     // refresh column headers + per-card outcome (colour accent + KPI strip)
     cols.forEach((v, c) => { const el = document.getElementById('colhead' + c); if (el) el.textContent = v + '% of spend'; });
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
@@ -328,7 +320,7 @@
     }
 
     const ax = axisColor(), gl = gridColor();
-    const ymax = currentYMax();
+    const yA = axisFor(yMaxOverride != null ? yMaxOverride : (rowMax[r] || 1000));
     const yrs = cell.years, n = yrs.length;
     const xTicks = n ? [{ v: yrs[0] }, { v: yrs[(n / 2) | 0] }, { v: yrs[n - 1] }] : undefined;
     new google.visualization.LineChart(host).draw(dt, {
@@ -340,7 +332,7 @@
       width: w, height: h,
       hAxis: { format: '####', textStyle: { fontSize: 9, color: ax }, ticks: xTicks,
                gridlines: { color: 'transparent' }, baselineColor: gl, textPosition: 'out' },
-      vAxis: { viewWindow: { min: 0, max: ymax }, ticks: yTicks(ymax),
+      vAxis: { viewWindow: { min: 0, max: yA.max }, ticks: yA.ticks,
                textStyle: { fontSize: 9, color: ax }, gridlines: { color: gl }, baselineColor: gl }
     });
   }
@@ -371,7 +363,7 @@
     let cmax = 0;
     cell.a.forEach(v => { if (v > cmax) cmax = v; });
     cell.b.forEach(v => { if (v > cmax) cmax = v; });
-    cmax = niceCeil(cmax * 1.05) || 1000;
+    const yA = axisFor(yMaxOverride != null ? yMaxOverride : cmax * 1.05);
 
     const ax = axisColor(), gl = gridColor();
     new google.visualization.LineChart(host).draw(dt, {
@@ -380,7 +372,7 @@
       chartArea: { left: 72, top: 16, right: 24, bottom: 40, width: '86%', height: '82%' },
       width: w, height: h,
       hAxis: { format: '####', textStyle: { fontSize: 13, color: ax }, gridlines: { color: 'transparent' }, baselineColor: gl },
-      vAxis: { viewWindow: { min: 0, max: cmax }, ticks: yTicks(cmax, 5),
+      vAxis: { viewWindow: { min: 0, max: yA.max }, ticks: yA.ticks,
                textStyle: { fontSize: 13, color: ax }, gridlines: { color: gl }, baselineColor: gl }
     });
   }
