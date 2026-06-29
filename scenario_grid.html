@@ -10,8 +10,10 @@
 <style>
   :root {
     --accent:#2c7a7b; --amber:#d97706;
-    --ink:#2c3e50; --sub:#64748b; --line:#e2e8f0;
-    --bg:#fff; --cell:#fcfdfe; --cellborder:#e2e8f0;
+    --ink:#2c3e50; --sub:#64748b; --line:#d3e3e3;
+    --bg:#e8f0f0; --cell:#ffffff; --cellborder:#d4e4e4;
+    --cellshadow:0 1px 3px rgba(15,52,52,0.10);
+    --headbg:#ffffff;
   }
   html, body { height:100%; }
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; background:var(--bg); color:var(--ink);
@@ -23,7 +25,7 @@
 
   /* ---- slim header: spend controls + legend ---- */
   .grid-head { flex:none; display:flex; align-items:center; justify-content:space-between;
-               gap:14px; padding:8px 12px 9px; border-bottom:2px solid var(--line); flex-wrap:wrap; }
+               gap:14px; padding:8px 12px 9px; background:var(--headbg); border-bottom:2px solid var(--line); flex-wrap:wrap; }
   .gh-left { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   .gh-title { font-size:14px; font-weight:700; color:var(--ink); }
   .gh-sub { font-size:11px; color:var(--sub); }
@@ -36,7 +38,7 @@
   .legend .sw { width:16px; height:3px; border-radius:2px; display:inline-block; }
 
   /* ---- the matrix fills everything below the header, no scroll ---- */
-  .matrix { flex:1 1 auto; min-height:0; display:grid; gap:4px; padding:6px 8px 8px; box-sizing:border-box; }
+  .matrix { flex:1 1 auto; min-height:0; display:grid; gap:7px; padding:8px 10px 10px; box-sizing:border-box; }
   .colhead { display:flex; align-items:center; justify-content:center;
              font-size:12px; font-weight:700; color:var(--accent); }
   .corner { }
@@ -45,15 +47,38 @@
   .rowlabel .ry { font-size:15px; font-weight:700; color:var(--ink); }
   .rowlabel .rs { font-size:11px; color:var(--sub); }
   .cell { position:relative; background:var(--cell); border:1px solid var(--cellborder);
-          border-radius:8px; overflow:hidden; min-width:0; min-height:0; }
+          border-radius:8px; overflow:hidden; min-width:0; min-height:0; box-shadow:var(--cellshadow); }
   .chart { position:absolute; inset:0; }
+
+  /* corner zoom button (mirrors the modelling charts' full-screen control) */
+  .zoom-btn { position:absolute; top:4px; right:4px; z-index:6; display:inline-flex; align-items:center;
+              justify-content:center; width:26px; height:26px; padding:0; border:1px solid var(--cellborder);
+              border-radius:6px; background:var(--cell); color:var(--sub); cursor:pointer; opacity:0.72; }
+  .zoom-btn:hover { opacity:1; color:var(--accent); border-color:var(--accent); }
+
+  /* full-screen overlay for a single card */
+  .fs-overlay { position:fixed; inset:0; z-index:9000; background:var(--bg); display:none;
+                flex-direction:column; padding:10px 12px 12px; box-sizing:border-box; }
+  .fs-overlay.show { display:flex; }
+  .fs-head { flex:none; display:flex; align-items:center; justify-content:space-between; gap:14px;
+             padding-bottom:8px; }
+  .fs-title { font-size:15px; font-weight:700; color:var(--ink); }
+  .fs-title .pct { color:var(--accent); }
+  .fs-right { display:flex; align-items:center; gap:16px; }
+  .fs-close { display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px;
+              padding:0; border:1px solid var(--cellborder); border-radius:8px; background:var(--cell);
+              color:var(--sub); cursor:pointer; }
+  .fs-close:hover { color:var(--accent); border-color:var(--accent); }
+  .fs-chart { flex:1 1 auto; min-height:0; }
 
   /* ---- automatic dark mode ---- */
   @media (prefers-color-scheme: dark) {
     :root {
       --accent:#5eead4; --amber:#fbbf24;
       --ink:#e2e8f0; --sub:#94a3b8; --line:#334155;
-      --bg:#0f172a; --cell:#1e293b; --cellborder:#334155;
+      --bg:#0b1120; --cell:#1e293b; --cellborder:#334155;
+      --cellshadow:0 1px 3px rgba(0,0,0,0.45);
+      --headbg:#0f172a;
     }
     .spend-ctl input { background:#0f172a; color:#e2e8f0; border-color:#475569; }
     #status.s-load, .s-load { background:#1e293b; color:#93c5fd; }
@@ -67,7 +92,7 @@
   <div class="grid-head">
     <div class="gh-left">
       <span class="gh-title">Scenario Grid</span>
-      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid1)</span></span>
+      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid2)</span></span>
       <span class="spend-ctl"><label>Spend %</label>
         <input id="sp0" type="number" min="0" max="200" step="5" value="50" inputmode="numeric">
         <input id="sp1" type="number" min="0" max="200" step="5" value="60" inputmode="numeric">
@@ -82,6 +107,20 @@
 
   <div class="matrix" id="matrix"><!-- built in JS --></div>
 
+  <div class="fs-overlay" id="fsOverlay">
+    <div class="fs-head">
+      <span class="fs-title" id="fsTitle">—</span>
+      <div class="fs-right">
+        <div class="legend">
+          <span class="key"><span class="sw" id="fsSw0" style="background:var(--accent);"></span><span id="fsNm0">Graham</span></span>
+          <span class="key"><span class="sw" id="fsSw1" style="background:var(--amber);"></span><span id="fsNm1">Julie</span></span>
+        </div>
+        <button class="fs-close" id="fsClose" type="button" aria-label="Close" title="Close"></button>
+      </div>
+    </div>
+    <div class="fs-chart" id="fsChart"></div>
+  </div>
+
 <script>
   const ROWS = 5;                       // retire now + next 4 years
   const COLS = 3;                       // three spend-% columns
@@ -93,6 +132,12 @@
   let CELLS = [];                       // CELLS[r][c] = { years:[], a:[], b:[] }
   let globalMax = 0;
   let chartsReady = false;
+  let lastCols = [50, 60, 70];          // spend % actually used in the current matrix
+  let fsOpen = null;                    // {r,c} of the card shown full-screen, or null
+
+  // inline SVGs so the icons never depend on a font glyph rendering on iPad Safari
+  const FS_EXPAND_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
+  const FS_CLOSE_SVG  = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
 
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
   const isDark = () => mq.matches;
@@ -176,6 +221,7 @@
 
   function recomputeMatrix() {
     const cols = spendCols();
+    lastCols = cols.slice();
     CELLS = []; globalMax = 0;
     for (let r = 0; r < ROWS; r++) {
       const row = [];
@@ -207,10 +253,15 @@
       html += '<div class="rowlabel"><span class="ry">' + d.getFullYear() + '</span>'
             + '<span class="rs">' + MONTHS[d.getMonth()] + ' &middot; ' + sub + '</span></div>';
       for (let c = 0; c < COLS; c++) {
-        html += '<div class="cell"><div class="chart" id="ch_' + r + '_' + c + '"></div></div>';
+        html += '<div class="cell"><button class="zoom-btn" type="button" data-r="' + r + '" data-c="' + c
+              + '" aria-label="Zoom" title="Zoom">' + FS_EXPAND_SVG + '</button>'
+              + '<div class="chart" id="ch_' + r + '_' + c + '"></div></div>';
       }
     }
     m.innerHTML = html;
+    m.querySelectorAll('.zoom-btn').forEach(b => {
+      b.addEventListener('click', () => openZoom(Number(b.dataset.r), Number(b.dataset.c)));
+    });
   }
 
   function drawOneChart(r, c) {
@@ -250,6 +301,53 @@
     requestAnimationFrame(() => {
       for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) drawOneChart(r, c);
     });
+  }
+
+  // ---- full-screen single card (own scale for max detail; legend + axes enlarged) ----
+  function drawFsChart() {
+    if (!fsOpen || !chartsReady) return;
+    const host = document.getElementById('fsChart');
+    const w = host.clientWidth, h = host.clientHeight;
+    if (w < 8 || h < 8) return;
+    const cell = CELLS[fsOpen.r] && CELLS[fsOpen.r][fsOpen.c];
+    if (!cell) return;
+
+    const dt = new google.visualization.DataTable();
+    dt.addColumn('number', 'Year');
+    dt.addColumn('number', p1Name);
+    if (p2Name) dt.addColumn('number', p2Name);
+    for (let i = 0; i < cell.years.length; i++) {
+      dt.addRow(p2Name ? [cell.years[i], cell.a[i], cell.b[i]] : [cell.years[i], cell.a[i]]);
+    }
+    let cmax = 0;
+    cell.a.forEach(v => { if (v > cmax) cmax = v; });
+    cell.b.forEach(v => { if (v > cmax) cmax = v; });
+    cmax = niceCeil(cmax * 1.05) || 1000;
+
+    const ax = axisColor(), gl = gridColor();
+    new google.visualization.LineChart(host).draw(dt, {
+      legend: 'none', backgroundColor: 'transparent', colors: lineColors(),
+      lineWidth: 3, pointSize: 0, interpolateNulls: true,
+      chartArea: { left: 72, top: 16, right: 24, bottom: 40, width: '86%', height: '82%' },
+      width: w, height: h,
+      hAxis: { format: '####', textStyle: { fontSize: 13, color: ax }, gridlines: { color: 'transparent' }, baselineColor: gl },
+      vAxis: { viewWindow: { min: 0, max: cmax }, ticks: yTicks(cmax, 5),
+               textStyle: { fontSize: 13, color: ax }, gridlines: { color: gl }, baselineColor: gl }
+    });
+  }
+  function openZoom(r, c) {
+    if (!CELLS[r] || !CELLS[r][c]) return;
+    fsOpen = { r: r, c: c };
+    const d = retireDates[r], sub = r === 0 ? 'now' : '+' + r + ' yr';
+    document.getElementById('fsTitle').innerHTML =
+      'Retire ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear() + ' (' + sub + ') &middot; '
+      + '<span class="pct">' + lastCols[c] + '% of spend</span>';
+    document.getElementById('fsOverlay').classList.add('show');
+    requestAnimationFrame(drawFsChart);
+  }
+  function closeZoom() {
+    fsOpen = null;
+    document.getElementById('fsOverlay').classList.remove('show');
   }
 
   // ---- spend input changes → recompute affected scenarios, then redraw ----
@@ -302,8 +400,12 @@
       p1Name = sortedM[0] ? sortedM[0].name : 'Graham';
       p2Name = sortedM[1] ? sortedM[1].name : null;
       document.getElementById('lgNm0').textContent = p1Name;
-      if (p2Name) document.getElementById('lgNm1').textContent = p2Name;
-      else { document.getElementById('lgNm1').textContent = ''; document.getElementById('lgSw1').style.display = 'none'; }
+      document.getElementById('fsNm0').textContent = p1Name;
+      if (p2Name) { document.getElementById('lgNm1').textContent = p2Name; document.getElementById('fsNm1').textContent = p2Name; }
+      else {
+        document.getElementById('lgNm1').textContent = ''; document.getElementById('lgSw1').style.display = 'none';
+        document.getElementById('fsNm1').textContent = ''; document.getElementById('fsSw1').style.display = 'none';
+      }
 
       // saved modelling parameters (held fixed; only retire-date and spend vary across the grid)
       const pRows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name) + '&order=updated_at.desc&limit=1');
@@ -341,10 +443,15 @@
 
   // ---- redraw on resize / orientation / theme change (size only — series are cached) ----
   let rt = null;
-  window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(drawAll, 150); });
-  if (mq.addEventListener) mq.addEventListener('change', () => setTimeout(drawAll, 60));
+  window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { drawAll(); if (fsOpen) drawFsChart(); }, 150); });
+  if (mq.addEventListener) mq.addEventListener('change', () => setTimeout(() => { drawAll(); if (fsOpen) drawFsChart(); }, 60));
   window.addEventListener('message', (ev) => { if (ev && ev.data === 'refresh-data') load(); });
   ['sp0', 'sp1', 'sp2'].forEach(id => document.getElementById(id).addEventListener('change', onSpendChange));
+
+  // ---- zoom overlay wiring ----
+  document.getElementById('fsClose').innerHTML = FS_CLOSE_SVG;
+  document.getElementById('fsClose').addEventListener('click', closeZoom);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && fsOpen) closeZoom(); });
 
   google.charts.load('current', { packages: ['corechart'] });
   google.charts.setOnLoadCallback(() => { chartsReady = true; drawAll(); });
