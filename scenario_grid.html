@@ -47,8 +47,17 @@
   .rowlabel .ry { font-size:15px; font-weight:700; color:var(--ink); }
   .rowlabel .rs { font-size:11px; color:var(--sub); }
   .cell { position:relative; background:var(--cell); border:1px solid var(--cellborder);
-          border-radius:8px; overflow:hidden; min-width:0; min-height:0; box-shadow:var(--cellshadow); }
-  .chart { position:absolute; inset:0; }
+          border-left:4px solid var(--cellborder); border-radius:8px; overflow:hidden;
+          min-width:0; min-height:0; box-shadow:var(--cellshadow);
+          display:flex; flex-direction:column; cursor:pointer; }
+  .chart { flex:1 1 auto; min-height:0; }
+  .cell-kpi { flex:none; height:19px; line-height:19px; font-size:11px; font-weight:700;
+              text-align:center; letter-spacing:.2px; border-top:1px solid var(--cellborder);
+              white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px; }
+  /* outcome colouring: green = survives horizon, amber = depletes near the end, red = depletes early */
+  .cell.ok   { border-left-color:#10b981; } .cell.ok   .cell-kpi { color:#0f9d6e; }
+  .cell.warn { border-left-color:#f59e0b; } .cell.warn .cell-kpi { color:#c77c08; }
+  .cell.bad  { border-left-color:#ef4444; } .cell.bad  .cell-kpi { color:#dc3030; }
 
   /* corner zoom button (mirrors the modelling charts' full-screen control) */
   .zoom-btn { position:absolute; top:4px; right:4px; z-index:6; display:inline-flex; align-items:center;
@@ -83,6 +92,7 @@
     .spend-ctl input { background:#0f172a; color:#e2e8f0; border-color:#475569; }
     #status.s-load, .s-load { background:#1e293b; color:#93c5fd; }
     #status.s-err, .s-err { background:#3b1d1d; color:#f87171; }
+    .cell.ok .cell-kpi { color:#34d399; } .cell.warn .cell-kpi { color:#fbbf24; } .cell.bad .cell-kpi { color:#f87171; }
   }
 </style>
 </head>
@@ -92,14 +102,14 @@
   <div class="grid-head">
     <div class="gh-left">
       <span class="gh-title">Scenario Grid</span>
-      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid3)</span></span>
+      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid4)</span></span>
       <span class="spend-ctl"><label>Spend %</label>
         <input id="sp0" type="number" min="0" max="200" step="5" value="50" inputmode="numeric">
         <input id="sp1" type="number" min="0" max="200" step="5" value="60" inputmode="numeric">
         <input id="sp2" type="number" min="0" max="200" step="5" value="70" inputmode="numeric">
       </span>
       <span class="spend-ctl"><label>Y-max £K</label>
-        <input id="ymax" type="number" min="0" step="50" inputmode="numeric" placeholder="auto">
+        <input id="ymax" type="number" min="0" step="50" inputmode="numeric" placeholder="auto" style="width:74px;">
       </span>
     </div>
     <div class="legend">
@@ -214,7 +224,21 @@
       a.push(Math.max(0, Math.round((r.g_taxFree || 0) + (r.g_taxable || 0))));
       b.push(Math.max(0, Math.round((r.j_taxFree || 0) + (r.j_taxable || 0))));
     });
-    return { years: years, a: a, b: b };
+    // peak (for outlier-robust shared scale) and depletion outcome
+    let peak = 0;
+    for (let i = 0; i < years.length; i++) { if (a[i] > peak) peak = a[i]; if (b[i] > peak) peak = b[i]; }
+    const lastYear = years.length ? years[years.length - 1] : null;
+    let dryYear = null;
+    for (let i = 0; i < years.length; i++) { if ((a[i] + b[i]) < 1000) { dryYear = years[i]; break; } }
+    let cls, kpi;
+    if (dryYear == null) {
+      const finalTotal = years.length ? (a[a.length - 1] + b[b.length - 1]) : 0;
+      cls = 'ok'; kpi = '\u2713 to ' + lastYear + '  ' + shortGBP(finalTotal);
+    } else {
+      cls = (lastYear != null && dryYear >= lastYear - 5) ? 'warn' : 'bad';
+      kpi = '\u2717 dry ' + dryYear;
+    }
+    return { years: years, a: a, b: b, peak: peak, dryYear: dryYear, lastYear: lastYear, cls: cls, kpi: kpi };
   }
 
   function spendCols() {
@@ -227,24 +251,34 @@
   function recomputeMatrix() {
     const cols = spendCols();
     lastCols = cols.slice();
-    CELLS = []; globalMax = 0;
+    CELLS = [];
+    const peaks = [];
     for (let r = 0; r < ROWS; r++) {
       const row = [];
       for (let c = 0; c < COLS; c++) {
         const cell = computeCell(retireDates[r], cols[c]);
-        cell.years.forEach((_, i) => {
-          if (cell.a[i] > globalMax) globalMax = cell.a[i];
-          if (cell.b[i] > globalMax) globalMax = cell.b[i];
-        });
+        peaks.push(cell.peak);
         row.push(cell);
       }
       CELLS.push(row);
     }
-    globalMax = niceCeil(globalMax * 1.04) || 1000;
+    // shared ceiling = highest cell peak, but drop a single outlier spike (>1.4x the next) so
+    // one runaway scenario doesn't squash every other card into the bottom of its panel.
+    peaks.sort((x, y) => y - x);
+    let ceilSrc = peaks.length ? peaks[0] : 1000;
+    if (peaks.length >= 3 && peaks[0] > peaks[1] * 1.4) ceilSrc = peaks[1];
+    globalMax = niceCeil(ceilSrc * 1.05) || 1000;
     const ym = document.getElementById('ymax');
     if (ym) ym.placeholder = 'auto ' + Math.round(globalMax / 1000);
-    // refresh column headers to the live percentages
+    // refresh column headers + per-card outcome (colour accent + KPI strip)
     cols.forEach((v, c) => { const el = document.getElementById('colhead' + c); if (el) el.textContent = v + '% of spend'; });
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      const cell = CELLS[r][c];
+      const cellEl = document.getElementById('cell_' + r + '_' + c);
+      const kpiEl = document.getElementById('kpi_' + r + '_' + c);
+      if (cellEl) { cellEl.classList.remove('ok', 'warn', 'bad'); cellEl.classList.add(cell.cls); }
+      if (kpiEl) kpiEl.textContent = cell.kpi;
+    }
   }
 
   // ---- layout: header row of spend labels, left column of retire-year labels, 15 chart cells ----
@@ -260,14 +294,20 @@
       html += '<div class="rowlabel"><span class="ry">' + d.getFullYear() + '</span>'
             + '<span class="rs">' + MONTHS[d.getMonth()] + ' &middot; ' + sub + '</span></div>';
       for (let c = 0; c < COLS; c++) {
-        html += '<div class="cell"><button class="zoom-btn" type="button" data-r="' + r + '" data-c="' + c
+        html += '<div class="cell" id="cell_' + r + '_' + c + '" data-r="' + r + '" data-c="' + c + '">'
+              + '<button class="zoom-btn" type="button" data-r="' + r + '" data-c="' + c
               + '" aria-label="Zoom" title="Zoom">' + FS_EXPAND_SVG + '</button>'
-              + '<div class="chart" id="ch_' + r + '_' + c + '"></div></div>';
+              + '<div class="chart" id="ch_' + r + '_' + c + '"></div>'
+              + '<div class="cell-kpi" id="kpi_' + r + '_' + c + '"></div></div>';
       }
     }
     m.innerHTML = html;
+    // whole card is a tap target (easier on iPad); the corner button stays as the visual cue
+    m.querySelectorAll('.cell').forEach(el => {
+      el.addEventListener('click', () => openZoom(Number(el.dataset.r), Number(el.dataset.c)));
+    });
     m.querySelectorAll('.zoom-btn').forEach(b => {
-      b.addEventListener('click', () => openZoom(Number(b.dataset.r), Number(b.dataset.c)));
+      b.addEventListener('click', (e) => { e.stopPropagation(); openZoom(Number(b.dataset.r), Number(b.dataset.c)); });
     });
   }
 
@@ -289,7 +329,8 @@
 
     const ax = axisColor(), gl = gridColor();
     const ymax = currentYMax();
-    const everyX = Math.max(1, Math.round(cell.years.length / 5));
+    const yrs = cell.years, n = yrs.length;
+    const xTicks = n ? [{ v: yrs[0] }, { v: yrs[(n / 2) | 0] }, { v: yrs[n - 1] }] : undefined;
     new google.visualization.LineChart(host).draw(dt, {
       legend: 'none',
       backgroundColor: 'transparent',
@@ -297,7 +338,7 @@
       lineWidth: 2, pointSize: 0, interpolateNulls: true,
       chartArea: { left: 46, top: 8, right: 10, bottom: 20, width: '80%', height: '76%' },
       width: w, height: h,
-      hAxis: { format: '####', textStyle: { fontSize: 9, color: ax }, showTextEvery: everyX,
+      hAxis: { format: '####', textStyle: { fontSize: 9, color: ax }, ticks: xTicks,
                gridlines: { color: 'transparent' }, baselineColor: gl, textPosition: 'out' },
       vAxis: { viewWindow: { min: 0, max: ymax }, ticks: yTicks(ymax),
                textStyle: { fontSize: 9, color: ax }, gridlines: { color: gl }, baselineColor: gl }
@@ -347,9 +388,10 @@
     if (!CELLS[r] || !CELLS[r][c]) return;
     fsOpen = { r: r, c: c };
     const d = retireDates[r], sub = r === 0 ? 'now' : '+' + r + ' yr';
+    const cell = CELLS[r][c];
     document.getElementById('fsTitle').innerHTML =
       'Retire ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear() + ' (' + sub + ') &middot; '
-      + '<span class="pct">' + lastCols[c] + '% of spend</span>';
+      + '<span class="pct">' + lastCols[c] + '% of spend</span> &middot; ' + (cell.kpi || '');
     document.getElementById('fsOverlay').classList.add('show');
     requestAnimationFrame(drawFsChart);
   }
