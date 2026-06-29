@@ -92,11 +92,14 @@
   <div class="grid-head">
     <div class="gh-left">
       <span class="gh-title">Scenario Grid</span>
-      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid2)</span></span>
+      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid3)</span></span>
       <span class="spend-ctl"><label>Spend %</label>
         <input id="sp0" type="number" min="0" max="200" step="5" value="50" inputmode="numeric">
         <input id="sp1" type="number" min="0" max="200" step="5" value="60" inputmode="numeric">
         <input id="sp2" type="number" min="0" max="200" step="5" value="70" inputmode="numeric">
+      </span>
+      <span class="spend-ctl"><label>Y-max £K</label>
+        <input id="ymax" type="number" min="0" step="50" inputmode="numeric" placeholder="auto">
       </span>
     </div>
     <div class="legend">
@@ -134,6 +137,8 @@
   let chartsReady = false;
   let lastCols = [50, 60, 70];          // spend % actually used in the current matrix
   let fsOpen = null;                    // {r,c} of the card shown full-screen, or null
+  let yMaxOverride = null;              // manual y-axis ceiling (£), or null = auto (shared max)
+  const currentYMax = () => (yMaxOverride != null ? yMaxOverride : globalMax);
 
   // inline SVGs so the icons never depend on a font glyph rendering on iPad Safari
   const FS_EXPAND_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
@@ -236,6 +241,8 @@
       CELLS.push(row);
     }
     globalMax = niceCeil(globalMax * 1.04) || 1000;
+    const ym = document.getElementById('ymax');
+    if (ym) ym.placeholder = 'auto ' + Math.round(globalMax / 1000);
     // refresh column headers to the live percentages
     cols.forEach((v, c) => { const el = document.getElementById('colhead' + c); if (el) el.textContent = v + '% of spend'; });
   }
@@ -281,6 +288,7 @@
     }
 
     const ax = axisColor(), gl = gridColor();
+    const ymax = currentYMax();
     const everyX = Math.max(1, Math.round(cell.years.length / 5));
     new google.visualization.LineChart(host).draw(dt, {
       legend: 'none',
@@ -291,7 +299,7 @@
       width: w, height: h,
       hAxis: { format: '####', textStyle: { fontSize: 9, color: ax }, showTextEvery: everyX,
                gridlines: { color: 'transparent' }, baselineColor: gl, textPosition: 'out' },
-      vAxis: { viewWindow: { min: 0, max: globalMax }, ticks: yTicks(globalMax),
+      vAxis: { viewWindow: { min: 0, max: ymax }, ticks: yTicks(ymax),
                textStyle: { fontSize: 9, color: ax }, gridlines: { color: gl }, baselineColor: gl }
     });
   }
@@ -447,6 +455,11 @@
   if (mq.addEventListener) mq.addEventListener('change', () => setTimeout(() => { drawAll(); if (fsOpen) drawFsChart(); }, 60));
   window.addEventListener('message', (ev) => { if (ev && ev.data === 'refresh-data') load(); });
   ['sp0', 'sp1', 'sp2'].forEach(id => document.getElementById(id).addEventListener('change', onSpendChange));
+  document.getElementById('ymax').addEventListener('change', () => {
+    const v = Number(document.getElementById('ymax').value);
+    yMaxOverride = (isFinite(v) && v > 0) ? v * 1000 : null;   // £K → £, blank/0 = auto
+    drawAll();
+  });
 
   // ---- zoom overlay wiring ----
   document.getElementById('fsClose').innerHTML = FS_CLOSE_SVG;
