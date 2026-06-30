@@ -26,6 +26,11 @@
           padding:7px 14px 8px; background:var(--headbg); border-bottom:2px solid var(--line); }
   .hrow { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
   .h-title { font-size:15px; font-weight:700; }
+  .seg { display:inline-flex; border:1px solid var(--panelborder); border-radius:9px; overflow:hidden; background:var(--panel); }
+  .seg-btn { border:0; background:transparent; color:var(--sub); font-size:12px; font-weight:700; padding:6px 13px;
+             cursor:pointer; border-left:1px solid var(--panelborder); -webkit-tap-highlight-color:transparent; }
+  .seg-btn:first-child { border-left:0; }
+  .seg-btn.active { background:var(--accent); color:#08312f; }
   .h-sub { font-size:12px; color:var(--sub); line-height:1.3; }
   .h-sub b { color:var(--ink); }
   .ctl { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--sub); }
@@ -85,11 +90,16 @@
 
   <div class="head">
     <div class="hrow">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front4)</span></span>
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front5)</span></span>
+      <div class="seg" id="seg">
+        <button type="button" class="seg-btn active" data-mode="joint">Joint</button>
+        <button type="button" class="seg-btn" data-mode="p1" id="segP1">Graham</button>
+        <button type="button" class="seg-btn" data-mode="p2" id="segP2">Julie</button>
+      </div>
       <div class="legend">
-        <span class="key"><span class="sw" id="lgSafe"></span>Safe</span>
-        <span class="key"><span class="sw" id="lgMarg"></span>Marginal</span>
-        <span class="key"><span class="sw" id="lgRisk"></span>Runs dry</span>
+        <span class="key"><span class="sw" id="lgSafe"></span><span id="lgSafeT">Safe</span></span>
+        <span class="key"><span class="sw" id="lgMarg"></span><span id="lgMargT">Marginal</span></span>
+        <span class="key"><span class="sw" id="lgRisk"></span><span id="lgRiskT">Runs dry</span></span>
         <span class="key"><span class="dot"></span>Your plan</span>
       </div>
     </div>
@@ -123,6 +133,9 @@
   let frontier = [];           // [{ year:decimal, pct }]
   let plan = null;             // { year:decimal, date, pct }
   let endYear = null, yMax = 100;
+  let mode = 'joint';          // 'joint' | 'p1' (Graham) | 'p2' (Julie)
+  const modeName = () => mode === 'p1' ? p1Name : (mode === 'p2' ? p2Name : 'Joint');
+  const isIndiv = () => mode === 'p1' || mode === 'p2';
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
   const isDark = () => mq.matches;
 
@@ -155,28 +168,39 @@
     return { pl: pl, pots: pots, own: own, startYr: retireDate.getFullYear(),
              sp: PensionEngine.baselineSP(stateNames) };
   }
-  function drawdownFinal(base, spendPct) {
+  function endPots(base, spendPct) {
     const cfg = {
       pots: base.pots, potsAtOwnRetire: base.own, gRatio: savedBase.gRatio,
       spendRed: spendPct / 100, startYear: base.startYr, retirementDate: base.pl.retirementDate,
       retireByMember: base.pl.retireByMember, savingsFundBills: savedBase.savingsFundBills, sp: base.sp
     };
     const rows = PensionEngine.drawdown(data, cfg) || [];
-    if (!rows.length) return { survives: true, end: null };
+    if (!rows.length) return null;
     const last = rows[rows.length - 1];
-    const total = (last.g_taxFree || 0) + (last.g_taxable || 0) + (last.j_taxFree || 0) + (last.j_taxable || 0);
-    return { survives: total >= 1000, end: last.year };
+    return { end: last.year,
+             g: (last.g_taxFree || 0) + (last.g_taxable || 0),
+             j: (last.j_taxFree || 0) + (last.j_taxable || 0) };
   }
-  // highest spend % whose pots still last to end-of-plan (survival is monotonic in spend)
-  function maxSafeSpend(base) {
-    const hi0 = drawdownFinal(base, SPEND_HI);
-    if (hi0.survives) return { pct: SPEND_HI, end: hi0.end };
+  // success test by mode: joint = household pots last; individual = that pot preserved (end >= start)
+  function passes(base, spendPct, m) {
+    const e = endPots(base, spendPct);
+    if (!e) return { ok: true, end: null };
+    let ok;
+    if (m === 'p1') ok = e.g >= base.pots.graham;          // Graham's DC pot maintained or grown
+    else if (m === 'p2') ok = e.j >= base.pots.julie;      // Julie's DC pot maintained or grown
+    else ok = (e.g + e.j) >= 1000;                          // joint: household pots last
+    return { ok: ok, end: e.end };
+  }
+  // highest spend % that still meets the test (monotonic: more spend -> harder to pass)
+  function maxSafeSpend(base, m) {
+    const hi0 = passes(base, SPEND_HI, m);
+    if (hi0.ok) return { pct: SPEND_HI, end: hi0.end };
     let lo = SPEND_LO, hi = SPEND_HI, endY = null;
     for (let i = 0; i < 9; i++) {
       const mid = (lo + hi) / 2;
-      const r = drawdownFinal(base, mid);
+      const r = passes(base, mid, m);
       if (r.end != null) endY = r.end;
-      if (r.survives) lo = mid; else hi = mid;
+      if (r.ok) lo = mid; else hi = mid;
     }
     return { pct: lo, end: endY };
   }
@@ -187,7 +211,7 @@
     const base0 = new Date(now.getFullYear(), now.getMonth(), 1);
     for (let m = 0; m <= HORIZON_YEARS * 12; m += STEP_MONTHS) {
       const d = new Date(base0.getFullYear(), base0.getMonth() + m, 1);
-      const res = maxSafeSpend(baseFor(d));
+      const res = maxSafeSpend(baseFor(d), mode);
       if (res.end != null) endYear = res.end;
       frontier.push({ year: decYear(d), pct: res.pct });
     }
@@ -196,7 +220,7 @@
     const pd = savedBase.planRetire;
     if (pd) {
       const pBase = baseFor(new Date(pd.getFullYear(), pd.getMonth(), 1));
-      const pFront = maxSafeSpend(pBase).pct;
+      const pFront = maxSafeSpend(pBase, mode).pct;
       plan = { year: decYear(pd), date: pd, pct: Math.round(savedBase.planSpend * 100), headroom: pFront };
     }
     let mx = 0; frontier.forEach(p => { if (p.pct > mx) mx = p.pct; });
@@ -204,9 +228,19 @@
     yMax = Math.min(SPEND_HI, Math.max(60, Math.ceil((mx + 8) / 10) * 10));
   }
 
+  function applyModeLabels() {
+    // legend wording adapts: joint = survival, individual = pot preservation
+    const safeT = document.getElementById('lgSafeT'), margT = document.getElementById('lgMargT'), riskT = document.getElementById('lgRiskT');
+    if (isIndiv()) { safeT.textContent = 'Grows'; margT.textContent = 'Maintained'; riskT.textContent = 'Shrinks'; }
+    else { safeT.textContent = 'Safe'; margT.textContent = 'Marginal'; riskT.textContent = 'Runs dry'; }
+    document.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  }
+
   function buildSubline() {
     const sub = document.getElementById('hSub');
-    let t = 'Safe = both pots last to <b>' + (endYear || '?') + '</b>.';
+    let t = isIndiv()
+      ? '<b>' + modeName() + "</b>'s pot kept whole = the most you can spend before it shrinks by <b>" + (endYear || '?') + '</b> (drawdown split ' + Math.round(savedBase.gRatio * 100) + '% from ' + p1Name + ').'
+      : 'Safe = both pots last to <b>' + (endYear || '?') + '</b>.';
     if (plan) {
       const diff = Math.round(plan.headroom - plan.pct);
       const when = ymLabel(plan.year);
@@ -216,6 +250,7 @@
     }
     sub.innerHTML = t;
     if (plan) document.getElementById('markerTag').textContent = 'Your plan · ' + plan.pct + '%';
+    applyModeLabels();
   }
 
   // earliest retirement date at which a given spend % becomes safe (where it crosses the frontier).
@@ -255,12 +290,19 @@
     document.getElementById('lgMarg').style.background = margC;
     document.getElementById('lgRisk').style.background = riskC;
 
+    const who = modeName();
     const tip = (decY, pct, kind) => {
       const lab = ymLabel(decY), v = Math.round(pct);
       let line;
-      if (kind === 'safe') line = '<span style="color:' + safeC + ';font-weight:700;">Safe</span> — spend up to <b>' + (v - MARGIN) + '%</b> with room to spare';
-      else if (kind === 'marg') line = '<span style="color:' + margC + ';font-weight:700;">Marginal</span> — around <b>' + v + '%</b> the pots only just last';
-      else line = '<span style="color:' + riskC + ';font-weight:700;">Runs dry</span> — above <b>' + v + '%</b> the pots empty before ' + (endYear || '?');
+      if (isIndiv()) {
+        if (kind === 'safe') line = '<span style="color:' + safeC + ';font-weight:700;">Grows</span> — spend up to <b>' + (v - MARGIN) + '%</b> and ' + who + "'s pot keeps building";
+        else if (kind === 'marg') line = '<span style="color:' + margC + ';font-weight:700;">Maintained</span> — around <b>' + v + '%</b> ' + who + "'s pot just holds its value";
+        else line = '<span style="color:' + riskC + ';font-weight:700;">Shrinks</span> — above <b>' + v + '%</b> ' + who + "'s pot is eroded by " + (endYear || '?');
+      } else {
+        if (kind === 'safe') line = '<span style="color:' + safeC + ';font-weight:700;">Safe</span> — spend up to <b>' + (v - MARGIN) + '%</b> with room to spare';
+        else if (kind === 'marg') line = '<span style="color:' + margC + ';font-weight:700;">Marginal</span> — around <b>' + v + '%</b> the pots only just last';
+        else line = '<span style="color:' + riskC + ';font-weight:700;">Runs dry</span> — above <b>' + v + '%</b> the pots empty before ' + (endYear || '?');
+      }
       return '<div style="padding:7px 10px;font-family:Segoe UI,sans-serif;font-size:12px;line-height:1.5;'
            + 'white-space:nowrap;background:' + tipBg + ';color:' + tipInk + ';"><b>Retire ' + lab + '</b><br>' + line + '</div>';
     };
@@ -385,6 +427,9 @@
       const sortedM = (members || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
       p1Name = sortedM[0] ? sortedM[0].name : 'Graham';
       p2Name = sortedM[1] ? sortedM[1].name : null;
+      document.getElementById('segP1').textContent = p1Name;
+      if (p2Name) document.getElementById('segP2').textContent = p2Name;
+      else document.getElementById('segP2').style.display = 'none';
 
       const pRows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name) + '&order=updated_at.desc&limit=1');
       const p = (pRows && pRows.length) ? pRows[0] : {};
@@ -434,6 +479,17 @@
   }
   document.getElementById('spDn').addEventListener('click', () => nudgeSpend(-1));
   document.getElementById('spUp').addEventListener('click', () => nudgeSpend(1));
+  document.getElementById('seg').addEventListener('click', (e) => {
+    const b = e.target.closest('.seg-btn'); if (!b || b.dataset.mode === mode) return;
+    mode = b.dataset.mode;
+    document.querySelectorAll('.seg-btn').forEach(x => x.classList.toggle('active', x.dataset.mode === mode));
+    const status = document.getElementById('status');
+    status.style.display = 'block'; status.className = 's-load'; status.textContent = 'Recomputing…';
+    setTimeout(() => {
+      try { computeFrontier(); buildSubline(); draw(); status.style.display = 'none'; }
+      catch (err) { status.className = 's-err'; status.textContent = 'Could not compute: ' + err.message; }
+    }, 20);
+  });
   window.addEventListener('message', (ev) => { if (ev && ev.data === 'refresh-data') load(); });
 
   google.charts.load('current', { packages: ['corechart'] });
