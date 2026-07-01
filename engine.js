@@ -455,13 +455,16 @@
       });
       // annuity income: purchased annuities for this member pay from their purchase month onward,
       // escalating from their own purchase date (level when esc = 0). Taxed as "other" income.
+      // Tracked separately so charts can split annuity income from DB/other guaranteed income.
+      let annuityGross = 0;
       annuities.forEach(a => {
         if (a.member !== who || !a.purchased || a.skipped) return;
         if (idx < a.pIdx) return;
         const yrs = Math.floor((idx - a.pIdx) / 12);
-        otherGross += a.annualIncome / 12 * Math.pow(1 + a.esc, yrs);
+        annuityGross += a.annualIncome / 12 * Math.pow(1 + a.esc, yrs);
       });
-      return { stateGross, otherGross, total: stateGross + otherGross };
+      otherGross += annuityGross;
+      return { stateGross, otherGross, annuityGross, total: stateGross + otherGross };
     }
 
     // Floors (dynamic mode): each person's taxable pot is protected down to a % of
@@ -537,7 +540,9 @@
           g_tfGrowth: 0, g_txGrowth: 0, j_tfGrowth: 0, j_txGrowth: 0, tfGrowth: 0, txGrowth: 0, crash: null,
           annuityBuy: 0, g_annuityBuy: 0, j_annuityBuy: 0,
           stateGross: 0, otherPensions: 0, drawdown: 0,
-          g_other: 0, j_other: 0, g_otherNet: 0, j_otherNet: 0, g_draw: 0, j_draw: 0, g_income: 0, j_income: 0, totalIncome: 0,
+          g_other: 0, j_other: 0, g_otherNet: 0, j_otherNet: 0,
+          g_annuityIncome: 0, j_annuityIncome: 0,
+          g_draw: 0, j_draw: 0, g_income: 0, j_income: 0, totalIncome: 0,
           combinedClosing: 0, g_closing: 0, j_closing: 0, shortfall: false,
           cashBalance: 0, cashFinance: 0, cashDeposit: 0, cashShortfall: 0, cashCapDraw: 0
         };
@@ -757,7 +762,9 @@
         crash: crashInfo(idx),
         annuityBuy: gAnnBuy + jAnnBuy, g_annuityBuy: gAnnBuy, j_annuityBuy: jAnnBuy,
         stateGross: mState, otherPensions: mOther, drawdown: gDraw + jDraw,
-        g_other: gRes.inc.total, j_other: jRes.inc.total, g_otherNet: gRes.dbNet, j_otherNet: jRes.dbNet, g_draw: gDraw, j_draw: jDraw,
+        g_other: gRes.inc.total, j_other: jRes.inc.total, g_otherNet: gRes.dbNet, j_otherNet: jRes.dbNet,
+        g_annuityIncome: gRes.inc.annuityGross, j_annuityIncome: jRes.inc.annuityGross,
+        g_draw: gDraw, j_draw: jDraw,
         g_income: gRes.inc.total + gDraw, j_income: jRes.inc.total + jDraw,
         totalIncome: mOther + gDraw + jDraw,
         combinedClosing: gTf + gTx + jTf + jTx, g_closing: gTf + gTx, j_closing: jTf + jTx,
@@ -770,6 +777,7 @@
       acc.gTarget += gTargetM; acc.jTarget += jTargetM;
       acc.stateGross += gRes.inc.stateGross + jRes.inc.stateGross;
       acc.g_other += gRes.inc.total; acc.j_other += jRes.inc.total;
+      acc.g_annuityIncome += gRes.inc.annuityGross; acc.j_annuityIncome += jRes.inc.annuityGross;
       acc.g_otherNet += gRes.dbNet; acc.j_otherNet += jRes.dbNet;
       acc.otherPensions += gRes.inc.total + jRes.inc.total;
       acc.g_draw += gDraw; acc.j_draw += jDraw; acc.drawdown += gDraw + jDraw;
