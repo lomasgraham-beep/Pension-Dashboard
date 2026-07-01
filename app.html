@@ -166,6 +166,11 @@
     }
 
     .chart-box { width:100%; height:400px; margin-bottom:20px; }
+    /* Custom two-row wrapping legend under charts (replaces google's paginating legend) */
+    .cx-legend { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:4px 12px; padding:6px 40px 10px; font-size:12px; color:var(--ink); max-height:calc(1.4em * 2 + 12px); overflow:hidden; margin:-14px 0 12px; }
+    .cx-legend .cx-item { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; line-height:1.35; }
+    .cx-legend .cx-swatch { display:inline-block; width:12px; height:12px; border-radius:2px; flex:0 0 auto; }
+    .cx-legend .cx-swatch.line { height:3px; border-radius:2px; }
     .chart-wrap { position:relative; }
     .chart-fs-btn { position:absolute; top:8px; right:8px; z-index:6; display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; padding:0; border:1px solid var(--line-strong); border-radius:8px; background:var(--surface); color:var(--ink-soft); cursor:pointer; opacity:0.8; box-shadow:var(--shadow); }
     .chart-fs-btn:hover { opacity:1; color:var(--accent); border-color:var(--accent-border); }
@@ -874,7 +879,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-276</span>
+    <span class="build-stamp">build: LC-277</span>
   </div>
 
   <script>
@@ -1201,6 +1206,19 @@
       applyColVisibility();
     }
 
+    // Render a custom HTML legend below a chart (Google's built-in legend paginates when
+    // series don't fit on one line, which produces a fiddly "1/2 ▶" control). This wraps
+    // naturally, capped at 2 lines by CSS. entries = [{ label, color, type: 'bar'|'line' }, ...]
+    function renderCustomLegend(wrapEl, entries) {
+      if (!wrapEl) return;
+      let leg = wrapEl.querySelector('.cx-legend');
+      if (!leg) { leg = document.createElement('div'); leg.className = 'cx-legend'; wrapEl.appendChild(leg); }
+      leg.innerHTML = (entries || []).map(e => {
+        const cls = e.type === 'line' ? 'cx-swatch line' : 'cx-swatch';
+        return '<span class="cx-item"><span class="' + cls + '" style="background:' + e.color + ';"></span>' + e.label + '</span>';
+      }).join('');
+    }
+
     function drawCharts() {
       if (!chartsReady || !drawdownRows.length) return;
       const joint = (currentView === 'Joint');
@@ -1413,19 +1431,60 @@
 
       new google.visualization.ComboChart(document.getElementById('potChart')).draw(dPots, {
         title: potTitle, seriesType: 'bars', isStacked: true, series: potSeries,
-        legend: { position: 'bottom', maxLines:2 }, chartArea: potArea, colors: potColors,
+        legend: { position: 'none' }, chartArea: potArea, colors: potColors,
         vAxes: { 0: potVAxis, 1: spendVAxis },
         annotations: { alwaysOutside:true, textStyle:{ fontSize:13, color:'#c0392b', bold:true }, stem:{ color:'#c0392b' } }
       });
+      // Custom legend: stacked bars (in colour order) + two lines on 2nd axis
+      const potLegendEntries = joint
+        ? [
+            { label: p2Name + ' tax-free', color: potColors[0], type: 'bar' },
+            { label: p1Name + ' tax-free', color: potColors[1], type: 'bar' },
+            { label: p2Name + ' taxable',  color: potColors[2], type: 'bar' },
+            { label: p1Name + ' taxable',  color: potColors[3], type: 'bar' },
+            { label: 'Annual spend',       color: '#2c3e50',    type: 'line' },
+            { label: 'Pension income (net)', color: '#16a085',  type: 'line' }
+          ]
+        : [
+            { label: 'Tax-Free Pot',       color: potColors[0], type: 'bar' },
+            { label: 'Taxable Pot',        color: potColors[1], type: 'bar' },
+            { label: 'Annual spend',       color: '#2c3e50',    type: 'line' },
+            { label: 'Pension income (net)', color: '#16a085',  type: 'line' }
+          ];
+      renderCustomLegend(document.getElementById('potChart').closest('.chart-wrap'), potLegendEntries);
+
       new google.visualization.ComboChart(document.getElementById('incomeChart')).draw(dInc, {
         title: incTitle, seriesType:'bars', isStacked:true, series: incSeries,
-        legend:{position:'bottom', maxLines:2}, chartArea: incArea,
+        legend:{position:'none'}, chartArea: incArea,
         vAxes: {
           0: phone ? { title:'', viewWindow:{min:0, max:incMax}, ticks: incTicks, textStyle: axisText } : { title:'Income (£)', viewWindow:{min:0, max:incMax}, format:'£#,###', textStyle: axisText },
           1: phone ? { title:'', viewWindow:{min:0, max:incMax}, ticks: incTicks, textStyle: axisText } : { title:'Total drawdown (£)', viewWindow:{min:0, max:incMax}, format:'£#,###', textStyle: axisText }
         },
         annotations: { alwaysOutside:true, textStyle:{ fontSize:13, color:'#c0392b', bold:true }, stem:{ color:'#c0392b' } }
       });
+      // Custom legend for income chart — order matches the series indices above
+      const incLegendEntries = [];
+      if (joint) {
+        incLegendEntries.push(
+          { label: p2Name + ' drawdown',   color: '#9b59b6', type: 'bar' },
+          { label: p1Name + ' drawdown',   color: '#3498db', type: 'bar' },
+          { label: p2Name + ' guaranteed', color: '#c39bd3', type: 'bar' },
+          { label: p1Name + ' guaranteed', color: '#85c1e9', type: 'bar' }
+        );
+        if (hasAnnuity) incLegendEntries.push(
+          { label: p2Name + ' annuity', color: '#e67e22', type: 'bar' },
+          { label: p1Name + ' annuity', color: '#2c7a7b', type: 'bar' }
+        );
+        incLegendEntries.push({ label: 'Total drawdown', color: '#f39c12', type: 'line' });
+      } else {
+        incLegendEntries.push(
+          { label: 'Drawdown',          color: '#3498db', type: 'bar' },
+          { label: 'Guaranteed income', color: '#9b59b6', type: 'bar' }
+        );
+        if (hasAnnuity) incLegendEntries.push({ label: 'Annuity income', color: '#2c7a7b', type: 'bar' });
+        incLegendEntries.push({ label: 'Total drawdown', color: '#f39c12', type: 'line' });
+      }
+      renderCustomLegend(document.getElementById('incomeChart').closest('.chart-wrap'), incLegendEntries);
       drawCrashChart();
       drawCashModelChart();
       drawAnnuityChart();
@@ -1537,13 +1596,17 @@
       new google.visualization.ColumnChart(box).draw(dt, {
         title: 'Savings balance by account' + (currentView !== 'Joint' ? ' — ' + currentView : ''),
         isStacked: true,
-        legend: { position: 'top', alignment: 'center', textStyle: { fontSize: phone ? 10 : 12 } },
+        legend: { position: 'none' },
         colors: palette.slice(0, showAccts.length),
-        chartArea: phone ? { left: 60, right: 16, top: 60, bottom: 60, height: '60%' } : { left: 88, right: 30, top: 56, bottom: 60 },
+        chartArea: phone ? { left: 60, right: 16, top: 40, bottom: 60, height: '68%' } : { left: 88, right: 30, top: 40, bottom: 60 },
         vAxis: { minValue: 0, viewWindow: { min: 0, max: top }, title: phone ? '' : 'Balance (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
         hAxis: { title: phone ? '' : 'Year', textStyle: { fontSize: phone ? 9 : 11 }, showTextEvery: phone ? 2 : 1 },
         annotations: { alwaysOutside: true, textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } }
       });
+      renderCustomLegend(wrap, showAccts.map((a, i) => ({
+        label: a.name + (currentView === 'Joint' ? ' (' + a.member + ')' : ''),
+        color: palette[i % palette.length], type: 'bar'
+      })));
     }
 
     function drawAnnuityChart() {
@@ -1618,12 +1681,16 @@
         seriesType: 'line',
         series: series,
         colors: palette.slice(0, viewWindows.length),
-        legend: { position: 'bottom', textStyle: { fontSize: phone ? 10 : 12 } },
-        chartArea: phone ? { left: 60, right: 16, top: 40, bottom: 80, height: '58%' } : { left: 88, right: 30, top: 40, bottom: 60 },
+        legend: { position: 'none' },
+        chartArea: phone ? { left: 60, right: 16, top: 40, bottom: 60, height: '68%' } : { left: 88, right: 30, top: 40, bottom: 60 },
         vAxis: { viewWindow: { min: yMin, max: yMax }, title: phone ? '' : 'Net position (£)', format: '£#,###',
                  baselineColor: '#444', textStyle: { fontSize: phone ? 10 : 12 } },
         hAxis: { title: phone ? '' : 'Year', textStyle: { fontSize: phone ? 9 : 11 }, showTextEvery: phone ? 4 : 2 }
       });
+      renderCustomLegend(wrap, viewWindows.map((w, i) => ({
+        label: (w.name || 'Annuity') + ' (' + w.member + ')',
+        color: palette[i % palette.length], type: 'line'
+      })));
     }
 
     let _ovSparkSeq = 0;
@@ -2616,7 +2683,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front12';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front13';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
