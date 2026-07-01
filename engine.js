@@ -369,7 +369,7 @@
     // The income (amount x rate) joins that member's "other" guaranteed income from the purchase
     // month, escalating from ITS OWN purchase date, so it funds bills BEFORE the remaining pot draws.
     // Rate and escalation are stored as percent numbers (e.g. 6.0, 0.0), matching the crashes table.
-    const annuities = (data.annuities || []).map(a => {
+    const annuities = (data.annuities || []).filter(a => a.enabled !== false).map(a => {
       const d = a.purchase_date ? new Date(a.purchase_date) : null;
       const pIdx = d ? d.getFullYear() * 12 + d.getMonth() : null;
       const amount = Math.max(0, Number(a.purchase_amount) || 0);

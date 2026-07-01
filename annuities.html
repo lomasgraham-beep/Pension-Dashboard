@@ -26,6 +26,21 @@
   td input[type=date] { width:150px; }
   td input[type=number] { width:100px; text-align:right; }
   td select { min-width:100px; text-align:left; }
+  /* Toggle switch (Active column) */
+  td.f-active { text-align:center; }
+  .toggle-sw { position:relative; display:inline-block; width:42px; height:22px; vertical-align:middle; cursor:pointer; }
+  .toggle-sw input { opacity:0; width:0; height:0; }
+  .toggle-sw .slider { position:absolute; inset:0; background:#cbd5e1; border-radius:22px; transition:background 0.2s; }
+  .toggle-sw .slider:before { content:''; position:absolute; height:16px; width:16px; left:3px; top:3px; background:#fff; border-radius:50%; transition:transform 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.15); }
+  .toggle-sw input:checked + .slider { background:var(--accent); }
+  .toggle-sw input:checked + .slider:before { transform:translateX(20px); }
+  /* Disabled annuity row: everything greyed except the toggle */
+  tr.row-disabled td { opacity:0.45; }
+  tr.row-disabled td.f-active { opacity:1; }
+  tr.row-disabled td input, tr.row-disabled td select { background:#f1f5f9; }
+  @media (prefers-color-scheme: dark) {
+    tr.row-disabled td input, tr.row-disabled td select { background:#0f172a !important; }
+  }
   td.f-calc { text-align:left; white-space:nowrap; font-size:13px; line-height:1.35; }
   td.f-calc .yr { font-weight:bold; color:var(--accent-dark); }
   td.f-calc .mo { color:var(--ink-soft); }
@@ -96,7 +111,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Annuities <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(build: ann5)</span></h2>
+  <h2>Annuities <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(build: ann6)</span></h2>
   <p class="note">Model buying an annuity during retirement. At the <strong>purchase date</strong> the <strong>purchase amount</strong> is taken from that member&rsquo;s DC pot (drawn proportionally across tax-free and taxable) and converted into a lifelong income of <strong>amount &times; annuity rate</strong>. That income joins the member&rsquo;s guaranteed income and pays towards the bills <em>before</em> their remaining pot is drawn down. Escalation 0 = a level (fixed) annuity. If the pot is too small at the purchase month the annuity is skipped. You can add more than one.</p>
 
   <div class="bar">
@@ -109,8 +124,8 @@
 
   <div class="table-wrap">
     <table id="aTbl">
-      <thead><tr><th>Member</th><th>Annuity Name</th><th>Purchase Date</th><th>Purchase Amount (&pound;)</th><th>Annuity Rate %/yr</th><th>Escalation %/yr</th><th>Gross Income (calc)</th><th>Payback Period</th><th></th></tr></thead>
-      <tbody><tr><td colspan="9">Loading&hellip;</td></tr></tbody>
+      <thead><tr><th>Active</th><th>Member</th><th>Annuity Name</th><th>Purchase Date</th><th>Purchase Amount (&pound;)</th><th>Annuity Rate %/yr</th><th>Escalation %/yr</th><th>Gross Income (calc)</th><th>Payback Period</th><th></th></tr></thead>
+      <tbody><tr><td colspan="10">Loading&hellip;</td></tr></tbody>
     </table>
   </div>
   <div id="sumSection"></div>
@@ -192,7 +207,7 @@
       const dateLabel = a.purchase_date ? new Date(a.purchase_date).toLocaleDateString('en-GB', { month:'short', year:'numeric' }) : '—';
       const pbPct = payback ? Math.min(100, 100 / payback * 20).toFixed(1) : 0;
       const pbColour = payback ? (payback < 12 ? '#2c7a7b' : payback < 20 ? '#92400e' : '#c0392b') : '#94a3b8';
-      return '<tr>' +
+      return '<tr style="' + (a.enabled === false ? 'opacity:0.45;' : '') + '">' +
         '<td>' + (a.annuity_name || '—') + '<span class="member-pill">' + (a.member_name || '') + '</span></td>' +
         '<td>' + dateLabel + '</td>' +
         '<td>' + gbp(num(a.purchase_amount)) + '</td>' +
@@ -213,7 +228,9 @@
 
   function rowHtml(a, i) {
     const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
-    return '<tr data-i="' + i + '">' +
+    const on = a.enabled !== false;
+    return '<tr data-i="' + i + '" class="' + (on ? '' : 'row-disabled') + '">' +
+      '<td class="f-active" data-label="Active"><label class="toggle-sw"><input type="checkbox" class="f-enabled" ' + (on ? 'checked' : '') + ' onchange="mark()"><span class="slider"></span></label></td>' +
       '<td data-label="Member"><select class="f-member" onchange="mark()">' +
         members.map(m => '<option ' + (a.member_name === m ? 'selected' : '') + '>' + m + '</option>').join('') + '</select></td>' +
       '<td data-label="Annuity Name"><input type="text" class="f-name" value="' + esc(a.annuity_name) + '" oninput="mark()"></td>' +
@@ -229,16 +246,20 @@
     tbody.querySelectorAll('tr[data-i]').forEach(tr => {
       const calcCell = tr.querySelector('.f-calc'); if (calcCell) calcCell.innerHTML = calcHtml(tr.querySelector('.f-amount').value, tr.querySelector('.f-rate').value);
       const pbCell = tr.querySelector('.f-payback'); if (pbCell) pbCell.innerHTML = paybackHtml(tr.querySelector('.f-amount').value, tr.querySelector('.f-rate').value);
+      // apply/remove the disabled visual to match the current toggle state
+      const en = tr.querySelector('.f-enabled');
+      if (en) tr.classList.toggle('row-disabled', !en.checked);
     });
   }
   function render() {
-    tbody.innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="9">No annuities modelled. Use \u201cAdd annuity\u201d.</td></tr>';
+    tbody.innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="10">No annuities modelled. Use \u201cAdd annuity\u201d.</td></tr>';
     renderSummary();
   }
   function mark() { syncDom(); updateCalcCells(); renderSummary(); setDirty(); }
   function syncDom() {
     tbody.querySelectorAll('tr[data-i]').forEach(tr => {
       const i = Number(tr.dataset.i); if (!rows[i]) return;
+      rows[i].enabled = tr.querySelector('.f-enabled').checked;
       rows[i].member_name = tr.querySelector('.f-member').value;
       rows[i].annuity_name = tr.querySelector('.f-name').value.trim();
       rows[i].purchase_date = tr.querySelector('.f-date').value || null;
@@ -249,7 +270,7 @@
   }
   function addRow() {
     syncDom();
-    rows.push({ id: undefined, member_name: members[0] || 'Graham', annuity_name: '', purchase_date: null, purchase_amount: 0, annuity_rate: 6, escalation_pct: 0 });
+    rows.push({ id: undefined, enabled: true, member_name: members[0] || 'Graham', annuity_name: '', purchase_date: null, purchase_amount: 0, annuity_rate: 6, escalation_pct: 0 });
     render(); setDirty();
   }
   function delRow(btn) {
@@ -270,7 +291,8 @@
       for (const id of deleted) await App.write('DELETE', 'bd_annuities?id=eq.' + id, undefined);
       for (const a of rows) {
         const payload = { member_name: a.member_name, annuity_name: a.annuity_name, purchase_date: a.purchase_date,
-                          purchase_amount: a.purchase_amount, annuity_rate: a.annuity_rate, escalation_pct: a.escalation_pct };
+                          purchase_amount: a.purchase_amount, annuity_rate: a.annuity_rate, escalation_pct: a.escalation_pct,
+                          enabled: a.enabled !== false };
         if (a.id != null) await App.write('PATCH', 'bd_annuities?id=eq.' + a.id, payload);
         else await App.write('POST', 'bd_annuities', payload);
       }
