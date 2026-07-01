@@ -517,6 +517,12 @@
     }
 
     const rows = [];
+    // Surplus savings: engine-only accounts, one per member, credited when that person's net
+    // guaranteed+annuity income exceeds their share of bills+dining. Compounds monthly at 3% APR.
+    // Balance is display-only — never drawn from — so the DC pot still handles later shortfalls.
+    const SURPLUS_APR = 0.03;
+    const SURPLUS_MONTHLY_RATE = SURPLUS_APR / 12;
+    let gSurplusBal = 0, jSurplusBal = 0;
     const monthlyRows = [];
     const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     let acc = null, accYear = null;
@@ -544,7 +550,9 @@
           g_annuityIncome: 0, j_annuityIncome: 0,
           g_draw: 0, j_draw: 0, g_income: 0, j_income: 0, totalIncome: 0,
           combinedClosing: 0, g_closing: 0, j_closing: 0, shortfall: false,
-          cashBalance: 0, cashFinance: 0, cashDeposit: 0, cashShortfall: 0, cashCapDraw: 0
+          cashBalance: 0, cashFinance: 0, cashDeposit: 0, cashShortfall: 0, cashCapDraw: 0,
+          surplusBalance: 0, g_surplusBalance: 0, j_surplusBalance: 0,
+          surplusThis: 0, g_surplusThis: 0, j_surplusThis: 0
         };
       }
 
@@ -750,6 +758,16 @@
       const mState = gRes.inc.stateGross + jRes.inc.stateGross;
       const mOther = gRes.inc.total + jRes.inc.total;
 
+      // Surplus savings — per member, compounded monthly at 3% APR.
+      // Surplus = person's net guaranteed+annuity income (dbNet) minus their share of bills+dining
+      // (target), only when positive. Grows monthly at 3%/12; never drawn from.
+      gSurplusBal *= (1 + SURPLUS_MONTHLY_RATE);
+      jSurplusBal *= (1 + SURPLUS_MONTHLY_RATE);
+      const gSurplusThis = Math.max(0, gRes.dbNet - gTargetM);
+      const jSurplusThis = Math.max(0, jRes.dbNet - jTargetM);
+      gSurplusBal += gSurplusThis;
+      jSurplusBal += jSurplusThis;
+
       // one row for this single month (same field names as yearly rows)
       monthlyRows.push({
         year: yr, month: (idx % 12), label: MONTH_NAMES[idx % 12] + ' ' + yr,
@@ -770,6 +788,8 @@
         combinedClosing: gTf + gTx + jTf + jTx, g_closing: gTf + gTx, j_closing: jTf + jTx,
         shortfall: monthShort,
         cashBalance: cashBal, cashFinance: financeThisMonth, cashDeposit: depositThisMonth, cashShortfall: depositShortfall, cashCapDraw: capDrawFromSavings,
+        surplusBalance: gSurplusBal + jSurplusBal, g_surplusBalance: gSurplusBal, j_surplusBalance: jSurplusBal,
+        surplusThis: gSurplusThis + jSurplusThis, g_surplusThis: gSurplusThis, j_surplusThis: jSurplusThis,
         acctBalances: savingsAccts.map(a => ({ name: a.name, member: a.member, bal: a.bal }))
       });
 
@@ -794,6 +814,12 @@
       acc.cashFinance += financeThisMonth;
       acc.cashDeposit += depositThisMonth;
       acc.cashShortfall += depositShortfall;
+      acc.surplusBalance = gSurplusBal + jSurplusBal;      // year-end balance
+      acc.g_surplusBalance = gSurplusBal;
+      acc.j_surplusBalance = jSurplusBal;
+      acc.surplusThis += gSurplusThis + jSurplusThis;      // cumulative deposited this year (pre-interest)
+      acc.g_surplusThis += gSurplusThis;
+      acc.j_surplusThis += jSurplusThis;
       if (monthShort) acc.shortfall = true;
     }
     flush();
