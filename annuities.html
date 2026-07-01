@@ -26,6 +26,9 @@
   td input[type=date] { width:150px; }
   td input[type=number] { width:100px; text-align:right; }
   td select { min-width:100px; text-align:left; }
+  td.f-calc { text-align:left; white-space:nowrap; font-size:13px; line-height:1.35; }
+  td.f-calc .yr { font-weight:bold; color:var(--accent-dark); }
+  td.f-calc .mo { color:var(--ink-soft); }
   .del { background:#fdecea; color:#c0392b; border:none; border-radius:6px; padding:7px 11px; font-weight:bold; cursor:pointer; }
   #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
@@ -74,7 +77,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Annuities <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(build: ann1)</span></h2>
+  <h2>Annuities <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(build: ann2)</span></h2>
   <p class="note">Model buying an annuity during retirement. At the <strong>purchase date</strong> the <strong>purchase amount</strong> is taken from that member&rsquo;s DC pot (drawn proportionally across tax-free and taxable) and converted into a lifelong income of <strong>amount &times; annuity rate</strong>. That income joins the member&rsquo;s guaranteed income and pays towards the bills <em>before</em> their remaining pot is drawn down. Escalation 0 = a level (fixed) annuity. If the pot is too small at the purchase month the annuity is skipped. You can add more than one.</p>
 
   <div class="bar">
@@ -87,8 +90,8 @@
 
   <div class="table-wrap">
     <table id="aTbl">
-      <thead><tr><th>Member</th><th>Annuity Name</th><th>Purchase Date</th><th>Purchase Amount (&pound;)</th><th>Annuity Rate %/yr</th><th>Escalation %/yr</th><th></th></tr></thead>
-      <tbody><tr><td colspan="7">Loading&hellip;</td></tr></tbody>
+      <thead><tr><th>Member</th><th>Annuity Name</th><th>Purchase Date</th><th>Purchase Amount (&pound;)</th><th>Annuity Rate %/yr</th><th>Escalation %/yr</th><th>Gross Income (calc)</th><th></th></tr></thead>
+      <tbody><tr><td colspan="8">Loading&hellip;</td></tr></tbody>
     </table>
   </div>
 
@@ -122,6 +125,18 @@
   const tbody = document.querySelector('#aTbl tbody');
   const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
   function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+  function gbp(n){ return '\u00A3' + Math.round(n).toLocaleString('en-GB'); }
+  // gross income implied by amount x rate% — level (before escalation), gross of tax
+  function calcHtml(amount, rate) {
+    const annual = num(amount) * num(rate) / 100;
+    return '<span class="yr">' + gbp(annual) + '/yr</span><br><span class="mo">' + gbp(annual / 12) + '/mo</span>';
+  }
+  function updateCalcCells() {
+    tbody.querySelectorAll('tr[data-i]').forEach(tr => {
+      const cell = tr.querySelector('.f-calc'); if (!cell) return;
+      cell.innerHTML = calcHtml(tr.querySelector('.f-amount').value, tr.querySelector('.f-rate').value);
+    });
+  }
 
   function rowHtml(a, i) {
     const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
@@ -133,12 +148,13 @@
       '<td data-label="Purchase Amount (\u00A3)"><input type="number" class="f-amount" step="1000" value="' + (a.purchase_amount != null ? a.purchase_amount : 0) + '" oninput="mark()"></td>' +
       '<td data-label="Annuity Rate %/yr"><input type="number" class="f-rate" step="0.1" value="' + (a.annuity_rate != null ? a.annuity_rate : 6) + '" oninput="mark()"></td>' +
       '<td data-label="Escalation %/yr"><input type="number" class="f-esc" step="0.1" min="0" value="' + (a.escalation_pct != null ? a.escalation_pct : 0) + '" oninput="mark()"></td>' +
+      '<td class="f-calc" data-label="Gross Income (calc)">' + calcHtml(a.purchase_amount, a.annuity_rate) + '</td>' +
       '<td><button class="del" onclick="delRow(this)">Delete</button></td></tr>';
   }
   function render() {
-    tbody.innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="7">No annuities modelled. Use \u201cAdd annuity\u201d.</td></tr>';
+    tbody.innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="8">No annuities modelled. Use \u201cAdd annuity\u201d.</td></tr>';
   }
-  function mark() { syncDom(); setDirty(); }
+  function mark() { syncDom(); updateCalcCells(); setDirty(); }
   function syncDom() {
     tbody.querySelectorAll('tr[data-i]').forEach(tr => {
       const i = Number(tr.dataset.i); if (!rows[i]) return;
