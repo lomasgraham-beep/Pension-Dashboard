@@ -180,6 +180,9 @@
     tr.crash-row td { background:#fef2f2; }
     .crash-info { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; min-width:26px; border:none; border-radius:50%; background:#dc2626; color:#fff; font-size:14px; font-weight:700; font-style:italic; font-family:Georgia,serif; margin-left:6px; cursor:pointer; vertical-align:middle; padding:0; -webkit-tap-highlight-color:transparent; }
     .crash-info:active { background:#991b1b; }
+    .annuity-info { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; min-width:26px; border:none; border-radius:50%; background:#2c7a7b; color:#fff; font-size:14px; font-weight:700; margin-left:6px; cursor:pointer; vertical-align:middle; padding:0; -webkit-tap-highlight-color:transparent; }
+    .annuity-info:active { background:#236668; }
+    tr.annuity-row td { background:#f0fdfa; }
     #crashTip { position:absolute; display:none; z-index:9999; background:#1e293b; color:#fff; font-size:13px; line-height:1.4; padding:10px 12px; border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,0.25); pointer-events:none; }
     #rTable th:first-child, #rTable td:first-child { white-space:nowrap; }
     #rTable { width:auto; }
@@ -407,6 +410,8 @@
     #status.s-load, .s-load { background:#1e293b !important; color:#93c5fd !important; }
     #crashTip { background:#020617 !important; }
     .crash-info { background:#dc2626 !important; }
+    .annuity-info { background:#2c7a7b !important; }
+    tr.annuity-row td { background:transparent !important; }
     .topbar { color:#94a3b8 !important; }
     a, .topbar a { color:#60a5fa !important; }
   }
@@ -867,7 +872,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-271</span>
+    <span class="build-stamp">build: LC-272</span>
   </div>
 
   <script>
@@ -1143,6 +1148,20 @@
       // show/hide the growth column headers
       document.querySelectorAll('#rTable .grow-col').forEach(el => el.style.display = retShowGrowth ? '' : 'none');
       if (!rowsToShow.length) { tb.innerHTML = '<tr><td colspan="13">No rows.</td></tr>'; return; }
+      // annuity markers by period: purchase month/year -> tooltip text (from the engine's annuityWindows)
+      const AMN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const annByYear = {}, annByLabel = {};
+      (drawdownRows.annuityWindows || []).forEach(w => {
+        const y = Math.floor(w.purchaseIdx / 12);
+        const label = AMN[w.purchaseIdx % 12] + ' ' + y;
+        const amt = Math.round(w.amount || 0).toLocaleString('en-GB');
+        const inc = Math.round(w.annualIncome || 0).toLocaleString('en-GB');
+        const txt = w.skipped
+          ? ('Annuity ' + (w.name || 'Annuity') + ' (' + w.member + ') SKIPPED — pot too small for \u00A3' + amt + ' at this date.')
+          : ('Annuity ' + (w.name || 'Annuity') + ' (' + w.member + ') — \u00A3' + amt + ' taken from the pot; \u00A3' + inc + '/yr gross income started (funds bills before the pot).');
+        annByYear[y] = annByYear[y] ? (annByYear[y] + ' ' + txt) : txt;
+        annByLabel[label] = annByLabel[label] ? (annByLabel[label] + ' ' + txt) : txt;
+      });
       tb.innerHTML = rowsToShow.map(r => {
         const v = vrow(r);
         const period = (retGran === 'month') ? r.label : r.year;
@@ -1157,8 +1176,15 @@
         }
         const tfGrow = retShowGrowth ? `<td class="grow-col rc-tf" style="color:${v.tfG < 0 ? '#c0392b' : '#16a34a'};font-size:0.92em;">${fmt(v.tfG)}</td>` : '';
         const txGrow = retShowGrowth ? `<td class="grow-col rc-tx" style="color:${v.txG < 0 ? '#c0392b' : '#16a34a'};font-size:0.92em;">${fmt(v.txG)}</td>` : '';
-        return `<tr class="${r.shortfall ? 'shortfall' : ''}${r.crash ? ' crash-row' : ''}">
-          <td>${period}${crashIcon}</td>
+        let annIcon = '', annHit = false;
+        const annTxt = (retGran === 'month') ? annByLabel[r.label] : annByYear[r.year];
+        if (annTxt) {
+          annHit = true;
+          const safeA = annTxt.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          annIcon = ` <button type="button" class="annuity-info" aria-label="${safeA}" onclick="showCrashTip(event,'${safeA}')" onmouseenter="showCrashTip(event,'${safeA}')" onmouseleave="hideCrashTip()">\u00A3</button>`;
+        }
+        return `<tr class="${r.shortfall ? 'shortfall' : ''}${r.crash ? ' crash-row' : ''}${annHit ? ' annuity-row' : ''}">
+          <td>${period}${crashIcon}${annIcon}</td>
           <td class="rc-tf">${fmt(v.tf)}</td>${tfGrow}<td class="rc-tx">${fmt(v.tx)}</td>${txGrow}
           <td class="rc-cash" style="color:#2c7a7b;">${fmt(r.cashBalance || 0)}</td>
           <td class="rc-other">${fmt(v.other)}</td>
@@ -1190,6 +1216,11 @@
         const y = new Date(p.purchase_date).getFullYear();
         const nm = p.purchase_name || 'Purchase';
         eventByYear[y] = (eventByYear[y] ? eventByYear[y] + '; ' : '') + nm;
+      });
+      (drawdownRows.annuityWindows || []).forEach(w => {
+        if (!w.purchased) return;
+        const y = Math.floor(w.purchaseIdx / 12);
+        eventByYear[y] = (eventByYear[y] ? eventByYear[y] + '; ' : '') + 'Annuity: ' + (w.name || 'Annuity') + ' (' + w.member + ')';
       });
       function evDot(year) { return eventByYear[year] ? '●' : null; }
       function evText(year) { return eventByYear[year] || null; }
@@ -2458,7 +2489,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front7';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front8';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
