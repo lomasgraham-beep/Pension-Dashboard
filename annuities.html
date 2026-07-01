@@ -33,22 +33,19 @@
   td.f-payback .pb-yrs { font-weight:bold; }
   td.f-payback .pb-yr { font-size:11px; color:var(--ink-soft); }
   /* Summary cards */
-  .sum-grid { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
-  .sum-card { background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:10px 13px; min-width:160px; flex:1 1 160px; }
-  .sum-card h4 { margin:0 0 7px; font-size:12px; color:var(--ink); display:flex; align-items:center; gap:5px; }
-  .sum-card h4 .member-pill { font-size:10px; font-weight:bold; background:var(--accent); color:#fff; border-radius:20px; padding:1px 6px; }
-  .sum-row { display:flex; justify-content:space-between; align-items:baseline; font-size:11px; border-bottom:1px solid var(--line); padding:3px 0; gap:6px; }
-  .sum-row:last-child { border-bottom:none; }
-  .sum-row .lbl { color:var(--ink-soft); white-space:nowrap; }
-  .sum-row .val { font-weight:bold; color:var(--ink); white-space:nowrap; text-align:right; }
-  .sum-row .val.pos { color:#065f46; }
-  .sum-row .val.warn { color:#92400e; }
-  .pb-bar-wrap { margin-top:8px; background:var(--line); border-radius:4px; height:8px; overflow:hidden; }
-  .pb-bar { height:8px; border-radius:4px; background:var(--accent); transition:width 0.3s; }
+  .sum-table { width:100%; border-collapse:collapse; font-size:11px; margin-top:14px; }
+  .sum-table th { background:var(--surface-2); color:var(--ink-soft); font-size:10px; text-transform:uppercase; letter-spacing:0.03em; padding:4px 8px; border-bottom:2px solid var(--line-strong); text-align:right; white-space:nowrap; }
+  .sum-table th:first-child { text-align:left; }
+  .sum-table td { padding:5px 8px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+  .sum-table td:first-child { text-align:left; font-weight:bold; }
+  .sum-table .member-pill { font-size:10px; font-weight:bold; background:var(--accent); color:#fff; border-radius:20px; padding:1px 6px; margin-left:4px; }
+  .sum-table .pos { color:#065f46; font-weight:bold; }
+  .sum-table .warn { color:#92400e; font-weight:bold; }
+  .pb-bar-wrap { margin:0; background:var(--line); border-radius:3px; height:5px; overflow:hidden; min-width:40px; }
+  .pb-bar { height:5px; border-radius:3px; background:var(--accent); }
   @media (prefers-color-scheme: dark) {
-    .sum-card { background:#1e293b !important; border-color:#334155 !important; }
-    .sum-row { border-color:#334155 !important; }
-    .sum-row .val { color:#e2e8f0 !important; }
+    .sum-table th { background:#0f172a !important; color:#94a3b8 !important; border-color:#475569 !important; }
+    .sum-table td { border-color:#334155 !important; color:#cbd5e1 !important; }
     .pb-bar-wrap { background:#334155 !important; }
   }
   .del { background:#fdecea; color:#c0392b; border:none; border-radius:6px; padding:7px 11px; font-weight:bold; cursor:pointer; }
@@ -99,7 +96,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Annuities <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(build: ann4)</span></h2>
+  <h2>Annuities <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(build: ann5)</span></h2>
   <p class="note">Model buying an annuity during retirement. At the <strong>purchase date</strong> the <strong>purchase amount</strong> is taken from that member&rsquo;s DC pot (drawn proportionally across tax-free and taxable) and converted into a lifelong income of <strong>amount &times; annuity rate</strong>. That income joins the member&rsquo;s guaranteed income and pays towards the bills <em>before</em> their remaining pot is drawn down. Escalation 0 = a level (fixed) annuity. If the pot is too small at the purchase month the annuity is skipped. You can add more than one.</p>
 
   <div class="bar">
@@ -184,31 +181,34 @@
   function renderSummary() {
     const sec = document.getElementById('sumSection');
     if (!rows.length) { sec.innerHTML = ''; return; }
-    const cards = rows.map(a => {
+    const trs = rows.map(a => {
       const annual = num(a.purchase_amount) * num(a.annuity_rate) / 100;
       const monthly = annual / 12;
       const netMo = netMonthly(annual);
-      const payback = num(a.annuity_rate) ? (100 / num(a.annuity_rate)).toFixed(1) : null;
+      const payback = num(a.annuity_rate) ? (100 / num(a.annuity_rate)) : null;
       const lt = lifetimeIncome(annual, a.purchase_date, null);
-      const ltLabel = lt != null ? gbp(lt) : '—';
-      const net = lt != null ? gbp(lt - num(a.purchase_amount)) : '—';
-      const netPos = lt != null && lt > num(a.purchase_amount);
+      const net = lt != null ? Math.round(lt - num(a.purchase_amount)) : null;
+      const netPos = net != null && net > 0;
       const dateLabel = a.purchase_date ? new Date(a.purchase_date).toLocaleDateString('en-GB', { month:'short', year:'numeric' }) : '—';
-      return '<div class="sum-card">' +
-        '<h4>' + (a.annuity_name || 'Annuity') + ' <span class="member-pill">' + (a.member_name || '') + '</span></h4>' +
-        '<div class="sum-row"><span class="lbl">Purchase date</span><span class="val">' + dateLabel + '</span></div>' +
-        '<div class="sum-row"><span class="lbl">Cost</span><span class="val">' + gbp(num(a.purchase_amount)) + '</span></div>' +
-        '<div class="sum-row"><span class="lbl">Gross/yr</span><span class="val pos">' + gbp(annual) + '</span></div>' +
-        '<div class="sum-row"><span class="lbl">Gross/mo</span><span class="val pos">' + gbp(monthly) + '</span></div>' +
-        '<div class="sum-row"><span class="lbl">Est. net/mo</span><span class="val pos">' + gbp(netMo) + '</span></div>' +
-        '<div class="sum-row"><span class="lbl">Payback</span><span class="val">' + (payback ? payback + ' yrs' : '—') + '</span></div>' +
-        (num(a.purchase_amount) && payback ? '<div class="pb-bar-wrap"><div class="pb-bar" style="width:' + Math.min(100, 100 / parseFloat(payback) * 20).toFixed(1) + '%;"></div></div>' : '') +
-        '<div class="sum-row" style="margin-top:4px;"><span class="lbl">Lifetime gross (30 yr)</span><span class="val">' + ltLabel + '</span></div>' +
-        '<div class="sum-row"><span class="lbl">Net gain (30 yr)</span><span class="val ' + (netPos ? 'pos' : 'warn') + '">' + net + '</span></div>' +
-        '</div>';
+      const pbPct = payback ? Math.min(100, 100 / payback * 20).toFixed(1) : 0;
+      const pbColour = payback ? (payback < 12 ? '#2c7a7b' : payback < 20 ? '#92400e' : '#c0392b') : '#94a3b8';
+      return '<tr>' +
+        '<td>' + (a.annuity_name || '—') + '<span class="member-pill">' + (a.member_name || '') + '</span></td>' +
+        '<td>' + dateLabel + '</td>' +
+        '<td>' + gbp(num(a.purchase_amount)) + '</td>' +
+        '<td class="pos">' + gbp(annual) + '</td>' +
+        '<td class="pos">' + gbp(monthly) + '</td>' +
+        '<td class="pos">' + gbp(netMo) + '</td>' +
+        '<td style="min-width:90px;"><span style="font-weight:bold;color:' + pbColour + ';">' + (payback ? payback.toFixed(1) + ' yrs' : '—') + '</span><div class="pb-bar-wrap" style="margin-top:3px;"><div class="pb-bar" style="width:' + pbPct + '%;background:' + pbColour + ';"></div></div></td>' +
+        '<td>' + (lt != null ? gbp(lt) : '—') + '</td>' +
+        '<td class="' + (netPos ? 'pos' : 'warn') + '">' + (net != null ? gbp(net) : '—') + '</td>' +
+        '</tr>';
     });
-    sec.innerHTML = '<h3 style="margin:18px 0 8px;color:var(--ink);font-size:13px;">Annuity Summary</h3><div class="sum-grid">' + cards.join('') + '</div>' +
-      '<p style="font-size:11px;color:var(--ink-soft);margin-top:8px;">Est. net/mo: basic-rate (20%) tax above personal allowance (\u00A3' + (12570).toLocaleString('en-GB') + '), before other income. Lifetime totals assume 30 yrs from purchase. Payback = years to recover cost at quoted rate.</p>';
+    sec.innerHTML = '<p style="margin:12px 0 4px;font-size:11px;font-weight:bold;color:var(--ink);">Summary</p>' +
+      '<div style="overflow-x:auto;"><table class="sum-table"><thead><tr>' +
+      '<th style="text-align:left;">Name</th><th>Date</th><th>Cost</th><th>Gross/yr</th><th>Gross/mo</th><th>Net/mo</th><th>Payback</th><th>Lifetime (30yr)</th><th>Net gain</th>' +
+      '</tr></thead><tbody>' + trs.join('') + '</tbody></table></div>' +
+      '<p style="font-size:10px;color:var(--ink-soft);margin:4px 0 0;">Net/mo: basic-rate tax above \u00A3' + (12570).toLocaleString('en-GB') + ' PA. Lifetime &amp; net gain over 30 yrs from purchase. Payback bar = 20 yr scale.</p>';
   }
 
   function rowHtml(a, i) {
