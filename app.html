@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=auth02"></script>
-  <script src="engine.js?v=annu2"></script>
+  <script src="engine.js?v=surp1"></script>
   <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
@@ -805,7 +805,7 @@
     </div>
     <div class="table-wrap">
       <table id="rTable">
-        <thead><tr><th id="rThPeriod">Year</th><th class="rc-tf">Tax-Free Pot</th><th class="grow-col rc-tf" style="display:none;">TF Growth</th><th class="rc-tx">Taxable Pot</th><th class="grow-col rc-tx" style="display:none;">Tx Growth</th><th class="rc-cash">Cash Savings</th><th class="rc-other">Other Incomes</th><th class="rc-savbills">Savings to Bills</th><th class="rc-bills">Bills</th><th class="rc-dining">Dining</th><th class="rc-loan">Loan Payment</th><th class="rc-draw">Drawdown required</th><th>Total Gross Income</th></tr></thead>
+        <thead><tr><th id="rThPeriod">Year</th><th class="rc-tf">Tax-Free Pot</th><th class="grow-col rc-tf" style="display:none;">TF Growth</th><th class="rc-tx">Taxable Pot</th><th class="grow-col rc-tx" style="display:none;">Tx Growth</th><th class="rc-cash">Cash Savings</th><th class="rc-surplus">Surplus Savings</th><th class="rc-other">Other Incomes</th><th class="rc-savbills">Savings to Bills</th><th class="rc-bills">Bills</th><th class="rc-dining">Dining</th><th class="rc-loan">Loan Payment</th><th class="rc-draw">Drawdown required</th><th>Total Gross Income</th></tr></thead>
         <tbody><tr><td colspan="13">Calculating…</td></tr></tbody>
       </table>
     </div>
@@ -879,7 +879,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-278</span>
+    <span class="build-stamp">build: LC-279</span>
   </div>
 
   <script>
@@ -1084,9 +1084,9 @@
 
     // ---------- per-view field pickers ----------
     function vrow(r) {
-      if (currentView === p1Name) { const g = savedPlan.gRatio; return { dining:r.diningTotal*g, bills:r.billsTotal*g, loan:(r.cashFinance||0)*g, savToBills:(r.cashCapDraw||0)*g, tf:r.g_taxFree, tx:r.g_taxable, tfG:r.g_tfGrowth||0, txG:r.g_txGrowth||0, other:r.g_other, draw:r.g_draw, income:r.g_income, close:r.g_closing }; }
-      if (currentView === p2Name)  { const j = 1 - savedPlan.gRatio; return { dining:r.diningTotal*j, bills:r.billsTotal*j, loan:(r.cashFinance||0)*j, savToBills:(r.cashCapDraw||0)*j, tf:r.j_taxFree, tx:r.j_taxable, tfG:r.j_tfGrowth||0, txG:r.j_txGrowth||0, other:r.j_other, draw:r.j_draw, income:r.j_income, close:r.j_closing }; }
-      return { dining:r.diningTotal, bills:r.billsTotal, loan:(r.cashFinance||0), savToBills:(r.cashCapDraw||0), tf:r.taxFree, tx:r.taxable, tfG:r.tfGrowth||0, txG:r.txGrowth||0, other:r.otherPensions, draw:r.drawdown, income:r.totalIncome, close:r.combinedClosing };
+      if (currentView === p1Name) { const g = savedPlan.gRatio; return { dining:r.diningTotal*g, bills:r.billsTotal*g, loan:(r.cashFinance||0)*g, savToBills:(r.cashCapDraw||0)*g, tf:r.g_taxFree, tx:r.g_taxable, tfG:r.g_tfGrowth||0, txG:r.g_txGrowth||0, other:r.g_other, draw:r.g_draw, income:r.g_income, close:r.g_closing, surplus:r.g_surplusBalance||0 }; }
+      if (currentView === p2Name)  { const j = 1 - savedPlan.gRatio; return { dining:r.diningTotal*j, bills:r.billsTotal*j, loan:(r.cashFinance||0)*j, savToBills:(r.cashCapDraw||0)*j, tf:r.j_taxFree, tx:r.j_taxable, tfG:r.j_tfGrowth||0, txG:r.j_txGrowth||0, other:r.j_other, draw:r.j_draw, income:r.j_income, close:r.j_closing, surplus:r.j_surplusBalance||0 }; }
+      return { dining:r.diningTotal, bills:r.billsTotal, loan:(r.cashFinance||0), savToBills:(r.cashCapDraw||0), tf:r.taxFree, tx:r.taxable, tfG:r.tfGrowth||0, txG:r.txGrowth||0, other:r.otherPensions, draw:r.drawdown, income:r.totalIncome, close:r.combinedClosing, surplus:r.surplusBalance||0 };
     }
 
     function setRetGran(g) { retGran = g; document.getElementById('rThPeriod').textContent = (g === 'month') ? 'Month' : 'Year'; renderRetirementTable(); }
@@ -1117,7 +1117,7 @@
     // ---- Retirement table column chooser ----
     const RET_COLS = [
       { cls:'rc-tf', label:'Tax-Free Pot' }, { cls:'rc-tx', label:'Taxable Pot' },
-      { cls:'rc-cash', label:'Cash Savings' }, { cls:'rc-other', label:'Other Incomes' },
+      { cls:'rc-cash', label:'Cash Savings' }, { cls:'rc-surplus', label:'Surplus Savings' }, { cls:'rc-other', label:'Other Incomes' },
       { cls:'rc-savbills', label:'Savings to Bills' }, { cls:'rc-bills', label:'Bills' },
       { cls:'rc-dining', label:'Dining' }, { cls:'rc-loan', label:'Loan Payment' },
       { cls:'rc-draw', label:'Drawdown required' }
@@ -1154,7 +1154,7 @@
       const rowsToShow = (retGran === 'month') ? (drawdownRows.monthly || []) : drawdownRows;
       // show/hide the growth column headers
       document.querySelectorAll('#rTable .grow-col').forEach(el => el.style.display = retShowGrowth ? '' : 'none');
-      if (!rowsToShow.length) { tb.innerHTML = '<tr><td colspan="13">No rows.</td></tr>'; return; }
+      if (!rowsToShow.length) { tb.innerHTML = '<tr><td colspan="14">No rows.</td></tr>'; return; }
       // annuity markers by period: purchase month/year -> tooltip text (from the engine's annuityWindows)
       const AMN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       const annByYear = {}, annByLabel = {};
@@ -1194,6 +1194,7 @@
           <td>${period}${crashIcon}${annIcon}</td>
           <td class="rc-tf">${fmt(v.tf)}</td>${tfGrow}<td class="rc-tx">${fmt(v.tx)}</td>${txGrow}
           <td class="rc-cash" style="color:#2c7a7b;">${fmt(r.cashBalance || 0)}</td>
+          <td class="rc-surplus" style="color:#6b5b95;">${fmt(v.surplus || 0)}</td>
           <td class="rc-other">${fmt(v.other)}</td>
           <td class="rc-savbills" style="font-weight:bold;color:#2c7a7b;">${fmt(v.savToBills)}</td>
           <td class="rc-bills" style="font-weight:bold;color:#c0392b;">${fmt(v.bills)}</td>
@@ -1552,7 +1553,16 @@
 
       // which accounts belong in this view
       const showAccts = acctList.filter(a => currentView === 'Joint' || a.member === currentView);
-      if (!showAccts.length) { head.style.display = 'none'; if (wrap.classList.contains('fs')) closeChartFs(); wrap.style.display = 'none'; return; }
+      // Determine whether we have any surplus to show (per current view)
+      const surplusYearEnd = {};
+      monthly.forEach(m => { surplusYearEnd[m.year] = m; });   // last month wins = year-end
+      const anySurplus = Object.values(surplusYearEnd).some(m => {
+        const v = currentView === p1Name ? (m.g_surplusBalance||0)
+                : currentView === p2Name ? (m.j_surplusBalance||0)
+                : (m.surplusBalance||0);
+        return v > 0.5;
+      });
+      if (!showAccts.length && !anySurplus) { head.style.display = 'none'; if (wrap.classList.contains('fs')) closeChartFs(); wrap.style.display = 'none'; return; }
       head.style.display = ''; wrap.style.display = '';
 
       // sample one row per year (year-end: last month present for that year)
@@ -1560,9 +1570,23 @@
       monthly.forEach(m => { byYear[m.year] = m; });   // later months overwrite, leaving year-end
       const years = Object.keys(byYear).map(Number).sort((a, b) => a - b);
 
+      // build column definitions: savings accounts first, then optional surplus segment(s)
+      const surplusCols = [];
+      if (anySurplus) {
+        if (currentView === 'Joint') {
+          surplusCols.push({ label: 'Surplus (' + p1Name + ')', get: r => r.g_surplusBalance || 0, color: '#6b5b95' });
+          if (p2Name) surplusCols.push({ label: 'Surplus (' + p2Name + ')', get: r => r.j_surplusBalance || 0, color: '#9b7bbe' });
+        } else if (currentView === p1Name) {
+          surplusCols.push({ label: 'Surplus', get: r => r.g_surplusBalance || 0, color: '#6b5b95' });
+        } else if (currentView === p2Name) {
+          surplusCols.push({ label: 'Surplus', get: r => r.j_surplusBalance || 0, color: '#9b7bbe' });
+        }
+      }
+
       const dt = new google.visualization.DataTable();
       dt.addColumn('string', 'Year');
       showAccts.forEach(a => dt.addColumn('number', a.name + (currentView === 'Joint' ? ' (' + a.member + ')' : '')));
+      surplusCols.forEach(c => dt.addColumn('number', c.label));
       dt.addColumn({ type: 'string', role: 'annotation' });
       dt.addColumn({ type: 'string', role: 'annotationText' });
 
@@ -1583,6 +1607,7 @@
         const cells = [String(y)];
         let stackTotal = 0;
         showAccts.forEach(a => { const v = Math.round(balById[a.name + '|' + a.member] || 0); cells.push(v); stackTotal += v; });
+        surplusCols.forEach(c => { const v = Math.round(c.get(row)); cells.push(v); stackTotal += v; });
         if (stackTotal > peak) peak = stackTotal;
         cells.push(buysByYear[y] ? '▼' : null);                              // annotation marker
         cells.push(buysByYear[y] ? ('Purchase: ' + buysByYear[y]) : null);   // tooltip text
@@ -1590,23 +1615,26 @@
       });
       const top = Math.ceil(Math.max(peak, 1) * 1.05 / 1000) * 1000;
 
-      // a pleasant palette for the account segments
-      const palette = ['#2c7a7b', '#e67e22', '#6b5b95', '#0e7490', '#b7791f', '#9b2c2c', '#2f855a', '#553c9a'];
+      // a pleasant palette for the account segments (surplus colours come from surplusCols)
+      const palette = ['#2c7a7b', '#e67e22', '#0e7490', '#b7791f', '#9b2c2c', '#2f855a', '#553c9a'];
+      const acctColors = showAccts.map((_, i) => palette[i % palette.length]);
+      const allColors = acctColors.concat(surplusCols.map(c => c.color));
       const phone = window.innerWidth <= 600;
       new google.visualization.ColumnChart(box).draw(dt, {
         title: 'Savings balance by account' + (currentView !== 'Joint' ? ' — ' + currentView : ''),
         isStacked: true,
         legend: { position: 'none' },
-        colors: palette.slice(0, showAccts.length),
+        colors: allColors,
         chartArea: phone ? { left: 60, right: 16, top: 40, bottom: 60, height: '68%' } : { left: 88, right: 30, top: 40, bottom: 60 },
         vAxis: { minValue: 0, viewWindow: { min: 0, max: top }, title: phone ? '' : 'Balance (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
         hAxis: { title: phone ? '' : 'Year', textStyle: { fontSize: phone ? 9 : 11 }, showTextEvery: phone ? 2 : 1 },
         annotations: { alwaysOutside: true, textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } }
       });
-      renderCustomLegend(wrap, showAccts.map((a, i) => ({
+      const legendEntries = showAccts.map((a, i) => ({
         label: a.name + (currentView === 'Joint' ? ' (' + a.member + ')' : ''),
-        color: palette[i % palette.length], type: 'bar'
-      })));
+        color: acctColors[i], type: 'bar'
+      })).concat(surplusCols.map(c => ({ label: c.label, color: c.color, type: 'bar' })));
+      renderCustomLegend(wrap, legendEntries);
     }
 
     function drawAnnuityChart() {
@@ -2683,7 +2711,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front14';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front15';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
