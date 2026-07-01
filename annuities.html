@@ -29,6 +29,28 @@
   td.f-calc { text-align:left; white-space:nowrap; font-size:13px; line-height:1.35; }
   td.f-calc .yr { font-weight:bold; color:var(--accent-dark); }
   td.f-calc .mo { color:var(--ink-soft); }
+  td.f-payback { text-align:center; font-size:13px; }
+  td.f-payback .pb-yrs { font-weight:bold; }
+  td.f-payback .pb-yr { font-size:11px; color:var(--ink-soft); }
+  /* Summary cards */
+  .sum-grid { display:flex; flex-wrap:wrap; gap:14px; margin-top:22px; }
+  .sum-card { background:var(--surface-2); border:1px solid var(--line); border-radius:12px; padding:14px 18px; min-width:220px; flex:1 1 220px; }
+  .sum-card h4 { margin:0 0 10px; font-size:14px; color:var(--ink); display:flex; align-items:center; gap:6px; }
+  .sum-card h4 .member-pill { font-size:11px; font-weight:bold; background:var(--accent); color:#fff; border-radius:20px; padding:2px 8px; }
+  .sum-row { display:flex; justify-content:space-between; font-size:13px; border-bottom:1px solid var(--line); padding:5px 0; }
+  .sum-row:last-child { border-bottom:none; }
+  .sum-row .lbl { color:var(--ink-soft); }
+  .sum-row .val { font-weight:bold; color:var(--ink); }
+  .sum-row .val.pos { color:#065f46; }
+  .sum-row .val.warn { color:#92400e; }
+  .pb-bar-wrap { margin-top:8px; background:var(--line); border-radius:4px; height:8px; overflow:hidden; }
+  .pb-bar { height:8px; border-radius:4px; background:var(--accent); transition:width 0.3s; }
+  @media (prefers-color-scheme: dark) {
+    .sum-card { background:#1e293b !important; border-color:#334155 !important; }
+    .sum-row { border-color:#334155 !important; }
+    .sum-row .val { color:#e2e8f0 !important; }
+    .pb-bar-wrap { background:#334155 !important; }
+  }
   .del { background:#fdecea; color:#c0392b; border:none; border-radius:6px; padding:7px 11px; font-weight:bold; cursor:pointer; }
   #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
@@ -77,7 +99,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Annuities <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(build: ann2)</span></h2>
+  <h2>Annuities <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(build: ann3)</span></h2>
   <p class="note">Model buying an annuity during retirement. At the <strong>purchase date</strong> the <strong>purchase amount</strong> is taken from that member&rsquo;s DC pot (drawn proportionally across tax-free and taxable) and converted into a lifelong income of <strong>amount &times; annuity rate</strong>. That income joins the member&rsquo;s guaranteed income and pays towards the bills <em>before</em> their remaining pot is drawn down. Escalation 0 = a level (fixed) annuity. If the pot is too small at the purchase month the annuity is skipped. You can add more than one.</p>
 
   <div class="bar">
@@ -90,10 +112,11 @@
 
   <div class="table-wrap">
     <table id="aTbl">
-      <thead><tr><th>Member</th><th>Annuity Name</th><th>Purchase Date</th><th>Purchase Amount (&pound;)</th><th>Annuity Rate %/yr</th><th>Escalation %/yr</th><th>Gross Income (calc)</th><th></th></tr></thead>
-      <tbody><tr><td colspan="8">Loading&hellip;</td></tr></tbody>
+      <thead><tr><th>Member</th><th>Annuity Name</th><th>Purchase Date</th><th>Purchase Amount (&pound;)</th><th>Annuity Rate %/yr</th><th>Escalation %/yr</th><th>Gross Income (calc)</th><th>Payback Period</th><th></th></tr></thead>
+      <tbody><tr><td colspan="9">Loading&hellip;</td></tr></tbody>
     </table>
   </div>
+  <div id="sumSection"></div>
 
 <script>
   (function(){
@@ -131,11 +154,61 @@
     const annual = num(amount) * num(rate) / 100;
     return '<span class="yr">' + gbp(annual) + '/yr</span><br><span class="mo">' + gbp(annual / 12) + '/mo</span>';
   }
-  function updateCalcCells() {
-    tbody.querySelectorAll('tr[data-i]').forEach(tr => {
-      const cell = tr.querySelector('.f-calc'); if (!cell) return;
-      cell.innerHTML = calcHtml(tr.querySelector('.f-amount').value, tr.querySelector('.f-rate').value);
+  // payback = years to recoup the purchase lump at quoted rate (level annuity basis)
+  function paybackHtml(amount, rate) {
+    const a = num(amount), r = num(rate);
+    if (!a || !r) return '<span style="color:#94a3b8;">—</span>';
+    const yrs = 100 / r;  // amount / (amount * rate/100) = 100/rate
+    const whole = Math.floor(yrs), frac = yrs - whole;
+    const mo = Math.round(frac * 12);
+    const label = whole + ' yr' + (whole !== 1 ? 's' : '') + (mo ? ' ' + mo + ' mo' : '');
+    // visual indicator: shade by how many years until payback
+    // < 12 yrs = good (teal), 12-20 = amber, > 20 = warn red
+    const colour = yrs < 12 ? '#2c7a7b' : yrs < 20 ? '#92400e' : '#c0392b';
+    return '<span class="pb-yrs" style="color:' + colour + ';">' + label + '</span>';
+  }
+  // net monthly approximation: gross less 20% basic-rate tax above personal allowance (~£12,570/yr)
+  function netMonthly(annualGross) {
+    const pa = 12570;
+    const taxable = Math.max(0, annualGross - pa);
+    return (annualGross - taxable * 0.20) / 12;
+  }
+  // lifetime income total: from purchase date to a given end-of-life (or 30 years if no dob supplied)
+  function lifetimeIncome(annualGross, purchaseDate, eolDate) {
+    if (!purchaseDate) return null;
+    const pd = new Date(purchaseDate);
+    const ed = eolDate ? new Date(eolDate) : new Date(pd.getFullYear() + 30, pd.getMonth(), pd.getDate());
+    const yrs = Math.max(0, (ed - pd) / (365.25 * 24 * 3600 * 1000));
+    return annualGross * yrs;
+  }
+  function renderSummary() {
+    const sec = document.getElementById('sumSection');
+    if (!rows.length) { sec.innerHTML = ''; return; }
+    const cards = rows.map(a => {
+      const annual = num(a.purchase_amount) * num(a.annuity_rate) / 100;
+      const monthly = annual / 12;
+      const netMo = netMonthly(annual);
+      const payback = num(a.annuity_rate) ? (100 / num(a.annuity_rate)).toFixed(1) : null;
+      const lt = lifetimeIncome(annual, a.purchase_date, null);
+      const ltLabel = lt != null ? gbp(lt) : '—';
+      const net = lt != null ? gbp(lt - num(a.purchase_amount)) : '—';
+      const netPos = lt != null && lt > num(a.purchase_amount);
+      const dateLabel = a.purchase_date ? new Date(a.purchase_date).toLocaleDateString('en-GB', { month:'short', year:'numeric' }) : '—';
+      return '<div class="sum-card">' +
+        '<h4>' + (a.annuity_name || 'Annuity') + ' <span class="member-pill">' + (a.member_name || '') + '</span></h4>' +
+        '<div class="sum-row"><span class="lbl">Purchase date</span><span class="val">' + dateLabel + '</span></div>' +
+        '<div class="sum-row"><span class="lbl">Purchase amount</span><span class="val">' + gbp(num(a.purchase_amount)) + '</span></div>' +
+        '<div class="sum-row"><span class="lbl">Gross income/yr</span><span class="val pos">' + gbp(annual) + '</span></div>' +
+        '<div class="sum-row"><span class="lbl">Gross income/mo</span><span class="val pos">' + gbp(monthly) + '</span></div>' +
+        '<div class="sum-row"><span class="lbl">Est. net income/mo <span style="font-weight:normal;font-size:11px;">(basic rate)</span></span><span class="val pos">' + gbp(netMo) + '</span></div>' +
+        '<div class="sum-row"><span class="lbl">Payback period</span><span class="val">' + (payback ? payback + ' yrs' : '—') + '</span></div>' +
+        (num(a.purchase_amount) && payback ? '<div class="pb-bar-wrap"><div class="pb-bar" style="width:' + Math.min(100, 100 / parseFloat(payback) * 20).toFixed(1) + '%;"></div></div>' : '') +
+        '<div class="sum-row" style="margin-top:6px;"><span class="lbl">Lifetime gross total <span style="font-weight:normal;font-size:11px;">(30 yr)</span></span><span class="val">' + ltLabel + '</span></div>' +
+        '<div class="sum-row"><span class="lbl">Net gain over 30 yrs</span><span class="val ' + (netPos ? 'pos' : 'warn') + '">' + net + '</span></div>' +
+        '</div>';
     });
+    sec.innerHTML = '<h3 style="margin:22px 0 10px;color:var(--ink);font-size:15px;">Annuity Summary</h3><div class="sum-grid">' + cards.join('') + '</div>' +
+      '<p style="font-size:12px;color:var(--ink-soft);margin-top:10px;">Net income estimated at basic-rate (20%) tax above the personal allowance (\u00A3' + (12570).toLocaleString('en-GB') + '), before any interaction with other income. Lifetime totals assume 30 years from purchase. Payback period = years of income to recover the purchase cost at the quoted rate, ignoring escalation.</p>';
   }
 
   function rowHtml(a, i) {
@@ -149,12 +222,20 @@
       '<td data-label="Annuity Rate %/yr"><input type="number" class="f-rate" step="0.1" value="' + (a.annuity_rate != null ? a.annuity_rate : 6) + '" oninput="mark()"></td>' +
       '<td data-label="Escalation %/yr"><input type="number" class="f-esc" step="0.1" min="0" value="' + (a.escalation_pct != null ? a.escalation_pct : 0) + '" oninput="mark()"></td>' +
       '<td class="f-calc" data-label="Gross Income (calc)">' + calcHtml(a.purchase_amount, a.annuity_rate) + '</td>' +
+      '<td class="f-payback" data-label="Payback Period">' + paybackHtml(a.purchase_amount, a.annuity_rate) + '</td>' +
       '<td><button class="del" onclick="delRow(this)">Delete</button></td></tr>';
   }
-  function render() {
-    tbody.innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="8">No annuities modelled. Use \u201cAdd annuity\u201d.</td></tr>';
+  function updateCalcCells() {
+    tbody.querySelectorAll('tr[data-i]').forEach(tr => {
+      const calcCell = tr.querySelector('.f-calc'); if (calcCell) calcCell.innerHTML = calcHtml(tr.querySelector('.f-amount').value, tr.querySelector('.f-rate').value);
+      const pbCell = tr.querySelector('.f-payback'); if (pbCell) pbCell.innerHTML = paybackHtml(tr.querySelector('.f-amount').value, tr.querySelector('.f-rate').value);
+    });
   }
-  function mark() { syncDom(); updateCalcCells(); setDirty(); }
+  function render() {
+    tbody.innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="9">No annuities modelled. Use \u201cAdd annuity\u201d.</td></tr>';
+    renderSummary();
+  }
+  function mark() { syncDom(); updateCalcCells(); renderSummary(); setDirty(); }
   function syncDom() {
     tbody.querySelectorAll('tr[data-i]').forEach(tr => {
       const i = Number(tr.dataset.i); if (!rows[i]) return;
