@@ -33,14 +33,14 @@
   td.f-payback .pb-yrs { font-weight:bold; }
   td.f-payback .pb-yr { font-size:11px; color:var(--ink-soft); }
   /* Summary cards */
-  .sum-grid { display:flex; flex-wrap:wrap; gap:14px; margin-top:22px; }
-  .sum-card { background:var(--surface-2); border:1px solid var(--line); border-radius:12px; padding:14px 18px; min-width:220px; flex:1 1 220px; }
-  .sum-card h4 { margin:0 0 10px; font-size:14px; color:var(--ink); display:flex; align-items:center; gap:6px; }
-  .sum-card h4 .member-pill { font-size:11px; font-weight:bold; background:var(--accent); color:#fff; border-radius:20px; padding:2px 8px; }
-  .sum-row { display:flex; justify-content:space-between; font-size:13px; border-bottom:1px solid var(--line); padding:5px 0; }
+  .sum-grid { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+  .sum-card { background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:10px 13px; min-width:160px; flex:1 1 160px; }
+  .sum-card h4 { margin:0 0 7px; font-size:12px; color:var(--ink); display:flex; align-items:center; gap:5px; }
+  .sum-card h4 .member-pill { font-size:10px; font-weight:bold; background:var(--accent); color:#fff; border-radius:20px; padding:1px 6px; }
+  .sum-row { display:flex; justify-content:space-between; align-items:baseline; font-size:11px; border-bottom:1px solid var(--line); padding:3px 0; gap:6px; }
   .sum-row:last-child { border-bottom:none; }
-  .sum-row .lbl { color:var(--ink-soft); }
-  .sum-row .val { font-weight:bold; color:var(--ink); }
+  .sum-row .lbl { color:var(--ink-soft); white-space:nowrap; }
+  .sum-row .val { font-weight:bold; color:var(--ink); white-space:nowrap; text-align:right; }
   .sum-row .val.pos { color:#065f46; }
   .sum-row .val.warn { color:#92400e; }
   .pb-bar-wrap { margin-top:8px; background:var(--line); border-radius:4px; height:8px; overflow:hidden; }
@@ -99,7 +99,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Annuities <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(build: ann3)</span></h2>
+  <h2>Annuities <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(build: ann4)</span></h2>
   <p class="note">Model buying an annuity during retirement. At the <strong>purchase date</strong> the <strong>purchase amount</strong> is taken from that member&rsquo;s DC pot (drawn proportionally across tax-free and taxable) and converted into a lifelong income of <strong>amount &times; annuity rate</strong>. That income joins the member&rsquo;s guaranteed income and pays towards the bills <em>before</em> their remaining pot is drawn down. Escalation 0 = a level (fixed) annuity. If the pot is too small at the purchase month the annuity is skipped. You can add more than one.</p>
 
   <div class="bar">
@@ -197,18 +197,18 @@
       return '<div class="sum-card">' +
         '<h4>' + (a.annuity_name || 'Annuity') + ' <span class="member-pill">' + (a.member_name || '') + '</span></h4>' +
         '<div class="sum-row"><span class="lbl">Purchase date</span><span class="val">' + dateLabel + '</span></div>' +
-        '<div class="sum-row"><span class="lbl">Purchase amount</span><span class="val">' + gbp(num(a.purchase_amount)) + '</span></div>' +
-        '<div class="sum-row"><span class="lbl">Gross income/yr</span><span class="val pos">' + gbp(annual) + '</span></div>' +
-        '<div class="sum-row"><span class="lbl">Gross income/mo</span><span class="val pos">' + gbp(monthly) + '</span></div>' +
-        '<div class="sum-row"><span class="lbl">Est. net income/mo <span style="font-weight:normal;font-size:11px;">(basic rate)</span></span><span class="val pos">' + gbp(netMo) + '</span></div>' +
-        '<div class="sum-row"><span class="lbl">Payback period</span><span class="val">' + (payback ? payback + ' yrs' : '—') + '</span></div>' +
+        '<div class="sum-row"><span class="lbl">Cost</span><span class="val">' + gbp(num(a.purchase_amount)) + '</span></div>' +
+        '<div class="sum-row"><span class="lbl">Gross/yr</span><span class="val pos">' + gbp(annual) + '</span></div>' +
+        '<div class="sum-row"><span class="lbl">Gross/mo</span><span class="val pos">' + gbp(monthly) + '</span></div>' +
+        '<div class="sum-row"><span class="lbl">Est. net/mo</span><span class="val pos">' + gbp(netMo) + '</span></div>' +
+        '<div class="sum-row"><span class="lbl">Payback</span><span class="val">' + (payback ? payback + ' yrs' : '—') + '</span></div>' +
         (num(a.purchase_amount) && payback ? '<div class="pb-bar-wrap"><div class="pb-bar" style="width:' + Math.min(100, 100 / parseFloat(payback) * 20).toFixed(1) + '%;"></div></div>' : '') +
-        '<div class="sum-row" style="margin-top:6px;"><span class="lbl">Lifetime gross total <span style="font-weight:normal;font-size:11px;">(30 yr)</span></span><span class="val">' + ltLabel + '</span></div>' +
-        '<div class="sum-row"><span class="lbl">Net gain over 30 yrs</span><span class="val ' + (netPos ? 'pos' : 'warn') + '">' + net + '</span></div>' +
+        '<div class="sum-row" style="margin-top:4px;"><span class="lbl">Lifetime gross (30 yr)</span><span class="val">' + ltLabel + '</span></div>' +
+        '<div class="sum-row"><span class="lbl">Net gain (30 yr)</span><span class="val ' + (netPos ? 'pos' : 'warn') + '">' + net + '</span></div>' +
         '</div>';
     });
-    sec.innerHTML = '<h3 style="margin:22px 0 10px;color:var(--ink);font-size:15px;">Annuity Summary</h3><div class="sum-grid">' + cards.join('') + '</div>' +
-      '<p style="font-size:12px;color:var(--ink-soft);margin-top:10px;">Net income estimated at basic-rate (20%) tax above the personal allowance (\u00A3' + (12570).toLocaleString('en-GB') + '), before any interaction with other income. Lifetime totals assume 30 years from purchase. Payback period = years of income to recover the purchase cost at the quoted rate, ignoring escalation.</p>';
+    sec.innerHTML = '<h3 style="margin:18px 0 8px;color:var(--ink);font-size:13px;">Annuity Summary</h3><div class="sum-grid">' + cards.join('') + '</div>' +
+      '<p style="font-size:11px;color:var(--ink-soft);margin-top:8px;">Est. net/mo: basic-rate (20%) tax above personal allowance (\u00A3' + (12570).toLocaleString('en-GB') + '), before other income. Lifetime totals assume 30 yrs from purchase. Payback = years to recover cost at quoted rate.</p>';
   }
 
   function rowHtml(a, i) {
