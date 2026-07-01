@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Annuities</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err27"></script>
+<style>
+  :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
+  h2 { color:var(--ink); margin:0 0 4px; }
+  .note { color:var(--ink-soft); font-size:13px; margin:0 0 14px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  .btn { border:none; border-radius:8px; font-weight:bold; font-size:14px; cursor:pointer; padding:11px 18px; color:#fff; }
+  .btn-save { background:var(--accent); } .btn-save:hover { background:var(--accent-dark); }
+  .btn-reload { background:#64748b; } .btn-add { background:#475569; }
+  .unsaved { display:none; background:#fef3c7; color:#92400e; font-weight:bold; font-size:13px; padding:6px 12px; border-radius:6px; }
+  .msg { font-weight:bold; font-size:14px; }
+  table { width:auto; border-collapse:collapse; font-size:14px; margin-top:6px; }
+  th,td { padding:8px 14px 8px 8px; border-bottom:1px solid var(--line); text-align:right; }
+  th { background:var(--surface-2); color:var(--ink); font-size:12px; text-transform:uppercase; letter-spacing:0.03em; white-space:normal; text-align:center; vertical-align:bottom; line-height:1.2; max-width:100px; }
+  td { white-space:nowrap; }
+  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align:left; }
+  td input, td select { padding:8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px; box-sizing:border-box; font-family:inherit; }
+  td input[type=text] { width:150px; text-align:left; }
+  td input[type=date] { width:150px; }
+  td input[type=number] { width:100px; text-align:right; }
+  td select { min-width:100px; text-align:left; }
+  .del { background:#fdecea; color:#c0392b; border:none; border-radius:6px; padding:7px 11px; font-weight:bold; cursor:pointer; }
+  #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
+  .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
+  .table-wrap { overflow-x:auto; }
+  @media (max-width: 600px) {
+    body { padding:12px; }
+    #aTbl thead { display:none; }
+    #aTbl, #aTbl tbody, #aTbl tr, #aTbl td { display:block; width:auto; }
+    #aTbl tr { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:12px; background:var(--surface-2); }
+    #aTbl td { border:none; padding:6px 0; text-align:right; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    #aTbl td::before { content:attr(data-label); font-size:12px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; text-align:left; }
+    #aTbl td input[type=text], #aTbl td input[type=date], #aTbl td select { width:160px; }
+    #aTbl td:last-child::before { content:""; }
+    #aTbl td .del { width:100%; padding:10px; }
+  }
+
+  /* ---- Automatic dark mode (follows device setting) ---- */
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1, h2, h3, h4 { color:#f1f5f9 !important; }
+    .panel, .card, .login-box, .login-card, .tier-card, .tier-block,
+    .summary, .pot-card, .member-card, .filter-bar, .derived, .inc-mgr,
+    [style*="background:#fff"], [style*="background: #fff"],
+    [style*="background:#f8fafc"], [style*="background:#f4f7f6"],
+    [style*="background:#fcfdfe"], [style*="background:#fcffff"] {
+      background:#1e293b !important; border-color:#334155 !important;
+      box-shadow:0 2px 4px rgba(0,0,0,0.4) !important;
+    }
+    .intro, .hint, .src-desc, .note, .sub, .subtitle, .inc-meta, .meta, .lbl,
+    [style*="color:#64748b"], [style*="color:#475569"], [style*="color:#94a3b8"] { color:#94a3b8 !important; }
+    [style*="color:#2c3e50"], [style*="color:#1e3a8a"] { color:#e2e8f0 !important; }
+    label { color:#cbd5e1 !important; }
+    input, select, textarea {
+      background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important;
+    }
+    input::placeholder { color:#64748b !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    tr:nth-child(even) td { background:rgba(255,255,255,0.02) !important; }
+    #status.s-load, .s-load { background:#1e293b !important; color:#93c5fd !important; }
+    .topbar { color:#94a3b8 !important; }
+    a, .topbar a { color:#60a5fa !important; }
+  }
+</style>
+</head>
+<body>
+  <div id="status" class="s-load">Loading&hellip;</div>
+  <h2>Annuities <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(build: ann1)</span></h2>
+  <p class="note">Model buying an annuity during retirement. At the <strong>purchase date</strong> the <strong>purchase amount</strong> is taken from that member&rsquo;s DC pot (drawn proportionally across tax-free and taxable) and converted into a lifelong income of <strong>amount &times; annuity rate</strong>. That income joins the member&rsquo;s guaranteed income and pays towards the bills <em>before</em> their remaining pot is drawn down. Escalation 0 = a level (fixed) annuity. If the pot is too small at the purchase month the annuity is skipped. You can add more than one.</p>
+
+  <div class="bar">
+    <button class="btn btn-save" onclick="saveAll()">Save changes</button>
+    <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
+    <button class="btn btn-add" onclick="addRow()">+ Add annuity</button>
+    <span class="unsaved" id="unsaved">&#9679; Unsaved changes</span>
+    <span class="msg" id="msg"></span>
+  </div>
+
+  <div class="table-wrap">
+    <table id="aTbl">
+      <thead><tr><th>Member</th><th>Annuity Name</th><th>Purchase Date</th><th>Purchase Amount (&pound;)</th><th>Annuity Rate %/yr</th><th>Escalation %/yr</th><th></th></tr></thead>
+      <tbody><tr><td colspan="7">Loading&hellip;</td></tr></tbody>
+    </table>
+  </div>
+
+<script>
+  (function(){
+    window.addEventListener('message', function(ev){
+      if (ev && ev.data === 'refresh-data') {
+        try {
+          if (typeof reload === 'function') return reload(true);
+        } catch(e){}
+      }
+    });
+  })();
+
+  (function(){
+    const _f = window.fetch;
+    window.fetch = async function(u, o){
+      const r = await _f(u, o);
+      try {
+        const m = (o && o.method || 'GET').toUpperCase();
+        if (r.ok && (m==='POST'||m==='PATCH'||m==='DELETE'||m==='PUT') && String(u).indexOf('/rest/v1/')>=0) {
+          if (window.parent && window.parent !== window) window.parent.postMessage('data-saved','*');
+        }
+      } catch(e){}
+      return r;
+    };
+  })();
+
+  let rows = [], dirty = false, deleted = [];
+  let members = ['Graham', 'Julie'];
+  const tbody = document.querySelector('#aTbl tbody');
+  const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
+  function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+  function rowHtml(a, i) {
+    const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
+    return '<tr data-i="' + i + '">' +
+      '<td data-label="Member"><select class="f-member" onchange="mark()">' +
+        members.map(m => '<option ' + (a.member_name === m ? 'selected' : '') + '>' + m + '</option>').join('') + '</select></td>' +
+      '<td data-label="Annuity Name"><input type="text" class="f-name" value="' + esc(a.annuity_name) + '" oninput="mark()"></td>' +
+      '<td data-label="Purchase Date"><input type="date" class="f-date" value="' + (a.purchase_date ? String(a.purchase_date).split('T')[0] : '') + '" onchange="mark()"></td>' +
+      '<td data-label="Purchase Amount (\u00A3)"><input type="number" class="f-amount" step="1000" value="' + (a.purchase_amount != null ? a.purchase_amount : 0) + '" oninput="mark()"></td>' +
+      '<td data-label="Annuity Rate %/yr"><input type="number" class="f-rate" step="0.1" value="' + (a.annuity_rate != null ? a.annuity_rate : 6) + '" oninput="mark()"></td>' +
+      '<td data-label="Escalation %/yr"><input type="number" class="f-esc" step="0.1" min="0" value="' + (a.escalation_pct != null ? a.escalation_pct : 0) + '" oninput="mark()"></td>' +
+      '<td><button class="del" onclick="delRow(this)">Delete</button></td></tr>';
+  }
+  function render() {
+    tbody.innerHTML = rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="7">No annuities modelled. Use \u201cAdd annuity\u201d.</td></tr>';
+  }
+  function mark() { syncDom(); setDirty(); }
+  function syncDom() {
+    tbody.querySelectorAll('tr[data-i]').forEach(tr => {
+      const i = Number(tr.dataset.i); if (!rows[i]) return;
+      rows[i].member_name = tr.querySelector('.f-member').value;
+      rows[i].annuity_name = tr.querySelector('.f-name').value.trim();
+      rows[i].purchase_date = tr.querySelector('.f-date').value || null;
+      rows[i].purchase_amount = num(tr.querySelector('.f-amount').value);
+      rows[i].annuity_rate = num(tr.querySelector('.f-rate').value);
+      rows[i].escalation_pct = num(tr.querySelector('.f-esc').value);
+    });
+  }
+  function addRow() {
+    syncDom();
+    rows.push({ id: undefined, member_name: members[0] || 'Graham', annuity_name: '', purchase_date: null, purchase_amount: 0, annuity_rate: 6, escalation_pct: 0 });
+    render(); setDirty();
+  }
+  function delRow(btn) {
+    syncDom();
+    const tr = btn.closest('tr'); const i = Number(tr.dataset.i); const a = rows[i];
+    if (a && a.id != null) deleted.push(a.id);
+    rows.splice(i, 1); render(); setDirty();
+  }
+
+  async function saveAll() {
+    const msg = document.getElementById('msg'); msg.style.color = '#1e3a8a'; msg.textContent = 'Saving\u2026';
+    syncDom();
+    for (const a of rows) {
+      if (!a.annuity_name) { msg.style.color = '#c0392b'; msg.textContent = 'Every annuity needs a name.'; return; }
+      if (!a.purchase_date) { msg.style.color = '#c0392b'; msg.textContent = 'Every annuity needs a purchase date.'; return; }
+    }
+    try {
+      for (const id of deleted) await App.write('DELETE', 'bd_annuities?id=eq.' + id, undefined);
+      for (const a of rows) {
+        const payload = { member_name: a.member_name, annuity_name: a.annuity_name, purchase_date: a.purchase_date,
+                          purchase_amount: a.purchase_amount, annuity_rate: a.annuity_rate, escalation_pct: a.escalation_pct };
+        if (a.id != null) await App.write('PATCH', 'bd_annuities?id=eq.' + a.id, payload);
+        else await App.write('POST', 'bd_annuities', payload);
+      }
+      deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
+      msg.style.color = '#065f46'; msg.textContent = '\u2713 Saved. Reopen the dashboard to update projections.';
+      await reload(true);
+    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
+  }
+
+  async function reload(quiet) {
+    if (!quiet && dirty && !confirm('Discard unsaved changes and reload?')) return;
+    const status = document.getElementById('status');
+    try {
+      const mn = await App.memberNames();
+      if (mn.all && mn.all.length) members = mn.all;
+      rows = await App.rest('bd_annuities?order=purchase_date.asc') || [];
+      deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
+      render(); status.style.display = 'none';
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+  App.requireLogin(() => reload(true), { title: 'Annuities' });
+</script>
+</body>
+</html>

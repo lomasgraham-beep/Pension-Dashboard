@@ -232,6 +232,7 @@
     // Default true preserves the original behaviour byte-for-byte.
     const savingsFundBills = (cfg.savingsFundBills !== false);
     const unaffordable = [];   // purchases skipped under savingsFundBills=false
+    const annuitySkipped = []; // annuities skipped because the member's DC pot was too small at the purchase month
     const members = data.members || [], bills = data.bills || [], dining = data.dining || [], guaranteed = data.guaranteed || [];
     // person 1 / person 2 derived from the members table, alphabetically by name.
     // Single-member instances leave p2 empty, so all j_* contributions are zero.
@@ -361,6 +362,26 @@
       return { name: p.purchase_name, pIdx: pIdx, deposit: deposit, pay: pay, term: term, skipped: false };
     }).filter(p => p.pIdx != null);
 
+    // ---- Annuities (DC pot -> guaranteed income) ----
+    // At its purchase month, an annuity converts a lump from ONE member's DC pot into a
+    // lifelong income. The lump is drawn proportionally across that member's tax-free/taxable
+    // pot; if the pot can't cover it, the annuity is SKIPPED and flagged (never partial).
+    // The income (amount x rate) joins that member's "other" guaranteed income from the purchase
+    // month, escalating from ITS OWN purchase date, so it funds bills BEFORE the remaining pot draws.
+    // Rate and escalation are stored as percent numbers (e.g. 6.0, 0.0), matching the crashes table.
+    const annuities = (data.annuities || []).map(a => {
+      const d = a.purchase_date ? new Date(a.purchase_date) : null;
+      const pIdx = d ? d.getFullYear() * 12 + d.getMonth() : null;
+      const amount = Math.max(0, Number(a.purchase_amount) || 0);
+      const rate = (Number(a.annuity_rate) || 0) / 100;         // e.g. 6.0 -> 0.06 annual income rate
+      const esc = (Number(a.escalation_pct) || 0) / 100;        // e.g. 0.0 -> level annuity
+      return {
+        name: a.annuity_name || 'Annuity', member: a.member_name,
+        pIdx: pIdx, amount: amount, annualIncome: amount * rate, esc: esc,
+        purchased: false, skipped: false
+      };
+    }).filter(a => a.pIdx != null && a.member != null);
+
     // ---- Market crashes (PruFund smoothed) ----
     // Each crash: starts at startIdx; pot falls by fall% over fallMonths to the trough,
     // then climbs back to the pre-crash value over recoveryMonths. During a crash window
@@ -431,6 +452,14 @@
           const monthly = (Number(g.initial_annual_value) || 0) / 12 * Math.pow(1 + escR, elapsedYrs);
           otherGross += monthly;
         }
+      });
+      // annuity income: purchased annuities for this member pay from their purchase month onward,
+      // escalating from their own purchase date (level when esc = 0). Taxed as "other" income.
+      annuities.forEach(a => {
+        if (a.member !== who || !a.purchased || a.skipped) return;
+        if (idx < a.pIdx) return;
+        const yrs = Math.floor((idx - a.pIdx) / 12);
+        otherGross += a.annualIncome / 12 * Math.pow(1 + a.esc, yrs);
       });
       return { stateGross, otherGross, total: stateGross + otherGross };
     }
@@ -506,6 +535,7 @@
           taxFree: gTf + jTf, taxable: gTx + jTx,
           g_taxFree: gTf, g_taxable: gTx, j_taxFree: jTf, j_taxable: jTx,
           g_tfGrowth: 0, g_txGrowth: 0, j_tfGrowth: 0, j_txGrowth: 0, tfGrowth: 0, txGrowth: 0, crash: null,
+          annuityBuy: 0, g_annuityBuy: 0, j_annuityBuy: 0,
           stateGross: 0, otherPensions: 0, drawdown: 0,
           g_other: 0, j_other: 0, g_otherNet: 0, j_otherNet: 0, g_draw: 0, j_draw: 0, g_income: 0, j_income: 0, totalIncome: 0,
           combinedClosing: 0, g_closing: 0, j_closing: 0, shortfall: false,
@@ -654,6 +684,33 @@
       // opening pots for THIS month (before drawdown)
       const oGTf = gTf, oGTx = gTx, oJTf = jTf, oJTx = jTx;
 
+      // ---- Annuity purchases dated this month ----
+      // Buy from the member's own DC pot (tax-free + taxable), reduced PROPORTIONALLY so the
+      // 25/75 split is preserved. Affordability is checked on the opening pot (pre-draw, pre-growth).
+      // If the pot can't cover the lump, the annuity is skipped and flagged (never partial).
+      // Runs before grossMonth so the new income is live from this same month.
+      let gAnnBuy = 0, jAnnBuy = 0;
+      for (const an of annuities) {
+        if (an.pIdx !== idx || an.purchased || an.skipped) continue;
+        if (an.member === p1Name) {
+          const pot = gTf + gTx;
+          if (pot + 1e-6 >= an.amount && an.amount > 0) {
+            const f = pot > 0 ? an.amount / pot : 0;
+            gTf -= gTf * f; gTx -= gTx * f; an.purchased = true; gAnnBuy += an.amount;
+          } else if (an.amount > 0) {
+            an.skipped = true; annuitySkipped.push({ name: an.name, member: an.member, idx: idx, amount: an.amount, available: pot });
+          }
+        } else if (p2Name && an.member === p2Name) {
+          const pot = jTf + jTx;
+          if (pot + 1e-6 >= an.amount && an.amount > 0) {
+            const f = pot > 0 ? an.amount / pot : 0;
+            jTf -= jTf * f; jTx -= jTx * f; an.purchased = true; jAnnBuy += an.amount;
+          } else if (an.amount > 0) {
+            an.skipped = true; annuitySkipped.push({ name: an.name, member: an.member, idx: idx, amount: an.amount, available: pot });
+          }
+        }
+      }
+
       const gInc = grossMonth(p1Name, idx, elapsed);
       const jInc = p2Name ? grossMonth(p2Name, idx, elapsed) : { stateGross: 0, otherGross: 0, total: 0 };
 
@@ -698,6 +755,7 @@
         g_tfGrowth: gTfGrowth, g_txGrowth: gTxGrowth, j_tfGrowth: jTfGrowth, j_txGrowth: jTxGrowth,
         tfGrowth: gTfGrowth + jTfGrowth, txGrowth: gTxGrowth + jTxGrowth,
         crash: crashInfo(idx),
+        annuityBuy: gAnnBuy + jAnnBuy, g_annuityBuy: gAnnBuy, j_annuityBuy: jAnnBuy,
         stateGross: mState, otherPensions: mOther, drawdown: gDraw + jDraw,
         g_other: gRes.inc.total, j_other: jRes.inc.total, g_otherNet: gRes.dbNet, j_otherNet: jRes.dbNet, g_draw: gDraw, j_draw: jDraw,
         g_income: gRes.inc.total + gDraw, j_income: jRes.inc.total + jDraw,
@@ -718,6 +776,7 @@
       acc.g_tfGrowth += gTfGrowth; acc.g_txGrowth += gTxGrowth; acc.j_tfGrowth += jTfGrowth; acc.j_txGrowth += jTxGrowth;
       acc.tfGrowth += gTfGrowth + jTfGrowth; acc.txGrowth += gTxGrowth + jTxGrowth;
       { const ci = crashInfo(idx); if (ci && !acc.crash) acc.crash = ci; }
+      acc.annuityBuy += gAnnBuy + jAnnBuy; acc.g_annuityBuy += gAnnBuy; acc.j_annuityBuy += jAnnBuy;
       acc.g_income += gRes.inc.total + gDraw; acc.j_income += jRes.inc.total + jDraw;
       acc.totalIncome += gRes.inc.total + jRes.inc.total + gDraw + jDraw;
       acc.combinedClosing = gTf + gTx + jTf + jTx;
@@ -735,6 +794,8 @@
     rows.crashWindows = crashes.map(c => ({ startIdx: c.startIdx, troughIdx: c.startIdx + c.D, endIdx: c.endIdx }));
     rows.purchaseWindows = purchases.map(p => ({ name: p.name, depositIdx: p.pIdx, payoffIdx: p.pIdx + p.term, term: p.term, deposit: p.deposit, pay: p.pay, skipped: p.skipped }));
     rows.unaffordable = unaffordable;
+    rows.annuityWindows = annuities.map(a => ({ name: a.name, member: a.member, purchaseIdx: a.pIdx, amount: a.amount, annualIncome: a.annualIncome, esc: a.esc, purchased: a.purchased, skipped: a.skipped }));
+    rows.annuitySkipped = annuitySkipped;
     return rows;
   }
 
