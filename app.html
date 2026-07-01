@@ -749,6 +749,8 @@
     <div class="chart-wrap" id="crashWrap" style="display:none;"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="crashChart" class="chart-box"></div></div>
     <h3 id="cashModelHead" style="color:var(--ink); margin:18px 0 4px; display:none;">Cash Savings Balance</h3>
     <div class="chart-wrap" id="cashModelWrap" style="display:none;"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="cashModelChart" class="chart-box"></div></div>
+    <h3 id="annuityChartHead" style="color:var(--ink); margin:18px 0 4px; display:none;">Annuity Payback</h3>
+    <div class="chart-wrap" id="annuityChartWrap" style="display:none;"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="annuityChart" class="chart-box"></div></div>
     </div>
     </div>
   </div>
@@ -872,7 +874,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-272</span>
+    <span class="build-stamp">build: LC-273</span>
   </div>
 
   <script>
@@ -1266,36 +1268,80 @@
       }
 
       // ---------- INCOME CHART (combo: stacked bars + drawdown line on 2nd axis) ----------
+      // Bars bottom -> top per person: drawdown | other guaranteed (DB/state) | annuity income
+      // Annuity income is split out so you can see the step-up at each purchase.
       const dInc = new google.visualization.DataTable();
       dInc.addColumn('string','Year');
       let incSeries, incTitle;
+      const hasAnnuity = (drawdownRows.annuityWindows || []).some(w => w.purchased);
       if (joint) {
-        // bars bottom -> top: p2 drawdown, p1 drawdown, p2 other, p1 other; line: total drawdown
-        dInc.addColumn('number', p2Name + ' drawdown'); dInc.addColumn('number', p1Name + ' drawdown');
-        dInc.addColumn('number', p2Name + ' other income'); dInc.addColumn('number', p1Name + ' other income');
+        dInc.addColumn('number', p2Name + ' drawdown');
+        dInc.addColumn('number', p1Name + ' drawdown');
+        dInc.addColumn('number', p2Name + ' guaranteed');
+        dInc.addColumn('number', p1Name + ' guaranteed');
+        if (hasAnnuity) {
+          dInc.addColumn('number', p2Name + ' annuity');
+          dInc.addColumn('number', p1Name + ' annuity');
+        }
         dInc.addColumn('number','Total drawdown');
         dInc.addColumn({type:'string', role:'annotation'}); dInc.addColumn({type:'string', role:'annotationText'});
-        yrRows.forEach(r => dInc.addRow([String(r.year),
-          Math.round(r.j_draw), Math.round(r.g_draw), Math.round(r.j_other), Math.round(r.g_other),
-          Math.round(r.drawdown), evDot(r.year), evText(r.year)]));
-        incSeries = {
-          0: { targetAxisIndex:0, color:'#9b59b6' }, // Julie drawdown
-          1: { targetAxisIndex:0, color:'#3498db' }, // Graham drawdown
-          2: { targetAxisIndex:0, color:'#c39bd3' }, // Julie other income
-          3: { targetAxisIndex:0, color:'#85c1e9' }, // Graham other income
-          4: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
-        };
+        yrRows.forEach(r => {
+          const gAnn = Math.round(r.g_annuityIncome || 0), jAnn = Math.round(r.j_annuityIncome || 0);
+          const row = [String(r.year),
+            Math.round(r.j_draw), Math.round(r.g_draw),
+            Math.round(r.j_other - jAnn), Math.round(r.g_other - gAnn)];
+          if (hasAnnuity) row.push(jAnn, gAnn);
+          row.push(Math.round(r.drawdown), evDot(r.year), evText(r.year));
+          dInc.addRow(row);
+        });
+        if (hasAnnuity) {
+          incSeries = {
+            0: { targetAxisIndex:0, color:'#9b59b6' },  // Julie drawdown
+            1: { targetAxisIndex:0, color:'#3498db' },  // Graham drawdown
+            2: { targetAxisIndex:0, color:'#c39bd3' },  // Julie guaranteed
+            3: { targetAxisIndex:0, color:'#85c1e9' },  // Graham guaranteed
+            4: { targetAxisIndex:0, color:'#e67e22' },  // Julie annuity (amber)
+            5: { targetAxisIndex:0, color:'#2c7a7b' },  // Graham annuity (teal)
+            6: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
+          };
+        } else {
+          incSeries = {
+            0: { targetAxisIndex:0, color:'#9b59b6' },
+            1: { targetAxisIndex:0, color:'#3498db' },
+            2: { targetAxisIndex:0, color:'#c39bd3' },
+            3: { targetAxisIndex:0, color:'#85c1e9' },
+            4: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
+          };
+        }
         incTitle = 'Income';
       } else {
-        dInc.addColumn('number','Drawdown'); dInc.addColumn('number','Other income');
+        dInc.addColumn('number','Drawdown');
+        dInc.addColumn('number','Guaranteed income');
+        if (hasAnnuity) dInc.addColumn('number','Annuity income');
         dInc.addColumn('number','Total drawdown');
         dInc.addColumn({type:'string', role:'annotation'}); dInc.addColumn({type:'string', role:'annotationText'});
-        yrRows.forEach(r => { const v = vrow(r); dInc.addRow([String(r.year), Math.round(v.draw), Math.round(v.other), Math.round(v.draw), evDot(r.year), evText(r.year)]); });
-        incSeries = {
-          0: { targetAxisIndex:0, color:'#3498db' }, // drawdown
-          1: { targetAxisIndex:0, color:'#9b59b6' }, // other income
-          2: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
-        };
+        yrRows.forEach(r => {
+          const v = vrow(r);
+          const ann = Math.round(currentView === p1Name ? (r.g_annuityIncome || 0) : (r.j_annuityIncome || 0));
+          const row = [String(r.year), Math.round(v.draw), Math.round(v.other) - ann];
+          if (hasAnnuity) row.push(ann);
+          row.push(Math.round(v.draw), evDot(r.year), evText(r.year));
+          dInc.addRow(row);
+        });
+        if (hasAnnuity) {
+          incSeries = {
+            0: { targetAxisIndex:0, color:'#3498db' },  // drawdown
+            1: { targetAxisIndex:0, color:'#9b59b6' },  // guaranteed
+            2: { targetAxisIndex:0, color:'#2c7a7b' },  // annuity (teal)
+            3: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
+          };
+        } else {
+          incSeries = {
+            0: { targetAxisIndex:0, color:'#3498db' },
+            1: { targetAxisIndex:0, color:'#9b59b6' },
+            2: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
+          };
+        }
         incTitle = currentView + ' Income';
       }
 
@@ -1382,6 +1428,7 @@
       });
       drawCrashChart();
       drawCashModelChart();
+      drawAnnuityChart();
     }
 
     function drawCrashChart() {
@@ -1496,6 +1543,86 @@
         vAxis: { minValue: 0, viewWindow: { min: 0, max: top }, title: phone ? '' : 'Balance (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
         hAxis: { title: phone ? '' : 'Year', textStyle: { fontSize: phone ? 9 : 11 }, showTextEvery: phone ? 2 : 1 },
         annotations: { alwaysOutside: true, textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } }
+      });
+    }
+
+    function drawAnnuityChart() {
+      // Option 4: cumulative payback chart — for each purchased annuity, shows the purchase cost
+      // as a negative bar at the purchase year, then cumulative income received in each subsequent
+      // year as a rising line, crossing zero at the payback point.
+      const head = document.getElementById('annuityChartHead'), box = document.getElementById('annuityChart');
+      const wrap = box.closest('.chart-wrap');
+      const windows = (drawdownRows.annuityWindows || []).filter(w => w.purchased && !w.skipped);
+      if (!chartsReady || !windows.length) { head.style.display = 'none'; if (wrap.classList.contains('fs')) closeChartFs(); wrap.style.display = 'none'; return; }
+
+      // filter windows to those relevant for the current view
+      const viewWindows = windows.filter(w => currentView === 'Joint' || w.member === currentView);
+      if (!viewWindows.length) { head.style.display = 'none'; if (wrap.classList.contains('fs')) closeChartFs(); wrap.style.display = 'none'; return; }
+      head.style.display = ''; wrap.style.display = '';
+
+      // build year range: from first purchase year to last row year
+      const firstYear = Math.min(...viewWindows.map(w => Math.floor(w.purchaseIdx / 12)));
+      const lastYear = drawdownRows.length ? drawdownRows[drawdownRows.length - 1].year : firstYear + 30;
+
+      // for each annuity, compute cumulative income received by year-end
+      // using the yearly rows' annuityIncome fields to match the engine's own numbers
+      const dt = new google.visualization.DataTable();
+      dt.addColumn('string', 'Year');
+      // one line per annuity
+      viewWindows.forEach(w => dt.addColumn('number', (w.name || 'Annuity') + ' (' + w.member + ')'));
+
+      const palette = ['#2c7a7b', '#e67e22', '#6b5b95', '#c0392b', '#2471a3', '#27ae60'];
+      const years = []; for (let y = firstYear; y <= lastYear; y++) years.push(y);
+
+      // cumulative income per annuity: starts at -purchase amount in its purchase year,
+      // then adds annual income each subsequent year from the engine rows
+      const cumul = viewWindows.map(w => ({ pYear: Math.floor(w.purchaseIdx / 12), amount: w.amount, running: 0 }));
+
+      years.forEach(y => {
+        const eRow = drawdownRows.find(r => r.year === y);
+        const cells = [String(y)];
+        viewWindows.forEach((w, i) => {
+          const st = cumul[i];
+          if (y < st.pYear) { cells.push(null); return; }
+          if (y === st.pYear) {
+            // purchase year: start at negative of cost, then add any partial income earned this year
+            const partialIncome = eRow ? (w.member === p1Name ? (eRow.g_annuityIncome || 0) : (eRow.j_annuityIncome || 0)) : 0;
+            st.running = -st.amount + partialIncome;
+            cells.push(Math.round(st.running));
+          } else {
+            const annIncome = eRow ? (w.member === p1Name ? (eRow.g_annuityIncome || 0) : (eRow.j_annuityIncome || 0)) : w.annualIncome;
+            st.running += annIncome;
+            cells.push(Math.round(st.running));
+          }
+        });
+        dt.addRow(cells);
+      });
+
+      const nf = new google.visualization.NumberFormat({ prefix: '£', fractionDigits: 0 });
+      for (let i = 1; i < dt.getNumberOfColumns(); i++) nf.format(dt, i);
+
+      // y-axis range: lowest point (purchase amount negative) to highest cumulative
+      let yMin = 0, yMax = 0;
+      for (let r = 0; r < dt.getNumberOfRows(); r++) {
+        for (let c = 1; c < dt.getNumberOfColumns(); c++) {
+          const v = dt.getValue(r, c); if (v == null) continue;
+          if (v < yMin) yMin = v; if (v > yMax) yMax = v;
+        }
+      }
+      yMin = Math.floor(yMin * 1.05 / 1000) * 1000;
+      yMax = Math.ceil(yMax * 1.05 / 1000) * 1000 || 1000;
+      const phone = window.innerWidth <= 600;
+      const series = {}; viewWindows.forEach((_, i) => { series[i] = { type: 'line', lineWidth: 3, pointSize: 4 }; });
+      new google.visualization.ComboChart(box).draw(dt, {
+        title: 'Cumulative annuity payback' + (currentView !== 'Joint' ? ' — ' + currentView : ''),
+        seriesType: 'line',
+        series: series,
+        colors: palette.slice(0, viewWindows.length),
+        legend: { position: 'bottom', textStyle: { fontSize: phone ? 10 : 12 } },
+        chartArea: phone ? { left: 60, right: 16, top: 40, bottom: 80, height: '58%' } : { left: 88, right: 30, top: 40, bottom: 60 },
+        vAxis: { viewWindow: { min: yMin, max: yMax }, title: phone ? '' : 'Net position (£)', format: '£#,###',
+                 baselineColor: '#444', textStyle: { fontSize: phone ? 10 : 12 } },
+        hAxis: { title: phone ? '' : 'Year', textStyle: { fontSize: phone ? 9 : 11 }, showTextEvery: phone ? 4 : 2 }
       });
     }
 
@@ -2489,7 +2616,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front8';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front9';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
