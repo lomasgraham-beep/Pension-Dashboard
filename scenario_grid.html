@@ -5,7 +5,7 @@
 <title>Scenario Grid</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=err45"></script>
-<script src="engine.js?v=draw1"></script>
+<script src="engine.js?v=ufpls1"></script>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
   :root {
@@ -102,7 +102,7 @@
   <div class="grid-head">
     <div class="gh-left">
       <span class="gh-title">Scenario Grid</span>
-      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid6)</span></span>
+      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid7)</span></span>
       <span class="spend-ctl"><label>Spend %</label>
         <input id="sp0" type="number" min="0" max="200" step="5" value="50" inputmode="numeric">
         <input id="sp1" type="number" min="0" max="200" step="5" value="60" inputmode="numeric">
@@ -193,7 +193,7 @@
       p2phase: savedBase.p2phase,
       spendRed: spendRed, gRatio: savedBase.gRatio,
       savingsFundBills: savedBase.savingsFundBills,
-      drawOrder: savedBase.drawOrder,
+      withdrawalMethod: savedBase.withdrawalMethod, crystallisationDate: savedBase.crystallisationDate, ufplsDivertTf: savedBase.ufplsDivertTf,
       retired: false                                  // grid is a pre-retirement what-if
     };
   }
@@ -212,7 +212,9 @@
       gRatio: plan.gRatio, spendRed: plan.spendRed,
       startYear: startYr, retirementDate: plan.retirementDate,
       retireByMember: plan.retireByMember,
-      savingsFundBills: plan.savingsFundBills, drawOrder: plan.drawOrder, sp: sp
+      savingsFundBills: plan.savingsFundBills,
+      withdrawalMethod: plan.withdrawalMethod, crystallisationDate: plan.crystallisationDate, ufplsDivertTf: plan.ufplsDivertTf,
+      sp: sp
     };
   }
   function computeCell(retireDate, spendPct) {
@@ -468,7 +470,12 @@
         growthRate: p.pension_growth_rate != null ? Number(p.pension_growth_rate) : 0.05,
         gRatio: p.drawdown_ratio_graham != null ? Number(p.drawdown_ratio_graham) : 0.5,
         savingsFundBills: p.savings_fund_bills != null ? !!p.savings_fund_bills : true,
-        drawOrder: p.draw_order === 'taxable' ? 'taxable' : 'taxfree',
+        withdrawalMethod: { graham: p.withdrawal_method_graham === 'fad' ? 'fad' : 'ufpls', julie: p.withdrawal_method_julie === 'fad' ? 'fad' : 'ufpls' },
+        crystallisationDate: {
+          graham: p.crystallisation_date_graham ? App.parseLocalDate(p.crystallisation_date_graham) : null,
+          julie: p.crystallisation_date_julie ? App.parseLocalDate(p.crystallisation_date_julie) : null
+        },
+        ufplsDivertTf: !!p.ufpls_divert_tf,
         phase1Date: App.parseLocalDate(p.shorter_week_date_1), phase1Days: p.working_days_1 ? Number(p.working_days_1) : 5,
         phase2Date: App.parseLocalDate(p.shorter_week_date_2), phase2Days: p.working_days_2 ? Number(p.working_days_2) : 5,
         p2phase: p2phase
