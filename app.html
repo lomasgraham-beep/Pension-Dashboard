@@ -191,7 +191,7 @@
     #crashTip { position:absolute; display:none; z-index:9999; background:#1e293b; color:#fff; font-size:13px; line-height:1.4; padding:10px 12px; border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,0.25); pointer-events:none; }
     #rTable th:first-child, #rTable td:first-child { white-space:nowrap; }
     #rTable { width:auto; }
-    #rTable th { white-space:normal; vertical-align:bottom; line-height:1.2; text-align:center; position:sticky; top:0; z-index:5; background:var(--surface); box-shadow:0 1px 0 var(--line); }
+    #rTable th { white-space:normal; vertical-align:bottom; line-height:1.2; text-align:center; }
     #rTable td { white-space:nowrap; }
     #rTable th, #rTable td { padding-right:22px; }
     #rTable th:first-child, #rTable td:first-child { padding-right:16px; }
@@ -200,6 +200,9 @@
     th { background:var(--surface-2); color:var(--ink); position:sticky; top:0; z-index:5; box-shadow:0 2px 0 var(--line); }
     tr.shortfall td { background:#fdecea; }
     .table-wrap { overflow-x:auto; overflow-y:visible; }
+    .frozen-header { position:fixed; top:0; z-index:50; overflow:hidden; pointer-events:none; background:var(--surface); box-shadow:0 2px 6px rgba(0,0,0,0.15); }
+    .frozen-header table { margin:0; }
+    .frozen-header th { background:var(--surface); }
 
     .subtab-buttons { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:15px; border-bottom:2px solid var(--line); padding-bottom:10px; }
     .subtab-group-label { flex-basis:100%; width:100%; margin:6px 0 0; font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-soft); }
@@ -428,7 +431,7 @@
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-284</span>
+      <span class="build-stamp">LC-285</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1179,6 +1182,8 @@
       });
     }
     function renderRetirementTable() {
+      // Remove frozen-header ghost so it rebuilds from the new thead
+      const _fg = document.querySelector('.frozen-header'); if (_fg) _fg.remove();
       const tb = document.querySelector('#rTable tbody');
       const rowsToShow = (retGran === 'month') ? (drawdownRows.monthly || []) : drawdownRows;
       // show/hide the growth column headers
@@ -1235,6 +1240,62 @@
       }).join('');
       applyColVisibility();
     }
+
+    // ---- Frozen table header (Safari-proof: no position:sticky needed) ----
+    // Clones the thead into a fixed-position div when the real header scrolls above the viewport.
+    (function initFrozenHeader() {
+      let ghost = null;
+      function getWrap() { return document.querySelector('#Retirement .table-wrap'); }
+      function syncWidths() {
+        if (!ghost) return;
+        const realThs = document.querySelectorAll('#rTable thead th');
+        const ghostThs = ghost.querySelectorAll('th');
+        realThs.forEach((th, i) => { if (ghostThs[i]) ghostThs[i].style.width = th.getBoundingClientRect().width + 'px'; });
+      }
+      function killGhost() { if (ghost) { ghost.remove(); ghost = null; } }
+      function onScroll() {
+        const table = document.getElementById('rTable');
+        const wrap = getWrap();
+        if (!table || !wrap) { killGhost(); return; }
+        const thead = table.querySelector('thead');
+        if (!thead) return;
+        const tRect = table.getBoundingClientRect();
+        const hRect = thead.getBoundingClientRect();
+        const wrapRect = wrap.getBoundingClientRect();
+        const needsFreeze = hRect.bottom < 0 && tRect.bottom > hRect.height;
+        if (needsFreeze) {
+          if (!ghost) {
+            ghost = document.createElement('div');
+            ghost.className = 'frozen-header';
+            const tbl = document.createElement('table');
+            tbl.style.cssText = 'border-collapse:collapse;font-size:' + getComputedStyle(table).fontSize;
+            tbl.appendChild(thead.cloneNode(true));
+            ghost.appendChild(tbl);
+            document.body.appendChild(ghost);
+            document.querySelectorAll('#rTable thead th').forEach((th, i) => {
+              const gTh = ghost.querySelectorAll('th')[i];
+              if (gTh) gTh.style.display = th.style.display;
+            });
+          }
+          ghost.style.left = wrapRect.left + 'px';
+          ghost.style.width = wrapRect.width + 'px';
+          ghost.querySelector('table').style.marginLeft = (-wrap.scrollLeft) + 'px';
+          syncWidths();
+        } else { killGhost(); }
+      }
+      window.addEventListener('scroll', onScroll, { passive: true });
+      document.addEventListener('scroll', function() {
+        const wrap = getWrap();
+        if (wrap && ghost) ghost.querySelector('table').style.marginLeft = (-wrap.scrollLeft) + 'px';
+      }, { passive: true, capture: true });
+      // Observe horizontal scroll on the table-wrap itself
+      new MutationObserver(function() {
+        const wrap = getWrap();
+        if (wrap) wrap.addEventListener('scroll', function() {
+          if (ghost) ghost.querySelector('table').style.marginLeft = (-wrap.scrollLeft) + 'px';
+        }, { passive: true });
+      }).observe(document.body, { childList: true, subtree: true });
+    })();
 
     // Render a custom HTML legend below a chart (Google's built-in legend paginates when
     // series don't fit on one line, which produces a fiddly "1/2 ▶" control). This wraps
