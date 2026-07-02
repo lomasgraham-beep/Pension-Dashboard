@@ -231,6 +231,9 @@
     // instant-access savings at its month is SKIPPED (not financed, never spills to drawdown).
     // Default true preserves the original behaviour byte-for-byte.
     const savingsFundBills = (cfg.savingsFundBills !== false);
+    // Which pot is consumed first for the monthly shortfall: 'taxfree' (default) or 'taxable'.
+    // Only affects fundPerson's draw order below; annuity/purchase draws are unaffected.
+    const drawOrder = (cfg.drawOrder === 'taxable') ? 'taxable' : 'taxfree';
     const unaffordable = [];   // purchases skipped under savingsFundBills=false
     const annuitySkipped = []; // annuities skipped because the member's DC pot was too small at the purchase month
     const members = data.members || [], bills = data.bills || [], dining = data.dining || [], guaranteed = data.guaranteed || [];
@@ -475,44 +478,58 @@
 
     // Fund one person's monthly net target from guaranteed income, then tax-free pot,
     // then taxable pot — but never taking the taxable pot below `txFloor`.
-    function fundPerson(target, inc, tfPot, txPot, txFloor) {
+    function fundPerson(target, inc, tfPot, txPot, txFloor, order) {
       const dbGross = inc.total;
       let dbNet, paRem;
       if (dbGross > MPA) { dbNet = MPA + (dbGross - MPA) * 0.80; paRem = 0; }
       else { dbNet = dbGross; paRem = MPA - dbGross; }
       let netGap = Math.max(target - dbNet, 0);
-      const drawTf = Math.min(netGap, tfPot);
-      netGap -= drawTf;
       const txAvail = Math.max(txPot - txFloor, 0);
-      let desiredGross = 0;
-      if (netGap > 0) desiredGross = (netGap <= paRem) ? netGap : paRem + (netGap - paRem) / 0.80;
-      const drawGross = Math.min(desiredGross, txAvail);
-      const netFromTax = (drawGross <= paRem) ? drawGross : paRem + (drawGross - paRem) * 0.80;
-      const unmetNet = Math.max(netGap - netFromTax, 0);
+      let drawTf, drawGross, netFromTax;
+      if (order === 'taxable') {
+        // Taxable first (PAYE-style), tax-free only for what's left.
+        let desiredGross = 0;
+        if (netGap > 0) desiredGross = (netGap <= paRem) ? netGap : paRem + (netGap - paRem) / 0.80;
+        drawGross = Math.min(desiredGross, txAvail);
+        netFromTax = (drawGross <= paRem) ? drawGross : paRem + (drawGross - paRem) * 0.80;
+        netGap -= netFromTax;
+        drawTf = Math.min(netGap, tfPot);
+        netGap -= drawTf;
+      } else {
+        // Tax-free first (default) — original behaviour, unchanged code path.
+        drawTf = Math.min(netGap, tfPot);
+        netGap -= drawTf;
+        let desiredGross = 0;
+        if (netGap > 0) desiredGross = (netGap <= paRem) ? netGap : paRem + (netGap - paRem) / 0.80;
+        drawGross = Math.min(desiredGross, txAvail);
+        netFromTax = (drawGross <= paRem) ? drawGross : paRem + (drawGross - paRem) * 0.80;
+        netGap -= netFromTax;
+      }
+      const unmetNet = Math.max(netGap, 0);
       return { drawTf, drawGross, tfAfter: tfPot - drawTf, txAfter: txPot - drawGross, unmetNet, inc, dbNet };
     }
 
     // MANUAL mode: independent per person, no floor, no redistribution (with means test).
-    function personManual(target, incRaw, tfPot, txPot) {
-      const p1 = fundPerson(target, incRaw, tfPot, txPot, 0);
+    function personManual(target, incRaw, tfPot, txPot, order) {
+      const p1 = fundPerson(target, incRaw, tfPot, txPot, 0, order);
       let inc = incRaw;
       if (sp.meansTest && sp.meansTest.enabled && sp.meansTest.taper > 0 && incRaw.stateGross > 0) {
         const over = Math.max(0, (p1.drawTf + p1.drawGross) - (sp.meansTest.threshold / 12));
         const reduction = Math.min(sp.meansTest.taper * over, incRaw.stateGross);
         if (reduction > 0) inc = { stateGross: incRaw.stateGross - reduction, otherGross: incRaw.otherGross, total: incRaw.total - reduction };
       }
-      const p2 = fundPerson(target, inc, tfPot, txPot, 0);
+      const p2 = fundPerson(target, inc, tfPot, txPot, 0, order);
       return Object.assign({}, p2, { inc: inc, shortfall: p2.unmetNet > 1 });
     }
 
     // DYNAMIC mode: split by ratio, cap at floors, redirect a capped person's shortfall
     // to the other; returns the household residual still unfunded after redistribution.
-    function allocate(gT, jT, gInc, jInc, tfG, txG, tfJ, txJ, fG, fJ) {
-      let g = fundPerson(gT, gInc, tfG, txG, fG);
-      let j = fundPerson(jT, jInc, tfJ, txJ, fJ);
+    function allocate(gT, jT, gInc, jInc, tfG, txG, tfJ, txJ, fG, fJ, order) {
+      let g = fundPerson(gT, gInc, tfG, txG, fG, order);
+      let j = fundPerson(jT, jInc, tfJ, txJ, fJ, order);
       let residual = 0;
-      if (g.unmetNet > 0.5) { j = fundPerson(jT + g.unmetNet, jInc, tfJ, txJ, fJ); residual = j.unmetNet; }
-      else if (j.unmetNet > 0.5) { g = fundPerson(gT + j.unmetNet, gInc, tfG, txG, fG); residual = g.unmetNet; }
+      if (g.unmetNet > 0.5) { j = fundPerson(jT + g.unmetNet, jInc, tfJ, txJ, fJ, order); residual = j.unmetNet; }
+      else if (j.unmetNet > 0.5) { g = fundPerson(gT + j.unmetNet, gInc, tfG, txG, fG, order); residual = g.unmetNet; }
       return { g: g, j: j, residual: residual };
     }
 
@@ -729,14 +746,14 @@
 
       let gRes, jRes, monthShort;
       if (cfg.dynamic) {
-        let a = allocate(gTargetM, jTargetM, gInc, jInc, gTf, gTx, jTf, jTx, gFloor, jFloor);
+        let a = allocate(gTargetM, jTargetM, gInc, jInc, gTf, gTx, jTf, jTx, gFloor, jFloor, drawOrder);
         if (a.residual > 0.5) {            // both at their floors → draw below the floors
-          a = allocate(gTargetM, jTargetM, gInc, jInc, gTf, gTx, jTf, jTx, 0, 0);
+          a = allocate(gTargetM, jTargetM, gInc, jInc, gTf, gTx, jTf, jTx, 0, 0, drawOrder);
         }
         gRes = a.g; jRes = a.j; monthShort = a.residual > 1; // genuine only if pots truly empty
       } else {
-        gRes = personManual(gTargetM, gInc, gTf, gTx);
-        jRes = personManual(jTargetM, jInc, jTf, jTx);
+        gRes = personManual(gTargetM, gInc, gTf, gTx, drawOrder);
+        jRes = personManual(jTargetM, jInc, jTf, jTx, drawOrder);
         monthShort = gRes.shortfall || jRes.shortfall;
       }
 
