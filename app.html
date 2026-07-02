@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=auth02"></script>
-  <script src="engine.js?v=surp1"></script>
+  <script src="engine.js?v=draw1"></script>
   <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
@@ -713,6 +713,15 @@
             <button type="button" class="info-btn" onclick="toggleInfo(event,'info_savb')" aria-label="What does Savings fund bills do?">i</button></label>
           <div class="info-text" id="info_savb">On (default): savings can offset bills and the pension covers any purchase deposit your savings can&rsquo;t. Off: savings never subsidise bills and grow on their own &mdash; a purchase whose deposit your savings can&rsquo;t cover is flagged &ldquo;not enough savings&rdquo; on the Cash &amp; Purchases page instead of drawing the pension.</div>
         </div>
+        <div class="ctrl ctrl-wide">
+          <div style="font-size:14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <strong style="color:#2c3e50;">Pot draw order:</strong>
+            <label style="cursor:pointer;"><input type="radio" name="m_draworder" value="taxfree" checked onchange="onParam()"> Tax-free first</label>
+            <label style="cursor:pointer;"><input type="radio" name="m_draworder" value="taxable" onchange="onParam()"> Taxable first</label>
+            <button type="button" class="info-btn" onclick="toggleInfo(event,'info_draworder')" aria-label="What does Pot draw order do?">i</button>
+          </div>
+          <div class="info-text" id="info_draworder">Which part of each person&rsquo;s pension pot is drawn first to cover a monthly shortfall. Tax-free first (default): today&rsquo;s behaviour &mdash; tax-free cash is used before any taxable drawdown. Taxable first: preserves tax-free cash for later &mdash; useful if you want to keep it available for a large one-off purchase such as a house.</div>
+        </div>
       </div>
       <div class="actions">
         <button class="pbtn pbtn-save" onclick="savePlan()">Save as my plan</button>
@@ -777,6 +786,8 @@
     <div style="margin:0 0 12px;">
       <span class="sw-pill">Savings fund bills: <b id="ret_savb_state">&hellip;</b><button type="button" class="info-btn" onclick="toggleInfo(event,'info_savb_ret')" aria-label="About Savings fund bills">i</button></span>
       <div class="info-text" id="info_savb_ret">When off, savings don&rsquo;t subsidise bills and grow on their own; an unaffordable purchase is flagged on the Cash &amp; Purchases page rather than drawing the pension. Change this on the Modelling page, in the left-hand controls rail.</div>
+      <span class="sw-pill">Pot draw order: <b id="ret_draworder_state">&hellip;</b><button type="button" class="info-btn" onclick="toggleInfo(event,'info_draworder_ret')" aria-label="About Pot draw order">i</button></span>
+      <div class="info-text" id="info_draworder_ret">Which pot funds the monthly shortfall first &mdash; tax-free (default) or taxable. Change this on the Modelling page, in the left-hand controls rail.</div>
     </div>
     <div class="ret-controls">
     <div class="scope-toggle">
@@ -879,7 +890,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-279</span>
+    <span class="build-stamp">build: LC-280</span>
   </div>
 
   <script>
@@ -2316,6 +2327,7 @@
         gRatio: p2Name ? (parseFloat(document.getElementById('m_ratio').value) / 100) : 1,
         dynamic: document.getElementById('m_dynamic').checked,
         savingsFundBills: document.getElementById('m_savebills').checked,
+        drawOrder: (document.querySelector('input[name="m_draworder"]:checked') || {}).value || 'taxfree',
         retired: savedPlan ? !!savedPlan.retired : false,
         gFloorPct: (parseFloat(document.getElementById('m_gfloor').value) || 0) / 100,
         jFloorPct: (parseFloat(document.getElementById('m_jfloor').value) || 0) / 100,
@@ -2327,6 +2339,8 @@
     function applyControls(plan) {
       document.getElementById('m_retire').value = dateToIdx(plan.retirementDate);
       document.getElementById('m_savebills').checked = (plan.savingsFundBills !== false);
+      const doEl = document.querySelector('input[name="m_draworder"][value="' + ((plan.drawOrder === 'taxable') ? 'taxable' : 'taxfree') + '"]');
+      if (doEl) doEl.checked = true;
       document.getElementById('m_growth').value = (plan.growthRate * 100).toFixed(2);
       document.getElementById('m_spend').value = Math.round(plan.spendRed * 100);
       document.getElementById('m_ratio').value = Math.round(plan.gRatio * 100);
@@ -2456,6 +2470,9 @@
       const on = document.getElementById('m_savebills').checked;
       const el = document.getElementById('ret_savb_state');
       if (el) { el.textContent = on ? 'On' : 'Off'; el.className = on ? 'sw-on' : 'sw-off'; }
+      const doVal = (document.querySelector('input[name="m_draworder"]:checked') || {}).value || 'taxfree';
+      const doEl = document.getElementById('ret_draworder_state');
+      if (doEl) { doEl.textContent = (doVal === 'taxable') ? 'Taxable first' : 'Tax-free first'; doEl.className = (doVal === 'taxable') ? 'sw-off' : 'sw-on'; }
     }
     function applyRetiredMode() {
       const on = savedPlan ? !!savedPlan.retired : false;
@@ -2486,6 +2503,7 @@
         spending_reduction_pct: c.spendRed,
         drawdown_ratio_graham: c.gRatio,
         savings_fund_bills: c.savingsFundBills,
+        draw_order: c.drawOrder,
         updated_at: new Date().toISOString()
       };
       msg.style.color = '#1e3a8a'; msg.textContent = 'Saving…';
@@ -2539,6 +2557,7 @@
         tierDateOverrides: plan.tierDateOverrides || null,
         dynamic: plan.dynamic, gFloorPct: plan.gFloorPct, jFloorPct: plan.jFloorPct,
         savingsFundBills: plan.savingsFundBills,
+        drawOrder: plan.drawOrder,
         sp: sp
       };
     }
@@ -2711,7 +2730,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front15';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front16';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -2907,6 +2926,7 @@
           spendRed: p.spending_reduction_pct != null ? Number(p.spending_reduction_pct) : 1.0,
           gRatio: p.drawdown_ratio_graham != null ? Number(p.drawdown_ratio_graham) : 0.5,
           savingsFundBills: p.savings_fund_bills != null ? !!p.savings_fund_bills : true,
+          drawOrder: p.draw_order === 'taxable' ? 'taxable' : 'taxfree',
           retired: p.retired_mode != null ? !!p.retired_mode : false
         };
 
