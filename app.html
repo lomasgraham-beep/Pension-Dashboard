@@ -239,14 +239,14 @@
     /* Wide screens: Modelling controls become a fixed left rail, charts fill the right and rise to top */
     @media (min-width: 1300px) {
       .model-layout { display:flex; gap:18px; align-items:flex-start; }
-      .model-layout .params { flex:0 0 300px; width:300px; position:sticky; top:10px; max-height:calc(100vh - 20px); overflow-y:auto; margin:0; }
+      .model-layout .params { flex:0 0 300px; width:300px; align-self:flex-start; margin:0; }
       .model-layout .params .grid { grid-template-columns:1fr; gap:14px; }   /* stack sliders top-to-bottom */
       .model-layout .params .ctrl > label { min-height:0; }                  /* labels can wrap freely */
       .model-layout .params .floors-panel.show { grid-template-columns:1fr; }
       .model-layout .model-main { flex:1 1 auto; min-width:0; }
       .model-layout .model-main h2 { margin-top:0; }                         /* charts rise to the top */
       .rail-collapse { width:100%; margin-bottom:10px; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); color:var(--ink-soft); font-weight:bold; font-size:13px; cursor:pointer; }
-      .rail-strip { display:none; flex:0 0 30px; width:30px; align-self:stretch; min-height:300px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); cursor:pointer; position:sticky; top:10px; }
+      .rail-strip { display:none; flex:0 0 30px; width:30px; align-self:stretch; min-height:300px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); cursor:pointer; }
       .rail-strip span { writing-mode:vertical-rl; transform:rotate(180deg); display:block; text-align:center; padding:14px 0; color:var(--ink-soft); font-weight:bold; font-size:13px; white-space:nowrap; }
       /* collapsed: hide the rail, show the thin strip */
       .model-layout.collapsed .params { display:none; }
@@ -428,7 +428,7 @@
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-282</span>
+      <span class="build-stamp">LC-283</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
