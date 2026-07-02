@@ -231,9 +231,13 @@
     // instant-access savings at its month is SKIPPED (not financed, never spills to drawdown).
     // Default true preserves the original behaviour byte-for-byte.
     const savingsFundBills = (cfg.savingsFundBills !== false);
-    // Which pot is consumed first for the monthly shortfall: 'taxfree' (default) or 'taxable'.
-    // Only affects fundPerson's draw order below; annuity/purchase draws are unaffected.
-    const drawOrder = (cfg.drawOrder === 'taxable') ? 'taxable' : 'taxfree';
+    // Withdrawal method per person: 'ufpls' (default) or 'fad' (Flexi-Access Drawdown).
+    // UFPLS: each monthly draw is 25% tax-free, 75% taxable. FAD: crystallise at a date,
+    // take 25% PCLS → surplus savings, then all subsequent draws are 100% taxable.
+    const wm = cfg.withdrawalMethod || {};
+    const gMode = (wm.graham === 'fad') ? 'fad' : 'ufpls';
+    const jMode = (wm.julie === 'fad') ? 'fad' : 'ufpls';
+    const divertTf = !!cfg.ufplsDivertTf;  // household-wide: divert 25% TF to surplus savings
     const unaffordable = [];   // purchases skipped under savingsFundBills=false
     const annuitySkipped = []; // annuities skipped because the member's DC pot was too small at the purchase month
     const members = data.members || [], bills = data.bills || [], dining = data.dining || [], guaranteed = data.guaranteed || [];
@@ -473,63 +477,87 @@
     // Floors (dynamic mode): each person's taxable pot is protected down to a % of
     // its value at retirement. Drawing stops at the floor and the unmet need is
     // redirected to the other person. If BOTH reach their floors, we draw below them.
-    const gFloor = cfg.dynamic ? (cfg.gFloorPct || 0) * (cfg.pots.graham * 0.75) : 0;
-    const jFloor = cfg.dynamic ? (cfg.jFloorPct || 0) * (cfg.pots.julie  * 0.75) : 0;
+    const gFloor = cfg.dynamic ? (cfg.gFloorPct || 0) * cfg.pots.graham : 0;
+    const jFloor = cfg.dynamic ? (cfg.jFloorPct || 0) * cfg.pots.julie  : 0;
 
-    // Fund one person's monthly net target from guaranteed income, then tax-free pot,
-    // then taxable pot — but never taking the taxable pot below `txFloor`.
-    function fundPerson(target, inc, tfPot, txPot, txFloor, order) {
+    // FAD crystallisation: month-index at which each person crystallises (takes PCLS → surplus).
+    // Before this month: UFPLS rules (25/75). At this month: 25% of pot → surplus, pot = 75%.
+    // After: all draws 100% taxable. Defaults to Infinity (= never crystallise = pure UFPLS).
+    const cd = cfg.crystallisationDate || {};
+    const gCrystIdx = (gMode === 'fad' && cd.graham) ? cd.graham.getFullYear() * 12 + cd.graham.getMonth() : Infinity;
+    const jCrystIdx = (jMode === 'fad' && cd.julie)  ? cd.julie.getFullYear()  * 12 + cd.julie.getMonth()  : Infinity;
+    let gCrystallised = false, jCrystallised = false;
+
+    // Fund one person's monthly net target from guaranteed income, then DC pot.
+    // Under UFPLS: each draw is 25% tax-free, 75% taxable (UK pension law).
+    // Under FAD post-crystallisation: all draws are 100% taxable (PCLS already taken).
+    // `potFloor`: minimum total pot value (Dynamic mode only; 0 = no floor).
+    // `crystallised`: true once FAD crystallisation has occurred (tfPot will be 0).
+    // `dvTf`: divert the 25% tax-free element of UFPLS draws to surplus savings.
+    function fundPerson(target, inc, tfPot, txPot, potFloor, crystallised, dvTf) {
       const dbGross = inc.total;
       let dbNet, paRem;
       if (dbGross > MPA) { dbNet = MPA + (dbGross - MPA) * 0.80; paRem = 0; }
       else { dbNet = dbGross; paRem = MPA - dbGross; }
-      let netGap = Math.max(target - dbNet, 0);
-      const txAvail = Math.max(txPot - txFloor, 0);
-      let drawTf, drawGross, netFromTax;
-      if (order === 'taxable') {
-        // Taxable first (PAYE-style), tax-free only for what's left.
-        let desiredGross = 0;
-        if (netGap > 0) desiredGross = (netGap <= paRem) ? netGap : paRem + (netGap - paRem) / 0.80;
-        drawGross = Math.min(desiredGross, txAvail);
-        netFromTax = (drawGross <= paRem) ? drawGross : paRem + (drawGross - paRem) * 0.80;
-        netGap -= netFromTax;
-        drawTf = Math.min(netGap, tfPot);
-        netGap -= drawTf;
-      } else {
-        // Tax-free first (default) — original behaviour, unchanged code path.
-        drawTf = Math.min(netGap, tfPot);
-        netGap -= drawTf;
-        let desiredGross = 0;
-        if (netGap > 0) desiredGross = (netGap <= paRem) ? netGap : paRem + (netGap - paRem) / 0.80;
-        drawGross = Math.min(desiredGross, txAvail);
-        netFromTax = (drawGross <= paRem) ? drawGross : paRem + (drawGross - paRem) * 0.80;
-        netGap -= netFromTax;
+      const netGap = Math.max(target - dbNet, 0);
+      // Net received from a given gross taxable amount after PAYE
+      function taxNet(gross) { return gross <= paRem ? gross : paRem + (gross - paRem) * 0.80; }
+      const pot = tfPot + txPot;
+      const potAvail = Math.max(pot - potFloor, 0);
+      let G = 0, drawTf = 0, drawGross = 0, tfToSurplus = 0;
+      if (netGap > 0) {
+        if (crystallised) {
+          // FAD post-crystallisation: 100% taxable draw from txPot (tfPot is 0)
+          if (netGap <= paRem) G = netGap;
+          else G = paRem + (netGap - paRem) / 0.80;
+          G = Math.min(G, potAvail);
+          drawGross = G;
+        } else if (dvTf) {
+          // UFPLS + divert: only 75% taxable portion covers bills; 25% TF → surplus
+          if (netGap <= paRem) G = netGap / 0.75;
+          else G = (netGap - 0.20 * paRem) / 0.60;
+          G = Math.min(G, potAvail);
+          drawTf = 0.25 * G; drawGross = 0.75 * G;
+          tfToSurplus = drawTf;
+        } else {
+          // UFPLS default: full net (25% TF + 75% taxable net) covers bills
+          const threshold = paRem / 0.75;    // G at which 0.75*G = paRem
+          if (netGap <= threshold) G = netGap;
+          else G = (netGap - 0.20 * paRem) / 0.85;
+          G = Math.min(G, potAvail);
+          drawTf = 0.25 * G; drawGross = 0.75 * G;
+        }
       }
-      const unmetNet = Math.max(netGap, 0);
-      return { drawTf, drawGross, tfAfter: tfPot - drawTf, txAfter: txPot - drawGross, unmetNet, inc, dbNet };
+      // Actual net delivered to bills
+      const actualNet = crystallised ? taxNet(drawGross) :
+                        dvTf ? taxNet(drawGross) :
+                        drawTf + taxNet(drawGross);
+      const unmetNet = Math.max(0, netGap - actualNet);
+      return { drawTf, drawGross, tfAfter: tfPot - drawTf, txAfter: txPot - drawGross,
+               unmetNet, tfToSurplus, inc, dbNet };
     }
 
     // MANUAL mode: independent per person, no floor, no redistribution (with means test).
-    function personManual(target, incRaw, tfPot, txPot, order) {
-      const p1 = fundPerson(target, incRaw, tfPot, txPot, 0, order);
+    function personManual(target, incRaw, tfPot, txPot, crystallised, dvTf) {
+      const p1 = fundPerson(target, incRaw, tfPot, txPot, 0, crystallised, dvTf);
       let inc = incRaw;
       if (sp.meansTest && sp.meansTest.enabled && sp.meansTest.taper > 0 && incRaw.stateGross > 0) {
         const over = Math.max(0, (p1.drawTf + p1.drawGross) - (sp.meansTest.threshold / 12));
         const reduction = Math.min(sp.meansTest.taper * over, incRaw.stateGross);
         if (reduction > 0) inc = { stateGross: incRaw.stateGross - reduction, otherGross: incRaw.otherGross, total: incRaw.total - reduction };
       }
-      const p2 = fundPerson(target, inc, tfPot, txPot, 0, order);
+      const p2 = fundPerson(target, inc, tfPot, txPot, 0, crystallised, dvTf);
       return Object.assign({}, p2, { inc: inc, shortfall: p2.unmetNet > 1 });
     }
 
     // DYNAMIC mode: split by ratio, cap at floors, redirect a capped person's shortfall
     // to the other; returns the household residual still unfunded after redistribution.
-    function allocate(gT, jT, gInc, jInc, tfG, txG, tfJ, txJ, fG, fJ, order) {
-      let g = fundPerson(gT, gInc, tfG, txG, fG, order);
-      let j = fundPerson(jT, jInc, tfJ, txJ, fJ, order);
+    function allocate(gT, jT, gInc, jInc, tfG, txG, tfJ, txJ, fG, fJ, gCr, jCr, dvTf) {
+      let g = fundPerson(gT, gInc, tfG, txG, fG, gCr, dvTf);
+      let j = fundPerson(jT, jInc, tfJ, txJ, fJ, jCr, dvTf);
       let residual = 0;
-      if (g.unmetNet > 0.5) { j = fundPerson(jT + g.unmetNet, jInc, tfJ, txJ, fJ, order); residual = j.unmetNet; }
-      else if (j.unmetNet > 0.5) { g = fundPerson(gT + j.unmetNet, gInc, tfG, txG, fG, order); residual = g.unmetNet; }
+      if (g.unmetNet > 0.5) { j = fundPerson(jT + g.unmetNet, jInc, tfJ, txJ, fJ, jCr, dvTf); residual = j.unmetNet; }
+      else if (j.unmetNet > 0.5) { g = fundPerson(gT + j.unmetNet, gInc, tfG, txG, fG, gCr, dvTf); residual = g.unmetNet; }
       return { g: g, j: j, residual: residual };
     }
 
@@ -714,6 +742,17 @@
       // opening pots for THIS month (before drawdown)
       const oGTf = gTf, oGTx = gTx, oJTf = jTf, oJTx = jTx;
 
+      // ---- FAD crystallisation events ----
+      // On the crystallisation month: PCLS (= current tax-free portion ≈ 25%) → surplus savings.
+      // Pot becomes 100% taxable from this point. All subsequent draws skip the 25/75 split.
+      let gPcls = 0, jPcls = 0;
+      if (gMode === 'fad' && idx === gCrystIdx && !gCrystallised) {
+        gPcls = gTf; gSurplusBal += gTf; gTf = 0; gCrystallised = true;
+      }
+      if (jMode === 'fad' && idx === jCrystIdx && !jCrystallised) {
+        jPcls = jTf; jSurplusBal += jTf; jTf = 0; jCrystallised = true;
+      }
+
       // ---- Annuity purchases dated this month ----
       // Buy from the member's own DC pot (tax-free + taxable), reduced PROPORTIONALLY so the
       // 25/75 split is preserved. Affordability is checked on the opening pot (pre-draw, pre-growth).
@@ -746,14 +785,14 @@
 
       let gRes, jRes, monthShort;
       if (cfg.dynamic) {
-        let a = allocate(gTargetM, jTargetM, gInc, jInc, gTf, gTx, jTf, jTx, gFloor, jFloor, drawOrder);
+        let a = allocate(gTargetM, jTargetM, gInc, jInc, gTf, gTx, jTf, jTx, gFloor, jFloor, gCrystallised, jCrystallised, divertTf);
         if (a.residual > 0.5) {            // both at their floors → draw below the floors
-          a = allocate(gTargetM, jTargetM, gInc, jInc, gTf, gTx, jTf, jTx, 0, 0, drawOrder);
+          a = allocate(gTargetM, jTargetM, gInc, jInc, gTf, gTx, jTf, jTx, 0, 0, gCrystallised, jCrystallised, divertTf);
         }
         gRes = a.g; jRes = a.j; monthShort = a.residual > 1; // genuine only if pots truly empty
       } else {
-        gRes = personManual(gTargetM, gInc, gTf, gTx, drawOrder);
-        jRes = personManual(jTargetM, jInc, jTf, jTx, drawOrder);
+        gRes = personManual(gTargetM, gInc, gTf, gTx, gCrystallised, divertTf);
+        jRes = personManual(jTargetM, jInc, jTf, jTx, jCrystallised, divertTf);
         monthShort = gRes.shortfall || jRes.shortfall;
       }
 
@@ -780,8 +819,8 @@
       // (target), only when positive. Grows monthly at 3%/12; never drawn from.
       gSurplusBal *= (1 + SURPLUS_MONTHLY_RATE);
       jSurplusBal *= (1 + SURPLUS_MONTHLY_RATE);
-      const gSurplusThis = Math.max(0, gRes.dbNet - gTargetM);
-      const jSurplusThis = Math.max(0, jRes.dbNet - jTargetM);
+      const gSurplusThis = Math.max(0, gRes.dbNet - gTargetM) + (gRes.tfToSurplus || 0);
+      const jSurplusThis = Math.max(0, jRes.dbNet - jTargetM) + (jRes.tfToSurplus || 0);
       gSurplusBal += gSurplusThis;
       jSurplusBal += jSurplusThis;
 
