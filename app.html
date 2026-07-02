@@ -191,7 +191,7 @@
     #crashTip { position:absolute; display:none; z-index:9999; background:#1e293b; color:#fff; font-size:13px; line-height:1.4; padding:10px 12px; border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,0.25); pointer-events:none; }
     #rTable th:first-child, #rTable td:first-child { white-space:nowrap; }
     #rTable { width:auto; }
-    #rTable th { white-space:normal; vertical-align:bottom; line-height:1.2; text-align:center; }
+    #rTable th { white-space:normal; vertical-align:bottom; line-height:1.2; text-align:center; position:sticky; top:0; z-index:5; background:var(--surface); box-shadow:0 1px 0 var(--line); }
     #rTable td { white-space:nowrap; }
     #rTable th, #rTable td { padding-right:22px; }
     #rTable th:first-child, #rTable td:first-child { padding-right:16px; }
@@ -428,7 +428,7 @@
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-283</span>
+      <span class="build-stamp">LC-284</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
