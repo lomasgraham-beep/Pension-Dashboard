@@ -5,7 +5,7 @@
 <title>Retire Frontier</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=err45"></script>
-<script src="engine.js?v=surp1"></script>
+<script src="engine.js?v=draw1"></script>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
   :root {
@@ -90,7 +90,7 @@
 
   <div class="head">
     <div class="hrow">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front6)</span></span>
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front7)</span></span>
       <div class="seg" id="seg">
         <button type="button" class="seg-btn active" data-mode="joint">Joint</button>
         <button type="button" class="seg-btn" data-mode="p1" id="segP1">Graham</button>
@@ -154,7 +154,7 @@
       phase1Date: savedBase.phase1Date, phase1Days: savedBase.phase1Days,
       phase2Date: savedBase.phase2Date, phase2Days: savedBase.phase2Days,
       p2phase: savedBase.p2phase, gRatio: savedBase.gRatio,
-      savingsFundBills: savedBase.savingsFundBills, retired: false
+      savingsFundBills: savedBase.savingsFundBills, drawOrder: savedBase.drawOrder, retired: false
     };
   }
   function baseFor(retireDate) {
@@ -172,7 +172,7 @@
     const cfg = {
       pots: base.pots, potsAtOwnRetire: base.own, gRatio: savedBase.gRatio,
       spendRed: spendPct / 100, startYear: base.startYr, retirementDate: base.pl.retirementDate,
-      retireByMember: base.pl.retireByMember, savingsFundBills: savedBase.savingsFundBills, sp: base.sp
+      retireByMember: base.pl.retireByMember, savingsFundBills: savedBase.savingsFundBills, drawOrder: savedBase.drawOrder, sp: base.sp
     };
     const rows = PensionEngine.drawdown(data, cfg) || [];
     if (!rows.length) return null;
@@ -452,6 +452,7 @@
         growthRate: p.pension_growth_rate != null ? Number(p.pension_growth_rate) : 0.05,
         gRatio: p.drawdown_ratio_graham != null ? Number(p.drawdown_ratio_graham) : 0.5,
         savingsFundBills: p.savings_fund_bills != null ? !!p.savings_fund_bills : true,
+        drawOrder: p.draw_order === 'taxable' ? 'taxable' : 'taxfree',
         phase1Date: App.parseLocalDate(p.shorter_week_date_1), phase1Days: p.working_days_1 ? Number(p.working_days_1) : 5,
         phase2Date: App.parseLocalDate(p.shorter_week_date_2), phase2Days: p.working_days_2 ? Number(p.working_days_2) : 5,
         p2phase: p2phase, planRetire: planRetire,
