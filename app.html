@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=auth02"></script>
-  <script src="engine.js?v=draw1"></script>
+  <script src="engine.js?v=ufpls1"></script>
   <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
@@ -714,13 +714,29 @@
           <div class="info-text" id="info_savb">On (default): savings can offset bills and the pension covers any purchase deposit your savings can&rsquo;t. Off: savings never subsidise bills and grow on their own &mdash; a purchase whose deposit your savings can&rsquo;t cover is flagged &ldquo;not enough savings&rdquo; on the Cash &amp; Purchases page instead of drawing the pension.</div>
         </div>
         <div class="ctrl ctrl-wide">
-          <div style="font-size:14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <strong style="color:#2c3e50;">Pot draw order:</strong>
-            <label style="cursor:pointer;"><input type="radio" name="m_draworder" value="taxfree" checked onchange="onParam()"> Tax-free first</label>
-            <label style="cursor:pointer;"><input type="radio" name="m_draworder" value="taxable" onchange="onParam()"> Taxable first</label>
-            <button type="button" class="info-btn" onclick="toggleInfo(event,'info_draworder')" aria-label="What does Pot draw order do?">i</button>
+          <div style="font-size:14px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            <strong style="color:#2c3e50;" id="m_wm_g_label">Graham:</strong>
+            <label style="cursor:pointer;"><input type="radio" name="m_wm_g" value="ufpls" checked onchange="onParam()"> UFPLS</label>
+            <label style="cursor:pointer;"><input type="radio" name="m_wm_g" value="fad" onchange="onParam()"> FAD</label>
+            <button type="button" class="info-btn" onclick="toggleInfo(event,'info_wm')" aria-label="About withdrawal method">i</button>
           </div>
-          <div class="info-text" id="info_draworder">Which part of each person&rsquo;s pension pot is drawn first to cover a monthly shortfall. Tax-free first (default): today&rsquo;s behaviour &mdash; tax-free cash is used before any taxable drawdown. Taxable first: preserves tax-free cash for later &mdash; useful if you want to keep it available for a large one-off purchase such as a house.</div>
+          <div id="m_crystdate_g_wrap" style="display:none;margin:4px 0 0 8px;font-size:13px;">
+            <label>Crystallisation date: <input type="date" id="m_crystdate_g" onchange="onParam()" style="font-size:13px;"></label>
+          </div>
+          <div style="font-size:14px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px;">
+            <strong style="color:#2c3e50;" id="m_wm_j_label">Julie:</strong>
+            <label style="cursor:pointer;"><input type="radio" name="m_wm_j" value="ufpls" checked onchange="onParam()"> UFPLS</label>
+            <label style="cursor:pointer;"><input type="radio" name="m_wm_j" value="fad" onchange="onParam()"> FAD</label>
+          </div>
+          <div id="m_crystdate_j_wrap" style="display:none;margin:4px 0 0 8px;font-size:13px;">
+            <label>Crystallisation date: <input type="date" id="m_crystdate_j" onchange="onParam()" style="font-size:13px;"></label>
+          </div>
+          <div class="info-text" id="info_wm">UFPLS (default): each pension withdrawal is 25% tax-free and 75% taxable &mdash; matches UK pension law for uncrystallised funds. FAD (Flexi-Access Drawdown): on the crystallisation date, 25% of the pot is taken as a tax-free PCLS lump sum (added to surplus savings) and the remaining 75% stays invested; all subsequent draws are 100% taxable.</div>
+        </div>
+        <div class="ctrl ctrl-wide">
+          <label class="switch"><input type="checkbox" id="m_divert_tf" onchange="onParam()"><span class="track"></span><span class="switch-text">Divert tax-free to surplus savings</span>
+            <button type="button" class="info-btn" onclick="toggleInfo(event,'info_divert')" aria-label="About divert tax-free">i</button></label>
+          <div class="info-text" id="info_divert">When on (UFPLS mode only): the 25% tax-free element of each pension withdrawal is diverted to surplus savings instead of covering bills. Bills are funded entirely by the 75% taxable portion (net of tax), so the gross withdrawal is larger but you build a tax-free cash buffer. When off (default): the full net &mdash; 25% tax-free plus 75% taxable net &mdash; covers bills.</div>
         </div>
       </div>
       <div class="actions">
@@ -786,8 +802,9 @@
     <div style="margin:0 0 12px;">
       <span class="sw-pill">Savings fund bills: <b id="ret_savb_state">&hellip;</b><button type="button" class="info-btn" onclick="toggleInfo(event,'info_savb_ret')" aria-label="About Savings fund bills">i</button></span>
       <div class="info-text" id="info_savb_ret">When off, savings don&rsquo;t subsidise bills and grow on their own; an unaffordable purchase is flagged on the Cash &amp; Purchases page rather than drawing the pension. Change this on the Modelling page, in the left-hand controls rail.</div>
-      <span class="sw-pill">Pot draw order: <b id="ret_draworder_state">&hellip;</b><button type="button" class="info-btn" onclick="toggleInfo(event,'info_draworder_ret')" aria-label="About Pot draw order">i</button></span>
-      <div class="info-text" id="info_draworder_ret">Which pot funds the monthly shortfall first &mdash; tax-free (default) or taxable. Change this on the Modelling page, in the left-hand controls rail.</div>
+      <span class="sw-pill" id="ret_wm_g_pill"><b id="ret_wm_g_label">Graham</b>: <b id="ret_wm_g_state">&hellip;</b></span>
+      <span class="sw-pill" id="ret_wm_j_pill"><b id="ret_wm_j_label">Julie</b>: <b id="ret_wm_j_state">&hellip;</b></span>
+      <span class="sw-pill">TF&nbsp;&rarr;&nbsp;surplus: <b id="ret_divert_state">&hellip;</b></span>
     </div>
     <div class="ret-controls">
     <div class="scope-toggle">
@@ -890,7 +907,7 @@
 
   <div class="app-footer">
     <span class="who"><span id="whoami"></span></span>
-    <span class="build-stamp">build: LC-280</span>
+    <span class="build-stamp">build: LC-281</span>
   </div>
 
   <script>
@@ -2327,7 +2344,11 @@
         gRatio: p2Name ? (parseFloat(document.getElementById('m_ratio').value) / 100) : 1,
         dynamic: document.getElementById('m_dynamic').checked,
         savingsFundBills: document.getElementById('m_savebills').checked,
-        drawOrder: (document.querySelector('input[name="m_draworder"]:checked') || {}).value || 'taxfree',
+        withdrawalMethodGraham: (document.querySelector('input[name="m_wm_g"]:checked') || {}).value || 'ufpls',
+        withdrawalMethodJulie: (document.querySelector('input[name="m_wm_j"]:checked') || {}).value || 'ufpls',
+        crystallisationDateGraham: document.getElementById('m_crystdate_g').value || null,
+        crystallisationDateJulie: document.getElementById('m_crystdate_j').value || null,
+        ufplsDivertTf: document.getElementById('m_divert_tf').checked,
         retired: savedPlan ? !!savedPlan.retired : false,
         gFloorPct: (parseFloat(document.getElementById('m_gfloor').value) || 0) / 100,
         jFloorPct: (parseFloat(document.getElementById('m_jfloor').value) || 0) / 100,
@@ -2339,8 +2360,15 @@
     function applyControls(plan) {
       document.getElementById('m_retire').value = dateToIdx(plan.retirementDate);
       document.getElementById('m_savebills').checked = (plan.savingsFundBills !== false);
-      const doEl = document.querySelector('input[name="m_draworder"][value="' + ((plan.drawOrder === 'taxable') ? 'taxable' : 'taxfree') + '"]');
-      if (doEl) doEl.checked = true;
+      const wmg = document.querySelector('input[name="m_wm_g"][value="' + ((plan.withdrawalMethodGraham === 'fad') ? 'fad' : 'ufpls') + '"]');
+      if (wmg) wmg.checked = true;
+      const wmj = document.querySelector('input[name="m_wm_j"][value="' + ((plan.withdrawalMethodJulie === 'fad') ? 'fad' : 'ufpls') + '"]');
+      if (wmj) wmj.checked = true;
+      document.getElementById('m_crystdate_g').value = plan.crystallisationDateGraham || '';
+      document.getElementById('m_crystdate_j').value = plan.crystallisationDateJulie || '';
+      document.getElementById('m_divert_tf').checked = !!plan.ufplsDivertTf;
+      document.getElementById('m_crystdate_g_wrap').style.display = (plan.withdrawalMethodGraham === 'fad') ? '' : 'none';
+      document.getElementById('m_crystdate_j_wrap').style.display = (plan.withdrawalMethodJulie === 'fad') ? '' : 'none';
       document.getElementById('m_growth').value = (plan.growthRate * 100).toFixed(2);
       document.getElementById('m_spend').value = Math.round(plan.spendRed * 100);
       document.getElementById('m_ratio').value = Math.round(plan.gRatio * 100);
@@ -2470,9 +2498,16 @@
       const on = document.getElementById('m_savebills').checked;
       const el = document.getElementById('ret_savb_state');
       if (el) { el.textContent = on ? 'On' : 'Off'; el.className = on ? 'sw-on' : 'sw-off'; }
-      const doVal = (document.querySelector('input[name="m_draworder"]:checked') || {}).value || 'taxfree';
-      const doEl = document.getElementById('ret_draworder_state');
-      if (doEl) { doEl.textContent = (doVal === 'taxable') ? 'Taxable first' : 'Tax-free first'; doEl.className = (doVal === 'taxable') ? 'sw-off' : 'sw-on'; }
+      const wmgVal = (document.querySelector('input[name="m_wm_g"]:checked') || {}).value || 'ufpls';
+      const wmjVal = (document.querySelector('input[name="m_wm_j"]:checked') || {}).value || 'ufpls';
+      const wmgEl = document.getElementById('ret_wm_g_state');
+      const wmjEl = document.getElementById('ret_wm_j_state');
+      if (wmgEl) { wmgEl.textContent = wmgVal === 'fad' ? 'FAD' : 'UFPLS'; wmgEl.className = wmgVal === 'fad' ? 'sw-off' : 'sw-on'; }
+      if (wmjEl) { wmjEl.textContent = wmjVal === 'fad' ? 'FAD' : 'UFPLS'; wmjEl.className = wmjVal === 'fad' ? 'sw-off' : 'sw-on'; }
+      const dvEl = document.getElementById('ret_divert_state');
+      if (dvEl) { const dv = document.getElementById('m_divert_tf').checked; dvEl.textContent = dv ? 'On' : 'Off'; dvEl.className = dv ? 'sw-off' : 'sw-on'; }
+      document.getElementById('m_crystdate_g_wrap').style.display = wmgVal === 'fad' ? '' : 'none';
+      document.getElementById('m_crystdate_j_wrap').style.display = wmjVal === 'fad' ? '' : 'none';
     }
     function applyRetiredMode() {
       const on = savedPlan ? !!savedPlan.retired : false;
@@ -2503,7 +2538,11 @@
         spending_reduction_pct: c.spendRed,
         drawdown_ratio_graham: c.gRatio,
         savings_fund_bills: c.savingsFundBills,
-        draw_order: c.drawOrder,
+        withdrawal_method_graham: c.withdrawalMethodGraham,
+        withdrawal_method_julie: c.withdrawalMethodJulie,
+        crystallisation_date_graham: c.crystallisationDateGraham || null,
+        crystallisation_date_julie: c.crystallisationDateJulie || null,
+        ufpls_divert_tf: c.ufplsDivertTf,
         updated_at: new Date().toISOString()
       };
       msg.style.color = '#1e3a8a'; msg.textContent = 'Saving…';
@@ -2557,7 +2596,12 @@
         tierDateOverrides: plan.tierDateOverrides || null,
         dynamic: plan.dynamic, gFloorPct: plan.gFloorPct, jFloorPct: plan.jFloorPct,
         savingsFundBills: plan.savingsFundBills,
-        drawOrder: plan.drawOrder,
+        withdrawalMethod: { graham: plan.withdrawalMethodGraham || 'ufpls', julie: plan.withdrawalMethodJulie || 'ufpls' },
+        crystallisationDate: {
+          graham: plan.crystallisationDateGraham ? App.parseLocalDate(plan.crystallisationDateGraham) : null,
+          julie: plan.crystallisationDateJulie ? App.parseLocalDate(plan.crystallisationDateJulie) : null
+        },
+        ufplsDivertTf: plan.ufplsDivertTf,
         sp: sp
       };
     }
@@ -2730,7 +2774,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front16';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front17';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -2926,7 +2970,11 @@
           spendRed: p.spending_reduction_pct != null ? Number(p.spending_reduction_pct) : 1.0,
           gRatio: p.drawdown_ratio_graham != null ? Number(p.drawdown_ratio_graham) : 0.5,
           savingsFundBills: p.savings_fund_bills != null ? !!p.savings_fund_bills : true,
-          drawOrder: p.draw_order === 'taxable' ? 'taxable' : 'taxfree',
+          withdrawalMethodGraham: p.withdrawal_method_graham === 'fad' ? 'fad' : 'ufpls',
+          withdrawalMethodJulie: p.withdrawal_method_julie === 'fad' ? 'fad' : 'ufpls',
+          crystallisationDateGraham: p.crystallisation_date_graham || null,
+          crystallisationDateJulie: p.crystallisation_date_julie || null,
+          ufplsDivertTf: !!p.ufpls_divert_tf,
           retired: p.retired_mode != null ? !!p.retired_mode : false
         };
 
