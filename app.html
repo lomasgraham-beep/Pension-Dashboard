@@ -463,7 +463,7 @@
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-295</span>
+      <span class="build-stamp">LC-296</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1275,7 +1275,11 @@
       const tr = btn.closest('tr');
       const detail = tr.nextElementSibling;
       if (!detail || !detail.classList.contains('ss-detail-row')) return;
-      const open = (detail.style.display === 'none' || !detail.style.display);
+      // Every detail row is created with an explicit style="display:none;" (see the row
+      // template below), so 'none' unambiguously means closed and '' means open. The old
+      // check also treated a falsy style.display ('') as closed — but that's exactly the
+      // value left behind after opening, so it re-opened on every tap and could never close.
+      const open = (detail.style.display === 'none');
       if (open) {
         const cell = detail.firstElementChild;
         if (!cell.dataset.built) { cell.innerHTML = ssRowDetailHtml(ssRetRowsShown[+tr.dataset.ri]); cell.dataset.built = '1'; }
