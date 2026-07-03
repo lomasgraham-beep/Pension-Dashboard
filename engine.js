@@ -1,5 +1,6 @@
 /* ============================================================
    engine.js  —  Pension modelling engine (pure JavaScript)
+   build tag: brk1  (additive: per-person tax/net + per-source income breakdown, display-only)
 
    This is the SAME maths that runs in the Scenario Lab, which was
    validated against the Supabase functions (calculate_joint_retirement
@@ -438,6 +439,7 @@
     function grossMonth(who, idx, elapsed) {
       const elapsedYrs = Math.floor(elapsed);   // annual step: flat within each year since retirement
       let stateGross = 0, otherGross = 0;
+      const sources = [];   // additive: per-source breakdown for the expandable audit panel (display only)
       guaranteed.filter(g => g.member_name === who).forEach(g => {
         if (!g.start_date) return;
         const isState = sp.stateNames.has(g.income_name);
@@ -451,6 +453,7 @@
           // stored as TODAY'S value → grow from now to this month (pre-retirement span + whole years since)
           const monthly = (Number(g.initial_annual_value) || 0) / 12 * Math.pow(1 + sp.spRate, Math.floor(preRetireYears + elapsed));
           stateGross += monthly;
+          sources.push({ name: g.income_name, gross: monthly, kind: 'state' });
         } else {
           // stored as value at retirement → grow across whole years since retirement at THIS
           // income's own escalation rate (DB scheme rule); falls back to INFL (2.5%) if unset.
@@ -458,6 +461,7 @@
           const escR = escRaw > 1 ? escRaw / 100 : escRaw;   // tolerate decimal or percent
           const monthly = (Number(g.initial_annual_value) || 0) / 12 * Math.pow(1 + escR, elapsedYrs);
           otherGross += monthly;
+          sources.push({ name: g.income_name, gross: monthly, kind: 'db' });
         }
       });
       // annuity income: purchased annuities for this member pay from their purchase month onward,
@@ -468,10 +472,12 @@
         if (a.member !== who || !a.purchased || a.skipped) return;
         if (idx < a.pIdx) return;
         const yrs = Math.floor((idx - a.pIdx) / 12);
-        annuityGross += a.annualIncome / 12 * Math.pow(1 + a.esc, yrs);
+        const m = a.annualIncome / 12 * Math.pow(1 + a.esc, yrs);
+        annuityGross += m;
+        sources.push({ name: a.name, gross: m, kind: 'annuity' });
       });
       otherGross += annuityGross;
-      return { stateGross, otherGross, annuityGross, total: stateGross + otherGross };
+      return { stateGross, otherGross, annuityGross, total: stateGross + otherGross, sources };
     }
 
     // Floors (dynamic mode): each person's taxable pot is protected down to a % of
@@ -533,8 +539,12 @@
                         dvTf ? taxNet(drawGross) :
                         drawTf + taxNet(drawGross);
       const unmetNet = Math.max(0, netGap - actualNet);
+      // additive (display only): per-person tax and net for the audit panel.
+      // tax-free draw (drawTf) is untaxed; the taxable draw (drawGross) is taxed via taxNet().
+      const taxTotal = (dbGross - dbNet) + (drawGross - taxNet(drawGross));
+      const netTotal = (dbGross + drawTf + drawGross) - taxTotal;
       return { drawTf, drawGross, tfAfter: tfPot - drawTf, txAfter: txPot - drawGross,
-               unmetNet, tfToSurplus, inc, dbNet };
+               unmetNet, tfToSurplus, inc, dbNet, taxTotal, netTotal };
     }
 
     // MANUAL mode: independent per person, no floor, no redistribution (with means test).
@@ -544,7 +554,7 @@
       if (sp.meansTest && sp.meansTest.enabled && sp.meansTest.taper > 0 && incRaw.stateGross > 0) {
         const over = Math.max(0, (p1.drawTf + p1.drawGross) - (sp.meansTest.threshold / 12));
         const reduction = Math.min(sp.meansTest.taper * over, incRaw.stateGross);
-        if (reduction > 0) inc = { stateGross: incRaw.stateGross - reduction, otherGross: incRaw.otherGross, total: incRaw.total - reduction };
+        if (reduction > 0) inc = { stateGross: incRaw.stateGross - reduction, otherGross: incRaw.otherGross, annuityGross: incRaw.annuityGross, total: incRaw.total - reduction, sources: incRaw.sources };
       }
       const p2 = fundPerson(target, inc, tfPot, txPot, 0, crystallised, dvTf);
       return Object.assign({}, p2, { inc: inc, shortfall: p2.unmetNet > 1 });
@@ -571,7 +581,8 @@
     const monthlyRows = [];
     const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     let acc = null, accYear = null;
-    function flush() { if (acc) rows.push(acc); }
+    function ssSourcesArr(m) { return Object.keys(m || {}).map(n => ({ name: n, gross: m[n].gross, kind: m[n].kind })); }
+    function flush() { if (acc) { acc.g_sources = ssSourcesArr(acc.g_sources); acc.j_sources = ssSourcesArr(acc.j_sources); rows.push(acc); } }
 
     for (let idx = earliestRetIdx; idx <= endIdx; idx++) {
       const yr = Math.floor(idx / 12);
@@ -594,6 +605,7 @@
           g_other: 0, j_other: 0, g_otherNet: 0, j_otherNet: 0,
           g_annuityIncome: 0, j_annuityIncome: 0,
           g_draw: 0, j_draw: 0, g_income: 0, j_income: 0, totalIncome: 0,
+          g_tax: 0, j_tax: 0, g_net: 0, j_net: 0, g_sources: {}, j_sources: {},
           combinedClosing: 0, g_closing: 0, j_closing: 0, shortfall: false,
           cashBalance: 0, cashFinance: 0, cashDeposit: 0, cashShortfall: 0, cashCapDraw: 0,
           surplusBalance: 0, g_surplusBalance: 0, j_surplusBalance: 0,
@@ -781,7 +793,7 @@
       }
 
       const gInc = grossMonth(p1Name, idx, elapsed);
-      const jInc = p2Name ? grossMonth(p2Name, idx, elapsed) : { stateGross: 0, otherGross: 0, total: 0 };
+      const jInc = p2Name ? grossMonth(p2Name, idx, elapsed) : { stateGross: 0, otherGross: 0, total: 0, sources: [] };
 
       let gRes, jRes, monthShort;
       if (cfg.dynamic) {
@@ -840,6 +852,8 @@
         g_annuityIncome: gRes.inc.annuityGross, j_annuityIncome: jRes.inc.annuityGross,
         g_draw: gDraw, j_draw: jDraw,
         g_income: gRes.inc.total + gDraw, j_income: jRes.inc.total + jDraw,
+        g_tax: gRes.taxTotal, j_tax: jRes.taxTotal, g_net: gRes.netTotal, j_net: jRes.netTotal,
+        g_sources: gRes.inc.sources || [], j_sources: jRes.inc.sources || [],
         totalIncome: mOther + gDraw + jDraw,
         combinedClosing: gTf + gTx + jTf + jTx, g_closing: gTf + gTx, j_closing: jTf + jTx,
         shortfall: monthShort,
@@ -862,6 +876,10 @@
       { const ci = crashInfo(idx); if (ci && !acc.crash) acc.crash = ci; }
       acc.annuityBuy += gAnnBuy + jAnnBuy; acc.g_annuityBuy += gAnnBuy; acc.j_annuityBuy += jAnnBuy;
       acc.g_income += gRes.inc.total + gDraw; acc.j_income += jRes.inc.total + jDraw;
+      acc.g_tax += gRes.taxTotal; acc.j_tax += jRes.taxTotal;
+      acc.g_net += gRes.netTotal; acc.j_net += jRes.netTotal;
+      (gRes.inc.sources || []).forEach(s => { const e = acc.g_sources[s.name] || (acc.g_sources[s.name] = { gross: 0, kind: s.kind }); e.gross += s.gross; });
+      (jRes.inc.sources || []).forEach(s => { const e = acc.j_sources[s.name] || (acc.j_sources[s.name] = { gross: 0, kind: s.kind }); e.gross += s.gross; });
       acc.totalIncome += gRes.inc.total + jRes.inc.total + gDraw + jDraw;
       acc.combinedClosing = gTf + gTx + jTf + jTx;
       acc.g_closing = gTf + gTx; acc.j_closing = jTf + jTx;
