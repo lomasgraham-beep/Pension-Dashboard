@@ -431,7 +431,7 @@
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-285</span>
+      <span class="build-stamp">LC-286</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -697,8 +697,11 @@
         <div class="ctrl ctrl-wide">
           <div style="font-size:14px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
             <strong style="color:#2c3e50;" id="m_wm_g_label">Graham:</strong>
-            <label style="cursor:pointer;"><input type="radio" name="m_wm_g" value="ufpls" checked onchange="onParam()"> UFPLS</label>
-            <label style="cursor:pointer;"><input type="radio" name="m_wm_g" value="fad" onchange="onParam()"> FAD</label>
+            <select id="m_wm_g" onchange="onParam()" style="font-size:13px;padding:2px 4px;">
+              <option value="ufpls">Blended (UFPLS)</option>
+              <option value="tffirst">Tax-free first</option>
+              <option value="faddate">FAD &mdash; choose date</option>
+            </select>
             <button type="button" class="info-btn" onclick="toggleInfo(event,'info_wm')" aria-label="About withdrawal method">i</button>
           </div>
           <div id="m_crystdate_g_wrap" style="display:none;margin:4px 0 0 8px;font-size:13px;">
@@ -706,13 +709,16 @@
           </div>
           <div style="font-size:14px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px;">
             <strong style="color:#2c3e50;" id="m_wm_j_label">Julie:</strong>
-            <label style="cursor:pointer;"><input type="radio" name="m_wm_j" value="ufpls" checked onchange="onParam()"> UFPLS</label>
-            <label style="cursor:pointer;"><input type="radio" name="m_wm_j" value="fad" onchange="onParam()"> FAD</label>
+            <select id="m_wm_j" onchange="onParam()" style="font-size:13px;padding:2px 4px;">
+              <option value="ufpls">Blended (UFPLS)</option>
+              <option value="tffirst">Tax-free first</option>
+              <option value="faddate">FAD &mdash; choose date</option>
+            </select>
           </div>
           <div id="m_crystdate_j_wrap" style="display:none;margin:4px 0 0 8px;font-size:13px;">
             <label>Crystallisation date: <input type="date" id="m_crystdate_j" onchange="onParam()" style="font-size:13px;"></label>
           </div>
-          <div class="info-text" id="info_wm">UFPLS (default): each pension withdrawal is 25% tax-free and 75% taxable &mdash; matches UK pension law for uncrystallised funds. FAD (Flexi-Access Drawdown): on the crystallisation date, 25% of the pot is taken as a tax-free PCLS lump sum (added to surplus savings) and the remaining 75% stays invested; all subsequent draws are 100% taxable.</div>
+          <div class="info-text" id="info_wm"><strong>Blended (UFPLS, default):</strong> each pension withdrawal is 25% tax-free and 75% taxable &mdash; matches UK pension law for uncrystallised funds, so both pots always deplete in a fixed 25:75 ratio. <strong>Tax-free first:</strong> on your retirement date the full 25% tax-free entitlement is taken as a PCLS lump sum into surplus savings, then every subsequent pot draw is 100% taxable. (Under UK law you cannot draw tax-free cash preferentially while staying in UFPLS &mdash; accessing it first <em>is</em> crystallising, so this is FAD set to crystallise the moment you retire.) <strong>FAD &mdash; choose date:</strong> the same crystallisation, but you pick the date instead of it defaulting to retirement.</div>
         </div>
         <div class="ctrl ctrl-wide">
           <label class="switch"><input type="checkbox" id="m_divert_tf" onchange="onParam()"><span class="track"></span><span class="switch-text">Divert tax-free to surplus savings</span>
@@ -2394,7 +2400,49 @@
       tierKeys.forEach(tk => { const el = document.getElementById(tk.sid), lab = document.getElementById(tk.sid + '_v'); if (el && lab) lab.textContent = monthLabel(idxToDate(el.value)); });
     }
 
+    // Retirement date used to auto-set the crystallisation date for "Tax-free first".
+    // Mirrors the shared/per-member logic used for retireByMember: while the live slider
+    // still sits on the saved baseline, honour the member's own saved retirement date;
+    // once the slider is dragged, fall back to the shared live date.
+    function memberRetireDate(who) {
+      const nm = (who === 'g') ? p1Name : p2Name;
+      const slider = idxToDate(document.getElementById('m_retire').value);
+      if (savedPlan && savedPlan.retirementDate && slider &&
+          slider.getTime() === savedPlan.retirementDate.getTime() &&
+          savedPlan.retireByMember && nm && savedPlan.retireByMember[nm]) {
+        return savedPlan.retireByMember[nm];
+      }
+      return slider;
+    }
+    // Derive the three-way selector state from the stored method + crystallisation date.
+    // Storage stays exactly {ufpls|fad} + date, so saved plans remain fully back-compatible:
+    // fad with a date equal to (or absent from) retirement reads back as "Tax-free first",
+    // any other fad date reads back as "FAD — choose date".
+    function deriveWmMode(method, crystStr, who) {
+      if (method !== 'fad') return 'ufpls';
+      if (!crystStr || crystStr === App.toInputDate(memberRetireDate(who))) return 'tffirst';
+      return 'faddate';
+    }
+    // Show the crystallisation-date box only for "FAD — choose date". For "Tax-free first"
+    // keep the (hidden) date input tracking the member's retirement date so the stored value
+    // and the engine's crystallisation event stay pinned to retirement.
+    function syncWmControls() {
+      [['g', 'm_wm_g', 'm_crystdate_g', 'm_crystdate_g_wrap'],
+       ['j', 'm_wm_j', 'm_crystdate_j', 'm_crystdate_j_wrap']].forEach(function (r) {
+        const who = r[0];
+        const sel = (document.getElementById(r[1]) || {}).value || 'ufpls';
+        const dateEl = document.getElementById(r[2]);
+        const wrap = document.getElementById(r[3]);
+        if (!dateEl || !wrap) return;
+        if (sel === 'tffirst') { dateEl.value = App.toInputDate(memberRetireDate(who)); wrap.style.display = 'none'; }
+        else if (sel === 'faddate') { wrap.style.display = ''; }
+        else { wrap.style.display = 'none'; }
+      });
+    }
+
     function readControls() {
+      const wmgSel = (document.getElementById('m_wm_g') || {}).value || 'ufpls';
+      const wmjSel = (document.getElementById('m_wm_j') || {}).value || 'ufpls';
       return {
         retirementDate: idxToDate(document.getElementById('m_retire').value),
         // If the live slider matches the saved baseline, keep per-member dates; if the user has
@@ -2406,10 +2454,12 @@
         gRatio: p2Name ? (parseFloat(document.getElementById('m_ratio').value) / 100) : 1,
         dynamic: document.getElementById('m_dynamic').checked,
         savingsFundBills: document.getElementById('m_savebills').checked,
-        withdrawalMethodGraham: (document.querySelector('input[name="m_wm_g"]:checked') || {}).value || 'ufpls',
-        withdrawalMethodJulie: (document.querySelector('input[name="m_wm_j"]:checked') || {}).value || 'ufpls',
-        crystallisationDateGraham: document.getElementById('m_crystdate_g').value || null,
-        crystallisationDateJulie: document.getElementById('m_crystdate_j').value || null,
+        withdrawalMethodGraham: wmgSel === 'ufpls' ? 'ufpls' : 'fad',
+        withdrawalMethodJulie: wmjSel === 'ufpls' ? 'ufpls' : 'fad',
+        crystallisationDateGraham: wmgSel === 'tffirst' ? App.toInputDate(memberRetireDate('g'))
+          : wmgSel === 'faddate' ? (document.getElementById('m_crystdate_g').value || null) : null,
+        crystallisationDateJulie: wmjSel === 'tffirst' ? App.toInputDate(memberRetireDate('j'))
+          : wmjSel === 'faddate' ? (document.getElementById('m_crystdate_j').value || null) : null,
         ufplsDivertTf: document.getElementById('m_divert_tf').checked,
         retired: savedPlan ? !!savedPlan.retired : false,
         gFloorPct: (parseFloat(document.getElementById('m_gfloor').value) || 0) / 100,
@@ -2422,15 +2472,14 @@
     function applyControls(plan) {
       document.getElementById('m_retire').value = dateToIdx(plan.retirementDate);
       document.getElementById('m_savebills').checked = (plan.savingsFundBills !== false);
-      const wmg = document.querySelector('input[name="m_wm_g"][value="' + ((plan.withdrawalMethodGraham === 'fad') ? 'fad' : 'ufpls') + '"]');
-      if (wmg) wmg.checked = true;
-      const wmj = document.querySelector('input[name="m_wm_j"][value="' + ((plan.withdrawalMethodJulie === 'fad') ? 'fad' : 'ufpls') + '"]');
-      if (wmj) wmj.checked = true;
       document.getElementById('m_crystdate_g').value = plan.crystallisationDateGraham || '';
       document.getElementById('m_crystdate_j').value = plan.crystallisationDateJulie || '';
+      const wmgSel = document.getElementById('m_wm_g');
+      if (wmgSel) wmgSel.value = deriveWmMode(plan.withdrawalMethodGraham, plan.crystallisationDateGraham, 'g');
+      const wmjSel = document.getElementById('m_wm_j');
+      if (wmjSel) wmjSel.value = deriveWmMode(plan.withdrawalMethodJulie, plan.crystallisationDateJulie, 'j');
       document.getElementById('m_divert_tf').checked = !!plan.ufplsDivertTf;
-      document.getElementById('m_crystdate_g_wrap').style.display = (plan.withdrawalMethodGraham === 'fad') ? '' : 'none';
-      document.getElementById('m_crystdate_j_wrap').style.display = (plan.withdrawalMethodJulie === 'fad') ? '' : 'none';
+      syncWmControls();
       document.getElementById('m_growth').value = (plan.growthRate * 100).toFixed(2);
       document.getElementById('m_spend').value = Math.round(plan.spendRed * 100);
       document.getElementById('m_ratio').value = Math.round(plan.gRatio * 100);
@@ -2560,16 +2609,16 @@
       const on = document.getElementById('m_savebills').checked;
       const el = document.getElementById('ret_savb_state');
       if (el) { el.textContent = on ? 'On' : 'Off'; el.className = on ? 'sw-on' : 'sw-off'; }
-      const wmgVal = (document.querySelector('input[name="m_wm_g"]:checked') || {}).value || 'ufpls';
-      const wmjVal = (document.querySelector('input[name="m_wm_j"]:checked') || {}).value || 'ufpls';
+      const wmgVal = (document.getElementById('m_wm_g') || {}).value || 'ufpls';
+      const wmjVal = (document.getElementById('m_wm_j') || {}).value || 'ufpls';
+      const wmLabel = function (v) { return v === 'tffirst' ? 'TF-first' : v === 'faddate' ? 'FAD' : 'UFPLS'; };
       const wmgEl = document.getElementById('ret_wm_g_state');
       const wmjEl = document.getElementById('ret_wm_j_state');
-      if (wmgEl) { wmgEl.textContent = wmgVal === 'fad' ? 'FAD' : 'UFPLS'; wmgEl.className = wmgVal === 'fad' ? 'sw-off' : 'sw-on'; }
-      if (wmjEl) { wmjEl.textContent = wmjVal === 'fad' ? 'FAD' : 'UFPLS'; wmjEl.className = wmjVal === 'fad' ? 'sw-off' : 'sw-on'; }
+      if (wmgEl) { wmgEl.textContent = wmLabel(wmgVal); wmgEl.className = wmgVal === 'ufpls' ? 'sw-on' : 'sw-off'; }
+      if (wmjEl) { wmjEl.textContent = wmLabel(wmjVal); wmjEl.className = wmjVal === 'ufpls' ? 'sw-on' : 'sw-off'; }
       const dvEl = document.getElementById('ret_divert_state');
       if (dvEl) { const dv = document.getElementById('m_divert_tf').checked; dvEl.textContent = dv ? 'On' : 'Off'; dvEl.className = dv ? 'sw-off' : 'sw-on'; }
-      document.getElementById('m_crystdate_g_wrap').style.display = wmgVal === 'fad' ? '' : 'none';
-      document.getElementById('m_crystdate_j_wrap').style.display = wmjVal === 'fad' ? '' : 'none';
+      syncWmControls();
     }
     function applyRetiredMode() {
       const on = savedPlan ? !!savedPlan.retired : false;
