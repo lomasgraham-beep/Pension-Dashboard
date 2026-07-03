@@ -431,7 +431,7 @@
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-286</span>
+      <span class="build-stamp">LC-287</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -700,7 +700,7 @@
             <select id="m_wm_g" onchange="onParam()" style="font-size:13px;padding:2px 4px;">
               <option value="ufpls">Blended (UFPLS)</option>
               <option value="tffirst">Tax-free first</option>
-              <option value="faddate">FAD &mdash; choose date</option>
+              <option value="faddate">Flexi-Access Drawdown &mdash; choose date</option>
             </select>
             <button type="button" class="info-btn" onclick="toggleInfo(event,'info_wm')" aria-label="About withdrawal method">i</button>
           </div>
@@ -712,13 +712,13 @@
             <select id="m_wm_j" onchange="onParam()" style="font-size:13px;padding:2px 4px;">
               <option value="ufpls">Blended (UFPLS)</option>
               <option value="tffirst">Tax-free first</option>
-              <option value="faddate">FAD &mdash; choose date</option>
+              <option value="faddate">Flexi-Access Drawdown &mdash; choose date</option>
             </select>
           </div>
           <div id="m_crystdate_j_wrap" style="display:none;margin:4px 0 0 8px;font-size:13px;">
             <label>Crystallisation date: <input type="date" id="m_crystdate_j" onchange="onParam()" style="font-size:13px;"></label>
           </div>
-          <div class="info-text" id="info_wm"><strong>Blended (UFPLS, default):</strong> each pension withdrawal is 25% tax-free and 75% taxable &mdash; matches UK pension law for uncrystallised funds, so both pots always deplete in a fixed 25:75 ratio. <strong>Tax-free first:</strong> on your retirement date the full 25% tax-free entitlement is taken as a PCLS lump sum into surplus savings, then every subsequent pot draw is 100% taxable. (Under UK law you cannot draw tax-free cash preferentially while staying in UFPLS &mdash; accessing it first <em>is</em> crystallising, so this is FAD set to crystallise the moment you retire.) <strong>FAD &mdash; choose date:</strong> the same crystallisation, but you pick the date instead of it defaulting to retirement.</div>
+          <div class="info-text" id="info_wm"><strong>Blended (UFPLS, default):</strong> each pension withdrawal is 25% tax-free and 75% taxable &mdash; matches UK pension law for uncrystallised funds, so both pots always deplete in a fixed 25:75 ratio. <strong>Tax-free first:</strong> on your retirement date the full 25% tax-free entitlement is taken as a PCLS lump sum into surplus savings, then every subsequent pot draw is 100% taxable. (Under UK law you cannot draw tax-free cash preferentially while staying in UFPLS &mdash; accessing it first <em>is</em> crystallising, so this is flexi-access drawdown set to crystallise the moment you retire.) <strong>Flexi-Access Drawdown &mdash; choose date:</strong> the same crystallisation, but you pick the date instead of it defaulting to retirement.</div>
         </div>
         <div class="ctrl ctrl-wide">
           <label class="switch"><input type="checkbox" id="m_divert_tf" onchange="onParam()"><span class="track"></span><span class="switch-text">Divert tax-free to surplus savings</span>
@@ -2417,13 +2417,13 @@
     // Derive the three-way selector state from the stored method + crystallisation date.
     // Storage stays exactly {ufpls|fad} + date, so saved plans remain fully back-compatible:
     // fad with a date equal to (or absent from) retirement reads back as "Tax-free first",
-    // any other fad date reads back as "FAD — choose date".
+    // any other fad date reads back as "Flexi-Access Drawdown — choose date".
     function deriveWmMode(method, crystStr, who) {
       if (method !== 'fad') return 'ufpls';
       if (!crystStr || crystStr === App.toInputDate(memberRetireDate(who))) return 'tffirst';
       return 'faddate';
     }
-    // Show the crystallisation-date box only for "FAD — choose date". For "Tax-free first"
+    // Show the crystallisation-date box only for "Flexi-Access Drawdown — choose date". For "Tax-free first"
     // keep the (hidden) date input tracking the member's retirement date so the stored value
     // and the engine's crystallisation event stay pinned to retirement.
     function syncWmControls() {
@@ -2611,7 +2611,7 @@
       if (el) { el.textContent = on ? 'On' : 'Off'; el.className = on ? 'sw-on' : 'sw-off'; }
       const wmgVal = (document.getElementById('m_wm_g') || {}).value || 'ufpls';
       const wmjVal = (document.getElementById('m_wm_j') || {}).value || 'ufpls';
-      const wmLabel = function (v) { return v === 'tffirst' ? 'TF-first' : v === 'faddate' ? 'FAD' : 'UFPLS'; };
+      const wmLabel = function (v) { return v === 'tffirst' ? 'TF-first' : v === 'faddate' ? 'Flexi-Access' : 'UFPLS'; };
       const wmgEl = document.getElementById('ret_wm_g_state');
       const wmjEl = document.getElementById('ret_wm_j_state');
       if (wmgEl) { wmgEl.textContent = wmLabel(wmgVal); wmgEl.className = wmgVal === 'ufpls' ? 'sw-on' : 'sw-off'; }
