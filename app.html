@@ -256,6 +256,16 @@
     .params .sv { color:var(--accent); font-weight:bold; font-size:15px; }
     .params .hint { font-size:12px; color:#94a3b8; margin-top:4px; }
 
+    /* ---- Rail containment ----
+       .ctrl is a flex column and .grid is a grid; flex/grid children default to
+       min-width:auto, which lets an unshrinkable child (a long <select> option,
+       a native date field, a nested flex row) push wider than its column and
+       poke past the panel border — even though nothing has an oversized width
+       set explicitly. Reset min-width on every descendant so children always
+       shrink to fit, and cap the naturally-unruly control types outright. */
+    .params * { min-width:0; }
+    .params select, .params input[type=date] { max-width:100%; box-sizing:border-box; }
+
     /* big touch-friendly sliders */
     /* width inset by one thumb (34px) + 17px side margins so the thumb at min/max sits
        flush inside the panel padding instead of overhanging the grey border. */
@@ -453,7 +463,7 @@
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-294</span>
+      <span class="build-stamp">LC-295</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
