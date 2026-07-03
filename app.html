@@ -334,8 +334,8 @@
     .scenario-summary .ss-whatif { background:#fef3c7; border:1px solid #fcd34d; color:#92400e; padding:7px 10px; border-radius:6px; margin:0 0 10px; font-weight:600; }
     .ss-expand { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; margin-right:7px; padding:0; border:1px solid var(--line-strong); border-radius:5px; background:var(--surface-2); color:var(--accent-dark); font-size:14px; line-height:1; cursor:pointer; transition:transform .15s; vertical-align:middle; }
     .ss-expand.open { transform:rotate(90deg); background:var(--accent); color:#fff; border-color:var(--accent); }
-    .ss-detail-row > td { padding:0 !important; background:var(--surface-2); }
-    .ss-detail { padding:16px 18px; border-top:2px solid var(--accent); }
+    .ss-detail-row > td { padding:0 !important; background:var(--surface-2); overflow:hidden; }
+    .ss-detail { padding:16px 18px; border-top:2px solid var(--accent); box-sizing:border-box; }
     .ss-detail-cap { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin:0 0 12px; }
     .ss-detail-cols { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     .ss-detail-cols.one { grid-template-columns:1fr; max-width:540px; }
@@ -457,7 +457,7 @@
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-290</span>
+      <span class="build-stamp">LC-291</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1276,7 +1276,34 @@
       }
       detail.style.display = open ? '' : 'none';
       btn.classList.toggle('open', open);
+      if (open) ssRepositionDetails();
     }
+    // The detail row lives in a <td colspan> of the same wide, horizontally-scrolling table
+    // (#Retirement .table-wrap has overflow-x:auto), so without correction the panel is laid
+    // out across the FULL underlying table width — Julie's column ends up off past the visible
+    // edge with slack space inside Graham's. Pin the panel to the visible viewport instead by
+    // sizing it to the wrap's clientWidth and offsetting it by scrollLeft, so it always fills
+    // exactly what's on screen. Deliberately NOT position:sticky — that fails in Safari whenever
+    // an ancestor has overflow-x:auto (same root cause as the table header), so this uses the
+    // same JS-transform approach already proven for the frozen header.
+    function ssRepositionDetails() {
+      const wrap = document.querySelector('#Retirement .table-wrap');
+      if (!wrap) return;
+      const w = Math.max(280, wrap.clientWidth - 4);
+      const ml = wrap.scrollLeft;
+      document.querySelectorAll('#rTable .ss-detail-row .ss-detail').forEach(function (d) {
+        d.style.width = w + 'px';
+        d.style.marginLeft = ml + 'px';
+      });
+    }
+    (function initDetailReposition() {
+      window.addEventListener('resize', ssRepositionDetails);
+      // wrap's scroll doesn't bubble normally; capture-phase at document catches it regardless
+      // of when the wrap element is created (mirrors the frozen-header listener pattern).
+      document.addEventListener('scroll', function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains('table-wrap')) ssRepositionDetails();
+      }, { passive: true, capture: true });
+    })();
 
     function renderRetirementTable() {
       // Remove frozen-header ghost so it rebuilds from the new thead
