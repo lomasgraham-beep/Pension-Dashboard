@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=auth02"></script>
-  <script src="engine.js?v=ufpls1"></script>
+  <script src="engine.js?v=brk1"></script>
   <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
@@ -332,6 +332,25 @@
     .scenario-summary p:last-child { margin-bottom:0; }
     .scenario-summary .ss-head { font-weight:700; color:var(--accent-dark); text-transform:uppercase; font-size:11px; letter-spacing:0.04em; margin:12px 0 4px; }
     .scenario-summary .ss-whatif { background:#fef3c7; border:1px solid #fcd34d; color:#92400e; padding:7px 10px; border-radius:6px; margin:0 0 10px; font-weight:600; }
+    .ss-expand { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; margin-right:7px; padding:0; border:1px solid var(--line-strong); border-radius:5px; background:var(--surface-2); color:var(--accent-dark); font-size:14px; line-height:1; cursor:pointer; transition:transform .15s; vertical-align:middle; }
+    .ss-expand.open { transform:rotate(90deg); background:var(--accent); color:#fff; border-color:var(--accent); }
+    .ss-detail-row > td { padding:0 !important; background:var(--surface-2); }
+    .ss-detail { padding:16px 18px; border-top:2px solid var(--accent); }
+    .ss-detail-cap { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin:0 0 12px; }
+    .ss-detail-cols { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .ss-detail-cols.one { grid-template-columns:1fr; max-width:540px; }
+    @media (max-width:640px){ .ss-detail-cols { grid-template-columns:1fr; } }
+    .ss-person { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:15px 17px; }
+    .ss-person h4 { margin:0 0 12px; font-size:17px; color:var(--accent-dark); border-bottom:1px solid var(--line); padding-bottom:8px; }
+    .ss-grp { margin:0 0 14px; }
+    .ss-grp:last-child { margin-bottom:0; }
+    .ss-grp-h { font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); margin:0 0 6px; }
+    .ss-line { display:flex; justify-content:space-between; gap:14px; font-size:15.5px; line-height:1.55; color:var(--ink); padding:2px 0; }
+    .ss-line b { font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .ss-line.ss-sub { color:var(--ink-soft); font-size:14.5px; padding-left:10px; }
+    .ss-line.ss-total { border-top:1px solid var(--line-strong); margin-top:5px; padding-top:6px; font-weight:700; font-size:16px; }
+    .ss-line.ss-net b { color:#16a34a; }
+    .ss-line.ss-tax b { color:#c0392b; }
     .info-text.show { display:block; }
 
     /* ===== Phones (placed last so it wins over base + wide rules) ===== */
@@ -438,7 +457,7 @@
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-289</span>
+      <span class="build-stamp">LC-290</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1196,11 +1215,75 @@
         });
       });
     }
+    // ---- Expandable per-row breakdown (audit panel) ----
+    let ssRetRowsShown = [];
+    function ssMoney(n) { return fmt(Math.round(n || 0)); }
+    function ssPersonCol(r, who, name) {
+      const gR = (lastDrawdownCfg && lastDrawdownCfg.gRatio != null) ? lastDrawdownCfg.gRatio : savedPlan.gRatio;
+      const ratio = (who === 'g') ? gR : (1 - gR);
+      const sources = ((who === 'g') ? r.g_sources : r.j_sources) || [];
+      const draw = (who === 'g') ? (r.g_draw || 0) : (r.j_draw || 0);
+      const gross = (who === 'g') ? (r.g_income || 0) : (r.j_income || 0);
+      const tax = (who === 'g') ? (r.g_tax || 0) : (r.j_tax || 0);
+      const net = (who === 'g') ? (r.g_net || 0) : (r.j_net || 0);
+      const savToBills = (r.cashCapDraw || 0) * ratio;
+      const bills = (r.billsTotal || 0) * ratio, dining = (r.diningTotal || 0) * ratio;
+      const loan = (r.cashFinance || 0) * ratio, purch = (r.cashShortfall || 0) * ratio;
+      const costTotal = bills + dining + loan + purch;
+
+      let incLines = sources.map(s => {
+        const tag = s.kind === 'annuity' ? ' (annuity)' : s.kind === 'state' ? ' (state)' : ' (pension)';
+        return `<div class="ss-line"><span>${s.name}${tag}</span><b>${ssMoney(s.gross)}</b></div>`;
+      }).join('');
+      if (!sources.length) incLines += `<div class="ss-line ss-sub"><span>No guaranteed income yet</span><b>&pound;0</b></div>`;
+      if (draw > 0.5) incLines += `<div class="ss-line"><span>Drawdown from pot</span><b>${ssMoney(draw)}</b></div>`;
+      incLines += `<div class="ss-line ss-total"><span>Gross income</span><b>${ssMoney(gross)}</b></div>`;
+
+      let costLines = `<div class="ss-line"><span>Bills</span><b>${ssMoney(bills)}</b></div>`
+        + `<div class="ss-line"><span>Dining</span><b>${ssMoney(dining)}</b></div>`;
+      if (loan > 0.5) costLines += `<div class="ss-line"><span>Loan payment</span><b>${ssMoney(loan)}</b></div>`;
+      if (purch > 0.5) costLines += `<div class="ss-line"><span>Purchase</span><b>${ssMoney(purch)}</b></div>`;
+      costLines += `<div class="ss-line ss-total"><span>Total costs (their share)</span><b>${ssMoney(costTotal)}</b></div>`;
+      if (savedPlan.savingsFundBills && savToBills > 0.5) costLines += `<div class="ss-line ss-sub"><span>&hellip;of which met from savings</span><b>${ssMoney(savToBills)}</b></div>`;
+
+      const taxNet = `<div class="ss-line"><span>Gross income</span><b>${ssMoney(gross)}</b></div>`
+        + `<div class="ss-line ss-tax"><span>Tax</span><b>&minus;${ssMoney(tax)}</b></div>`
+        + `<div class="ss-line ss-total ss-net"><span>Net income</span><b>${ssMoney(net)}</b></div>`;
+
+      return `<div class="ss-person"><h4>${name}</h4>`
+        + `<div class="ss-grp"><div class="ss-grp-h">Income &mdash; by source</div>${incLines}</div>`
+        + `<div class="ss-grp"><div class="ss-grp-h">Costs</div>${costLines}</div>`
+        + `<div class="ss-grp"><div class="ss-grp-h">Tax &amp; net</div>${taxNet}</div></div>`;
+    }
+    function ssRowDetailHtml(r) {
+      if (!r) return '';
+      const period = (retGran === 'month') ? r.label : r.year;
+      const joint = (currentView === 'Joint');
+      let cols, cls;
+      if (joint && p2Name) { cols = ssPersonCol(r, 'g', p1Name) + ssPersonCol(r, 'j', p2Name); cls = ''; }
+      else if (currentView === p2Name) { cols = ssPersonCol(r, 'j', p2Name); cls = ' one'; }
+      else { cols = ssPersonCol(r, 'g', p1Name); cls = ' one'; }
+      return `<div class="ss-detail"><div class="ss-detail-cap">Breakdown &mdash; ${period}</div><div class="ss-detail-cols${cls}">${cols}</div></div>`;
+    }
+    function toggleRowDetail(btn) {
+      const tr = btn.closest('tr');
+      const detail = tr.nextElementSibling;
+      if (!detail || !detail.classList.contains('ss-detail-row')) return;
+      const open = (detail.style.display === 'none' || !detail.style.display);
+      if (open) {
+        const cell = detail.firstElementChild;
+        if (!cell.dataset.built) { cell.innerHTML = ssRowDetailHtml(ssRetRowsShown[+tr.dataset.ri]); cell.dataset.built = '1'; }
+      }
+      detail.style.display = open ? '' : 'none';
+      btn.classList.toggle('open', open);
+    }
+
     function renderRetirementTable() {
       // Remove frozen-header ghost so it rebuilds from the new thead
       const _fg = document.querySelector('.frozen-header'); if (_fg) _fg.remove();
       const tb = document.querySelector('#rTable tbody');
       const rowsToShow = (retGran === 'month') ? (drawdownRows.monthly || []) : drawdownRows;
+      ssRetRowsShown = rowsToShow;
       // show/hide the growth column headers
       document.querySelectorAll('#rTable .grow-col').forEach(el => el.style.display = retShowGrowth ? '' : 'none');
       if (!rowsToShow.length) { tb.innerHTML = '<tr><td colspan="14">No rows.</td></tr>'; return; }
@@ -1218,7 +1301,7 @@
         annByYear[y] = annByYear[y] ? (annByYear[y] + ' ' + txt) : txt;
         annByLabel[label] = annByLabel[label] ? (annByLabel[label] + ' ' + txt) : txt;
       });
-      tb.innerHTML = rowsToShow.map(r => {
+      tb.innerHTML = rowsToShow.map((r, ri) => {
         const v = vrow(r);
         const period = (retGran === 'month') ? r.label : r.year;
         let crashIcon = '';
@@ -1239,8 +1322,8 @@
           const safeA = annTxt.replace(/'/g, "\\'").replace(/"/g, '&quot;');
           annIcon = ` <button type="button" class="annuity-info" aria-label="${safeA}" onclick="showCrashTip(event,'${safeA}')" onmouseenter="showCrashTip(event,'${safeA}')" onmouseleave="hideCrashTip()">\u00A3</button>`;
         }
-        return `<tr class="${r.shortfall ? 'shortfall' : ''}${r.crash ? ' crash-row' : ''}${annHit ? ' annuity-row' : ''}">
-          <td>${period}${crashIcon}${annIcon}</td>
+        return `<tr class="${r.shortfall ? 'shortfall' : ''}${r.crash ? ' crash-row' : ''}${annHit ? ' annuity-row' : ''}" data-ri="${ri}">
+          <td><button type="button" class="ss-expand" onclick="toggleRowDetail(this)" aria-label="Show breakdown">&#9656;</button>${period}${crashIcon}${annIcon}</td>
           <td class="rc-tf">${fmt(v.tf)}</td>${tfGrow}<td class="rc-tx">${fmt(v.tx)}</td>${txGrow}
           <td class="rc-cash" style="color:#2c7a7b;">${fmt(r.cashBalance || 0)}</td>
           <td class="rc-surplus" style="color:#6b5b95;">${fmt(v.surplus || 0)}</td>
@@ -1251,7 +1334,8 @@
           <td class="rc-loan" style="font-weight:bold;color:#2563eb;">${fmt(v.loan)}</td>
           <td class="rc-draw">${fmt(v.draw)}</td>
           <td style="font-weight:bold;color:#27ae60;">${fmt(v.income)}</td>
-        </tr>`;
+        </tr>
+        <tr class="ss-detail-row" style="display:none;"><td colspan="14" class="ss-detail-cell"></td></tr>`;
       }).join('');
       applyColVisibility();
     }
