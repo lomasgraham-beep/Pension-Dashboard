@@ -325,6 +325,13 @@
     .info-btn { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; margin-left:10px; border:none; border-radius:50%; background:var(--accent); color:#fff; font-style:italic; font-weight:bold; font-size:12px; font-family:Georgia, serif; cursor:pointer; flex:0 0 auto; }
     .info-btn:hover { background:var(--accent-dark); }
     .info-text { display:none; margin-top:8px; font-size:12px; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:8px 10px; }
+    .explain-btn { display:inline-flex; align-items:center; gap:6px; margin-left:14px; padding:5px 12px; border:1px solid var(--accent-border); border-radius:16px; background:var(--accent-soft); color:var(--accent-dark); font-size:13px; font-weight:600; cursor:pointer; vertical-align:middle; }
+    .explain-btn:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .scenario-summary { margin:10px 0 16px; padding:14px 18px; background:var(--surface-2); border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:8px; font-size:13.5px; line-height:1.55; color:var(--ink); }
+    .scenario-summary p { margin:0 0 9px; }
+    .scenario-summary p:last-child { margin-bottom:0; }
+    .scenario-summary .ss-head { font-weight:700; color:var(--accent-dark); text-transform:uppercase; font-size:11px; letter-spacing:0.04em; margin:12px 0 4px; }
+    .scenario-summary .ss-whatif { background:#fef3c7; border:1px solid #fcd34d; color:#92400e; padding:7px 10px; border-radius:6px; margin:0 0 10px; font-weight:600; }
     .info-text.show { display:block; }
 
     /* ===== Phones (placed last so it wins over base + wide rules) ===== */
@@ -431,7 +438,7 @@
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-288</span>
+      <span class="build-stamp">LC-289</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -757,7 +764,8 @@
       </div>
     </div>
     <div class="model-main">
-    <h2><span class="viewlabel">Joint</span> Projections</h2>
+    <h2><span class="viewlabel">Joint</span> Projections<button type="button" class="explain-btn" onclick="toggleScenarioSummary('scenarioSummary_rm')" aria-expanded="false">&#9432; Explain this scenario</button></h2>
+    <div id="scenarioSummary_rm" class="scenario-summary" style="display:none;"></div>
     <div class="scope-toggle">
       <span class="scope-lbl">Show:</span>
       <div class="view-toggle">
@@ -809,7 +817,8 @@
     <div class="model-layout">
     <div class="rail-slot" id="railSlot-Retirement"></div><div class="rail-strip" onclick="expandRail()" title="Show controls"><span>Controls &#9654;</span></div>
     <div class="model-main">
-    <h2><span class="viewlabel">Joint</span> Retirement Drawdown</h2>
+    <h2><span class="viewlabel">Joint</span> Retirement Drawdown<button type="button" class="explain-btn" onclick="toggleScenarioSummary('scenarioSummary_ret')" aria-expanded="false">&#9432; Explain this scenario</button></h2>
+    <div id="scenarioSummary_ret" class="scenario-summary" style="display:none;"></div>
     <div style="margin:0 0 12px;">
       <span class="sw-pill">Savings fund bills: <b id="ret_savb_state">&hellip;</b><button type="button" class="info-btn" onclick="toggleInfo(event,'info_savb_ret')" aria-label="About Savings fund bills">i</button></span>
       <div class="info-text" id="info_savb_ret">When off, savings don&rsquo;t subsidise bills and grow on their own; an unaffordable purchase is flagged on the Cash &amp; Purchases page rather than drawing the pension. Change this on the Modelling page, in the left-hand controls rail.</div>
@@ -2717,6 +2726,126 @@
       };
     }
 
+    // ---- Plain-English scenario summary (deterministic; regenerated on every recompute) ----
+    function ssIdxLabel(idx) { return MONTHS[((idx % 12) + 12) % 12] + ' ' + Math.floor(idx / 12); }
+    function ssWmPhrase(sel, crystStr) {
+      if (sel === 'tffirst') return 'takes tax-free cash first \u2014 the full 25% comes out as a PCLS lump into surplus savings at retirement, after which every drawdown is fully taxed';
+      if (sel === 'faddate') return 'uses flexi-access drawdown, crystallising on ' + (crystStr ? monthLabel(App.parseLocalDate(crystStr)) : 'the chosen date') + ' (25% tax-free lump, then fully-taxed drawdown)';
+      return 'takes blended UFPLS withdrawals \u2014 each draw is 25% tax-free and 75% taxable';
+    }
+    function ssIsWhatIf(plan) {
+      if (!savedPlan) return false;
+      const numKeys = ['growthRate', 'spendRed', 'gRatio'];
+      for (const k of numKeys) { if (typeof savedPlan[k] === 'number' && Math.abs((plan[k] || 0) - savedPlan[k]) > 1e-9) return true; }
+      const boolKeys = ['dynamic', 'savingsFundBills', 'ufplsDivertTf'];
+      for (const k of boolKeys) { if (typeof savedPlan[k] === 'boolean' && !!plan[k] !== !!savedPlan[k]) return true; }
+      const strKeys = ['withdrawalMethodGraham', 'withdrawalMethodJulie', 'crystallisationDateGraham', 'crystallisationDateJulie'];
+      for (const k of strKeys) { if (savedPlan[k] !== undefined && (plan[k] || null) !== (savedPlan[k] || null)) return true; }
+      if (savedPlan.retirementDate && plan.retirementDate && plan.retirementDate.getTime() !== savedPlan.retirementDate.getTime()) return true;
+      return false;
+    }
+    function buildScenarioSummaryHtml(plan) {
+      if (!plan) return '';
+      const p1 = p1Name, p2 = p2Name, both = !!p2, parts = [];
+
+      if (ssIsWhatIf(plan)) {
+        parts.push('<div class="ss-whatif">\u26a0 These are what-if settings that differ from your saved plan \u2014 nothing here is saved until you press \u201cSave as my plan\u201d.</div>');
+      }
+
+      // Retirement timing + growth
+      let s1;
+      if (plan.retired) {
+        s1 = '<strong>' + p1 + (both ? ' and ' + p2 : '') + '</strong> are modelled as already retired, with the projection running from this month off the latest logged pots.';
+      } else {
+        const rd = plan.retirementDate ? monthLabel(plan.retirementDate) : 'the set date';
+        let stag = '';
+        if (both && plan.retireByMember && plan.retireByMember[p1] && plan.retireByMember[p2] &&
+            plan.retireByMember[p1].getTime() !== plan.retireByMember[p2].getTime()) {
+          stag = ' (' + p1 + ' from ' + monthLabel(plan.retireByMember[p1]) + ', ' + p2 + ' from ' + monthLabel(plan.retireByMember[p2]) + ')';
+        }
+        s1 = 'You\u2019re modelling <strong>' + p1 + (both ? ' and ' + p2 : '') + '</strong> fully retiring in <strong>' + rd + '</strong>' + stag + '.';
+      }
+      s1 += ' Pension pots are grown at <strong>' + (plan.growthRate * 100).toFixed(1) + '%</strong> a year.';
+      parts.push('<p>' + s1 + '</p>');
+
+      // Withdrawal method per member + divert
+      const wmgSel = (document.getElementById('m_wm_g') || {}).value || 'ufpls';
+      const wmjSel = (document.getElementById('m_wm_j') || {}).value || 'ufpls';
+      let s2 = '<strong>' + p1 + '</strong> ' + ssWmPhrase(wmgSel, plan.crystallisationDateGraham) + '.';
+      if (both) s2 += ' <strong>' + p2 + '</strong> ' + ssWmPhrase(wmjSel, plan.crystallisationDateJulie) + '.';
+      if (plan.ufplsDivertTf && (wmgSel === 'ufpls' || wmjSel === 'ufpls')) {
+        s2 += ' The 25% tax-free element of each UFPLS draw is diverted to surplus savings rather than covering bills.';
+      }
+      parts.push('<p>' + s2 + '</p>');
+
+      // How bills are met
+      let s3 = 'Spending in retirement is set to <strong>' + Math.round(plan.spendRed * 100) + '%</strong> of current outgoings, reducing further at ages 70, 80 and 90 for bills that carry an age taper.';
+      if (plan.savingsFundBills) {
+        s3 += ' Bills are met first from guaranteed income (State and DB pensions); because <strong>Savings fund bills</strong> is on, cash and surplus savings then cover what\u2019s left before any pot is drawn, so the pots are only drawn for the remaining shortfall.';
+      } else {
+        s3 += ' <strong>Savings fund bills</strong> is off, so savings don\u2019t subsidise bills (they grow on their own) and any purchase whose deposit can\u2019t be met from instant-access savings is skipped rather than financed from the pension.';
+      }
+      if (both) s3 += ' Of the joint drawdown, <strong>' + p1 + '</strong> funds ' + Math.round(plan.gRatio * 100) + '% and <strong>' + p2 + '</strong> the remaining ' + Math.round((1 - plan.gRatio) * 100) + '%.';
+      parts.push('<p>' + s3 + '</p>');
+
+      // State pension + dynamic floors
+      let s4 = 'The State Pension is assumed to rise <strong>' + (plan.spRate * 100).toFixed(1) + '%</strong> a year';
+      if (plan.spDelay && plan.spDelay > 0) s4 += ', with State Pension age pushed back <strong>' + plan.spDelay + ' year' + (plan.spDelay === 1 ? '' : 's') + '</strong> for both';
+      s4 += '.';
+      if (Math.abs((plan.spRate || 0) - 0.025) > 1e-9 || (plan.spDelay || 0) > 0) s4 += ' (State Pension risk settings are what-if only and never saved.)';
+      if (plan.dynamic) {
+        s4 += ' Dynamic mode is on: each pot is protected down to a floor (' + p1 + ' ' + Math.round((plan.gFloorPct || 0) * 100) + '%' + (both ? ', ' + p2 + ' ' + Math.round((plan.jFloorPct || 0) * 100) + '%' : '') + ' of its value at retirement), redirecting any shortfall to the other pot.';
+      } else {
+        s4 += ' Dynamic mode is off, so there\u2019s no per-member pot floor.';
+      }
+      parts.push('<p>' + s4 + '</p>');
+
+      // Events: purchases, annuities, crashes
+      const evLines = [];
+      const unaffNames = new Set(((drawdownRows && drawdownRows.unaffordable) || []).map(u => u.name));
+      (data.purchases || []).filter(p => p.purchase_date).forEach(p => {
+        const d = App.parseLocalDate(p.purchase_date);
+        const total = Number(p.total_cost) || 0, dep = Number(p.deposit) || 0, fin = Math.max(0, total - dep);
+        let line = '<strong>' + (p.purchase_name || 'Purchase') + '</strong> in ' + (d ? monthLabel(d) : '\u2014') + ' \u2014 ' + fmt(total) + ' total';
+        line += fin > 0 ? ', ' + fmt(dep) + ' deposit with ' + fmt(fin) + ' financed' : ' paid outright';
+        if (unaffNames.has(p.purchase_name)) line += ' <em>(skipped as unaffordable \u2014 savings can\u2019t meet the deposit)</em>';
+        evLines.push(line + '.');
+      });
+      ((drawdownRows && drawdownRows.annuityWindows) || []).forEach(w => {
+        if (w.skipped) {
+          evLines.push('<strong>' + w.name + '</strong> annuity (' + w.member + ') is <em>skipped</em> \u2014 the pot is too small at ' + ssIdxLabel(w.purchaseIdx) + '.');
+        } else {
+          let line = '<strong>' + w.member + '</strong> buys the <strong>' + w.name + '</strong> annuity in ' + ssIdxLabel(w.purchaseIdx) + ': ' + fmt(w.amount) + ' from the pot for ' + fmt(Math.round(w.annualIncome)) + '/yr';
+          line += w.esc > 0 ? ', escalating ' + (w.esc * 100).toFixed(1) + '% a year.' : ' (level).';
+          evLines.push(line);
+        }
+      });
+      (data.crashes || []).filter(c => c.start_date).forEach(c => {
+        const d = App.parseLocalDate(c.start_date);
+        evLines.push('<strong>' + (c.crash_name || 'Market crash') + '</strong> \u2014 a ' + (Number(c.fall_pct) || 0) + '% fall from ' + (d ? monthLabel(d) : '\u2014') + ' over ' + (Number(c.fall_months) || 0) + ' months, recovering over ' + (Number(c.recovery_months) || 0) + ' months.');
+      });
+      if (evLines.length) parts.push('<div class="ss-head">Events modelled</div><p>' + evLines.join('<br>') + '</p>');
+      else parts.push('<div class="ss-head">Events modelled</div><p>No purchases, annuities or market crashes are modelled in this scenario.</p>');
+
+      return parts.join('');
+    }
+    function renderScenarioSummary(plan) {
+      const html = buildScenarioSummaryHtml(plan);
+      ['scenarioSummary_rm', 'scenarioSummary_ret'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = html;
+      });
+    }
+    function toggleScenarioSummary(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (!el.innerHTML) renderScenarioSummary(readControls());
+      const open = (el.style.display === 'none' || !el.style.display);
+      el.style.display = open ? 'block' : 'none';
+      const btn = document.querySelector('[onclick="toggleScenarioSummary(\'' + id + '\')"]');
+      if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
     function recomputeAll() {
       const plan = readControls();
       lastDrawdownCfg = buildDrawdownCfg(plan);
@@ -2724,6 +2853,7 @@
       drawdownRows = PensionEngine.drawdown(data, lastDrawdownCfg);
       updateEraFloorMax();
       updateSavbIndicator();
+      renderScenarioSummary(plan);
       renderOverview();
       renderRetirementTable();
       if (chartsReady) drawCharts();
