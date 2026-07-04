@@ -193,6 +193,10 @@
     #rTable th:first-child, #rTable td:first-child { white-space:nowrap; }
     #rTable { width:auto; }
     #rTable th { white-space:normal; vertical-align:bottom; line-height:1.2; text-align:center; }
+    /* group-name row (top of a two-row header): centre it and draw a divider bracketing its
+       sub-columns. All other header cells stay vertical-align:bottom so their labels share one
+       baseline whether or not their group is expanded. */
+    #rTable th.rc-grouprow { vertical-align:middle; text-align:center; padding-bottom:8px; border-bottom:2px solid var(--accent); }
     #rTable td { white-space:nowrap; }
     #rTable th, #rTable td { padding-right:22px; }
     #rTable th:first-child, #rTable td:first-child { padding-right:16px; }
@@ -466,7 +470,7 @@
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-304</span>
+      <span class="build-stamp">LC-305</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1213,74 +1217,97 @@
     }
 
     // Ordered leaf columns for the current view + expand/visibility state.
-    // Leaf: { label, val:(r,v,s)=>num, style?, neg?(render −), grow?(green/red small), head?({toggle,dir}) }
-    function retLeafCols() {
+    // Segment model: standalone columns and (collapsed/expanded) groups. The body reads the
+    // flattened leaves; the header renders each expanded group as a spanning top-row cell (name +
+    // toggle) with its sub-labels beneath, so the group name stays visible in BOTH states.
+    // Leaf: { label, val:(r,v,s)=>num, style?, neg?(render −), grow?(green/red small) }
+    function retSegModel() {
       const joint = (currentView === 'Joint');
       const RED='color:#c0392b;', ORANGE='color:#e67e22;', BLUE='color:#2563eb;', GREEN='color:#27ae60;', TEAL='color:#2c7a7b;', PURPLE='color:#6b5b95;', B='font-weight:bold;';
-      const cols = [];
+      const segs = [];
       // DC Pots
       if (retSegShown.pots) {
         if (!retGroupExp.pots) {
-          cols.push({ label:'DC Pots', val:(r,v)=>v.tf+v.tx, style:B, head:{toggle:'pots',dir:'exp'} });
+          segs.push({ key:'pots', label:'DC Pots', toggle:true, expanded:false, leaves:[{ label:'DC Pots', val:(r,v)=>v.tf+v.tx, style:B }] });
         } else {
+          const leaves = [];
           const mem = joint ? [['g','Graham'],['j','Julie']] : (currentView===p2Name ? [['j','']] : [['g','']]);
-          mem.forEach((m, mi) => {
+          mem.forEach(m => {
             const who=m[0], pre=m[1]?m[1]+' ':'';
             const tfGet = who==='g'?(r=>r.g_taxFree||0):(r=>r.j_taxFree||0);
             const txGet = who==='g'?(r=>r.g_taxable||0):(r=>r.j_taxable||0);
             const tfG   = who==='g'?(r=>r.g_tfGrowth||0):(r=>r.j_tfGrowth||0);
             const txG   = who==='g'?(r=>r.g_txGrowth||0):(r=>r.j_txGrowth||0);
-            cols.push({ label:pre+'tax-free', val:tfGet, head:(mi===0)?{toggle:'pots',dir:'col'}:null });
-            if (retShowGrowth) cols.push({ label:pre+'TF grth', val:tfG, grow:true });
-            cols.push({ label:pre+'taxable', val:txGet });
-            if (retShowGrowth) cols.push({ label:pre+'Tx grth', val:txG, grow:true });
+            leaves.push({ label:pre+'tax-free', val:tfGet });
+            if (retShowGrowth) leaves.push({ label:pre+'TF grth', val:tfG, grow:true });
+            leaves.push({ label:pre+'taxable', val:txGet });
+            if (retShowGrowth) leaves.push({ label:pre+'Tx grth', val:txG, grow:true });
           });
+          segs.push({ key:'pots', label:'DC Pots', toggle:true, expanded:true, leaves });
         }
       }
       // Savings group (Cash + Surplus). Cash is a household total (not member-split), so in a
       // single-person view the collapsed total mixes household cash with that person's surplus.
       if (retSegShown.savings) {
         if (!retGroupExp.savings) {
-          cols.push({ label:'Savings', val:(r,v)=>(r.cashBalance||0)+(v.surplus||0), style:B, head:{toggle:'savings',dir:'exp'} });
+          segs.push({ key:'savings', label:'Savings', toggle:true, expanded:false, leaves:[{ label:'Savings', val:(r,v)=>(r.cashBalance||0)+(v.surplus||0), style:B }] });
         } else {
-          cols.push({ label:'Cash Savings', val:(r)=>r.cashBalance||0, style:TEAL, head:{toggle:'savings',dir:'col'} });
-          cols.push({ label:'Surplus Savings', val:(r,v)=>v.surplus||0, style:PURPLE });
+          segs.push({ key:'savings', label:'Savings', toggle:true, expanded:true, leaves:[
+            { label:'Cash Savings', val:(r)=>r.cashBalance||0, style:TEAL },
+            { label:'Surplus Savings', val:(r,v)=>v.surplus||0, style:PURPLE }
+          ] });
         }
       }
-      if (retSegShown.savbills) cols.push({ label:'Savings to Bills', val:(r,v)=>v.savToBills||0, style:B+TEAL });
+      // Savings to Bills — standalone
+      if (retSegShown.savbills) segs.push({ key:'savbills', label:'Savings to Bills', toggle:false, expanded:false, leaves:[{ label:'Savings to Bills', val:(r,v)=>v.savToBills||0, style:B+TEAL }] });
       // Spending
       if (retSegShown.spend) {
         if (!retGroupExp.spend) {
-          cols.push({ label:'Spending', val:(r,v)=>v.bills+v.dining+v.loan, style:B+RED, head:{toggle:'spend',dir:'exp'} });
+          segs.push({ key:'spend', label:'Spending', toggle:true, expanded:false, leaves:[{ label:'Spending', val:(r,v)=>v.bills+v.dining+v.loan, style:B+RED }] });
         } else {
-          cols.push({ label:'Bills', val:(r,v)=>v.bills, style:B+RED, head:{toggle:'spend',dir:'col'} });
-          cols.push({ label:'Dining', val:(r,v)=>v.dining, style:B+ORANGE });
-          cols.push({ label:'Loan Payment', val:(r,v)=>v.loan, style:B+BLUE });
+          segs.push({ key:'spend', label:'Spending', toggle:true, expanded:true, leaves:[
+            { label:'Bills', val:(r,v)=>v.bills, style:B+RED },
+            { label:'Dining', val:(r,v)=>v.dining, style:B+ORANGE },
+            { label:'Loan Payment', val:(r,v)=>v.loan, style:B+BLUE }
+          ] });
         }
       }
       // Income (flat expansion: streams then gross/tax/net)
       if (retSegShown.income) {
         if (!retGroupExp.income) {
-          cols.push({ label:'Income', val:(r,v,s)=>s.net, style:B+GREEN, head:{toggle:'income',dir:'exp'} });
+          segs.push({ key:'income', label:'Income', toggle:true, expanded:false, leaves:[{ label:'Income', val:(r,v,s)=>s.net, style:B+GREEN }] });
         } else {
-          cols.push({ label:'Drawdown required', val:(r,v,s)=>s.draw, head:{toggle:'income',dir:'col'} });
-          cols.push({ label:'State Pension', val:(r,v,s)=>s.state });
-          cols.push({ label:'DB Pension', val:(r,v,s)=>s.db });
-          cols.push({ label:'Annuity', val:(r,v,s)=>s.annuity });
-          cols.push({ label:'Gross income', val:(r,v,s)=>s.gross, style:B });
-          cols.push({ label:'Tax', val:(r,v,s)=>s.tax, style:RED, neg:true });
-          cols.push({ label:'Net income', val:(r,v,s)=>s.net, style:B+GREEN });
+          segs.push({ key:'income', label:'Income', toggle:true, expanded:true, leaves:[
+            { label:'Drawdown required', val:(r,v,s)=>s.draw },
+            { label:'State Pension', val:(r,v,s)=>s.state },
+            { label:'DB Pension', val:(r,v,s)=>s.db },
+            { label:'Annuity', val:(r,v,s)=>s.annuity },
+            { label:'Gross income', val:(r,v,s)=>s.gross, style:B },
+            { label:'Tax', val:(r,v,s)=>s.tax, style:RED, neg:true },
+            { label:'Net income', val:(r,v,s)=>s.net, style:B+GREEN }
+          ] });
         }
       }
-      return cols;
+      return segs;
     }
-    function retHeadCell(lf) {
-      let btn = '';
-      if (lf.head && lf.head.toggle) {
-        const sym = lf.head.dir === 'exp' ? '\u25B8' : '\u25BE';   // ▸ collapsed / ▾ expanded
-        btn = `<button type="button" class="col-exp" onclick="toggleRetGroup('${lf.head.toggle}')" aria-label="Expand or collapse column">${sym}</button>`;
-      }
-      return `<th>${btn}${lf.label}</th>`;
+    function retColBtn(key, dir) {
+      const sym = dir === 'exp' ? '\u25B8' : '\u25BE';   // ▸ collapsed / ▾ expanded
+      return `<button type="button" class="col-exp" onclick="toggleRetGroup('${key}')" aria-label="Expand or collapse column">${sym}</button>`;
+    }
+    // Two-row header: row 1 carries group names (spanning their sub-columns) + toggles; standalone
+    // and collapsed cells span both rows. Row 2 carries the sub-labels of expanded groups.
+    function retBuildHeader(segs, periodLabel) {
+      let row1 = `<th rowspan="2" id="rThPeriod">${periodLabel}</th>`;
+      let row2 = '';
+      segs.forEach(s => {
+        if (s.expanded) {
+          row1 += `<th colspan="${s.leaves.length}" class="rc-grouprow">${s.toggle ? retColBtn(s.key,'col') : ''}${s.label}</th>`;
+          s.leaves.forEach(l => { row2 += `<th>${l.label}</th>`; });
+        } else {
+          row1 += `<th rowspan="2">${s.toggle ? retColBtn(s.key,'exp') : ''}${s.leaves[0].label}</th>`;
+        }
+      });
+      return `<tr>${row1}</tr><tr>${row2}</tr>`;
     }
     function retBodyCell(lf, r, v, s) {
       const n = lf.val(r, v, s);
@@ -1408,11 +1435,12 @@
       const tb = document.querySelector('#rTable tbody');
       const rowsToShow = (retGran === 'month') ? (drawdownRows.monthly || []) : drawdownRows;
       ssRetRowsShown = rowsToShow;
-      const leaves = retLeafCols();
+      const segs = retSegModel();
+      const leaves = [];
+      segs.forEach(s => s.leaves.forEach(l => leaves.push(l)));
       const totalCols = leaves.length + 1;   // +1 for the period column
-      // header (rebuilt each render because the column set is dynamic)
-      thead.innerHTML = '<tr><th id="rThPeriod">' + (retGran === 'month' ? 'Month' : 'Year') + '</th>'
-        + leaves.map(retHeadCell).join('') + '</tr>';
+      // two-row grouped header (rebuilt each render because the column set is dynamic)
+      thead.innerHTML = retBuildHeader(segs, retGran === 'month' ? 'Month' : 'Year');
       if (!rowsToShow.length) { tb.innerHTML = `<tr><td colspan="${totalCols}">No rows.</td></tr>`; return; }
       // annuity markers by period: purchase month/year -> tooltip text (from the engine's annuityWindows)
       const AMN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
