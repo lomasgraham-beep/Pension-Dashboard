@@ -463,7 +463,7 @@
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-300</span>
+      <span class="build-stamp">LC-301</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1252,9 +1252,11 @@
       costLines += `<div class="ss-line ss-total"><span>Total costs (their share)</span><b>${ssMoney(costTotal)}</b></div>`;
       if (savedPlan.savingsFundBills && savToBills > 0.5) costLines += `<div class="ss-line ss-sub"><span>&hellip;of which met from savings</span><b>${ssMoney(savToBills)}</b></div>`;
 
-      const taxNet = `<div class="ss-line"><span>Gross income</span><b>${ssMoney(gross)}</b></div>`
+      const surplusThis = (who === 'g') ? (r.g_surplusThis || 0) : (r.j_surplusThis || 0);
+      let taxNet = `<div class="ss-line"><span>Gross income</span><b>${ssMoney(gross)}</b></div>`
         + `<div class="ss-line ss-tax"><span>Tax</span><b>&minus;${ssMoney(tax)}</b></div>`
         + `<div class="ss-line ss-total ss-net"><span>Net income</span><b>${ssMoney(net)}</b></div>`;
+      if (surplusThis > 0.5) taxNet += `<div class="ss-line ss-sub"><span>Transferred to surplus savings</span><b>${ssMoney(surplusThis)}</b></div>`;
 
       return `<div class="ss-person"><h4>${name}</h4>`
         + `<div class="ss-grp"><div class="ss-grp-h">Income &mdash; by source</div>${incLines}</div>`
