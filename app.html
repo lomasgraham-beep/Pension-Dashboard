@@ -340,9 +340,9 @@
     .scenario-summary .ss-whatif { background:#fef3c7; border:1px solid #fcd34d; color:#92400e; padding:7px 10px; border-radius:6px; margin:0 0 10px; font-weight:600; }
     .ss-expand { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; margin-right:7px; padding:0; border:1px solid var(--line-strong); border-radius:5px; background:var(--surface-2); color:var(--accent-dark); font-size:14px; line-height:1; cursor:pointer; transition:transform .15s; vertical-align:middle; }
     .ss-expand.open { transform:rotate(90deg); background:var(--accent); color:#fff; border-color:var(--accent); }
-    /* group expand/collapse toggle in the table header */
-    .col-exp { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; margin-right:5px; padding:0; border:1px solid var(--line-strong); border-radius:4px; background:var(--surface); color:var(--accent-dark); font-size:11px; line-height:1; cursor:pointer; vertical-align:middle; }
-    .col-exp:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+    /* group expand/collapse toggle in the table header — accent-tinted so it reads as a control */
+    .col-exp { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; margin:0 6px 4px 0; padding:0; border:1px solid var(--accent); border-radius:6px; background:var(--accent); color:#fff; font-size:15px; font-weight:bold; line-height:1; cursor:pointer; vertical-align:middle; box-shadow:0 1px 2px rgba(0,0,0,0.15); }
+    .col-exp:hover { background:var(--accent-dark); border-color:var(--accent-dark); }
     .ss-detail-row > td { padding:0 !important; background:var(--surface-2); overflow:hidden; }
     .ss-detail { padding:16px 18px; border-top:2px solid var(--accent); box-sizing:border-box; }
     .ss-detail-cap { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin:0 0 12px; }
@@ -466,7 +466,7 @@
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-303</span>
+      <span class="build-stamp">LC-304</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1192,19 +1192,18 @@
     function toggleRetGrowth() { retShowGrowth = document.getElementById('retGrowthToggle').checked; renderRetirementTable(); }
 
     // ---- Retirement table: expandable column groups ----
-    // Three groups collapse to a single summed column and expand to their parts. Expansion flexes
+    // Four groups collapse to a single summed column and expand to their parts. Expansion flexes
     // with the Joint/Graham/Julie view — especially DC Pots, which shows per-member sub-columns.
-    // Standalone columns (Cash / Surplus / Other Incomes / Savings to Bills) are never grouped.
-    let retGroupExp = { pots:false, spend:false, income:false };   // expanded? (session only)
-    let retSegShown = { pots:true, cash:true, surplus:true, other:true, savbills:true, spend:true, income:true }; // chooser visibility
+    // Savings to Bills is a separate standalone column (never grouped).
+    let retGroupExp = { pots:false, savings:false, spend:false, income:false };   // expanded? (session only)
+    let retSegShown = { pots:true, savings:true, savbills:true, spend:true, income:true }; // chooser visibility
     const RET_SEGMENTS = [
-      { key:'pots', label:'DC Pots' }, { key:'cash', label:'Cash Savings' },
-      { key:'surplus', label:'Surplus Savings' }, { key:'other', label:'Other Incomes' },
+      { key:'pots', label:'DC Pots' }, { key:'savings', label:'Savings' },
       { key:'savbills', label:'Savings to Bills' }, { key:'spend', label:'Spending' },
       { key:'income', label:'Income' }
     ];
 
-    // Per-view income streams for one row. state+db+annuity = guaranteed (Other Incomes);
+    // Per-view income streams for one row. state+db+annuity = total guaranteed income;
     // +draw = gross; net = gross − tax. Joint sums both members.
     function retStreams(r) {
       const sk = (src, kind) => (src || []).reduce((s, x) => s + (x.kind === kind ? x.gross : 0), 0);
@@ -1238,9 +1237,16 @@
           });
         }
       }
-      if (retSegShown.cash)     cols.push({ label:'Cash Savings', val:(r)=>r.cashBalance||0, style:TEAL });
-      if (retSegShown.surplus)  cols.push({ label:'Surplus Savings', val:(r,v)=>v.surplus||0, style:PURPLE });
-      if (retSegShown.other)    cols.push({ label:'Other Incomes', val:(r,v)=>v.other||0 });
+      // Savings group (Cash + Surplus). Cash is a household total (not member-split), so in a
+      // single-person view the collapsed total mixes household cash with that person's surplus.
+      if (retSegShown.savings) {
+        if (!retGroupExp.savings) {
+          cols.push({ label:'Savings', val:(r,v)=>(r.cashBalance||0)+(v.surplus||0), style:B, head:{toggle:'savings',dir:'exp'} });
+        } else {
+          cols.push({ label:'Cash Savings', val:(r)=>r.cashBalance||0, style:TEAL, head:{toggle:'savings',dir:'col'} });
+          cols.push({ label:'Surplus Savings', val:(r,v)=>v.surplus||0, style:PURPLE });
+        }
+      }
       if (retSegShown.savbills) cols.push({ label:'Savings to Bills', val:(r,v)=>v.savToBills||0, style:B+TEAL });
       // Spending
       if (retSegShown.spend) {
@@ -1284,8 +1290,8 @@
       return `<td style="${style}">${txt}</td>`;
     }
     function toggleRetGroup(key) { retGroupExp[key] = !retGroupExp[key]; renderRetirementTable(); }
-    function retExpandAll()   { retGroupExp = { pots:true,  spend:true,  income:true  }; renderRetirementTable(); }
-    function retCollapseAll() { retGroupExp = { pots:false, spend:false, income:false }; renderRetirementTable(); }
+    function retExpandAll()   { retGroupExp = { pots:true,  savings:true,  spend:true,  income:true  }; renderRetirementTable(); }
+    function retCollapseAll() { retGroupExp = { pots:false, savings:false, spend:false, income:false }; renderRetirementTable(); }
     function buildColChooser() {
       const host = document.getElementById('colChooserList');
       if (!host) return;
