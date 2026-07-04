@@ -6,6 +6,7 @@
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=err27"></script>
+<script src="engine.js?v=brk1"></script>
 <style>
   :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
@@ -33,6 +34,11 @@
   td input[type=number] { width:84px; text-align:right; }
   .pay-cell { font-weight:bold; color:var(--accent-dark); }
   .del { background:#fdecea; color:#c0392b; border:none; border-radius:6px; padding:7px 11px; font-weight:bold; cursor:pointer; }
+  /* Surplus Savings rows: derived from the Retirement Model, not configured here — greyed and
+     non-interactive so they read clearly as different from the editable account rows above them. */
+  tr.surplus-row { background:var(--surface-2); color:var(--ink-soft); font-style:italic; }
+  tr.surplus-row td { color:var(--ink-soft); }
+  tr.surplus-row .pay-cell { color:var(--accent-dark); font-style:normal; font-weight:bold; }
   #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
   .table-wrap { overflow-x:auto; }
@@ -132,8 +138,8 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v17)</span></h2>
-  <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers.</p>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v18)</span></h2>
+  <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers. Surplus savings (built up automatically in retirement, from the Retirement Model) are shown alongside your own accounts, both below and on the chart.</p>
 
   <div class="ctrl-row">
     <span class="sw-pill">Savings fund bills: <b id="savbState">&hellip;</b></span>
@@ -156,14 +162,14 @@
   </div>
 
   <div id="cashChart" style="width:100%; height:425px; margin-bottom:10px;"></div>
-  <p class="note" id="chartHint" style="display:none;">Projected savings balance from retirement, updating live as you edit. Purchase deposits are drawn from instant-access savings on their month (marked &#9660;); with &ldquo;savings fund bills&rdquo; off, an unaffordable purchase is skipped and flagged in the table below.</p>
+  <p class="note" id="chartHint" style="display:none;">Projected balance per pot from retirement, updating live as you edit — each real account plus any surplus savings, and a bold total. Purchase deposits are drawn from instant-access savings on their month (marked &#9660;); with &ldquo;savings fund bills&rdquo; off, an unaffordable purchase is skipped and flagged in the table below.</p>
 
   <h3>Savings Accounts <button class="btn btn-add" style="font-size:13px; padding:8px 14px; margin-left:8px;" onclick="addAcct()">+ Add account</button></h3>
-  <p class="note">Each account belongs to a member. <strong>Instant access</strong> accounts can be drawn on to cover living costs (the cap feature) and purchase deposits; non-instant accounts (e.g. fixed-term ISAs) still grow but can't be tapped. Interest can compound monthly, pay annually, or only at the end of the term.</p>
+  <p class="note">Each account belongs to a member. <strong>Instant access</strong> accounts can be drawn on to cover living costs (the cap feature) and purchase deposits; non-instant accounts (e.g. fixed-term ISAs) still grow but can't be tapped. Interest can compound monthly, pay annually, or only at the end of the term. <strong>Surplus Savings</strong> rows (greyed, below your own accounts) are built up automatically in retirement by the Retirement Model &mdash; not editable here; change how they build up on the Modelling page.</p>
   <div class="table-wrap">
     <table id="acctTbl">
-      <thead><tr><th>Name</th><th>Member</th><th>Start Balance</th><th>Monthly</th><th>Increase/yr %</th><th>Savings Cap</th><th>Start Date</th><th>End Date</th><th>APR %</th><th>Interest</th><th>Type</th><th>Instant Access</th><th></th></tr></thead>
-      <tbody><tr><td colspan="13">Loading&hellip;</td></tr></tbody>
+      <thead><tr><th>Name</th><th>Member</th><th>Start Balance</th><th>Monthly</th><th>Increase/yr %</th><th>Savings Cap</th><th>Start Date</th><th>End Date</th><th>APR %</th><th>Interest</th><th>Type</th><th>Instant Access</th><th>Projected Balance<br>(end of plan)</th><th></th></tr></thead>
+      <tbody><tr><td colspan="14">Loading&hellip;</td></tr></tbody>
     </table>
   </div>
 
@@ -207,6 +213,11 @@
   let settingsRow = null, purchases = [], dirty = false, deleted = [];
   let accounts = [], deletedAccts = [], members = [];
   let savFundBills = true;   // saved "Savings fund bills" plan flag; gates the affordability message
+  // ---- Full-engine data, for surplus savings + per-account balances (see computeEngineRows) ----
+  // Everything the engine needs EXCEPT savingsAccounts/purchases, which are rebuilt from the live
+  // in-memory `accounts`/`purchases` arrays on every redraw so edits here show up before Save.
+  let engineData = null, enginePlan = null, enginePots = null;
+  let p1Name = null, p2Name = null;
   const tbody = document.querySelector('#pTbl tbody');
   const acctBody = document.querySelector('#acctTbl tbody');
   const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
@@ -267,7 +278,10 @@
     tbody.innerHTML = purchases.length ? purchases.map((p, i) => rowHtml(p, i, bad)).join('') : '<tr><td colspan="8">No purchases. Use \u201cAdd purchase\u201d.</td></tr>';
   }
   let __chartT = null;
-  function scheduleChart() { clearTimeout(__chartT); __chartT = setTimeout(drawCashChart, 250); }
+  function scheduleChart() { clearTimeout(__chartT); __chartT = setTimeout(redrawAll, 250); }
+  // One engine run feeds both the chart and the table's live "Projected Balance" column,
+  // so an edit never triggers PensionEngine.drawdown() twice.
+  function redrawAll() { const rows = computeEngineRows(); drawCashChart(rows); refreshProjectedBalances(rows); }
   function mark() { syncDom(); setDirty(); refreshAfford(); scheduleChart(); }
   function rowCalc(el) {
     const tr = el.closest('tr');
@@ -299,7 +313,7 @@
   }
 
   // ---- Savings accounts ----
-  function acctRowHtml(a, i) {
+  function acctRowHtml(a, i, finalBal) {
     const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
     const memOpts = members.map(m => '<option value="' + esc(m) + '"' + (a.member_name === m ? ' selected' : '') + '>' + esc(m) + '</option>').join('');
     const freqOpts = [['monthly','Monthly'],['annually','Annually'],['end_of_term','End of term']].map(o => '<option value="' + o[0] + '"' + (a.interest_frequency === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('');
@@ -317,10 +331,67 @@
       '<td data-label="Interest"><select class="a-freq" onchange="markAcct()">' + freqOpts + '</select></td>' +
       '<td data-label="Type"><select class="a-type" onchange="markAcct()">' + typeOpts + '</select></td>' +
       '<td data-label="Instant Access" style="text-align:center;"><input type="checkbox" class="a-instant"' + (a.instant_access !== false ? ' checked' : '') + ' onchange="markAcct()"></td>' +
+      '<td data-label="Projected Balance" class="pay-cell">' + fmt(finalBal || 0) + '</td>' +
       '<td><button class="del" onclick="delAcct(this)">Delete</button></td></tr>';
   }
+  // Read-only row for a member's Surplus Savings pot — built up automatically by the Retirement
+  // Model, not configured here, so every editable column shows a dash instead of an input.
+  function surplusRowHtml(memberName, finalBal) {
+    const esc = s => (s == null ? '' : String(s)).replace(/"/g, '&quot;');
+    const dash = label => '<td data-label="' + esc(label) + '">&mdash;</td>';
+    return '<tr class="surplus-row">' +
+      '<td data-label="Name"><em>Surplus Savings</em></td>' +
+      '<td data-label="Member">' + esc(memberName) + '</td>' +
+      dash('Start Balance') + dash('Monthly') + dash('Increase/yr %') + dash('Savings Cap') +
+      dash('Start Date') + dash('End Date') + dash('APR %') + dash('Interest') + dash('Type') + dash('Instant Access') +
+      '<td data-label="Projected Balance" class="pay-cell">' + fmt(finalBal || 0) + '</td>' +
+      '<td></td></tr>';
+  }
   function renderAccts() {
-    acctBody.innerHTML = accounts.length ? accounts.map(acctRowHtml).join('') : '<tr><td colspan="13">No savings accounts. Use \u201cAdd account\u201d.</td></tr>';
+    const rows = computeEngineRows();
+    const monthly = (rows && rows.monthly) || [];
+    const last = monthly.length ? monthly[monthly.length - 1] : null;
+    const finalById = {};
+    ((last && last.acctBalances) || []).forEach(b => { finalById[b.name + '|' + b.member] = b.bal; });
+    const acctHtml = accounts.length
+      ? accounts.map((a, i) => acctRowHtml(a, i, finalById[a.account_name + '|' + a.member_name])).join('')
+      : (members.length ? '' : '<tr><td colspan="14">No savings accounts. Use \u201cAdd account\u201d.</td></tr>');
+    const gFinal = last ? (last.g_surplusBalance || 0) : 0;
+    const jFinal = last ? (last.j_surplusBalance || 0) : 0;
+    const gAny = monthly.some(m => (m.g_surplusBalance || 0) > 0.5);
+    const jAny = p2Name && monthly.some(m => (m.j_surplusBalance || 0) > 0.5);
+    let surplusHtml = '';
+    if (gAny) surplusHtml += surplusRowHtml(p1Name, gFinal);
+    if (jAny) surplusHtml += surplusRowHtml(p2Name, jFinal);
+    acctBody.innerHTML = (acctHtml || surplusHtml)
+      ? (acctHtml + surplusHtml)
+      : '<tr><td colspan="14">No savings accounts. Use \u201cAdd account\u201d.</td></tr>';
+  }
+  // Live update of the "Projected Balance" column without rebuilding the table (keeps input
+  // focus while typing — same pattern as refreshAfford()). Row presence (surplus rows appearing
+  // or disappearing) is only re-decided on a full renderAccts() — load, add, delete, or reload.
+  function refreshProjectedBalances(rows) {
+    if (rows === undefined) rows = computeEngineRows();
+    const monthly = (rows && rows.monthly) || [];
+    const last = monthly.length ? monthly[monthly.length - 1] : null;
+    const finalById = {};
+    ((last && last.acctBalances) || []).forEach(b => { finalById[b.name + '|' + b.member] = b.bal; });
+    acctBody.querySelectorAll('tr[data-i]').forEach(tr => {
+      const i = Number(tr.dataset.i); const a = accounts[i]; if (!a) return;
+      const cell = tr.querySelector('td[data-label="Projected Balance"]');
+      if (cell) cell.textContent = fmt(finalById[a.account_name + '|' + a.member_name] || 0);
+    });
+    const surplusRows = acctBody.querySelectorAll('tr.surplus-row');
+    if (surplusRows.length) {
+      const gFinal = last ? (last.g_surplusBalance || 0) : 0;
+      const jFinal = last ? (last.j_surplusBalance || 0) : 0;
+      surplusRows.forEach(tr => {
+        const memberCell = tr.querySelector('td[data-label="Member"]');
+        const cell = tr.querySelector('td[data-label="Projected Balance"]');
+        if (!memberCell || !cell) return;
+        cell.textContent = fmt((memberCell.textContent === p1Name ? gFinal : jFinal));
+      });
+    }
   }
   function markAcct() { syncAccts(); setDirty(); refreshAfford(); scheduleChart(); }
   function syncAccts() {
@@ -386,28 +457,104 @@
     const status = document.getElementById('status');
     try {
       const mn = await App.memberNames();
-      const [acctRows, pRows, mRows, memRows] = await Promise.all([
+      p1Name = mn.p1 || 'Graham'; p2Name = mn.p2 || null;
+      const [acctRows, pRows, p1Rows, memRows,
+             bills, dining, guaranteed, pensions, contributions, logs, crashes,
+             contributionExceptions, workingTiers, incomeSources, incomeAmounts,
+             diningRota, mealCost, annuities] = await Promise.all([
         App.rest('bd_savings_accounts?order=account_name.asc'),
         App.rest('bd_purchases?order=purchase_date.asc'),
-        App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(mn.p1 || 'Graham') + '&order=updated_at.desc&limit=1'),
-        App.rest('bd_members')
+        App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name) + '&order=updated_at.desc&limit=1'),
+        App.rest('bd_members'),
+        App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
+        App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
+        App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
+        App.rest('bd_market_crashes?order=start_date.asc'),
+        App.rest('bd_contribution_exceptions?order=start_date.asc'),
+        App.rest('bd_working_tiers?order=from_date.asc'),
+        App.rest('bd_income_sources?order=member_name.asc'),
+        App.rest('bd_income_amounts?order=member_name.asc'),
+        App.rest('bd_dining_rota'), App.rest('bd_meal_cost'),
+        App.rest('bd_annuities?order=purchase_date.asc')
       ]);
       members = (memRows || []).map(m => m.name).filter(Boolean);
       accounts = acctRows || [];
       purchases = pRows || [];
       // timeline: retirement date -> latest end-of-life
-      retireDate = (mRows && mRows[0] && mRows[0].retirement_date) ? new Date(mRows[0].retirement_date) : null;
-      savFundBills = (mRows && mRows[0] && mRows[0].savings_fund_bills != null) ? !!mRows[0].savings_fund_bills : true;
+      retireDate = (p1Rows && p1Rows[0] && p1Rows[0].retirement_date) ? new Date(p1Rows[0].retirement_date) : null;
+      savFundBills = (p1Rows && p1Rows[0] && p1Rows[0].savings_fund_bills != null) ? !!p1Rows[0].savings_fund_bills : true;
       updateSavbPill();
       let endIdx = null;
       (memRows || []).forEach(m => { if (m.end_of_life_date) { const d = new Date(m.end_of_life_date); const ix = d.getFullYear()*12 + d.getMonth(); if (endIdx == null || ix > endIdx) endIdx = ix; } });
       endMonthIdx = endIdx;
+
+      // ---- Build the engine dataset + saved-plan cfg (for surplus + per-account balances) ----
+      // savingsAccounts/purchases are deliberately left off here — computeEngineRows() rebuilds
+      // them fresh from the live in-memory arrays on every redraw so unsaved edits show live.
+      const mealCostMap = {};
+      (mealCost || []).forEach(c => { mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
+      const DAY_COLS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+      const diningAnnual = (diningRota || []).reduce((sum, r) =>
+        sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
+      engineData = {
+        members: memRows || [], bills: bills || [], dining: dining || [], diningAnnual: diningAnnual,
+        guaranteed: guaranteed || [], pensions: pensions || [], contributions: contributions || [], logs: logs || [],
+        crashes: crashes || [], contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [],
+        incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || []
+      };
+      const p = (p1Rows && p1Rows.length) ? p1Rows[0] : {};
+      let p2phase = null, p2row = null;
+      if (p2Name) {
+        const p2Rows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p2Name) + '&order=updated_at.desc&limit=1');
+        p2row = (p2Rows && p2Rows.length) ? p2Rows[0] : null;
+        if (p2row) p2phase = {
+          phase1Date: App.parseLocalDate(p2row.shorter_week_date_1), phase1Days: p2row.working_days_1 ? Number(p2row.working_days_1) : 5,
+          phase2Date: App.parseLocalDate(p2row.shorter_week_date_2), phase2Days: p2row.working_days_2 ? Number(p2row.working_days_2) : 5
+        };
+      }
+      const p1Retire = App.parseLocalDate(p.retirement_date);
+      const p2Retire = (p2row && p2row.retirement_date) ? App.parseLocalDate(p2row.retirement_date) : p1Retire;
+      const retireByMember = {};
+      if (p1Name && p1Retire) retireByMember[p1Name] = p1Retire;
+      if (p2Name && p2Retire) retireByMember[p2Name] = p2Retire;
+      const latestRetire = [p1Retire, p2Retire].filter(Boolean).sort((a, b) => b - a)[0] || p1Retire;
+      enginePlan = {
+        retirementDate: latestRetire, retireByMember: retireByMember,
+        growthRate: p.pension_growth_rate != null ? Number(p.pension_growth_rate) : 0.05,
+        phase1Date: App.parseLocalDate(p.shorter_week_date_1), phase1Days: p.working_days_1 ? Number(p.working_days_1) : 5,
+        phase2Date: App.parseLocalDate(p.shorter_week_date_2), phase2Days: p.working_days_2 ? Number(p.working_days_2) : 5,
+        p2phase: p2phase,
+        spendRed: p.spending_reduction_pct != null ? Number(p.spending_reduction_pct) : 1.0,
+        gRatio: p.drawdown_ratio_graham != null ? Number(p.drawdown_ratio_graham) : 0.5,
+        savingsFundBills: savFundBills,
+        withdrawalMethodGraham: p.withdrawal_method_graham === 'fad' ? 'fad' : 'ufpls',
+        withdrawalMethodJulie: p.withdrawal_method_julie === 'fad' ? 'fad' : 'ufpls',
+        crystallisationDateGraham: p.crystallisation_date_graham || null,
+        crystallisationDateJulie: p.crystallisation_date_julie || null,
+        ufplsDivertTf: !!p.ufpls_divert_tf,
+        retired: p.retired_mode != null ? !!p.retired_mode : false,
+        // What-if-only fields on the Modelling page (dynamic mode, floors, SP risk) are never saved —
+        // mirror the dashboard's own baseline defaults so this matches what the dashboard shows on open.
+        dynamic: false, gFloorPct: 0.25, jFloorPct: 0.20, spRate: 0.025, spDelay: 0, tierDateOverrides: null
+      };
+      // Pension pots at retirement depend only on data untouched by this page (pensions, logs,
+      // contributions, tiers) — compute once here rather than on every debounced chart redraw.
+      const js0 = PensionEngine.forecast(engineData, enginePlan, 1);
+      enginePots = {
+        pots: { graham: Math.max(0, js0.graham || 0), julie: Math.max(0, js0.julie || 0) },
+        potsAtOwnRetire: js0.potsAtOwnRetire
+          ? { graham: Math.max(0, js0.potsAtOwnRetire.p1 || 0), julie: Math.max(0, js0.potsAtOwnRetire.p2 || 0) }
+          : null
+      };
+
       deleted = []; deletedAccts = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
       render(); renderAccts(); drawCashChart(); status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
 
-  // Standalone cash projection — mirrors the engine's monthly cash logic exactly.
+  // Standalone cash projection — used ONLY for the purchase-affordability warnings below (the
+  // "Not Enough Savings To Fund the Purchase" flag). The chart itself now uses computeEngineRows()
+  // instead (see below), which is the single source shared with the Modelling page's own chart.
   let retireDate = null, endMonthIdx = null, chartsReady = false;
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   google.charts.load('current', { packages:['corechart'] });
@@ -486,6 +633,45 @@
     return { totals, depAnnot, bad };
   }
 
+  // Runs the SAME engine the Modelling page uses, so per-account and surplus balances always
+  // agree with the dashboard. savingsAccounts/purchases are rebuilt from the live in-memory
+  // `accounts`/`purchases` arrays each call (field names already match what the engine expects),
+  // so edits on this page appear before "Save changes" is pressed. Only drawdown() re-runs here —
+  // forecast() (pension pots at retirement) was already cached once in reload() since nothing on
+  // this page can change it. Returns null until reload() has populated engineData/enginePlan.
+  function computeEngineRows() {
+    if (!engineData || !enginePlan || !enginePots) return null;
+    const data = Object.assign({}, engineData, { savingsAccounts: accounts, purchases: purchases });
+    const stateNames = new Set((data.guaranteed || []).map(x => x.income_name).filter(n => n && n.toLowerCase().indexOf('state') >= 0));
+    const sp = PensionEngine.baselineSP(stateNames);
+    sp.spRate = enginePlan.spRate;
+    sp.spDelay = {};
+    if (p1Name) sp.spDelay[p1Name] = enginePlan.spDelay;
+    if (p2Name) sp.spDelay[p2Name] = enginePlan.spDelay;
+    // Retired mode: the projection runs from THIS month for both members (no staggered gap);
+    // the saved retirement date is historical and ignored. Mirrors app.html's buildDrawdownCfg.
+    const retired = !!enginePlan.retired;
+    const nowFirst = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const baseRetire = retired ? nowFirst : enginePlan.retirementDate;
+    let retireByMember = enginePlan.retireByMember || null;
+    if (retired) { retireByMember = {}; if (p1Name) retireByMember[p1Name] = nowFirst; if (p2Name) retireByMember[p2Name] = nowFirst; }
+    const cfg = {
+      pots: enginePots.pots, potsAtOwnRetire: enginePots.potsAtOwnRetire || enginePots.pots,
+      gRatio: enginePlan.gRatio, spendRed: enginePlan.spendRed,
+      startYear: baseRetire ? baseRetire.getFullYear() : new Date().getFullYear(),
+      retirementDate: baseRetire, retireByMember: retireByMember,
+      dynamic: enginePlan.dynamic, gFloorPct: enginePlan.gFloorPct, jFloorPct: enginePlan.jFloorPct,
+      savingsFundBills: enginePlan.savingsFundBills,
+      withdrawalMethod: { graham: enginePlan.withdrawalMethodGraham, julie: enginePlan.withdrawalMethodJulie },
+      crystallisationDate: {
+        graham: enginePlan.crystallisationDateGraham ? App.parseLocalDate(enginePlan.crystallisationDateGraham) : null,
+        julie: enginePlan.crystallisationDateJulie ? App.parseLocalDate(enginePlan.crystallisationDateJulie) : null
+      },
+      ufplsDivertTf: enginePlan.ufplsDivertTf, sp: sp
+    };
+    return PensionEngine.drawdown(data, cfg);
+  }
+
   // ---- Year-range zoom for the savings chart (two single sliders; reliable on iPad Safari) ----
   let zoomSig = null;
   function setupZoom(sy, ey) {
@@ -532,49 +718,97 @@
   function onZoomTo() { const zf = document.getElementById('zFrom'), zt = document.getElementById('zTo'); if (Number(zt.value) < Number(zf.value)) zf.value = zt.value; syncZoomLabels(); scheduleChart(); }
   function zoomReset() { const zf = document.getElementById('zFrom'), zt = document.getElementById('zTo'); zf.value = zf.min; zt.value = zt.max; syncZoomLabels(); scheduleChart(); }
 
-  function drawCashChart() {
+  // Palette matches the Modelling page's "Cash Savings Balance" chart, so the two pages read
+  // consistently: accounts cycle the same 7-colour palette, surplus keeps the same purple pair.
+  const ACCT_PALETTE = ['#2c7a7b', '#e67e22', '#0e7490', '#b7791f', '#9b2c2c', '#2f855a', '#553c9a'];
+  const SURPLUS_COLORS = { g: '#6b5b95', j: '#9b7bbe' };
+  const TOTAL_COLOR = '#1e293b';
+
+  function drawCashChart(rows) {
     const box = document.getElementById('cashChart'), hint = document.getElementById('chartHint');
     if (!chartsReady) return;
-    if (!retireDate || endMonthIdx == null || !accounts.length) {
+    if (rows === undefined) rows = computeEngineRows();
+    const monthly = (rows && rows.monthly) || [];
+    if (!retireDate || endMonthIdx == null || (!accounts.length && !monthly.length)) {
+      box.style.display = 'none'; hint.style.display = 'none';
+      const zb = document.getElementById('zoomWrap'); if (zb) zb.style.display = 'none';
+      return;
+    }
+
+    // Which members have any real surplus to show (mirrors the Modelling page's own gate).
+    const gAny = monthly.some(m => (m.g_surplusBalance || 0) > 0.5);
+    const jAny = p2Name && monthly.some(m => (m.j_surplusBalance || 0) > 0.5);
+    if (!accounts.length && !gAny && !jAny) {
       box.style.display = 'none'; hint.style.display = 'none';
       const zb = document.getElementById('zoomWrap'); if (zb) zb.style.display = 'none';
       return;
     }
     box.style.display = ''; hint.style.display = '';
-    const startIdx = retireDate.getFullYear()*12 + retireDate.getMonth();
-    const startYear = Math.floor(startIdx/12), endYear = Math.floor(endMonthIdx/12);
+
+    // Month index (year*12+month) -> row, for O(1) lookup while walking the chart's own range.
+    const byIdx = {};
+    monthly.forEach(m => { byIdx[m.year * 12 + m.month] = m; });
+    const startIdx = retireDate.getFullYear() * 12 + retireDate.getMonth();
+    const startYear = Math.floor(startIdx / 12), endYear = Math.floor(endMonthIdx / 12);
     setupZoom(startYear, endYear);
     const win = zoomWindow(startYear, endYear);
-    const sim = simulateSavings();
+
+    // deposit annotations, from the engine's own purchase-window tracking
+    const buysByIdx = {};
+    ((rows && rows.purchaseWindows) || []).forEach(w => {
+      const label = w.name + ' (' + fmt(w.deposit) + ')';
+      buysByIdx[w.depositIdx] = buysByIdx[w.depositIdx] ? (buysByIdx[w.depositIdx] + '; ' + label) : label;
+    });
 
     const dt = new google.visualization.DataTable();
-    dt.addColumn('string','Month');
-    dt.addColumn('number','Total balance');
-    dt.addColumn({ type:'string', role:'annotation' });
-    dt.addColumn({ type:'string', role:'annotationText' });
+    dt.addColumn('string', 'Month');
+    const multiMember = !!p2Name;
+    accounts.forEach(a => dt.addColumn('number', a.account_name + (multiMember ? ' (' + a.member_name + ')' : '')));
+    if (gAny) dt.addColumn('number', 'Surplus' + (multiMember ? ' (' + p1Name + ')' : ''));
+    if (jAny) dt.addColumn('number', 'Surplus (' + p2Name + ')');
+    dt.addColumn('number', 'Total (all pots)');
+    dt.addColumn({ type: 'string', role: 'annotation' });
+    dt.addColumn({ type: 'string', role: 'annotationText' });
 
     let shown = 0;
     for (let idx = startIdx; idx <= endMonthIdx; idx++) {
-      const yr = Math.floor(idx/12);
+      const yr = Math.floor(idx / 12);
       if (yr < win[0] || yr > win[1]) continue;
-      const total = sim.totals[idx] || 0;
-      const dep = sim.depAnnot[idx];
-      const label = MONTHS[idx%12] + ' ' + yr;
-      const note = dep ? '▼' : null;
-      const noteText = dep ? (dep.names.join(', ') + ' — deposit ' + fmt(dep.amount)) : null;
-      dt.addRow([label, Math.round(total), note, noteText]);
+      const row = byIdx[idx];
+      const balById = {};
+      (row && row.acctBalances || []).forEach(b => { balById[b.name + '|' + b.member] = b.bal; });
+      const label = MONTHS[idx % 12] + ' ' + yr;
+      const cells = [label];
+      let total = 0;
+      accounts.forEach(a => { const v = Math.round(balById[a.account_name + '|' + a.member_name] || 0); cells.push(v); total += v; });
+      if (gAny) { const v = Math.round((row && row.g_surplusBalance) || 0); cells.push(v); total += v; }
+      if (jAny) { const v = Math.round((row && row.j_surplusBalance) || 0); cells.push(v); total += v; }
+      cells.push(total);
+      const dep = buysByIdx[idx];
+      cells.push(dep ? '▼' : null);
+      cells.push(dep ? ('Purchase: ' + dep) : null);
+      dt.addRow(cells);
       shown++;
     }
+
+    // colours + per-series styling, in column order: accounts, surplus(es), then bold Total
+    const colors = accounts.map((_, i) => ACCT_PALETTE[i % ACCT_PALETTE.length]);
+    if (gAny) colors.push(SURPLUS_COLORS.g);
+    if (jAny) colors.push(SURPLUS_COLORS.j);
+    colors.push(TOTAL_COLOR);
+    const totalSeriesIdx = colors.length - 1;
+    const series = { [totalSeriesIdx]: { lineWidth: 4 } };
 
     const phone = window.innerWidth <= 600;
     const months = Math.max(1, shown);
     new google.visualization.LineChart(box).draw(dt, {
-      title: 'Projected total savings balance (all accounts)',
-      legend: { position:'none' }, curveType:'function', lineWidth:3, colors:['#2c7a7b'],
-      chartArea: phone ? { left:64, right:16, top:40, bottom:70, height:'66%' } : { left:88, right:30, top:44, bottom:70 },
-      vAxis: { title: phone ? '' : 'Balance (£)', minValue:0, format:'£#,###', textStyle:{ fontSize: phone?10:12 } },
-      hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, Math.round(months/(phone?6:12))), slantedText:true, slantedTextAngle:45, textStyle:{ fontSize: phone?9:11 } },
-      annotations: { style:'point', stem:{ color:'#c0392b' }, textStyle:{ fontSize:11, color:'#c0392b', bold:true } }
+      title: 'Projected savings balance — by pot',
+      legend: { position: phone ? 'top' : 'right', textStyle: { fontSize: 11 }, maxLines: 3 },
+      curveType: 'function', lineWidth: 2, colors: colors, series: series,
+      chartArea: phone ? { left: 64, right: 16, top: 64, bottom: 70, height: '58%' } : { left: 88, right: 20, top: 44, bottom: 70, width: '68%' },
+      vAxis: { title: phone ? '' : 'Balance (£)', minValue: 0, format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
+      hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, Math.round(months / (phone ? 6 : 12))), slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: phone ? 9 : 11 } },
+      annotations: { style: 'point', stem: { color: '#c0392b' }, textStyle: { fontSize: 11, color: '#c0392b', bold: true } }
     });
   }
   window.addEventListener('resize', () => { clearTimeout(window.__cr); window.__cr = setTimeout(drawCashChart, 150); });
