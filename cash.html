@@ -145,7 +145,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v19)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v20)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers. Surplus savings (built up automatically in retirement, from the Retirement Model) are shown alongside your own accounts, both below and on the chart.</p>
 
   <div class="ctrl-row">
@@ -169,7 +169,8 @@
   </div>
 
   <div class="chart-wrap"><div id="cashChart" style="width:100%; height:425px; margin-bottom:10px;"></div></div>
-  <p class="note" id="chartHint" style="display:none;">Projected balance per pot from retirement, updating live as you edit — each real account plus any surplus savings, and a bold total. Purchase deposits are drawn from instant-access savings on their month (marked &#9660;); with &ldquo;savings fund bills&rdquo; off, an unaffordable purchase is skipped and flagged in the table below.</p>
+  <p class="note" id="chartHint" style="display:none;">Projected balance per pot from retirement, updating live as you edit — each real account and any surplus savings shown as lines (left axis), with the combined total as a light background bar (right axis, scaled so it never overtops the lines). Purchase deposits are drawn from instant-access savings on their month (marked &#9660;); with &ldquo;savings fund bills&rdquo; off, an unaffordable purchase is skipped and flagged in the table below.</p>
+  <p class="note" id="surplusDiag" style="display:none; font-size:11px; color:#94a3b8;"></p>
 
   <h3>Savings Accounts <button class="btn btn-add" style="font-size:13px; padding:8px 14px; margin-left:8px;" onclick="addAcct()">+ Add account</button></h3>
   <p class="note">Each account belongs to a member. <strong>Instant access</strong> accounts can be drawn on to cover living costs (the cap feature) and purchase deposits; non-instant accounts (e.g. fixed-term ISAs) still grow but can't be tapped. Interest can compound monthly, pay annually, or only at the end of the term. <strong>Surplus Savings</strong> rows (greyed, below your own accounts) are built up automatically in retirement by the Retirement Model &mdash; not editable here; change how they build up on the Modelling page.</p>
@@ -729,7 +730,7 @@
   // consistently: accounts cycle the same 7-colour palette, surplus keeps the same purple pair.
   const ACCT_PALETTE = ['#2c7a7b', '#e67e22', '#0e7490', '#b7791f', '#9b2c2c', '#2f855a', '#553c9a'];
   const SURPLUS_COLORS = { g: '#6b5b95', j: '#9b7bbe' };
-  const TOTAL_COLOR = '#1e293b';
+  const TOTAL_BAR_COLOR = '#dbe4ea';   // light grey-blue: background bar the lines sit clearly over
 
   function renderCustomLegend(wrapEl, entries) {
     if (!wrapEl) return;
@@ -788,7 +789,7 @@
     dt.addColumn({ type: 'string', role: 'annotation' });
     dt.addColumn({ type: 'string', role: 'annotationText' });
 
-    let shown = 0;
+    let shown = 0, peakLine = 0, peakTotal = 0;
     for (let idx = startIdx; idx <= endMonthIdx; idx++) {
       const yr = Math.floor(idx / 12);
       if (yr < win[0] || yr > win[1]) continue;
@@ -798,10 +799,11 @@
       const label = MONTHS[idx % 12] + ' ' + yr;
       const cells = [label];
       let total = 0;
-      accounts.forEach(a => { const v = Math.round(balById[a.account_name + '|' + a.member_name] || 0); cells.push(v); total += v; });
-      if (gAny) { const v = Math.round((row && row.g_surplusBalance) || 0); cells.push(v); total += v; }
-      if (jAny) { const v = Math.round((row && row.j_surplusBalance) || 0); cells.push(v); total += v; }
+      accounts.forEach(a => { const v = Math.round(balById[a.account_name + '|' + a.member_name] || 0); cells.push(v); total += v; if (v > peakLine) peakLine = v; });
+      if (gAny) { const v = Math.round((row && row.g_surplusBalance) || 0); cells.push(v); total += v; if (v > peakLine) peakLine = v; }
+      if (jAny) { const v = Math.round((row && row.j_surplusBalance) || 0); cells.push(v); total += v; if (v > peakLine) peakLine = v; }
       cells.push(total);
+      if (total > peakTotal) peakTotal = total;
       const dep = buysByIdx[idx];
       cells.push(dep ? '▼' : null);
       cells.push(dep ? ('Purchase: ' + dep) : null);
@@ -809,22 +811,37 @@
       shown++;
     }
 
-    // colours + per-series styling, in column order: accounts, surplus(es), then bold Total
+    // colours + per-series styling. Column order: accounts (lines), surplus(es) (lines), Total (bar).
     const colors = accounts.map((_, i) => ACCT_PALETTE[i % ACCT_PALETTE.length]);
     if (gAny) colors.push(SURPLUS_COLORS.g);
     if (jAny) colors.push(SURPLUS_COLORS.j);
-    colors.push(TOTAL_COLOR);
+    colors.push(TOTAL_BAR_COLOR);
     const totalSeriesIdx = colors.length - 1;
-    const series = { [totalSeriesIdx]: { lineWidth: 4 } };
+    // Every series is a line except the last (Total), which is a light bar on axis 1 (right).
+    const series = {};
+    for (let s = 0; s < totalSeriesIdx; s++) series[s] = { type: 'line', targetAxisIndex: 0 };
+    series[totalSeriesIdx] = { type: 'bars', targetAxisIndex: 1 };
+
+    // Left axis fits the individual pots. The right axis is scaled so the tallest Total bar
+    // reaches the SAME pixel height as the tallest line — never taller. Total >= every line
+    // always, so mapping peakTotal onto peakLine's height keeps every bar at or below the lines
+    // (Graham asked the total not to exceed the highest line). Guard against divide-by-zero.
+    const leftTop = Math.ceil(Math.max(peakLine, 1) * 1.05 / 1000) * 1000;
+    const ratio = peakLine > 0 ? (peakTotal / peakLine) : 1;
+    const rightMax = Math.max(leftTop, Math.ceil(leftTop * ratio / 1000) * 1000);
 
     const phone = window.innerWidth <= 600;
     const months = Math.max(1, shown);
-    new google.visualization.LineChart(box).draw(dt, {
+    new google.visualization.ComboChart(box).draw(dt, {
       title: 'Projected savings balance — by pot',
       legend: { position: 'none' },
-      curveType: 'function', lineWidth: 2, colors: colors, series: series,
-      chartArea: phone ? { left: 64, right: 16, top: 40, bottom: 70, height: '66%' } : { left: 88, right: 30, top: 44, bottom: 70 },
-      vAxis: { title: phone ? '' : 'Balance (£)', minValue: 0, format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
+      seriesType: 'line', curveType: 'function', lineWidth: 2, colors: colors, series: series,
+      bar: { groupWidth: '92%' },
+      chartArea: phone ? { left: 64, right: 52, top: 40, bottom: 70, height: '66%' } : { left: 88, right: 76, top: 44, bottom: 70 },
+      vAxes: {
+        0: { title: phone ? '' : 'Pot balance (£)', minValue: 0, viewWindow: { min: 0, max: leftTop }, format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
+        1: { title: phone ? '' : 'Total (£)', minValue: 0, viewWindow: { min: 0, max: rightMax }, format: '£#,###', textStyle: { fontSize: phone ? 10 : 12, color: '#94a3b8' }, gridlines: { color: 'transparent' } }
+      },
       hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, Math.round(months / (phone ? 6 : 12))), slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: phone ? 9 : 11 } },
       annotations: { style: 'point', stem: { color: '#c0392b' }, textStyle: { fontSize: 11, color: '#c0392b', bold: true } }
     });
@@ -833,8 +850,24 @@
     }));
     if (gAny) legendEntries.push({ label: 'Surplus' + (multiMember ? ' (' + p1Name + ')' : ''), color: SURPLUS_COLORS.g, type: 'line' });
     if (jAny) legendEntries.push({ label: 'Surplus (' + p2Name + ')', color: SURPLUS_COLORS.j, type: 'line' });
-    legendEntries.push({ label: 'Total (all pots)', color: TOTAL_COLOR, type: 'line' });
+    legendEntries.push({ label: 'Total (all pots)', color: TOTAL_BAR_COLOR, type: 'bar' });
     renderCustomLegend(wrap, legendEntries);
+
+    // --- Temporary surplus diagnostic (remove once the tax-free-first question is resolved) ---
+    // Reads the actual peak per-member surplus straight from the engine rows this page computed,
+    // alongside the withdrawal method in effect, so the numbers can be compared with Modelling.
+    const diag = document.getElementById('surplusDiag');
+    if (diag) {
+      let gPeak = 0, jPeak = 0;
+      monthly.forEach(m => { if ((m.g_surplusBalance || 0) > gPeak) gPeak = m.g_surplusBalance; if ((m.j_surplusBalance || 0) > jPeak) jPeak = m.j_surplusBalance; });
+      const wm = enginePlan ? (enginePlan.withdrawalMethodGraham + '/' + enginePlan.withdrawalMethodJulie) : '?';
+      const cg = enginePlan && enginePlan.crystallisationDateGraham ? enginePlan.crystallisationDateGraham : '—';
+      const cj = enginePlan && enginePlan.crystallisationDateJulie ? enginePlan.crystallisationDateJulie : '—';
+      diag.style.display = '';
+      diag.textContent = 'Diagnostic — peak surplus ' + p1Name + ': ' + fmt(gPeak)
+        + (p2Name ? (', ' + p2Name + ': ' + fmt(jPeak)) : '')
+        + ' · method(G/J): ' + wm + ' · cryst dates(G/J): ' + cg + ' / ' + cj;
+    }
   }
   window.addEventListener('resize', () => { clearTimeout(window.__cr); window.__cr = setTimeout(drawCashChart, 150); });
 
