@@ -33,6 +33,13 @@
   td input[type=date] { width:140px; }
   td input[type=number] { width:84px; text-align:right; }
   .pay-cell { font-weight:bold; color:var(--accent-dark); }
+  /* Custom chart legend — Google Charts' native legend has known reliability issues on this
+     project (silently drops/mis-sizes with several series); a simple HTML legend is used instead,
+     same pattern as the Modelling page's own multi-series charts. */
+  .cx-legend { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:4px 12px; padding:0 20px 10px; font-size:12px; color:var(--ink); }
+  .cx-legend .cx-item { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; line-height:1.35; }
+  .cx-legend .cx-swatch { display:inline-block; width:12px; height:12px; border-radius:2px; flex:0 0 auto; }
+  .cx-legend .cx-swatch.line { height:3px; border-radius:2px; }
   .del { background:#fdecea; color:#c0392b; border:none; border-radius:6px; padding:7px 11px; font-weight:bold; cursor:pointer; }
   /* Surplus Savings rows: derived from the Retirement Model, not configured here — greyed and
      non-interactive so they read clearly as different from the editable account rows above them. */
@@ -138,7 +145,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v18)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v19)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers. Surplus savings (built up automatically in retirement, from the Retirement Model) are shown alongside your own accounts, both below and on the chart.</p>
 
   <div class="ctrl-row">
@@ -161,7 +168,7 @@
     <span class="savb-note" id="savbNote">When off, your savings don&rsquo;t subsidise household bills and grow on their own, and each purchase must be covered by your savings &mdash; otherwise it shows &ldquo;Not Enough Savings To Fund the Purchase&rdquo; below. Change this on the Modelling page, in the left-hand controls rail.</span>
   </div>
 
-  <div id="cashChart" style="width:100%; height:425px; margin-bottom:10px;"></div>
+  <div class="chart-wrap"><div id="cashChart" style="width:100%; height:425px; margin-bottom:10px;"></div></div>
   <p class="note" id="chartHint" style="display:none;">Projected balance per pot from retirement, updating live as you edit — each real account plus any surplus savings, and a bold total. Purchase deposits are drawn from instant-access savings on their month (marked &#9660;); with &ldquo;savings fund bills&rdquo; off, an unaffordable purchase is skipped and flagged in the table below.</p>
 
   <h3>Savings Accounts <button class="btn btn-add" style="font-size:13px; padding:8px 14px; margin-left:8px;" onclick="addAcct()">+ Add account</button></h3>
@@ -724,13 +731,24 @@
   const SURPLUS_COLORS = { g: '#6b5b95', j: '#9b7bbe' };
   const TOTAL_COLOR = '#1e293b';
 
+  function renderCustomLegend(wrapEl, entries) {
+    if (!wrapEl) return;
+    let leg = wrapEl.querySelector('.cx-legend');
+    if (!leg) { leg = document.createElement('div'); leg.className = 'cx-legend'; wrapEl.appendChild(leg); }
+    leg.innerHTML = (entries || []).map(e => {
+      const cls = e.type === 'line' ? 'cx-swatch line' : 'cx-swatch';
+      return '<span class="cx-item"><span class="' + cls + '" style="background:' + e.color + ';"></span>' + e.label + '</span>';
+    }).join('');
+  }
+
   function drawCashChart(rows) {
     const box = document.getElementById('cashChart'), hint = document.getElementById('chartHint');
+    const wrap = box.closest('.chart-wrap');
     if (!chartsReady) return;
     if (rows === undefined) rows = computeEngineRows();
     const monthly = (rows && rows.monthly) || [];
     if (!retireDate || endMonthIdx == null || (!accounts.length && !monthly.length)) {
-      box.style.display = 'none'; hint.style.display = 'none';
+      wrap.style.display = 'none'; hint.style.display = 'none';
       const zb = document.getElementById('zoomWrap'); if (zb) zb.style.display = 'none';
       return;
     }
@@ -739,11 +757,11 @@
     const gAny = monthly.some(m => (m.g_surplusBalance || 0) > 0.5);
     const jAny = p2Name && monthly.some(m => (m.j_surplusBalance || 0) > 0.5);
     if (!accounts.length && !gAny && !jAny) {
-      box.style.display = 'none'; hint.style.display = 'none';
+      wrap.style.display = 'none'; hint.style.display = 'none';
       const zb = document.getElementById('zoomWrap'); if (zb) zb.style.display = 'none';
       return;
     }
-    box.style.display = ''; hint.style.display = '';
+    wrap.style.display = ''; hint.style.display = '';
 
     // Month index (year*12+month) -> row, for O(1) lookup while walking the chart's own range.
     const byIdx = {};
@@ -803,13 +821,20 @@
     const months = Math.max(1, shown);
     new google.visualization.LineChart(box).draw(dt, {
       title: 'Projected savings balance — by pot',
-      legend: { position: phone ? 'top' : 'right', textStyle: { fontSize: 11 }, maxLines: 3 },
+      legend: { position: 'none' },
       curveType: 'function', lineWidth: 2, colors: colors, series: series,
-      chartArea: phone ? { left: 64, right: 16, top: 64, bottom: 70, height: '58%' } : { left: 88, right: 20, top: 44, bottom: 70, width: '68%' },
+      chartArea: phone ? { left: 64, right: 16, top: 40, bottom: 70, height: '66%' } : { left: 88, right: 30, top: 44, bottom: 70 },
       vAxis: { title: phone ? '' : 'Balance (£)', minValue: 0, format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
       hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, Math.round(months / (phone ? 6 : 12))), slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: phone ? 9 : 11 } },
       annotations: { style: 'point', stem: { color: '#c0392b' }, textStyle: { fontSize: 11, color: '#c0392b', bold: true } }
     });
+    const legendEntries = accounts.map((a, i) => ({
+      label: a.account_name + (multiMember ? ' (' + a.member_name + ')' : ''), color: colors[i], type: 'line'
+    }));
+    if (gAny) legendEntries.push({ label: 'Surplus' + (multiMember ? ' (' + p1Name + ')' : ''), color: SURPLUS_COLORS.g, type: 'line' });
+    if (jAny) legendEntries.push({ label: 'Surplus (' + p2Name + ')', color: SURPLUS_COLORS.j, type: 'line' });
+    legendEntries.push({ label: 'Total (all pots)', color: TOTAL_COLOR, type: 'line' });
+    renderCustomLegend(wrap, legendEntries);
   }
   window.addEventListener('resize', () => { clearTimeout(window.__cr); window.__cr = setTimeout(drawCashChart, 150); });
 
