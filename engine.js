@@ -1,6 +1,6 @@
 /* ============================================================
    engine.js  —  Pension modelling engine (pure JavaScript)
-   build tag: brk1  (additive: per-person tax/net + per-source income breakdown, display-only)
+   build tag: ann1  (additive: annuity "whole pot" purchase mode; inert when use_whole_pot is off)
 
    This is the SAME maths that runs in the Scenario Lab, which was
    validated against the Supabase functions (calculate_joint_retirement
@@ -386,6 +386,7 @@
       return {
         name: a.annuity_name || 'Annuity', member: a.member_name,
         pIdx: pIdx, amount: amount, annualIncome: amount * rate, esc: esc,
+        rate: rate, wholePot: a.use_whole_pot === true,
         purchased: false, skipped: false
       };
     }).filter(a => a.pIdx != null && a.member != null);
@@ -775,7 +776,14 @@
         if (an.pIdx !== idx || an.purchased || an.skipped) continue;
         if (an.member === p1Name) {
           const pot = gTf + gTx;
-          if (pot + 1e-6 >= an.amount && an.amount > 0) {
+          if (an.wholePot) {                 // buy with the ENTIRE pot — always affordable, never skipped
+            if (pot > 0) {
+              an.amount = pot; an.annualIncome = pot * an.rate;
+              gTf = 0; gTx = 0; an.purchased = true; gAnnBuy += pot;
+            } else {
+              an.skipped = true; annuitySkipped.push({ name: an.name, member: an.member, idx: idx, amount: 0, available: pot });
+            }
+          } else if (pot + 1e-6 >= an.amount && an.amount > 0) {
             const f = pot > 0 ? an.amount / pot : 0;
             gTf -= gTf * f; gTx -= gTx * f; an.purchased = true; gAnnBuy += an.amount;
           } else if (an.amount > 0) {
@@ -783,7 +791,14 @@
           }
         } else if (p2Name && an.member === p2Name) {
           const pot = jTf + jTx;
-          if (pot + 1e-6 >= an.amount && an.amount > 0) {
+          if (an.wholePot) {                 // buy with the ENTIRE pot — always affordable, never skipped
+            if (pot > 0) {
+              an.amount = pot; an.annualIncome = pot * an.rate;
+              jTf = 0; jTx = 0; an.purchased = true; jAnnBuy += pot;
+            } else {
+              an.skipped = true; annuitySkipped.push({ name: an.name, member: an.member, idx: idx, amount: 0, available: pot });
+            }
+          } else if (pot + 1e-6 >= an.amount && an.amount > 0) {
             const f = pot > 0 ? an.amount / pot : 0;
             jTf -= jTf * f; jTx -= jTx * f; an.purchased = true; jAnnBuy += an.amount;
           } else if (an.amount > 0) {
