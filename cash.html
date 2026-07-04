@@ -145,7 +145,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v20)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v21)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers. Surplus savings (built up automatically in retirement, from the Retirement Model) are shown alongside your own accounts, both below and on the chart.</p>
 
   <div class="ctrl-row">
@@ -729,7 +729,10 @@
   // Palette matches the Modelling page's "Cash Savings Balance" chart, so the two pages read
   // consistently: accounts cycle the same 7-colour palette, surplus keeps the same purple pair.
   const ACCT_PALETTE = ['#2c7a7b', '#e67e22', '#0e7490', '#b7791f', '#9b2c2c', '#2f855a', '#553c9a'];
-  const SURPLUS_COLORS = { g: '#6b5b95', j: '#9b7bbe' };
+  // Two clearly-distinct hues: Graham keeps the muted purple (matches the Modelling page's
+  // stacked-bar surplus); Julie moves from a near-identical light purple to rose-pink so the two
+  // thin lines are tellable apart (as overlapping lines the old purples read as a single colour).
+  const SURPLUS_COLORS = { g: '#6b5b95', j: '#e64980' };
   const TOTAL_BAR_COLOR = '#dbe4ea';   // light grey-blue: background bar the lines sit clearly over
 
   function renderCustomLegend(wrapEl, entries) {
