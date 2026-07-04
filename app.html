@@ -463,14 +463,56 @@
     a, .topbar a { color:#60a5fa !important; }
   }
 
+  /* ---- Saved Models (LC-306) ---- */
+  .model-badge{ display:inline-block; background:var(--accent-soft); color:var(--accent-dark); border:1px solid var(--accent-border); border-radius:6px; padding:3px 10px; font-size:12px; font-weight:700; margin-right:10px; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:middle; }
+  .modelbar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 14px; padding:10px 12px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; }
+  .mdl-current{ font-size:13px; color:var(--ink-soft); margin-left:auto; }
+  .mdl-current-name{ color:var(--ink); font-weight:600; }
+  .mdl-btn{ background:var(--surface); color:var(--ink); border:1px solid var(--line-strong); border-radius:8px; padding:9px 16px; font-weight:600; font-size:14px; cursor:pointer; }
+  .mdl-btn:hover{ background:var(--surface-2); }
+  .mdl-btn-primary{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .mdl-btn-primary:hover{ background:var(--accent-dark); }
+  .mdl-btn-ghost{ background:transparent; }
+  .mdl-btn-danger{ color:#c0392b; border-color:#e6b0aa; }
+  .mdl-btn-danger:hover{ background:#fdecea; }
+  .mdl-btn-small{ padding:7px 12px; font-size:13px; }
+  .mdl-overlay{ position:fixed; inset:0; z-index:4000; background:rgba(15,23,42,0.45); display:none; align-items:flex-start; justify-content:center; padding:24px 14px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .mdl-overlay-center{ align-items:center; }
+  .mdl-card{ background:var(--surface); color:var(--ink); border:1px solid var(--line); border-radius:12px; width:100%; max-width:560px; padding:22px 22px 18px; box-shadow:0 12px 40px rgba(0,0,0,0.22); margin:auto 0; }
+  .mdl-head{ display:flex; align-items:center; justify-content:space-between; margin:0 0 14px; }
+  .mdl-head h2{ margin:0; font-size:19px; color:var(--ink); }
+  .mdl-x{ background:transparent; border:none; font-size:26px; line-height:1; color:var(--ink-soft); cursor:pointer; padding:0 4px; }
+  .mdl-label{ display:block; font-size:12px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; margin:12px 0 5px; }
+  .mdl-input{ width:100%; box-sizing:border-box; padding:11px; border:1px solid var(--line-strong); border-radius:8px; font-size:15px; background:var(--surface); color:var(--ink); }
+  .mdl-summary{ background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:11px 13px; font-size:13.5px; line-height:1.5; color:var(--ink); min-height:20px; }
+  .mdl-err{ color:#c0392b; font-size:13px; font-weight:600; min-height:18px; margin-top:8px; }
+  .mdl-actions{ display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin-top:16px; }
+  .mdl-list{ display:flex; flex-direction:column; gap:10px; max-height:60vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .mdl-empty{ color:var(--ink-soft); font-size:14px; padding:16px 4px; text-align:center; }
+  .mdl-row{ display:flex; align-items:flex-start; gap:12px; border:1px solid var(--line); border-radius:9px; padding:12px 14px; background:var(--surface-2); }
+  .mdl-row-click{ cursor:pointer; }
+  .mdl-row-click:hover{ border-color:var(--accent-border); background:var(--accent-soft); }
+  .mdl-row-main{ flex:1 1 auto; min-width:0; }
+  .mdl-row-name{ font-weight:700; font-size:15px; color:var(--ink); }
+  .mdl-row-meta{ font-size:12px; color:var(--ink-soft); margin:2px 0 5px; }
+  .mdl-row-summary{ font-size:13px; color:var(--ink); line-height:1.45; word-break:break-word; }
+  .mdl-row-btns{ display:flex; flex-direction:column; gap:7px; flex:0 0 auto; }
+  .mdl-tag{ display:inline-block; font-size:11px; font-weight:700; color:var(--accent-dark); background:var(--accent-soft); border:1px solid var(--accent-border); border-radius:5px; padding:1px 7px; margin-left:6px; vertical-align:middle; }
+  .mdl-rename{ margin-bottom:6px; }
+  .mdl-confirm-card{ background:var(--surface); color:var(--ink); border:1px solid var(--line); border-radius:12px; width:100%; max-width:420px; padding:22px; box-shadow:0 12px 40px rgba(0,0,0,0.25); margin:auto; }
+  .mdl-confirm-msg{ font-size:15px; line-height:1.5; color:var(--ink); margin-bottom:18px; }
+  .mdl-confirm-actions{ display:flex; gap:10px; justify-content:flex-end; }
+  .mdl-busy{ background:var(--surface); color:var(--ink); border-radius:12px; padding:22px 30px; font-weight:600; box-shadow:0 12px 40px rgba(0,0,0,0.25); margin:auto; }
+
 </style>
 </head>
 <body>
   <div class="topbar">
     <h1 id="appTitle">My Pension Model</h1>
     <div class="right">
+      <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-305</span>
+      <span class="build-stamp">LC-306</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -671,6 +713,11 @@
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
     </div>
+    <div class="modelbar">
+      <button class="mdl-btn mdl-btn-primary" onclick="openSaveOverlay()">Save model</button>
+      <button class="mdl-btn" onclick="openLoadOverlay()">Load model</button>
+      <span class="mdl-current">Loaded: <b class="mdl-current-name">No model loaded</b></span>
+    </div>
     <button type="button" class="opt-toggle" id="optToggle" onclick="toggleOptPair()" aria-expanded="false"><span class="opt-caret" aria-hidden="true">&#9654;</span> Intelligent modelling</button>
     <div class="opt-pair" id="optPair" style="display:none;">
     <div class="params" id="mssBlock">
@@ -845,6 +892,11 @@
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
+    </div>
+    <div class="modelbar">
+      <button class="mdl-btn mdl-btn-primary" onclick="openSaveOverlay()">Save model</button>
+      <button class="mdl-btn" onclick="openLoadOverlay()">Load model</button>
+      <span class="mdl-current">Loaded: <b class="mdl-current-name">No model loaded</b></span>
     </div>
     <div class="model-layout">
     <div class="rail-slot" id="railSlot-Retirement"></div><div class="rail-strip" onclick="expandRail()" title="Show controls"><span>Controls &#9654;</span></div>
@@ -3418,6 +3470,15 @@
 
         const pRows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name) + '&order=updated_at.desc&limit=1');
         const p = (pRows && pRows.length) ? pRows[0] : {};
+        // currently-loaded saved model (if any) — pointer lives on the first member's row
+        _activeModel = null;
+        if (p && p.active_model_id) {
+          try {
+            const mrows = await App.rest('op_saved_models?id=eq.' + encodeURIComponent(p.active_model_id) + '&select=id,name');
+            if (mrows && mrows.length) _activeModel = { id: mrows[0].id, name: mrows[0].name };
+          } catch (e) { /* table may not exist yet before the migration runs */ }
+        }
+        updateModelBadge();
         // person 2's own params (working-days schedule + their retirement date)
         let p2phase = null, p2row = null;
         if (p2Name) {
@@ -3474,13 +3535,352 @@
         recomputeAll();
         status.className = 's-ok';
         status.textContent = 'Connection healthy. Welcome back ' + p1Name + (p2Name ? ' and ' + p2Name : '');
+        // after a model load reloads the app, drop back to the page it was loaded from
+        try { const rt = sessionStorage.getItem('mpm_returnTab'); if (rt) { sessionStorage.removeItem('mpm_returnTab'); showTab(null, rt); } } catch (e) { /* ignore */ }
       } catch (e) {
         status.className = 's-err';
         status.textContent = 'Could not load: ' + e.message + '. Check your network settings allow access to Supabase.';
       }
     }
 
+    // ======================= SAVED MODELS (LC-306) =======================
+    let _activeModel = null;         // { id, name } of the loaded model, or null
+    let _pendingSaveState = null;    // snapshot collected when the Save overlay opens
+
+    const MODEL_COLLECTIONS = [
+      { key: 'annuities',        base: 'bd_annuities',        order: 'purchase_date.asc' },
+      { key: 'purchases',        base: 'bd_purchases',        order: 'purchase_date.asc' },
+      { key: 'savings_accounts', base: 'bd_savings_accounts', order: 'account_name.asc' },
+      { key: 'market_crashes',   base: 'bd_market_crashes',   order: 'start_date.asc' }
+    ];
+    const MDL_ROW_DROP = ['id', 'created_at', 'updated_at'];
+
+    function _mdlEsc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(ch){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[ch]; }); }
+    function _mdlStrip(row, drop){ const out = {}; Object.keys(row || {}).forEach(function(k){ if (drop.indexOf(k) < 0) out[k] = row[k]; }); return out; }
+    function _mdlSortedStringify(obj){
+      return JSON.stringify(obj, function(k, v){
+        if (v && typeof v === 'object' && !Array.isArray(v)) {
+          return Object.keys(v).sort().reduce(function(a, key){ a[key] = v[key]; return a; }, {});
+        }
+        return v;
+      });
+    }
+    function _mdlDMY(iso){ const d = new Date(iso); if (isNaN(d.getTime())) return '\u2014'; return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear(); }
+
+    // map the live modelling rail to an op_modelling_parameters row (mirrors savePlan's payload)
+    function railToParamsRow(c){
+      return {
+        member_name: p1Name,
+        retirement_date: App.toInputDate(c.retirementDate) || null,
+        pension_growth_rate: c.growthRate,
+        spending_reduction_pct: c.spendRed,
+        drawdown_ratio_graham: c.gRatio,
+        savings_fund_bills: c.savingsFundBills,
+        withdrawal_method_graham: c.withdrawalMethodGraham,
+        withdrawal_method_julie: c.withdrawalMethodJulie,
+        crystallisation_date_graham: c.crystallisationDateGraham || null,
+        crystallisation_date_julie: c.crystallisationDateJulie || null,
+        ufpls_divert_tf: c.ufplsDivertTf
+      };
+    }
+
+    // persist the on-screen rail as the live plan (keeps the live plan aligned with a saved model)
+    async function persistCurrentRail(){
+      const c = readControls();
+      const payload = Object.assign(railToParamsRow(c), { updated_at: new Date().toISOString() });
+      const existing = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name));
+      if (existing && existing.length) await App.write('PATCH', 'op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name), payload);
+      else await App.write('POST', 'op_modelling_parameters', payload);
+      savedPlan = c;
+    }
+
+    // gather everything a model captures (no DB writes): rail + the four collection tables
+    async function collectModelState(){
+      const c = readControls();
+      const modelling = { p1: railToParamsRow(c), p2: null };
+      if (p2Name) {
+        const p2rows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p2Name));
+        modelling.p2 = (p2rows && p2rows.length) ? _mdlStrip(p2rows[0], ['id', 'active_model_id', 'created_at', 'updated_at']) : null;
+      }
+      const state = { version: 1, modelling: modelling };
+      for (const t of MODEL_COLLECTIONS) {
+        const rows = await App.rest(t.base + '?order=' + t.order);
+        state[t.key] = (rows || []).map(function(r){ return _mdlStrip(r, MDL_ROW_DROP); });
+      }
+      return state;
+    }
+
+    function buildModelSummary(state){
+      const c = readControls();
+      const both = !!p2Name;
+      const bits = [];
+      if (c.retired) bits.push('Already retired');
+      else bits.push('Retire ' + (c.retirementDate ? monthLabel(c.retirementDate) : '\u2014'));
+      bits.push('growth ' + (c.growthRate * 100).toFixed(1) + '%');
+      bits.push('spend ' + Math.round(c.spendRed * 100) + '%');
+      if (both) bits.push(p1Name + ' ' + Math.round(c.gRatio * 100) + '% / ' + p2Name + ' ' + Math.round((1 - c.gRatio) * 100) + '%');
+      const wmLabel = function(id){ const v = (document.getElementById(id) || {}).value || 'ufpls'; return v === 'tffirst' ? 'TF-first' : (v === 'faddate' ? 'Flexi-Access' : 'UFPLS'); };
+      let wm = p1Name + ' ' + wmLabel('m_wm_g'); if (both) wm += ', ' + p2Name + ' ' + wmLabel('m_wm_j');
+      bits.push(wm);
+      const nP = (state.purchases || []).length, nA = (state.annuities || []).length, nC = (state.market_crashes || []).length;
+      const ev = [];
+      if (nP) ev.push(nP + ' purchase' + (nP > 1 ? 's' : ''));
+      if (nA) ev.push(nA + ' annuit' + (nA > 1 ? 'ies' : 'y'));
+      if (nC) ev.push(nC + ' crash' + (nC > 1 ? 'es' : ''));
+      bits.push(ev.length ? ev.join(', ') : 'no events');
+      return bits.join(' \u00b7 ');
+    }
+
+    function updateModelBadge(){
+      const name = _activeModel ? _activeModel.name : null;
+      const badge = document.getElementById('modelBadge');
+      if (badge) { if (name) { badge.textContent = 'Model: ' + name; badge.style.display = 'inline-block'; } else { badge.style.display = 'none'; badge.textContent = ''; } }
+      document.querySelectorAll('.mdl-current-name').forEach(function(el){ el.textContent = name ? name : 'No model loaded'; });
+      document.querySelectorAll('.mdl-has-model').forEach(function(el){ el.style.display = name ? '' : 'none'; });
+    }
+
+    // ---- overlay plumbing ----
+    function showModelOverlay(id){ const el = document.getElementById(id); if (el) el.style.display = 'flex'; }
+    function closeModelOverlay(id){ const el = document.getElementById(id); if (el) el.style.display = 'none'; }
+    function showModelConfirm(msg, onYes){
+      document.getElementById('mdlConfirmMsg').textContent = msg;
+      const yes = document.getElementById('mdlConfirmYes'), cancel = document.getElementById('mdlConfirmCancel'), ov = document.getElementById('mdlConfirm');
+      yes.style.display = onYes ? '' : 'none';
+      cancel.textContent = onYes ? 'Cancel' : 'OK';
+      ov.style.display = 'flex';
+      const cleanup = function(){ ov.style.display = 'none'; yes.onclick = null; cancel.onclick = null; };
+      yes.onclick = function(){ cleanup(); if (onYes) onYes(); };
+      cancel.onclick = function(){ cleanup(); };
+    }
+
+    // ---- SAVE ----
+    async function openSaveOverlay(){
+      const err = document.getElementById('mdlSaveErr'); err.textContent = '';
+      document.getElementById('mdlSaveName').value = _activeModel ? _activeModel.name : '';
+      document.getElementById('mdlSaveSummary').textContent = 'Preparing summary\u2026';
+      updateModelBadge();
+      showModelOverlay('mdlSaveOverlay');
+      try {
+        _pendingSaveState = await collectModelState();
+        document.getElementById('mdlSaveSummary').textContent = buildModelSummary(_pendingSaveState);
+      } catch (e) { document.getElementById('mdlSaveSummary').textContent = 'Summary unavailable: ' + e.message; }
+    }
+    function askSave(mode){
+      const name = (document.getElementById('mdlSaveName').value || '').trim();
+      if (!name) { document.getElementById('mdlSaveErr').textContent = 'Please enter a name.'; return; }
+      if (mode === 'overwrite') showModelConfirm('Overwrite \u201c' + (_activeModel ? _activeModel.name : name) + '\u201d with the current settings?', function(){ doSaveModel('overwrite'); });
+      else showModelConfirm('Save this as a new model named \u201c' + name + '\u201d?', function(){ doSaveModel('new'); });
+    }
+    async function modelInsertReturning(row){
+      const res = await App.sb.from('op_saved_models').insert(row).select('id,name');
+      if (res.error) throw res.error;
+      if (!res.data || !res.data.length) throw new Error('insert returned no row');
+      return res.data[0];
+    }
+    async function setActiveModelPointer(id){
+      const existing = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name));
+      const payload = { active_model_id: id };
+      if (existing && existing.length) await App.write('PATCH', 'op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name), payload);
+      else await App.write('POST', 'op_modelling_parameters', Object.assign({ member_name: p1Name }, payload));
+    }
+    async function doSaveModel(mode){
+      const err = document.getElementById('mdlSaveErr'); err.textContent = '';
+      const name = (document.getElementById('mdlSaveName').value || '').trim();
+      if (!name) { err.textContent = 'Please enter a name.'; return; }
+      try {
+        const state = _pendingSaveState || await collectModelState();
+        const summary = buildModelSummary(state);
+        const now = new Date().toISOString();
+        await persistCurrentRail();
+        if (mode === 'overwrite' && _activeModel) {
+          await App.write('PATCH', 'op_saved_models?id=eq.' + encodeURIComponent(_activeModel.id), { name: name, summary: summary, payload: state, updated_at: now });
+          _activeModel.name = name;
+          await setActiveModelPointer(_activeModel.id);
+        } else {
+          const created = await modelInsertReturning({ name: name, summary: summary, payload: state, created_at: now, updated_at: now });
+          _activeModel = { id: created.id, name: name };
+          await setActiveModelPointer(created.id);
+        }
+        document.querySelectorAll('iframe.app-frame').forEach(function(f){ try { if (f.contentWindow && f.getAttribute('src')) f.contentWindow.postMessage('refresh-data', '*'); } catch (e) {} });
+        updateModelBadge();
+        _pendingSaveState = null;
+        closeModelOverlay('mdlSaveOverlay');
+      } catch (e) { err.textContent = 'Save failed: ' + e.message; }
+    }
+
+    // ---- LOAD ----
+    async function openLoadOverlay(){
+      const list = document.getElementById('mdlLoadList');
+      list.innerHTML = '<div class="mdl-empty">Loading\u2026</div>';
+      showModelOverlay('mdlLoadOverlay');
+      try {
+        const models = await App.rest('op_saved_models?order=updated_at.desc');
+        renderModelList(list, models, 'load');
+      } catch (e) { list.innerHTML = '<div class="mdl-empty">Could not load models: ' + e.message + '</div>'; }
+    }
+    function renderModelList(container, models, mode){
+      if (!models || !models.length) { container.innerHTML = '<div class="mdl-empty">No saved models yet.</div>'; return; }
+      container.innerHTML = '';
+      models.forEach(function(m){
+        const row = document.createElement('div'); row.className = 'mdl-row';
+        const active = _activeModel && _activeModel.id === m.id;
+        if (mode === 'manage') {
+          row.innerHTML =
+            '<div class="mdl-row-main">' +
+              '<input class="mdl-input mdl-rename" type="text" maxlength="80">' +
+              '<div class="mdl-row-meta">Saved ' + _mdlDMY(m.updated_at) + (active ? ' \u00b7 <b>loaded</b>' : '') + '</div>' +
+              '<div class="mdl-row-summary">' + _mdlEsc(m.summary || '') + '</div>' +
+            '</div>' +
+            '<div class="mdl-row-btns">' +
+              '<button class="mdl-btn mdl-btn-small mdl-btn-rename">Rename</button>' +
+              '<button class="mdl-btn mdl-btn-small mdl-btn-danger">Delete</button>' +
+            '</div>';
+          const input = row.querySelector('.mdl-rename'); input.value = m.name || '';
+          row.querySelector('.mdl-btn-rename').onclick = function(){ doRename(m.id, input.value); };
+          row.querySelector('.mdl-btn-danger').onclick = function(){ showModelConfirm('Delete \u201c' + (m.name || 'this model') + '\u201d? This cannot be undone.', function(){ doDelete(m.id); }); };
+        } else {
+          row.classList.add('mdl-row-click');
+          row.innerHTML =
+            '<div class="mdl-row-main">' +
+              '<div class="mdl-row-name">' + _mdlEsc(m.name || 'Untitled') + (active ? ' <span class="mdl-tag">loaded</span>' : '') + '</div>' +
+              '<div class="mdl-row-meta">Saved ' + _mdlDMY(m.updated_at) + '</div>' +
+              '<div class="mdl-row-summary">' + _mdlEsc(m.summary || '') + '</div>' +
+            '</div>';
+          row.onclick = function(){ requestLoad(m); };
+        }
+        container.appendChild(row);
+      });
+    }
+    async function isDirtyVsModel(model){
+      if (typeof ssIsWhatIf === 'function' && ssIsWhatIf(readControls())) return true;
+      try {
+        for (const t of MODEL_COLLECTIONS) {
+          const rows = (await App.rest(t.base + '?order=' + t.order) || []).map(function(r){ return _mdlStrip(r, MDL_ROW_DROP); });
+          const saved = (model.payload && model.payload[t.key]) || [];
+          if (_mdlSortedStringify(rows) !== _mdlSortedStringify(saved)) return true;
+        }
+      } catch (e) { return true; }
+      return false;
+    }
+    async function requestLoad(model){
+      if (_activeModel) {
+        const dirty = await isDirtyVsModel(model);
+        if (dirty) { showModelConfirm('Changes haven\u2019t been saved. Load anyway? Your current annuities, purchases, savings and crashes will be replaced.', function(){ performLoad(model); }); return; }
+        performLoad(model);
+      } else {
+        showModelConfirm('Loading will replace your current annuities, purchases, savings and crashes with this saved model. Continue?', function(){ performLoad(model); });
+      }
+    }
+    async function patchModellingRow(name, row){
+      const clean = _mdlStrip(row, ['id', 'active_model_id', 'created_at']);
+      clean.member_name = name;
+      clean.updated_at = new Date().toISOString();
+      const existing = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(name));
+      if (existing && existing.length) await App.write('PATCH', 'op_modelling_parameters?member_name=eq.' + encodeURIComponent(name), clean);
+      else await App.write('POST', 'op_modelling_parameters', clean);
+    }
+    async function performLoad(model){
+      closeModelOverlay('mdlLoadOverlay');
+      showModelOverlay('mdlBusyOverlay');
+      try {
+        const pl = model.payload || {};
+        if (pl.modelling) {
+          if (pl.modelling.p1) await patchModellingRow(p1Name, pl.modelling.p1);
+          if (p2Name && pl.modelling.p2) await patchModellingRow(p2Name, pl.modelling.p2);
+        }
+        for (const t of MODEL_COLLECTIONS) {
+          await App.write('DELETE', t.base + '?id=not.is.null', undefined);
+          const rows = (pl[t.key] || []).map(function(r){ return _mdlStrip(r, MDL_ROW_DROP); });
+          if (rows.length) await App.write('POST', t.base, rows);
+        }
+        await setActiveModelPointer(model.id);
+        try { sessionStorage.setItem('mpm_returnTab', getActiveTabId()); } catch (e) {}
+        location.reload();
+      } catch (e) {
+        closeModelOverlay('mdlBusyOverlay');
+        showModelConfirm('Load failed: ' + e.message, null);
+      }
+    }
+    function getActiveTabId(){ const el = document.querySelector('.tabcontent.active'); return el ? el.id : 'Modelling'; }
+
+    // ---- MANAGE ----
+    function openManageOverlay(){ closeModelOverlay('mdlLoadOverlay'); showModelOverlay('mdlManageOverlay'); refreshManageList(); }
+    async function refreshManageList(){
+      const list = document.getElementById('mdlManageList'); list.innerHTML = '<div class="mdl-empty">Loading\u2026</div>';
+      try { const models = await App.rest('op_saved_models?order=updated_at.desc'); renderModelList(list, models, 'manage'); }
+      catch (e) { list.innerHTML = '<div class="mdl-empty">Could not load: ' + e.message + '</div>'; }
+    }
+    async function doRename(id, name){
+      name = (name || '').trim(); if (!name) return;
+      try {
+        await App.write('PATCH', 'op_saved_models?id=eq.' + encodeURIComponent(id), { name: name, updated_at: new Date().toISOString() });
+        if (_activeModel && _activeModel.id === id) { _activeModel.name = name; updateModelBadge(); }
+        refreshManageList();
+      } catch (e) { showModelConfirm('Rename failed: ' + e.message, null); }
+    }
+    async function doDelete(id){
+      try {
+        await App.write('DELETE', 'op_saved_models?id=eq.' + encodeURIComponent(id), undefined);
+        if (_activeModel && _activeModel.id === id) { _activeModel = null; updateModelBadge(); }
+        refreshManageList();
+      } catch (e) { showModelConfirm('Delete failed: ' + e.message, null); }
+    }
+    // ===================== end SAVED MODELS =====================
+
     App.requireLogin(loadEverything, { title: 'My Pension Model' });
   </script>
+
+  <!-- ===================== SAVED MODELS overlays (LC-306) ===================== -->
+  <div id="mdlSaveOverlay" class="mdl-overlay">
+    <div class="mdl-card">
+      <div class="mdl-head"><h2>Save model</h2><button class="mdl-x" onclick="closeModelOverlay('mdlSaveOverlay')" aria-label="Close">&times;</button></div>
+      <label class="mdl-label" for="mdlSaveName">Model name</label>
+      <input id="mdlSaveName" class="mdl-input" type="text" maxlength="80" placeholder="e.g. Base case">
+      <label class="mdl-label">Summary</label>
+      <div id="mdlSaveSummary" class="mdl-summary"></div>
+      <div id="mdlSaveErr" class="mdl-err"></div>
+      <div class="mdl-actions">
+        <button class="mdl-btn mdl-btn-ghost" onclick="closeModelOverlay('mdlSaveOverlay')">Cancel</button>
+        <button class="mdl-btn mdl-has-model" style="display:none;" onclick="askSave('overwrite')">Overwrite current</button>
+        <button class="mdl-btn mdl-btn-primary" onclick="askSave('new')">Save as new</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mdlLoadOverlay" class="mdl-overlay">
+    <div class="mdl-card">
+      <div class="mdl-head"><h2>Load model</h2><button class="mdl-x" onclick="closeModelOverlay('mdlLoadOverlay')" aria-label="Close">&times;</button></div>
+      <div id="mdlLoadList" class="mdl-list"></div>
+      <div class="mdl-actions">
+        <button class="mdl-btn mdl-btn-ghost" onclick="closeModelOverlay('mdlLoadOverlay')">Close</button>
+        <button class="mdl-btn" onclick="openManageOverlay()">Manage saved models</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mdlManageOverlay" class="mdl-overlay">
+    <div class="mdl-card">
+      <div class="mdl-head"><h2>Saved models</h2><button class="mdl-x" onclick="closeModelOverlay('mdlManageOverlay')" aria-label="Close">&times;</button></div>
+      <div id="mdlManageList" class="mdl-list"></div>
+      <div class="mdl-actions">
+        <button class="mdl-btn mdl-btn-ghost" onclick="closeModelOverlay('mdlManageOverlay')">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mdlConfirm" class="mdl-overlay mdl-overlay-center" style="z-index:4100;">
+    <div class="mdl-confirm-card">
+      <div id="mdlConfirmMsg" class="mdl-confirm-msg"></div>
+      <div class="mdl-confirm-actions">
+        <button id="mdlConfirmCancel" class="mdl-btn mdl-btn-ghost">Cancel</button>
+        <button id="mdlConfirmYes" class="mdl-btn mdl-btn-primary">Yes</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mdlBusyOverlay" class="mdl-overlay mdl-overlay-center" style="z-index:4050;">
+    <div class="mdl-busy">Loading model&hellip;</div>
+  </div>
+
 </body>
 </html>
