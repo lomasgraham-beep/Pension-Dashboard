@@ -506,6 +506,8 @@
   .bias-mini{ display:inline-flex; align-items:center; gap:6px; padding:4px 8px; background:var(--surface); border:1px solid var(--line); border-radius:7px; }
   .bias-mini-cap{ font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); white-space:nowrap; }
   .bias-mini svg{ display:block; width:180px; height:34px; }
+  .mdl-bias{ margin-top:6px; width:130px; }
+  .mdl-bias svg{ display:block; width:130px; height:auto; }
 
 </style>
 </head>
@@ -515,7 +517,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-309</span>
+      <span class="build-stamp">LC-310</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -3137,7 +3139,7 @@
       if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
 
-    // ---------- Value-bias strip (LC-309): cash | DC pension | annuities, sliding dots ----------
+    // ---------- Value-bias strip (LC-309/310): cash | DC pension | annuities, sliding dots ----------
     // DC anchors the centre. Cash slides left, annuity slides right, each by its share of
     // (that side + DC), so the further a dot is from centre the more it outweighs the DC pot.
     // If the whole pot is annuitised the DC dot vanishes and the line runs cash <-> annuity.
@@ -3147,9 +3149,7 @@
     function biasLink(x1, x2, y) {
       return '<line x1="' + x1.toFixed(1) + '" y1="' + y + '" x2="' + x2.toFixed(1) + '" y2="' + y + '" stroke="#2c7a7b" stroke-width="3" stroke-linecap="round" opacity="0.5"/>';
     }
-    function renderBiasStrip() {
-      const host = document.getElementById('biasStrip');
-      if (!host) return;
+    function computeBias() {
       const rows = drawdownRows || [];
       const wins = (rows.annuityWindows || []).filter(w => w.purchased);
       const annVal = wins.reduce((s, w) => s + (Number(w.amount) || 0), 0);
@@ -3157,18 +3157,19 @@
       let snapYear = null;
       if (wins.length) snapYear = Math.max.apply(null, wins.map(w => Math.floor(w.purchaseIdx / 12)));
       else if (rows.length) snapYear = rows[0].year;
-      let row = (snapYear != null) ? (rows.find(r => r.year === snapYear) || rows[0] || null) : (rows[0] || null);
+      const row = (snapYear != null) ? (rows.find(r => r.year === snapYear) || rows[0] || null) : (rows[0] || null);
       const dcVal = row ? (Number(row.combinedClosing) || 0) : 0;
       const cashVal = row ? ((Number(row.cashBalance) || 0) + (Number(row.surplusBalance) || 0)) : 0;
-
+      return { cashVal: cashVal, dcVal: dcVal, annVal: annVal, snapYear: snapYear };
+    }
+    function biasStripSvg(cashVal, dcVal, annVal, showLabels) {
       const W = 180, cx = 90, leftX = 12, rightX = 168, y = 13, r = 5;
       const hasCash = cashVal > 1, hasAnn = annVal > 1, hasDC = dcVal > 1;
       const fC = (cashVal + dcVal) > 0 ? cashVal / (cashVal + dcVal) : 0;
       const fA = (annVal + dcVal) > 0 ? annVal / (annVal + dcVal) : 0;
       const cashX = cx - fC * (cx - leftX);
       const annX = cx + fA * (rightX - cx);
-
-      let svg = '<svg viewBox="0 0 ' + W + ' 34" role="img" aria-label="Value bias: cash, DC pension, annuities">';
+      let svg = '<svg viewBox="0 0 ' + W + ' ' + (showLabels ? 34 : 26) + '" role="img" aria-label="Value bias: cash, DC pension, annuities">';
       svg += '<line x1="' + leftX + '" y1="' + y + '" x2="' + rightX + '" y2="' + y + '" stroke="#94a3b8" stroke-width="1"/>';
       [leftX, cx, rightX].forEach(function (tx) {
         svg += '<line x1="' + tx + '" y1="' + (y - 4) + '" x2="' + tx + '" y2="' + (y + 4) + '" stroke="#94a3b8" stroke-width="1"/>';
@@ -3182,25 +3183,38 @@
       if (hasCash) svg += biasDot(cashX, y, r, '#2f74a8');
       if (hasDC) svg += biasDot(cx, y, r, '#2c7a7b');
       if (hasAnn) svg += biasDot(annX, y, r, '#b07d1a');
-      svg += '<text x="8" y="30" text-anchor="start" font-size="9" style="fill:var(--ink-soft)">Cash</text>';
-      svg += '<text x="' + cx + '" y="30" text-anchor="middle" font-size="9" style="fill:var(--ink-soft)">DC</text>';
-      svg += '<text x="172" y="30" text-anchor="end" font-size="9" style="fill:var(--ink-soft)">Ann</text>';
-      svg += '</svg>';
-
-      const fmt0 = n => '\u00a3' + Math.round(n).toLocaleString('en-GB');
-      let cap;
-      if (!hasCash && !hasAnn) {
-        cap = 'Value bias \u2014 all in the DC pension' + (hasDC ? ' (' + fmt0(dcVal) + ')' : '') + '.';
-      } else {
-        const bits = [];
-        bits.push(hasDC ? 'DC pot ' + fmt0(dcVal) : 'DC pot fully annuitised');
-        if (hasCash) bits.push('cash ' + fmt0(cashVal) + (hasDC ? ' (' + Math.round(cashVal / dcVal * 100) + '% of pot)' : ''));
-        if (hasAnn) bits.push('annuity lump ' + fmt0(annVal) + (hasDC ? ' (' + Math.round(annVal / dcVal * 100) + '% of pot)' : ''));
-        cap = 'Value bias at ' + snapYear + ': ' + bits.join(' \u00b7 ') + '.';
+      if (showLabels) {
+        svg += '<text x="8" y="30" text-anchor="start" font-size="9" style="fill:var(--ink-soft)">Cash</text>';
+        svg += '<text x="' + cx + '" y="30" text-anchor="middle" font-size="9" style="fill:var(--ink-soft)">DC</text>';
+        svg += '<text x="172" y="30" text-anchor="end" font-size="9" style="fill:var(--ink-soft)">Ann</text>';
       }
-      host.innerHTML = svg;
+      svg += '</svg>';
+      return svg;
+    }
+    function biasCaption(cashVal, dcVal, annVal, snapYear) {
+      const fmt0 = n => '\u00a3' + Math.round(n).toLocaleString('en-GB');
+      const hasCash = cashVal > 1, hasAnn = annVal > 1, hasDC = dcVal > 1;
+      if (!hasCash && !hasAnn) return 'Value bias \u2014 all in the DC pension' + (hasDC ? ' (' + fmt0(dcVal) + ')' : '') + '.';
+      const bits = [];
+      bits.push(hasDC ? 'DC pot ' + fmt0(dcVal) : 'DC pot fully annuitised');
+      if (hasCash) bits.push('cash ' + fmt0(cashVal) + (hasDC ? ' (' + Math.round(cashVal / dcVal * 100) + '% of pot)' : ''));
+      if (hasAnn) bits.push('annuity lump ' + fmt0(annVal) + (hasDC ? ' (' + Math.round(annVal / dcVal * 100) + '% of pot)' : ''));
+      return 'Value bias' + (snapYear ? ' at ' + snapYear : '') + ': ' + bits.join(' \u00b7 ') + '.';
+    }
+    // the saved-model bias is packed into the (old matrix) columns: score_x=cash, score_y=annuity lump, quadrant="dc|year"
+    function biasFromModel(m) {
+      if (m.score_x == null && m.score_y == null && (m.quadrant == null || m.quadrant === '')) return null;
+      let dc = 0, yr = null;
+      if (m.quadrant) { const p = String(m.quadrant).split('|'); dc = Number(p[0]) || 0; yr = p[1] || null; }
+      return { cashVal: Number(m.score_x) || 0, dcVal: dc, annVal: Number(m.score_y) || 0, snapYear: yr };
+    }
+    function renderBiasStrip() {
+      const host = document.getElementById('biasStrip');
+      if (!host) return;
+      const b = computeBias();
+      host.innerHTML = biasStripSvg(b.cashVal, b.dcVal, b.annVal, true);
       const wrap = document.getElementById('biasWrap');
-      if (wrap) wrap.title = cap;
+      if (wrap) wrap.title = biasCaption(b.cashVal, b.dcVal, b.annVal, b.snapYear);
     }
 
     function recomputeAll() {
@@ -3762,13 +3776,16 @@
         const state = _pendingSaveState || await collectModelState();
         const summary = buildModelSummary(state);
         const now = new Date().toISOString();
+        // capture the value-bias position (packed into the old matrix columns)
+        const b = computeBias();
+        const biasCols = { score_x: Math.round(b.cashVal), score_y: Math.round(b.annVal), quadrant: Math.round(b.dcVal) + '|' + (b.snapYear || '') };
         await persistCurrentRail();
         if (mode === 'overwrite' && _activeModel) {
-          await App.write('PATCH', 'op_saved_models?id=eq.' + encodeURIComponent(_activeModel.id), { name: name, summary: summary, payload: state, updated_at: now });
+          await App.write('PATCH', 'op_saved_models?id=eq.' + encodeURIComponent(_activeModel.id), Object.assign({ name: name, summary: summary, payload: state, updated_at: now }, biasCols));
           _activeModel.name = name;
           await setActiveModelPointer(_activeModel.id);
         } else {
-          const created = await modelInsertReturning({ name: name, summary: summary, payload: state, created_at: now, updated_at: now });
+          const created = await modelInsertReturning(Object.assign({ name: name, summary: summary, payload: state, created_at: now, updated_at: now }, biasCols));
           _activeModel = { id: created.id, name: name };
           await setActiveModelPointer(created.id);
         }
@@ -3795,12 +3812,15 @@
       models.forEach(function(m){
         const row = document.createElement('div'); row.className = 'mdl-row';
         const active = _activeModel && _activeModel.id === m.id;
+        const b = biasFromModel(m);
+        const biasHtml = b ? '<div class="mdl-bias" title="' + _mdlEsc(biasCaption(b.cashVal, b.dcVal, b.annVal, b.snapYear)) + '">' + biasStripSvg(b.cashVal, b.dcVal, b.annVal, false) + '</div>' : '';
         if (mode === 'manage') {
           row.innerHTML =
             '<div class="mdl-row-main">' +
               '<input class="mdl-input mdl-rename" type="text" maxlength="80">' +
               '<div class="mdl-row-meta">Saved ' + _mdlDMY(m.updated_at) + (active ? ' \u00b7 <b>loaded</b>' : '') + '</div>' +
               '<div class="mdl-row-summary">' + _mdlEsc(m.summary || '') + '</div>' +
+              biasHtml +
             '</div>' +
             '<div class="mdl-row-btns">' +
               '<button class="mdl-btn mdl-btn-small mdl-btn-rename">Rename</button>' +
@@ -3816,6 +3836,7 @@
               '<div class="mdl-row-name">' + _mdlEsc(m.name || 'Untitled') + (active ? ' <span class="mdl-tag">loaded</span>' : '') + '</div>' +
               '<div class="mdl-row-meta">Saved ' + _mdlDMY(m.updated_at) + '</div>' +
               '<div class="mdl-row-summary">' + _mdlEsc(m.summary || '') + '</div>' +
+              biasHtml +
             '</div>';
           row.onclick = function(){ requestLoad(m); };
         }
