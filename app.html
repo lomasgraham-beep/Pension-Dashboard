@@ -503,10 +503,9 @@
   .mdl-confirm-msg{ font-size:15px; line-height:1.5; color:var(--ink); margin-bottom:18px; }
   .mdl-confirm-actions{ display:flex; gap:10px; justify-content:flex-end; }
   .mdl-busy{ background:var(--surface); color:var(--ink); border-radius:12px; padding:22px 30px; font-weight:600; box-shadow:0 12px 40px rgba(0,0,0,0.25); margin:auto; }
-  .bias-wrap{ margin:0 0 16px; padding:12px 16px 8px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; }
-  .bias-title{ font-size:13px; font-weight:700; color:var(--ink); margin:0 0 2px; }
-  .bias-sub{ font-weight:400; color:var(--ink-soft); font-size:12px; }
-  .bias-caption{ font-size:12px; color:var(--ink-soft); margin-top:2px; line-height:1.5; }
+  .bias-mini{ display:inline-flex; align-items:center; gap:6px; padding:4px 8px; background:var(--surface); border:1px solid var(--line); border-radius:7px; }
+  .bias-mini-cap{ font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); white-space:nowrap; }
+  .bias-mini svg{ display:block; width:180px; height:34px; }
 
 </style>
 </head>
@@ -516,7 +515,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-308</span>
+      <span class="build-stamp">LC-309</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -721,10 +720,7 @@
       <button class="mdl-btn mdl-btn-primary" onclick="openSaveOverlay()">Save model</button>
       <button class="mdl-btn" onclick="openLoadOverlay()">Load model</button>
       <span class="mdl-current">Loaded: <b class="mdl-current-name">No model loaded</b></span>
-    </div>
-    <div class="bias-wrap" id="biasWrap">
-      <div class="bias-title">Value bias <span class="bias-sub">where your money sits &mdash; cash &middot; DC pension &middot; annuities</span></div>
-      <div id="biasStrip"></div>
+      <div class="bias-mini" id="biasWrap" title="Value bias"><span class="bias-mini-cap">Bias</span><div id="biasStrip"></div></div>
     </div>
     <button type="button" class="opt-toggle" id="optToggle" onclick="toggleOptPair()" aria-expanded="false"><span class="opt-caret" aria-hidden="true">&#9654;</span> Intelligent modelling</button>
     <div class="opt-pair" id="optPair" style="display:none;">
@@ -3141,15 +3137,15 @@
       if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
 
-    // ---------- Value-bias strip (LC-308): cash | DC pension | annuities, sliding dots ----------
+    // ---------- Value-bias strip (LC-309): cash | DC pension | annuities, sliding dots ----------
     // DC anchors the centre. Cash slides left, annuity slides right, each by its share of
     // (that side + DC), so the further a dot is from centre the more it outweighs the DC pot.
     // If the whole pot is annuitised the DC dot vanishes and the line runs cash <-> annuity.
     function biasDot(x, y, r, colour) {
-      return '<circle cx="' + x.toFixed(1) + '" cy="' + y + '" r="' + r + '" fill="' + colour + '" style="stroke:var(--surface);stroke-width:2.5"/>';
+      return '<circle cx="' + x.toFixed(1) + '" cy="' + y + '" r="' + r + '" fill="' + colour + '" style="stroke:var(--surface);stroke-width:2"/>';
     }
     function biasLink(x1, x2, y) {
-      return '<line x1="' + x1.toFixed(1) + '" y1="' + y + '" x2="' + x2.toFixed(1) + '" y2="' + y + '" stroke="#2c7a7b" stroke-width="4" stroke-linecap="round" opacity="0.5"/>';
+      return '<line x1="' + x1.toFixed(1) + '" y1="' + y + '" x2="' + x2.toFixed(1) + '" y2="' + y + '" stroke="#2c7a7b" stroke-width="3" stroke-linecap="round" opacity="0.5"/>';
     }
     function renderBiasStrip() {
       const host = document.getElementById('biasStrip');
@@ -3165,18 +3161,17 @@
       const dcVal = row ? (Number(row.combinedClosing) || 0) : 0;
       const cashVal = row ? ((Number(row.cashBalance) || 0) + (Number(row.surplusBalance) || 0)) : 0;
 
-      const W = 600, cx = 300, leftX = 60, rightX = 540, y = 60, r = 9;
+      const W = 180, cx = 90, leftX = 12, rightX = 168, y = 13, r = 5;
       const hasCash = cashVal > 1, hasAnn = annVal > 1, hasDC = dcVal > 1;
       const fC = (cashVal + dcVal) > 0 ? cashVal / (cashVal + dcVal) : 0;
       const fA = (annVal + dcVal) > 0 ? annVal / (annVal + dcVal) : 0;
       const cashX = cx - fC * (cx - leftX);
       const annX = cx + fA * (rightX - cx);
 
-      let svg = '<svg width="100%" viewBox="0 0 ' + W + ' 100" role="img" aria-label="Value bias between cash, DC pension and annuities">';
-      svg += '<line x1="' + leftX + '" y1="' + y + '" x2="' + rightX + '" y2="' + y + '" stroke="#94a3b8" stroke-width="1.5"/>';
-      [[leftX, 'Cash'], [cx, 'DC pension'], [rightX, 'Annuities']].forEach(function (t) {
-        svg += '<line x1="' + t[0] + '" y1="' + (y - 7) + '" x2="' + t[0] + '" y2="' + (y + 7) + '" stroke="#94a3b8" stroke-width="1.5"/>';
-        svg += '<text x="' + t[0] + '" y="' + (y + 28) + '" text-anchor="middle" font-size="13" font-weight="600" style="fill:var(--ink-soft)">' + t[1] + '</text>';
+      let svg = '<svg viewBox="0 0 ' + W + ' 34" role="img" aria-label="Value bias: cash, DC pension, annuities">';
+      svg += '<line x1="' + leftX + '" y1="' + y + '" x2="' + rightX + '" y2="' + y + '" stroke="#94a3b8" stroke-width="1"/>';
+      [leftX, cx, rightX].forEach(function (tx) {
+        svg += '<line x1="' + tx + '" y1="' + (y - 4) + '" x2="' + tx + '" y2="' + (y + 4) + '" stroke="#94a3b8" stroke-width="1"/>';
       });
       if (hasDC) {
         if (hasCash) svg += biasLink(cashX, cx, y);
@@ -3187,20 +3182,25 @@
       if (hasCash) svg += biasDot(cashX, y, r, '#2f74a8');
       if (hasDC) svg += biasDot(cx, y, r, '#2c7a7b');
       if (hasAnn) svg += biasDot(annX, y, r, '#b07d1a');
+      svg += '<text x="8" y="30" text-anchor="start" font-size="9" style="fill:var(--ink-soft)">Cash</text>';
+      svg += '<text x="' + cx + '" y="30" text-anchor="middle" font-size="9" style="fill:var(--ink-soft)">DC</text>';
+      svg += '<text x="172" y="30" text-anchor="end" font-size="9" style="fill:var(--ink-soft)">Ann</text>';
       svg += '</svg>';
 
       const fmt0 = n => '\u00a3' + Math.round(n).toLocaleString('en-GB');
       let cap;
       if (!hasCash && !hasAnn) {
-        cap = 'All your value sits in the DC pension' + (hasDC ? ' (' + fmt0(dcVal) + ')' : '') + ' \u2014 no cash savings or annuities modelled.';
+        cap = 'Value bias \u2014 all in the DC pension' + (hasDC ? ' (' + fmt0(dcVal) + ')' : '') + '.';
       } else {
         const bits = [];
         bits.push(hasDC ? 'DC pot ' + fmt0(dcVal) : 'DC pot fully annuitised');
-        if (hasCash) bits.push('cash ' + fmt0(cashVal) + (hasDC ? ' (' + Math.round(cashVal / dcVal * 100) + '% of the pot)' : ''));
-        if (hasAnn) bits.push('annuity lump ' + fmt0(annVal) + (hasDC ? ' (' + Math.round(annVal / dcVal * 100) + '% of the pot)' : ''));
-        cap = 'At ' + snapYear + ': ' + bits.join(' \u00b7 ') + '. The further a dot is from centre, the more that side outweighs your DC pot.';
+        if (hasCash) bits.push('cash ' + fmt0(cashVal) + (hasDC ? ' (' + Math.round(cashVal / dcVal * 100) + '% of pot)' : ''));
+        if (hasAnn) bits.push('annuity lump ' + fmt0(annVal) + (hasDC ? ' (' + Math.round(annVal / dcVal * 100) + '% of pot)' : ''));
+        cap = 'Value bias at ' + snapYear + ': ' + bits.join(' \u00b7 ') + '.';
       }
-      host.innerHTML = svg + '<div class="bias-caption">' + cap + '</div>';
+      host.innerHTML = svg;
+      const wrap = document.getElementById('biasWrap');
+      if (wrap) wrap.title = cap;
     }
 
     function recomputeAll() {
