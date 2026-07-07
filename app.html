@@ -167,6 +167,10 @@
     }
 
     .chart-box { width:100%; height:400px; margin-bottom:20px; }
+    .chart-error { display:flex; align-items:flex-start; gap:10px; min-height:160px; padding:16px 18px; border:1px solid var(--line); border-left:4px solid var(--warn); border-radius:var(--radius); background:var(--surface-2); color:var(--ink); font-size:14px; line-height:1.45; }
+    .chart-error strong { display:block; margin-bottom:4px; color:var(--ink); }
+    .chart-error .chart-error-icon { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:var(--warn); color:#fff; font-weight:700; }
+    .chart-error code { font-size:12px; color:var(--ink-soft); white-space:normal; word-break:break-word; }
     /* Custom two-row wrapping legend under charts (replaces google's paginating legend) */
     .cx-legend { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:4px 12px; padding:6px 40px 10px; font-size:12px; color:var(--ink); max-height:calc(1.4em * 2 + 12px); overflow:hidden; margin:-14px 0 12px; }
     .cx-legend .cx-item { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; line-height:1.35; }
@@ -541,7 +545,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-316</span>
+      <span class="build-stamp">LC-317</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1663,7 +1667,39 @@
       }).join('');
     }
 
-    function drawCharts() {
+    // ---- Chart guards (LC-317) ----
+    // Google Charts fails hard if any numeric cell is NaN/Infinity. A single bad value
+    // previously stopped the Modelling charts completely while the control rail stayed visible.
+    function chartNumber(v) {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    }
+    function chartRound(v) { return Math.round(chartNumber(v)); }
+    function chartErrText(v) {
+      return String(v == null ? '' : v).replace(/[&<>"']/g, function (ch) {
+        return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch];
+      });
+    }
+    function showChartError(id, err) {
+      const box = document.getElementById(id);
+      if (!box) return;
+      const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-317 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+    }
+    function safeOptionalChart(drawFn, chartId, headId) {
+      try { drawFn(); }
+      catch (e) {
+        console.error('Optional modelling chart failed:', chartId, e);
+        const head = headId ? document.getElementById(headId) : null;
+        const box = document.getElementById(chartId);
+        const wrap = box ? box.closest('.chart-wrap') : null;
+        if (head) head.style.display = '';
+        if (wrap) wrap.style.display = '';
+        showChartError(chartId, e);
+      }
+    }
+
+    function drawChartsCore() {
       if (!chartsReady || !drawdownRows.length) return;
       const joint = (currentView === 'Joint');
       buildYearFilter();
@@ -1691,18 +1727,18 @@
 
       // annual spend line: total household outgoings (joint) or this person's share (single view)
       function spendForRow(r) {
-        if (joint) return Math.round(r.outgoings || 0);
+        if (joint) return chartRound(r.outgoings || 0);
         const gR = savedPlan ? savedPlan.gRatio : 0.5;
         const share = (currentView === p1Name) ? gR : (1 - gR);
-        return Math.round((r.outgoings || 0) * share);
+        return chartRound((r.outgoings || 0) * share);
       }
       // fixed (guaranteed) income paying the bills: state + DB pensions, NET (after tax).
       // Net is what actually meets the bills, so the gap up to the spend line is exactly
       // what the DC pot must draw that year.
       function fixedIncomeForRow(r) {
         const gN = r.g_otherNet || 0, jN = r.j_otherNet || 0;
-        if (joint) return Math.round(gN + jN);
-        return Math.round(currentView === p1Name ? gN : jN);
+        if (joint) return chartRound(gN + jN);
+        return chartRound(currentView === p1Name ? gN : jN);
       }
 
       // ---------- POT CHART (stacked columns) ----------
@@ -1716,7 +1752,7 @@
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
         dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Pension income (net)');
         yrRows.forEach(r => dPots.addRow([String(r.year),
-          Math.round(r.j_taxFree), Math.round(r.g_taxFree), Math.round(r.j_taxable), Math.round(r.g_taxable),
+          chartRound(r.j_taxFree), chartRound(r.g_taxFree), chartRound(r.j_taxable), chartRound(r.g_taxable),
           evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]));
         potColors = ['#c39bd3','#85c1e9','#8e44ad','#2471a3']; // Julie light, Graham light, Julie dark, Graham dark
         potTitle = 'Combined Pots';
@@ -1724,7 +1760,7 @@
         dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
         dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Pension income (net)');
-        yrRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), Math.round(v.tf), Math.round(v.tx), evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]); });
+        yrRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), chartRound(v.tf), chartRound(v.tx), evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]); });
         potColors = ['#2ecc71','#e74c3c'];
         potTitle = currentView + ' Pots';
       }
@@ -1748,12 +1784,12 @@
         dInc.addColumn('number','Total drawdown');
         dInc.addColumn({type:'string', role:'annotation'}); dInc.addColumn({type:'string', role:'annotationText'});
         yrRows.forEach(r => {
-          const gAnn = Math.round(r.g_annuityIncome || 0), jAnn = Math.round(r.j_annuityIncome || 0);
+          const gAnn = chartRound(r.g_annuityIncome || 0), jAnn = chartRound(r.j_annuityIncome || 0);
           const row = [String(r.year),
-            Math.round(r.j_draw), Math.round(r.g_draw),
-            Math.round(r.j_other - jAnn), Math.round(r.g_other - gAnn)];
+            chartRound(r.j_draw), chartRound(r.g_draw),
+            chartRound(Math.max(0, chartNumber(r.j_other) - jAnn)), chartRound(Math.max(0, chartNumber(r.g_other) - gAnn))];
           if (hasAnnuity) row.push(jAnn, gAnn);
-          row.push(Math.round(r.drawdown), evDot(r.year), evText(r.year));
+          row.push(chartRound(r.drawdown), evDot(r.year), evText(r.year));
           dInc.addRow(row);
         });
         if (hasAnnuity) {
@@ -1784,10 +1820,10 @@
         dInc.addColumn({type:'string', role:'annotation'}); dInc.addColumn({type:'string', role:'annotationText'});
         yrRows.forEach(r => {
           const v = vrow(r);
-          const ann = Math.round(currentView === p1Name ? (r.g_annuityIncome || 0) : (r.j_annuityIncome || 0));
-          const row = [String(r.year), Math.round(v.draw), Math.round(v.other) - ann];
+          const ann = chartRound(currentView === p1Name ? (r.g_annuityIncome || 0) : (r.j_annuityIncome || 0));
+          const row = [String(r.year), chartRound(v.draw), chartRound(Math.max(0, chartNumber(v.other) - ann))];
           if (hasAnnuity) row.push(ann);
-          row.push(Math.round(v.draw), evDot(r.year), evText(r.year));
+          row.push(chartRound(v.draw), evDot(r.year), evText(r.year));
           dInc.addRow(row);
         });
         if (hasAnnuity) {
@@ -1814,7 +1850,7 @@
       // shared y-scale for the income chart so the drawdown line overlays the bars truthfully
       let incMax = 0;
       drawdownRows.forEach(r => { const t = joint ? r.totalIncome : vrow(r).income; if (t > incMax) incMax = t; });
-      incMax = Math.ceil((incMax * 1.05) / 1000) * 1000; // round up to a tidy £1k
+      incMax = Math.ceil((incMax * 1.05) / 1000) * 1000 || 1000; // round up to a tidy £1k
 
       // annual-spend / pension-income line axis (pot chart, right side)
       let spendMax = 0;
@@ -1837,13 +1873,13 @@
         const a = Math.abs(n);
         if (a >= 1e6) { const v = n / 1e6; return '£' + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + 'M'; }
         if (a >= 1e3) { const v = n / 1e3; return '£' + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(0)) + 'K'; }
-        return '£' + Math.round(n);
+        return '£' + chartRound(n);
       }
       function shortTicks(maxValue, steps) {
         steps = steps || 5; const ticks = [];
         if (maxValue <= 0) return [{ v: 0, f: '£0' }];
         const step = maxValue / steps;
-        for (let i = 0; i <= steps; i++) { const v = Math.round(step * i); ticks.push({ v: v, f: shortGBP(v) }); }
+        for (let i = 0; i <= steps; i++) { const v = chartRound(step * i); ticks.push({ v: v, f: shortGBP(v) }); }
         return ticks;
       }
       // stacked pot chart max = largest row total across the STACKED bar segments only
@@ -1857,7 +1893,7 @@
         }
         if (t > potMax) potMax = t;
       }
-      potMax = Math.ceil((potMax * 1.05) / 1000) * 1000;
+      potMax = Math.ceil((potMax * 1.05) / 1000) * 1000 || 1000;
 
       const potVAxis = phone
         ? { minValue: 0, viewWindow: { min: 0, max: potMax }, ticks: shortTicks(potMax), textStyle: axisText }
@@ -1929,9 +1965,9 @@
         incLegendEntries.push({ label: 'Total drawdown', color: '#f39c12', type: 'line' });
       }
       renderCustomLegend(document.getElementById('incomeChart').closest('.chart-wrap'), incLegendEntries);
-      drawCrashChart();
-      drawCashModelChart();
-      drawAnnuityChart();
+      safeOptionalChart(drawCrashChart, 'crashChart', 'crashChartHead');
+      safeOptionalChart(drawCashModelChart, 'cashModelChart', 'cashModelHead');
+      safeOptionalChart(drawAnnuityChart, 'annuityChart', 'annuityChartHead');
     }
 
     function drawCrashChart() {
@@ -1967,7 +2003,7 @@
         const idx = r.year * 12 + r.month;
         const note = isTrough(idx) ? '▼ trough' : null;
         const noteText = isTrough(idx) ? ('Crash trough — ' + r.label + ': ' + fmt(potOf(r))) : null;
-        dt.addRow([r.label, inCrash(idx) ? bandTop : 0, Math.round(potOf(r)), note, noteText]);
+        dt.addRow([r.label, inCrash(idx) ? bandTop : 0, chartRound(potOf(r)), note, noteText]);
       });
 
       const phone = window.innerWidth <= 600;
@@ -1982,7 +2018,7 @@
         legend: { position: 'none' },
         chartArea: phone ? { left: 60, right: 16, top: 40, bottom: 70, height: '64%' } : { left: 88, right: 30, top: 44, bottom: 70 },
         vAxis: { minValue: 0, viewWindow: { min: 0, max: bandTop }, title: phone ? '' : 'Total pot (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
-        hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, Math.round(months / (phone ? 6 : 12))), slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: phone ? 9 : 11 } },
+        hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, chartRound(months / (phone ? 6 : 12))), slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: phone ? 9 : 11 } },
         annotations: { style: 'point', textStyle: { fontSize: 11, color: '#c0392b', bold: true } }
       });
     }
@@ -2049,8 +2085,8 @@
         (row.acctBalances || []).forEach(b => { balById[b.name + '|' + b.member] = b.bal; });
         const cells = [String(y)];
         let stackTotal = 0;
-        showAccts.forEach(a => { const v = Math.round(balById[a.name + '|' + a.member] || 0); cells.push(v); stackTotal += v; });
-        surplusCols.forEach(c => { const v = Math.round(c.get(row)); cells.push(v); stackTotal += v; });
+        showAccts.forEach(a => { const v = chartRound(balById[a.name + '|' + a.member] || 0); cells.push(v); stackTotal += v; });
+        surplusCols.forEach(c => { const v = chartRound(c.get(row)); cells.push(v); stackTotal += v; });
         if (stackTotal > peak) peak = stackTotal;
         cells.push(buysByYear[y] ? '▼' : null);                              // annotation marker
         cells.push(buysByYear[y] ? ('Purchase: ' + buysByYear[y]) : null);   // tooltip text
@@ -2122,11 +2158,11 @@
             // purchase year: start at negative of cost, then add any partial income earned this year
             const partialIncome = eRow ? (w.member === p1Name ? (eRow.g_annuityIncome || 0) : (eRow.j_annuityIncome || 0)) : 0;
             st.running = -st.amount + partialIncome;
-            cells.push(Math.round(st.running));
+            cells.push(chartRound(st.running));
           } else {
             const annIncome = eRow ? (w.member === p1Name ? (eRow.g_annuityIncome || 0) : (eRow.j_annuityIncome || 0)) : w.annualIncome;
             st.running += annIncome;
-            cells.push(Math.round(st.running));
+            cells.push(chartRound(st.running));
           }
         });
         dt.addRow(cells);
@@ -2162,6 +2198,15 @@
         label: (w.name || 'Annuity') + ' (' + w.member + ')',
         color: palette[i % palette.length], type: 'line'
       })));
+    }
+
+    function drawCharts() {
+      try { drawChartsCore(); }
+      catch (e) {
+        console.error('Modelling charts failed:', e);
+        showChartError('potChart', e);
+        showChartError('incomeChart', e);
+      }
     }
 
     let _ovSparkSeq = 0;
