@@ -313,7 +313,7 @@
   function keyLabel(k){ var o=keyYM(k); return MONTHS[o.m-1] + ' ' + o.y; }
   function sortKeys(arr){ return (arr||[]).slice().sort(function(a,b){ return keyDate(a)-keyDate(b); }); }
   function nowKey(){ var d=new Date(); return dkey(d.getFullYear(), d.getMonth()+1); }
-  function maxKey(){ return dkey(2067, 12); }
+  function maxKey(){ return dkey(2037, 12); }
   function toKey(d, defM){ var s=String(d); if (/^\d{4}-\d{1,2}$/.test(s)){ var o=keyYM(s); return dkey(o.y,o.m); } if (/^\d{4}$/.test(s)) return dkey(+s, defM||base.retireMonth||6); return dkey(new Date().getFullYear(), defM||6); }
   function clampKey(k){ var lo=nowKey(), hi=maxKey(); if (keyDate(k)<keyDate(lo)) return lo; if (keyDate(k)>keyDate(hi)) return hi; return k; }
 
@@ -524,7 +524,7 @@
 
   function defaultSpec() {
     var y = base.retireYear || new Date().getFullYear(), m = base.retireMonth || 6;
-    var dates = []; [dkey(y,m), dkey(y+2,m), dkey(y+4,m)].forEach(function(k){ k = clampKey(k); if (dates.indexOf(k)<0) dates.push(k); });
+    var dates = [];
     return {
       version:1, name:'', base:'live',
       dates: dates,
@@ -557,7 +557,7 @@
     el.dispatchEvent(new Event('input', { bubbles:true }));
   }
   function stepperHTML(pre, key){
-    var o = keyYM(key), minY = new Date().getFullYear(), maxY = 2067, yy = Math.max(minY, Math.min(maxY, o.y));
+    var o = keyYM(key), minY = new Date().getFullYear(), maxY = 2037, yy = Math.max(minY, Math.min(maxY, o.y));
     return '<div class="dstep">'
       + '<div class="dstep-row"><button type="button" class="nudge" data-nudge="'+pre+'Y" data-dir="-1">\u2212</button>'
       + '<input type="range" id="'+pre+'Y" min="'+minY+'" max="'+maxY+'" step="1" value="'+yy+'">'
@@ -588,10 +588,9 @@
       h += '<div class="frow"><label>Base un-varied settings on</label>' + seg([['live','Current settings'],['defaults','App defaults']], sp.base, 'base') + '</div>';
       h += '<p class="lbl">Add the retirement dates to compare (2–6). Each becomes one scenario, joint across both members.</p><div>';
       dates.forEach(function(k){ h += '<span class="wchip">' + keyLabel(k) + ' <b data-del="' + k + '">×</b></span>'; });
-      var lastK = dates[dates.length-1] || dkey(base.retireYear, base.retireMonth), lo = keyYM(lastK);
-      var addKey = clampKey(dkey(lo.y+2, lo.m));
+      var addKey = clampKey(dates.length ? dates[dates.length-1] : dkey(base.retireYear, base.retireMonth));
       h += '</div><div style="margin-top:10px;"><div class="lbl" style="margin-bottom:6px;">Add a date</div>' + stepperHTML('wAdd', addKey) + '<button class="mm-btn pri" id="wAdd" type="button">Add scenario</button></div>';
-      h += '<p class="note">' + dates.length + ' scenario' + (dates.length===1?'':'s') + '. Nudge the sliders to set year and month, then Add.</p>';
+      h += '<p class="note">' + (dates.length ? (dates.length + ' scenario' + (dates.length===1?'':'s') + '. Nudge the sliders, then Add another.') : 'No dates yet \u2014 set a year and month, then Add.') + '</p>';
     }
     if (wizStep === 1) {
       h += '<p class="lbl">Spending, as a % of your working-life spend.</p>' + seg([['same','Same for all'],['per','Per scenario']], sp.spendMode, 'spendMode');
@@ -658,7 +657,7 @@
     document.querySelectorAll('.nudge').forEach(function(b){ b.onclick = function(){ nudge(b.dataset.nudge, Number(b.dataset.dir)); }; });
     var addY = document.getElementById('wAdd');
     if (addY) addY.onclick = function(){ captureWizard(); var v = stepperKey('wAdd'); if (v && wizSpec.dates.indexOf(v)<0 && wizSpec.dates.length<6){ wizSpec.dates.push(v); } renderWizard(); };
-    document.querySelectorAll('[data-del]').forEach(function(b){ b.onclick = function(){ captureWizard(); var k=b.dataset.del; if (wizSpec.dates.length>1) wizSpec.dates = wizSpec.dates.filter(function(d){return d!==k;}); renderWizard(); }; });
+    document.querySelectorAll('[data-del]').forEach(function(b){ b.onclick = function(){ captureWizard(); var k=b.dataset.del; wizSpec.dates = wizSpec.dates.filter(function(d){return d!==k;}); renderWizard(); }; });
     document.querySelectorAll('[data-fn]').forEach(function(b){
       b.onclick = function(){
         captureWizard();
