@@ -84,6 +84,14 @@
   .in { font-size:13px; padding:7px 8px; border-radius:8px; border:1px solid #cbd5e1; background:#fff; color:var(--ink); width:88px; }
   .in.name { width:100%; max-width:320px; }
   .in-month { width:150px; }
+  .dstep { background:#f0f7f7; border:1px solid var(--cellborder); border-radius:10px; padding:10px 12px; margin-bottom:10px; max-width:380px; }
+  .dstep-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .dstep-row input[type=range] { flex:1; accent-color:var(--accent); height:28px; }
+  .nudge { width:40px; height:40px; border-radius:9px; border:1px solid #cbd5e1; background:#fff; color:var(--accent); font-size:22px; font-weight:700; line-height:1; cursor:pointer; flex:none; }
+  .nudge:active { background:#e6f4f1; }
+  .dval { min-width:40px; text-align:right; font-variant-numeric:tabular-nums; font-size:14px; font-weight:600; }
+  .dstep-lab { font-size:13px; color:var(--sub); }
+  .dstep-lab b { color:var(--ink); font-size:14px; }
   .badge { font-size:11px; background:#e6f4f1; color:var(--accent); padding:3px 9px; border-radius:20px; }
   .note { font-size:12px; color:#94a3b8; margin-top:2px; }
   .err { color:var(--bad); font-size:12.5px; min-height:16px; margin-top:6px; }
@@ -103,6 +111,8 @@
     .seg button { background:#0f172a; color:#94a3b8; }
     .seg button.on { background:#0f6e56; color:#e2fff5; }
     .in { background:#0f172a; color:#e2e8f0; border-color:#475569; }
+    .dstep { background:#0f2020; }
+    .nudge { background:#0f172a; color:#5eead4; border-color:#475569; }
     .stp { background:#0f172a; color:#94a3b8; }
     .stp.on { background:#0f6e56; color:#e2fff5; border-color:#0f6e56; }
     table.t tbody tr.sel td { background:#0f2b2b; }
@@ -303,7 +313,7 @@
   function keyLabel(k){ var o=keyYM(k); return MONTHS[o.m-1] + ' ' + o.y; }
   function sortKeys(arr){ return (arr||[]).slice().sort(function(a,b){ return keyDate(a)-keyDate(b); }); }
   function nowKey(){ var d=new Date(); return dkey(d.getFullYear(), d.getMonth()+1); }
-  function maxKey(){ return dkey(base.maxRetireYear||2037, 12); }
+  function maxKey(){ return dkey(2067, 12); }
   function toKey(d, defM){ var s=String(d); if (/^\d{4}-\d{1,2}$/.test(s)){ var o=keyYM(s); return dkey(o.y,o.m); } if (/^\d{4}$/.test(s)) return dkey(+s, defM||base.retireMonth||6); return dkey(new Date().getFullYear(), defM||6); }
   function clampKey(k){ var lo=nowKey(), hi=maxKey(); if (keyDate(k)<keyDate(lo)) return lo; if (keyDate(k)>keyDate(hi)) return hi; return k; }
 
@@ -537,6 +547,34 @@
       return '<button class="' + (cur===o[0]?'on':'') + '" data-fn="' + fn + '" data-v="' + o[0] + '">' + o[1] + '</button>';
     }).join('') + '</span>';
   }
+  function nudge(id, dir){
+    var el = document.getElementById(id); if(!el) return;
+    var step = Number(el.step)||1, mn = Number(el.min), mx = Number(el.max);
+    var v = Number(el.value) + dir*step;
+    if (!isNaN(mn)) v = Math.max(mn, v);
+    if (!isNaN(mx)) v = Math.min(mx, v);
+    el.value = v;
+    el.dispatchEvent(new Event('input', { bubbles:true }));
+  }
+  function stepperHTML(pre, key){
+    var o = keyYM(key), minY = new Date().getFullYear(), maxY = 2067, yy = Math.max(minY, Math.min(maxY, o.y));
+    return '<div class="dstep">'
+      + '<div class="dstep-row"><button type="button" class="nudge" data-nudge="'+pre+'Y" data-dir="-1">\u2212</button>'
+      + '<input type="range" id="'+pre+'Y" min="'+minY+'" max="'+maxY+'" step="1" value="'+yy+'">'
+      + '<button type="button" class="nudge" data-nudge="'+pre+'Y" data-dir="1">+</button>'
+      + '<span class="dval" id="'+pre+'Yv">'+yy+'</span></div>'
+      + '<div class="dstep-row"><button type="button" class="nudge" data-nudge="'+pre+'M" data-dir="-1">\u2212</button>'
+      + '<input type="range" id="'+pre+'M" min="1" max="12" step="1" value="'+o.m+'">'
+      + '<button type="button" class="nudge" data-nudge="'+pre+'M" data-dir="1">+</button>'
+      + '<span class="dval" id="'+pre+'Mv">'+MONTHS[o.m-1]+'</span></div>'
+      + '<div class="dstep-lab">Selected: <b id="'+pre+'Lab">'+keyLabel(dkey(yy,o.m))+'</b></div></div>';
+  }
+  function stepperKey(pre){ var yEl=document.getElementById(pre+'Y'), mEl=document.getElementById(pre+'M'); if(!yEl||!mEl) return null; return clampKey(dkey(Number(yEl.value), Number(mEl.value))); }
+  function wireStepper(pre){
+    var yEl=document.getElementById(pre+'Y'), mEl=document.getElementById(pre+'M'); if(!yEl||!mEl) return;
+    function upd(){ document.getElementById(pre+'Yv').textContent=yEl.value; document.getElementById(pre+'Mv').textContent=MONTHS[Number(mEl.value)-1]; document.getElementById(pre+'Lab').textContent=MONTHS[Number(mEl.value)-1]+' '+yEl.value; }
+    yEl.oninput=upd; mEl.oninput=upd; upd();
+  }
   function renderWizard() {
     var sp = wizSpec;
     document.getElementById('wizSteps').innerHTML = WIZ_STEPS.map(function(s,i){
@@ -551,8 +589,9 @@
       h += '<p class="lbl">Add the retirement dates to compare (2–6). Each becomes one scenario, joint across both members.</p><div>';
       dates.forEach(function(k){ h += '<span class="wchip">' + keyLabel(k) + ' <b data-del="' + k + '">×</b></span>'; });
       var lastK = dates[dates.length-1] || dkey(base.retireYear, base.retireMonth), lo = keyYM(lastK);
-      h += '</div><div class="frow" style="margin-top:8px;"><label>Add a date</label><input class="in in-month" id="wAddD" type="month" min="' + nowKey() + '" max="' + maxKey() + '" value="' + clampKey(dkey(lo.y+2, lo.m)) + '"><button class="mm-btn" id="wAdd" type="button">Add</button></div>';
-      h += '<p class="note">' + dates.length + ' scenario' + (dates.length===1?'':'s') + '. Selectable from ' + keyLabel(nowKey()) + ' to ' + keyLabel(maxKey()) + ' (age 67).</p>';
+      var addKey = clampKey(dkey(lo.y+2, lo.m));
+      h += '</div><div style="margin-top:10px;"><div class="lbl" style="margin-bottom:6px;">Add a date</div>' + stepperHTML('wAdd', addKey) + '<button class="mm-btn pri" id="wAdd" type="button">Add scenario</button></div>';
+      h += '<p class="note">' + dates.length + ' scenario' + (dates.length===1?'':'s') + '. Nudge the sliders to set year and month, then Add.</p>';
     }
     if (wizStep === 1) {
       h += '<p class="lbl">Spending, as a % of your working-life spend.</p>' + seg([['same','Same for all'],['per','Per scenario']], sp.spendMode, 'spendMode');
@@ -569,7 +608,7 @@
         h += '<div style="margin:4px 0 10px;">' + seg([['all','Apply to all scenarios'],['per','One per scenario']], sp.annMode, 'annScope') + '</div>';
         if (sp.annMode === 'all') {
           if (p2Name) h += '<div class="frow"><label>Member</label>' + seg([[p1Name,p1Name],[p2Name,p2Name]], sp.annAll.member, 'annMember') + '</div>';
-          h += '<div class="frow"><label>Purchase date</label><input class="in in-month" id="wAnnDate" type="month" min="' + nowKey() + '" max="' + maxKey() + '" value="' + (sp.annAll.date || clampKey(dkey(base.retireYear+5, base.retireMonth))) + '"></div>';
+          h += '<div class="lbl" style="margin-top:6px; margin-bottom:6px;">Purchase date</div>' + stepperHTML('wAnn', (sp.annAll.date || clampKey(dkey(base.retireYear+5, base.retireMonth))));
           h += '<div class="frow"><label>Amount</label><span class="badge">Whole pot</span><span class="note" style="margin:0;">amount disabled — annuitises the full pot</span></div>';
           h += '<div class="frow"><label>Rate / escalation</label><input class="in" id="wAnnRate" type="number" step="0.1" value="' + sp.annAll.rate + '"> % &nbsp; <input class="in" id="wAnnEsc" type="number" step="0.1" value="' + sp.annAll.esc + '"> %</div>';
         } else {
@@ -607,7 +646,7 @@
     var nm = document.getElementById('wName'); if (nm) sp.name = nm.value.trim();
     var sd = document.getElementById('wSpend'); if (sd) sp.spend = Number(sd.value)||0;
     document.querySelectorAll('[data-spy]').forEach(function(el){ sp.spendPer[el.dataset.spy] = Number(el.value)||0; });
-    var ay = document.getElementById('wAnnDate'); if (ay && ay.value) sp.annAll.date = ay.value;
+    if (document.getElementById('wAnnY')) { var _ak = stepperKey('wAnn'); if (_ak) sp.annAll.date = _ak; }
     var ar = document.getElementById('wAnnRate'); if (ar) sp.annAll.rate = Number(ar.value)||0;
     var ae = document.getElementById('wAnnEsc'); if (ae) sp.annAll.esc = Number(ae.value)||0;
     document.querySelectorAll('[data-anpy]').forEach(function(el){ var k = el.dataset.anpy; var a = sp.annPer[k] || (sp.annPer[k] = { member:p1Name, date:k, rate:6.0, esc:0.0 }); a.date = el.value || k; });
@@ -615,8 +654,10 @@
     var rt = document.getElementById('wRatio'); if (rt) sp.gRatio = Math.min(1, Math.max(0, (Number(rt.value)||0)/100));
   }
   function wireWizard() {
+    wireStepper('wAdd'); wireStepper('wAnn');
+    document.querySelectorAll('.nudge').forEach(function(b){ b.onclick = function(){ nudge(b.dataset.nudge, Number(b.dataset.dir)); }; });
     var addY = document.getElementById('wAdd');
-    if (addY) addY.onclick = function(){ captureWizard(); var el = document.getElementById('wAddD'); var v = (el && el.value) ? clampKey(el.value) : null; if (v && wizSpec.dates.indexOf(v)<0 && wizSpec.dates.length<6){ wizSpec.dates.push(v); } renderWizard(); };
+    if (addY) addY.onclick = function(){ captureWizard(); var v = stepperKey('wAdd'); if (v && wizSpec.dates.indexOf(v)<0 && wizSpec.dates.length<6){ wizSpec.dates.push(v); } renderWizard(); };
     document.querySelectorAll('[data-del]').forEach(function(b){ b.onclick = function(){ captureWizard(); var k=b.dataset.del; if (wizSpec.dates.length>1) wizSpec.dates = wizSpec.dates.filter(function(d){return d!==k;}); renderWizard(); }; });
     document.querySelectorAll('[data-fn]').forEach(function(b){
       b.onclick = function(){
