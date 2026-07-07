@@ -83,6 +83,7 @@
   .frow label { color:var(--sub); min-width:150px; }
   .in { font-size:13px; padding:7px 8px; border-radius:8px; border:1px solid #cbd5e1; background:#fff; color:var(--ink); width:88px; }
   .in.name { width:100%; max-width:320px; }
+  .in-month { width:150px; }
   .badge { font-size:11px; background:#e6f4f1; color:var(--accent); padding:3px 9px; border-radius:20px; }
   .note { font-size:12px; color:#94a3b8; margin-top:2px; }
   .err { color:var(--bad); font-size:12.5px; min-height:16px; margin-top:6px; }
@@ -286,29 +287,42 @@
         phase1Date: App.parseLocalDate(p.shorter_week_date_1), phase1Days: p.working_days_1 ? Number(p.working_days_1) : 5,
         phase2Date: App.parseLocalDate(p.shorter_week_date_2), phase2Days: p.working_days_2 ? Number(p.working_days_2) : 5,
         p2phase: p2phase,
-        retireYear: (function(){ var d = App.parseLocalDate(p.retirement_date); return d ? d.getFullYear() : new Date().getFullYear(); })()
+        retireYear: (function(){ var d = App.parseLocalDate(p.retirement_date); return d ? d.getFullYear() : new Date().getFullYear(); })(),
+        retireMonth: (function(){ var d = App.parseLocalDate(p.retirement_date); return d ? d.getMonth()+1 : 6; })(),
+        maxRetireYear: (function(){ var ys=(members||[]).map(function(m){ return m.dob ? new Date(m.dob).getFullYear()+67 : null; }).filter(function(x){return x;}); return ys.length ? Math.min.apply(null, ys) : 2037; })()
       };
       status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
 
+  // ---------- date keys (YYYY-MM) ----------
+  function pad2(n){ return (n<10?'0':'') + n; }
+  function dkey(y,m){ return y + '-' + pad2(m); }
+  function keyYM(k){ var p=String(k).split('-'); return { y:+p[0], m:+(p[1]||1) }; }
+  function keyDate(k){ var o=keyYM(k); return new Date(o.y, o.m-1, 1); }
+  function keyLabel(k){ var o=keyYM(k); return MONTHS[o.m-1] + ' ' + o.y; }
+  function sortKeys(arr){ return (arr||[]).slice().sort(function(a,b){ return keyDate(a)-keyDate(b); }); }
+  function nowKey(){ var d=new Date(); return dkey(d.getFullYear(), d.getMonth()+1); }
+  function maxKey(){ return dkey(base.maxRetireYear||2037, 12); }
+  function toKey(d, defM){ var s=String(d); if (/^\d{4}-\d{1,2}$/.test(s)){ var o=keyYM(s); return dkey(o.y,o.m); } if (/^\d{4}$/.test(s)) return dkey(+s, defM||base.retireMonth||6); return dkey(new Date().getFullYear(), defM||6); }
+  function clampKey(k){ var lo=nowKey(), hi=maxKey(); if (keyDate(k)<keyDate(lo)) return lo; if (keyDate(k)>keyDate(hi)) return hi; return k; }
+
   // ---------- engine orchestration (no engine change) ----------
-  function scenarioAnnuities(spec, i, year) {
+  function scenarioAnnuities(spec, key) {
     if (spec.annMode === 'none') return [];
-    var a;
-    if (spec.annMode === 'all') a = spec.annAll;
-    else { a = spec.annPer[year] || { member:p1Name, year:year, rate:6.0, esc:0.0 }; }
+    var a = (spec.annMode === 'all') ? spec.annAll : (spec.annPer[key] || { member:p1Name, date:key, rate:6.0, esc:0.0 });
+    var pd = a.date || key;
     return [{
       annuity_name: 'Annuity', member_name: a.member,
-      purchase_date: a.year + '-06-01', purchase_amount: 0,
+      purchase_date: pd + '-01', purchase_amount: 0,
       annuity_rate: a.rate, escalation_pct: a.esc, use_whole_pot: true, enabled: true
     }];
   }
-  function scenAttrs(spec, i, year) {
-    var spendPct = (spec.spendMode === 'same') ? spec.spend : (spec.spendPer[year] != null ? spec.spendPer[year] : spec.spend);
+  function scenAttrs(spec, key) {
+    var spendPct = (spec.spendMode === 'same') ? spec.spend : (spec.spendPer[key] != null ? spec.spendPer[key] : spec.spend);
     var wm = { graham: spec.method, julie: spec.method };
-    var cd, rm = base.phase1Date ? base.phase1Date.getMonth() : new Date().getMonth();
-    if (spec.method === 'fad') { var cdate = new Date(year, rm, 1); cd = { graham: cdate, julie: p2Name ? cdate : null }; }
+    var cd;
+    if (spec.method === 'fad') { var cdate = keyDate(key); cd = { graham: cdate, julie: p2Name ? cdate : null }; }
     else cd = { graham: null, julie: null };
     return { spendRed: (Number(spendPct)||0)/100, withdrawalMethod: wm, crystallisationDate: cd,
              growth: spec.growth, gRatio: spec.gRatio };
@@ -363,26 +377,26 @@
   }
   function computeScenarios(spec) {
     var out = [];
-    var dates = spec.dates.slice().sort(function(a,b){ return a-b; });
-    dates.forEach(function(year, i){
-      var date = new Date(year, (base.phase1Date ? base.phase1Date.getMonth() : new Date().getMonth()), 1);
-      var at = scenAttrs(spec, i, year);
-      var d = Object.assign({}, data, { annuities: scenarioAnnuities(spec, i, year) });
+    var keys = sortKeys(spec.dates);
+    keys.forEach(function(key, i){
+      var date = keyDate(key);
+      var at = scenAttrs(spec, key);
+      var d = Object.assign({}, data, { annuities: scenarioAnnuities(spec, key) });
       var plan = buildPlan(date, at);
       var cfg = buildCfg(d, plan, at);
       var rows = PensionEngine.drawdown(d, cfg) || [];
       var s = extract(rows);
-      out.push({ year:year, date:date, label:'Retire ' + year,
-        spendPct: (spec.spendMode==='same') ? spec.spend : (spec.spendPer[year]!=null?spec.spendPer[year]:spec.spend),
-        method: spec.method, ann: describeAnn(spec, year), series:s, sum:summarise(s) });
+      out.push({ key:key, date:date, label:'Retire ' + keyLabel(key),
+        spendPct: (spec.spendMode==='same') ? spec.spend : (spec.spendPer[key]!=null?spec.spendPer[key]:spec.spend),
+        method: spec.method, ann: describeAnn(spec, key), series:s, sum:summarise(s) });
     });
     return out;
   }
-  function describeAnn(spec, year) {
+  function describeAnn(spec, key) {
     if (spec.annMode === 'none') return '—';
-    if (spec.annMode === 'all') return 'Whole pot ' + spec.annAll.year + ' (' + spec.annAll.member + ')';
-    var a = spec.annPer[year] || { member:p1Name, year:year };
-    return 'Whole pot ' + a.year + ' (' + a.member + ')';
+    if (spec.annMode === 'all') return 'Whole pot ' + keyLabel(spec.annAll.date) + ' (' + spec.annAll.member + ')';
+    var a = spec.annPer[key] || { member:p1Name, date:key };
+    return 'Whole pot ' + keyLabel(a.date || key) + ' (' + a.member + ')';
   }
 
   // ---------- output ----------
@@ -406,7 +420,7 @@
       var sm = sc.sum;
       return '<tr data-i="' + i + '" class="' + (i===sel?'sel':'') + '">'
         + '<td><span class="dot" style="background:' + pal[i%pal.length] + '"></span>S' + (i+1) + '</td>'
-        + '<td>' + sc.year + '</td><td>' + sc.spendPct + '%</td><td>' + methodLabel(sc.method) + '</td><td>' + esc(sc.ann) + '</td>'
+        + '<td>' + keyLabel(sc.key) + '</td><td>' + sc.spendPct + '%</td><td>' + methodLabel(sc.method) + '</td><td>' + esc(sc.ann) + '</td>'
         + '<td>' + shortGBP(sm.finalPot) + '</td>'
         + '<td class="' + (sm.dry ? 'bad' : 'ok') + '">' + (sm.dry ? sm.dry : 'survives') + '</td>'
         + '<td>' + shortGBP(sm.minNet) + '</td><td>' + shortGBP(sm.avgNet) + '</td></tr>';
@@ -499,14 +513,15 @@
   var wizStep = 0, wizSpec = null, wizEditing = false;
 
   function defaultSpec() {
-    var y = base.retireYear || new Date().getFullYear();
+    var y = base.retireYear || new Date().getFullYear(), m = base.retireMonth || 6;
+    var dates = []; [dkey(y,m), dkey(y+2,m), dkey(y+4,m)].forEach(function(k){ k = clampKey(k); if (dates.indexOf(k)<0) dates.push(k); });
     return {
       version:1, name:'', base:'live',
-      dates:[y, y+2, y+4],
+      dates: dates,
       spendMode:'same', spend: Math.round(base.spendRed*100) || 60, spendPer:{},
       method: base.withdrawalDefault,
       growth: base.growthRate, gRatio: base.gRatio,
-      annMode:'none', annAll:{ member:p1Name, year:(y+5), rate:6.0, esc:0.0 }, annPer:{}
+      annMode:'none', annAll:{ member:p1Name, date: clampKey(dkey(y+5, m)), rate:6.0, esc:0.0 }, annPer:{}
     };
   }
   function openWizard(spec, editing) {
@@ -528,20 +543,21 @@
       return '<span class="stp ' + (i===wizStep?'on':'') + '">' + (i+1) + '. ' + s + '</span>';
     }).join('');
     var p = document.getElementById('wizPanel'), h = '';
-    var dates = sp.dates.slice().sort(function(a,b){ return a-b; });
+    var dates = sortKeys(sp.dates);
 
     if (wizStep === 0) {
       h += '<div class="frow"><label>Model name</label><input class="in name" id="wName" value="' + esc(sp.name) + '" placeholder="e.g. Retirement date sweep"></div>';
       h += '<div class="frow"><label>Base un-varied settings on</label>' + seg([['live','Current settings'],['defaults','App defaults']], sp.base, 'base') + '</div>';
       h += '<p class="lbl">Add the retirement dates to compare (2–6). Each becomes one scenario, joint across both members.</p><div>';
-      dates.forEach(function(y){ h += '<span class="wchip">' + y + ' <b data-del="' + y + '">×</b></span>'; });
-      h += '</div><div class="frow" style="margin-top:8px;"><label>Add a year</label><input class="in" id="wAddY" type="number" value="' + ((dates[dates.length-1]||base.retireYear)+2) + '"><button class="mm-btn" id="wAdd" type="button">Add</button></div>';
-      h += '<p class="note">' + dates.length + ' scenario' + (dates.length===1?'':'s') + '.</p>';
+      dates.forEach(function(k){ h += '<span class="wchip">' + keyLabel(k) + ' <b data-del="' + k + '">×</b></span>'; });
+      var lastK = dates[dates.length-1] || dkey(base.retireYear, base.retireMonth), lo = keyYM(lastK);
+      h += '</div><div class="frow" style="margin-top:8px;"><label>Add a date</label><input class="in in-month" id="wAddD" type="month" min="' + nowKey() + '" max="' + maxKey() + '" value="' + clampKey(dkey(lo.y+2, lo.m)) + '"><button class="mm-btn" id="wAdd" type="button">Add</button></div>';
+      h += '<p class="note">' + dates.length + ' scenario' + (dates.length===1?'':'s') + '. Selectable from ' + keyLabel(nowKey()) + ' to ' + keyLabel(maxKey()) + ' (age 67).</p>';
     }
     if (wizStep === 1) {
       h += '<p class="lbl">Spending, as a % of your working-life spend.</p>' + seg([['same','Same for all'],['per','Per scenario']], sp.spendMode, 'spendMode');
       if (sp.spendMode === 'same') h += '<div class="frow"><label>Spend %</label><input class="in" id="wSpend" type="number" value="' + sp.spend + '"> %</div>';
-      else dates.forEach(function(y){ var v = sp.spendPer[y]!=null?sp.spendPer[y]:sp.spend; h += '<div class="frow"><label>Retire ' + y + '</label><input class="in" data-spy="' + y + '" type="number" value="' + v + '"> %</div>'; });
+      else dates.forEach(function(k){ var v = sp.spendPer[k]!=null?sp.spendPer[k]:sp.spend; h += '<div class="frow"><label>Retire ' + keyLabel(k) + '</label><input class="in" data-spy="' + k + '" type="number" value="' + v + '"> %</div>'; });
     }
     if (wizStep === 2) {
       h += '<p class="lbl">Withdrawal method (applies to all scenarios in this version).</p>' + seg([['ufpls','UFPLS'],['fad','Flexi-Access']], sp.method, 'method');
@@ -553,15 +569,15 @@
         h += '<div style="margin:4px 0 10px;">' + seg([['all','Apply to all scenarios'],['per','One per scenario']], sp.annMode, 'annScope') + '</div>';
         if (sp.annMode === 'all') {
           if (p2Name) h += '<div class="frow"><label>Member</label>' + seg([[p1Name,p1Name],[p2Name,p2Name]], sp.annAll.member, 'annMember') + '</div>';
-          h += '<div class="frow"><label>Purchase year</label><input class="in" id="wAnnYear" type="number" value="' + sp.annAll.year + '"></div>';
+          h += '<div class="frow"><label>Purchase date</label><input class="in in-month" id="wAnnDate" type="month" min="' + nowKey() + '" max="' + maxKey() + '" value="' + (sp.annAll.date || clampKey(dkey(base.retireYear+5, base.retireMonth))) + '"></div>';
           h += '<div class="frow"><label>Amount</label><span class="badge">Whole pot</span><span class="note" style="margin:0;">amount disabled — annuitises the full pot</span></div>';
           h += '<div class="frow"><label>Rate / escalation</label><input class="in" id="wAnnRate" type="number" step="0.1" value="' + sp.annAll.rate + '"> % &nbsp; <input class="in" id="wAnnEsc" type="number" step="0.1" value="' + sp.annAll.esc + '"> %</div>';
         } else {
-          h += '<p class="lbl">Purchase year defaults to each scenario\u2019s retirement year.</p>';
-          dates.forEach(function(y){
-            var a = sp.annPer[y] || { member:p1Name, year:y, rate:6.0, esc:0.0 };
-            h += '<div class="frow"><label>Retire ' + y + '</label><input class="in" data-anpy="' + y + '" type="number" value="' + (a.year!=null?a.year:y) + '"> <span class="badge">Whole pot</span>'
-              + (p2Name ? ' ' + seg([[p1Name,p1Name],[p2Name,p2Name]], a.member, 'annPerM_' + y) : '') + '</div>';
+          h += '<p class="lbl">Purchase date defaults to each scenario\u2019s retirement date.</p>';
+          dates.forEach(function(k){
+            var a = sp.annPer[k] || { member:p1Name, date:k, rate:6.0, esc:0.0 };
+            h += '<div class="frow"><label>Retire ' + keyLabel(k) + '</label><input class="in in-month" data-anpy="' + k + '" type="month" min="' + nowKey() + '" max="' + maxKey() + '" value="' + (a.date || k) + '"> <span class="badge">Whole pot</span>'
+              + (p2Name ? ' ' + seg([[p1Name,p1Name],[p2Name,p2Name]], a.member, 'annPerM_' + k) : '') + '</div>';
           });
         }
       }
@@ -574,15 +590,15 @@
     if (wizStep === 5) {
       h += '<p class="lbl">Review the ' + dates.length + ' scenarios, then run.</p>';
       h += '<table class="t"><thead><tr><th>Scenario</th><th>Spend</th><th>Method</th><th>Annuity</th></tr></thead><tbody>';
-      dates.forEach(function(y){
-        var spd = sp.spendMode==='same'?sp.spend:(sp.spendPer[y]!=null?sp.spendPer[y]:sp.spend);
-        h += '<tr><td>Retire ' + y + '</td><td>' + spd + '%</td><td>' + methodLabel(sp.method) + '</td><td>' + esc(describeAnn(sp, y)) + '</td></tr>';
+      dates.forEach(function(k){
+        var spd = sp.spendMode==='same'?sp.spend:(sp.spendPer[k]!=null?sp.spendPer[k]:sp.spend);
+        h += '<tr><td>Retire ' + keyLabel(k) + '</td><td>' + spd + '%</td><td>' + methodLabel(sp.method) + '</td><td>' + esc(describeAnn(sp, k)) + '</td></tr>';
       });
       h += '</tbody></table>';
       h += '<p class="note">Growth ' + (sp.growth*100).toFixed(1) + '%' + (p2Name ? ' · ' + esc(p1Name) + ' ' + Math.round(sp.gRatio*100) + '% / ' + esc(p2Name) + ' ' + Math.round((1-sp.gRatio)*100) + '%' : '') + '</p>';
     }
     p.innerHTML = h;
-    document.getElementById('wizBack').style.visibility = wizStep===0 ? 'hidden' : 'visible';
+    var _bk = document.getElementById('wizBack'); _bk.disabled = (wizStep===0); _bk.style.visibility = 'visible';
     document.getElementById('wizNext').textContent = wizStep===WIZ_STEPS.length-1 ? 'Run scenarios' : 'Next';
     wireWizard();
   }
@@ -590,18 +606,18 @@
     var sp = wizSpec;
     var nm = document.getElementById('wName'); if (nm) sp.name = nm.value.trim();
     var sd = document.getElementById('wSpend'); if (sd) sp.spend = Number(sd.value)||0;
-    document.querySelectorAll('[data-spy]').forEach(function(el){ sp.spendPer[Number(el.dataset.spy)] = Number(el.value)||0; });
-    var ay = document.getElementById('wAnnYear'); if (ay) sp.annAll.year = Number(ay.value)||sp.annAll.year;
+    document.querySelectorAll('[data-spy]').forEach(function(el){ sp.spendPer[el.dataset.spy] = Number(el.value)||0; });
+    var ay = document.getElementById('wAnnDate'); if (ay && ay.value) sp.annAll.date = ay.value;
     var ar = document.getElementById('wAnnRate'); if (ar) sp.annAll.rate = Number(ar.value)||0;
     var ae = document.getElementById('wAnnEsc'); if (ae) sp.annAll.esc = Number(ae.value)||0;
-    document.querySelectorAll('[data-anpy]').forEach(function(el){ var y = Number(el.dataset.anpy); var a = sp.annPer[y] || (sp.annPer[y] = { member:p1Name, year:y, rate:6.0, esc:0.0 }); a.year = Number(el.value)||y; });
+    document.querySelectorAll('[data-anpy]').forEach(function(el){ var k = el.dataset.anpy; var a = sp.annPer[k] || (sp.annPer[k] = { member:p1Name, date:k, rate:6.0, esc:0.0 }); a.date = el.value || k; });
     var gr = document.getElementById('wGrowth'); if (gr) sp.growth = (Number(gr.value)||0)/100;
     var rt = document.getElementById('wRatio'); if (rt) sp.gRatio = Math.min(1, Math.max(0, (Number(rt.value)||0)/100));
   }
   function wireWizard() {
     var addY = document.getElementById('wAdd');
-    if (addY) addY.onclick = function(){ captureWizard(); var v = Number(document.getElementById('wAddY').value); if (v && wizSpec.dates.indexOf(v)<0 && wizSpec.dates.length<6){ wizSpec.dates.push(v); } renderWizard(); };
-    document.querySelectorAll('[data-del]').forEach(function(b){ b.onclick = function(){ captureWizard(); var y=Number(b.dataset.del); if (wizSpec.dates.length>1) wizSpec.dates = wizSpec.dates.filter(function(d){return d!==y;}); renderWizard(); }; });
+    if (addY) addY.onclick = function(){ captureWizard(); var el = document.getElementById('wAddD'); var v = (el && el.value) ? clampKey(el.value) : null; if (v && wizSpec.dates.indexOf(v)<0 && wizSpec.dates.length<6){ wizSpec.dates.push(v); } renderWizard(); };
+    document.querySelectorAll('[data-del]').forEach(function(b){ b.onclick = function(){ captureWizard(); var k=b.dataset.del; if (wizSpec.dates.length>1) wizSpec.dates = wizSpec.dates.filter(function(d){return d!==k;}); renderWizard(); }; });
     document.querySelectorAll('[data-fn]').forEach(function(b){
       b.onclick = function(){
         captureWizard();
@@ -612,13 +628,13 @@
         else if (fn==='annOn') wizSpec.annMode = (v==='none') ? 'none' : 'all';
         else if (fn==='annScope') wizSpec.annMode = v;
         else if (fn==='annMember') wizSpec.annAll.member = v;
-        else if (fn.indexOf('annPerM_')===0){ var y=Number(fn.slice(8)); var a=wizSpec.annPer[y]||(wizSpec.annPer[y]={member:p1Name,year:y,rate:6.0,esc:0.0}); a.member=v; }
+        else if (fn.indexOf('annPerM_')===0){ var k=fn.slice(8); var a=wizSpec.annPer[k]||(wizSpec.annPer[k]={member:p1Name,date:k,rate:6.0,esc:0.0}); a.member=v; }
         renderWizard();
       };
     });
   }
   function wizNext() {
-    captureWizard();
+    try { captureWizard(); } catch(e){}
     if (wizStep < WIZ_STEPS.length-1) { wizStep++; renderWizard(); return; }
     if (wizSpec.dates.length < 1) { document.getElementById('wizErr').textContent = 'Add at least one retirement date.'; return; }
     try {
@@ -639,7 +655,7 @@
     else { pill.textContent = 'Unsaved model'; pill.style.display = currentSpec ? 'inline-block' : 'none'; }
   }
   function specSummary(sp) {
-    var bits = ['Retire ' + sp.dates.slice().sort(function(a,b){return a-b;}).join('/'),
+    var bits = ['Retire ' + sortKeys(sp.dates).map(keyLabel).join(' / '),
                 'spend ' + (sp.spendMode==='same' ? sp.spend + '%' : 'per scenario'),
                 methodLabel(sp.method), 'growth ' + (sp.growth*100).toFixed(1) + '%'];
     if (sp.annMode !== 'none') bits.push(sp.annMode==='all' ? 'annuity (all)' : 'annuity (per scenario)');
@@ -709,12 +725,19 @@
   }
   function normaliseSpec(sp) {
     sp = sp || {};
+    var dm = base.retireMonth || 6;
+    var dates = (sp.dates && sp.dates.length) ? sp.dates.map(function(d){ return toKey(d, dm); }) : [dkey(base.retireYear, dm)];
+    var spOld = sp.spendPer||{}, spNew = {}; Object.keys(spOld).forEach(function(k){ spNew[toKey(k, dm)] = spOld[k]; });
+    var anOld = sp.annPer||{}, anNew = {}; Object.keys(anOld).forEach(function(k){ var v = anOld[k]||{}; anNew[toKey(k, dm)] = { member: v.member||p1Name, date: v.date ? toKey(v.date, dm) : (v.year ? toKey(v.year, dm) : toKey(k, dm)), rate: v.rate!=null?v.rate:6.0, esc: v.esc!=null?v.esc:0.0 }; });
+    var aa = sp.annAll || {};
     return {
       version: sp.version||1, name: sp.name||'', base: sp.base||'live',
-      dates: (sp.dates && sp.dates.length) ? sp.dates.slice() : [base.retireYear],
-      spendMode: sp.spendMode||'same', spend: sp.spend!=null?sp.spend:60, spendPer: sp.spendPer||{},
+      dates: dates,
+      spendMode: sp.spendMode||'same', spend: sp.spend!=null?sp.spend:60, spendPer: spNew,
       method: sp.method||'ufpls', growth: sp.growth!=null?sp.growth:base.growthRate, gRatio: sp.gRatio!=null?sp.gRatio:base.gRatio,
-      annMode: sp.annMode||'none', annAll: sp.annAll||{ member:p1Name, year:base.retireYear, rate:6.0, esc:0.0 }, annPer: sp.annPer||{}
+      annMode: sp.annMode||'none',
+      annAll: { member: aa.member||p1Name, date: aa.date ? toKey(aa.date, dm) : (aa.year ? toKey(aa.year, dm) : dkey(base.maxRetireYear||2037, dm)), rate: aa.rate!=null?aa.rate:6.0, esc: aa.esc!=null?aa.esc:0.0 },
+      annPer: anNew
     };
   }
   function renameModel(id) {
@@ -746,7 +769,7 @@
   document.getElementById('btnEdit').onclick = function(){ if (currentSpec) openWizard(normaliseSpec(JSON.parse(JSON.stringify(currentSpec))), true); };
   document.getElementById('btnSaved').onclick = openList;
   document.getElementById('btnSave').onclick = openSave;
-  document.getElementById('wizBack').onclick = function(){ captureWizard(); if (wizStep>0){ wizStep--; renderWizard(); } };
+  document.getElementById('wizBack').onclick = function(){ try { captureWizard(); } catch(e){} if (wizStep>0){ wizStep--; renderWizard(); } };
   document.getElementById('wizNext').onclick = wizNext;
   document.getElementById('wizCancel').onclick = closeWizard;
   document.getElementById('saveCancel').onclick = function(){ document.getElementById('saveOv').classList.remove('show'); };
