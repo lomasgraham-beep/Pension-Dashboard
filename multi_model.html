@@ -307,8 +307,8 @@
   function scenAttrs(spec, i, year) {
     var spendPct = (spec.spendMode === 'same') ? spec.spend : (spec.spendPer[year] != null ? spec.spendPer[year] : spec.spend);
     var wm = { graham: spec.method, julie: spec.method };
-    var cd;
-    if (spec.method === 'fad') { var iso = year + '-06-01'; cd = { graham: iso, julie: p2Name ? iso : null }; }
+    var cd, rm = base.phase1Date ? base.phase1Date.getMonth() : new Date().getMonth();
+    if (spec.method === 'fad') { var cdate = new Date(year, rm, 1); cd = { graham: cdate, julie: p2Name ? cdate : null }; }
     else cd = { graham: null, julie: null };
     return { spendRed: (Number(spendPct)||0)/100, withdrawalMethod: wm, crystallisationDate: cd,
              growth: spec.growth, gRatio: spec.gRatio };
