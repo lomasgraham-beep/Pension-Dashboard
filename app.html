@@ -541,7 +541,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-311</span>
+      <span class="build-stamp">LC-312</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -677,6 +677,7 @@
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
+      <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
     </div>
     <iframe id="frame-Cash" class="app-frame" title="Cash and Purchases"></iframe>
   </div>
@@ -689,6 +690,7 @@
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
+      <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
     </div>
     <iframe id="frame-Crashes" class="app-frame" title="Market Crashes"></iframe>
   </div>
@@ -702,6 +704,7 @@
       <button class="subtab-link active-sub" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
+      <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
     </div>
     <iframe id="frame-Annuities" class="app-frame" title="Annuities"></iframe>
   </div>
@@ -715,6 +718,7 @@
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
+      <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
     </div>
     <iframe id="frame-ScenarioGrid" class="app-frame" title="Scenario Grid"></iframe>
   </div>
@@ -728,8 +732,23 @@
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Frontier')">Frontier</button>
+      <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
     </div>
     <iframe id="frame-Frontier" class="app-frame" title="Retire Frontier"></iframe>
+  </div>
+
+  <div id="MultiModel" class="tabcontent">
+    <div class="subtab-buttons">
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
+      <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
+      <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
+      <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
+      <button class="subtab-link active-sub" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
+    </div>
+    <iframe id="frame-MultiModel" class="app-frame" title="Multi Modelling"></iframe>
   </div>
 
   <div id="Modelling" class="tabcontent">
@@ -741,6 +760,7 @@
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
+      <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
     </div>
     <div class="modelbar">
       <button class="mdl-btn mdl-btn-primary" onclick="openSaveOverlay()">Save model</button>
@@ -922,6 +942,7 @@
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
+      <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
     </div>
     <div class="modelbar">
       <button class="mdl-btn mdl-btn-primary" onclick="openSaveOverlay()">Save model</button>
@@ -3459,7 +3480,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front24';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front25';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -3571,6 +3592,12 @@
         const f = document.getElementById('frame-Frontier');
         if (f) { f.__fsLock = true; setTimeout(() => fillFrameToViewport(f), 30); }
         pingFrame('frame-Frontier');
+      }
+      if (id === 'MultiModel') {
+        ensureFrame('frame-MultiModel', 'multi_model.html' + FV);
+        const f = document.getElementById('frame-MultiModel');
+        if (f) { f.__fsLock = true; setTimeout(() => fillFrameToViewport(f), 30); }
+        pingFrame('frame-MultiModel');
       }
       if (id === 'KPI' && !window.__kpi) { window.__kpi = true; showSub(null, 'PerfKPIs'); }
       if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Budget'); }

@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi Modelling</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err45"></script>
+<script src="engine.js?v=ann1"></script>
+<script src="https://www.gstatic.com/charts/loader.js"></script>
+<style>
+  :root {
+    --accent:#2c7a7b; --amber:#d97706; --ink:#2c3e50; --sub:#64748b; --line:#d3e3e3;
+    --bg:#e8f0f0; --cell:#ffffff; --cellborder:#d4e4e4; --headbg:#ffffff;
+    --ok:#0f9d6e; --bad:#dc3030;
+  }
+  html, body { height:100%; }
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; background:var(--bg); color:var(--ink);
+         display:flex; flex-direction:column; overflow:hidden; }
+  #status { position:absolute; top:8px; left:50%; transform:translateX(-50%); z-index:60;
+            padding:6px 14px; border-radius:6px; font-weight:bold; font-size:13px; }
+  .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
+
+  .mm-head { flex:none; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+             padding:9px 12px; background:var(--headbg); border-bottom:2px solid var(--line); }
+  .mm-title { font-size:15px; font-weight:700; }
+  .mm-pill { font-size:12px; background:#e6f4f1; color:var(--accent); padding:4px 10px; border-radius:20px; }
+  .mm-btn { font-size:13px; padding:7px 13px; border-radius:8px; border:1px solid #cbd5e1;
+            background:#fff; color:var(--ink); cursor:pointer; }
+  .mm-btn.pri { border-color:var(--accent); color:var(--accent); font-weight:600; }
+  .mm-btn:disabled { opacity:.45; cursor:default; }
+  .spacer { flex:1; }
+
+  .mm-body { flex:1 1 auto; min-height:0; overflow:auto; padding:12px 14px 20px; box-sizing:border-box; }
+  .mm-empty { max-width:520px; margin:40px auto; text-align:center; color:var(--sub); font-size:14px; line-height:1.5; }
+  .mm-empty h3 { color:var(--ink); font-size:17px; margin:0 0 8px; }
+
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .chip { font-size:12.5px; padding:6px 12px; border-radius:20px; border:1px solid var(--cellborder);
+          background:#fff; color:var(--sub); cursor:pointer; }
+  .chip.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--sub); margin:2px 0 6px; }
+  .legend .k { display:flex; align-items:center; gap:6px; cursor:pointer; }
+  .legend .k.sel { font-weight:700; color:var(--ink); }
+  .sw { width:14px; height:3px; border-radius:2px; display:inline-block; }
+  .subh { font-size:12.5px; color:var(--sub); font-weight:600; margin:16px 0 4px; }
+  .cbox { background:var(--cell); border:1px solid var(--cellborder); border-radius:10px; padding:8px; box-shadow:0 1px 3px rgba(15,52,52,0.08); }
+  .chart-main { width:100%; height:300px; }
+  .chart-net { width:100%; height:190px; }
+
+  table.t { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px; }
+  table.t th, table.t td { padding:8px 9px; text-align:right; border-bottom:1px solid var(--cellborder); white-space:nowrap; }
+  table.t th { color:var(--sub); font-weight:600; }
+  table.t th:first-child, table.t td:first-child { text-align:left; }
+  table.t tbody tr { cursor:pointer; }
+  table.t tbody tr.sel td { background:#eaf5f2; }
+  .dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:7px; vertical-align:middle; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+  .drill { margin-top:16px; }
+  .drill-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:6px; }
+  .toggle { display:inline-flex; align-items:center; gap:8px; font-size:12.5px; color:var(--sub); cursor:pointer; }
+  .toggle input { width:40px; height:22px; -webkit-appearance:none; appearance:none; background:#cbd5e1; border-radius:20px; position:relative; cursor:pointer; }
+  .toggle input:checked { background:var(--accent); }
+  .toggle input::after { content:''; position:absolute; top:2px; left:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:left .15s; }
+  .toggle input:checked::after { left:20px; }
+
+  .overlay { position:fixed; inset:0; z-index:9000; background:rgba(15,30,30,0.35);
+             display:none; align-items:center; justify-content:center; padding:14px; box-sizing:border-box; }
+  .overlay.show { display:flex; }
+  .card { background:var(--cell); border-radius:14px; width:100%; max-width:560px; max-height:92vh; overflow:auto;
+          padding:16px 18px; box-shadow:0 12px 40px rgba(0,0,0,0.25); }
+  .card h3 { margin:0 0 4px; font-size:16px; color:var(--ink); }
+  .steps { display:flex; gap:5px; flex-wrap:wrap; margin:10px 0 14px; font-size:11.5px; }
+  .stp { padding:5px 10px; border-radius:20px; background:#eef4f4; border:1px solid var(--cellborder); color:var(--sub); }
+  .stp.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .lbl { font-size:13px; color:var(--sub); margin:2px 0 8px; }
+  .seg { display:inline-flex; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; margin-bottom:10px; }
+  .seg button { font-size:12.5px; padding:7px 13px; border:none; background:#fff; color:var(--sub); cursor:pointer; }
+  .seg button.on { background:var(--accent); color:#fff; }
+  .wchip { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; padding:6px 10px; border-radius:20px;
+           background:#e6f4f1; color:var(--accent); margin:0 6px 6px 0; }
+  .wchip b { cursor:pointer; font-weight:700; }
+  .frow { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:13px; flex-wrap:wrap; }
+  .frow label { color:var(--sub); min-width:150px; }
+  .in { font-size:13px; padding:7px 8px; border-radius:8px; border:1px solid #cbd5e1; background:#fff; color:var(--ink); width:88px; }
+  .in.name { width:100%; max-width:320px; }
+  .badge { font-size:11px; background:#e6f4f1; color:var(--accent); padding:3px 9px; border-radius:20px; }
+  .note { font-size:12px; color:#94a3b8; margin-top:2px; }
+  .err { color:var(--bad); font-size:12.5px; min-height:16px; margin-top:6px; }
+  .nav { display:flex; justify-content:space-between; margin-top:16px; padding-top:12px; border-top:1px solid var(--cellborder); }
+  .mlist { list-style:none; margin:8px 0 0; padding:0; }
+  .mlist li { display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid var(--cellborder); }
+  .mlist .mn { font-weight:600; font-size:14px; }
+  .mlist .ms { font-size:12px; color:var(--sub); }
+
+  @media (prefers-color-scheme: dark) {
+    :root { --accent:#5eead4; --amber:#fbbf24; --ink:#e2e8f0; --sub:#94a3b8; --line:#334155;
+            --bg:#0b1120; --cell:#1e293b; --cellborder:#334155; --headbg:#0f172a; --ok:#34d399; --bad:#f87171; }
+    .mm-btn { background:#0f172a; color:#e2e8f0; border-color:#475569; }
+    .mm-pill, .wchip, .badge { background:#0f2b2b; color:#5eead4; }
+    .chip { background:#0f172a; color:#94a3b8; border-color:#475569; }
+    .chip.on { background:#0f6e56; color:#e2fff5; border-color:#0f6e56; }
+    .seg button { background:#0f172a; color:#94a3b8; }
+    .seg button.on { background:#0f6e56; color:#e2fff5; }
+    .in { background:#0f172a; color:#e2e8f0; border-color:#475569; }
+    .stp { background:#0f172a; color:#94a3b8; }
+    .stp.on { background:#0f6e56; color:#e2fff5; border-color:#0f6e56; }
+    table.t tbody tr.sel td { background:#0f2b2b; }
+    #status.s-load, .s-load { background:#1e293b; color:#93c5fd; }
+    #status.s-err, .s-err { background:#3b1d1d; color:#f87171; }
+  }
+</style>
+</head>
+<body>
+  <div id="status" class="s-load">Loading…</div>
+
+  <div class="mm-head">
+    <span class="mm-title">Multi Modelling</span>
+    <span class="mm-pill" id="modelName" style="display:none;"></span>
+    <span style="font-size:11px; color:var(--sub);">(build: mm1)</span>
+    <span class="spacer"></span>
+    <button class="mm-btn pri" id="btnNew" type="button">+ New multi model</button>
+    <button class="mm-btn" id="btnEdit" type="button" disabled>Edit</button>
+    <button class="mm-btn" id="btnSaved" type="button">Saved models</button>
+    <button class="mm-btn" id="btnSave" type="button" disabled>Save</button>
+  </div>
+
+  <div class="mm-body" id="body">
+    <div class="mm-empty" id="empty">
+      <h3>Compare scenarios side by side</h3>
+      <p>Build a multi model to compare retirement dates, spending, withdrawal method and annuities across one set of charts. Nothing here changes your modelling defaults.</p>
+      <p><button class="mm-btn pri" id="btnNew2" type="button">+ New multi model</button></p>
+    </div>
+    <div id="output" style="display:none;"></div>
+  </div>
+
+  <!-- ===== Wizard ===== -->
+  <div class="overlay" id="wiz">
+    <div class="card">
+      <h3 id="wizTitle">New multi model</h3>
+      <div class="steps" id="wizSteps"></div>
+      <div id="wizPanel"></div>
+      <div class="err" id="wizErr"></div>
+      <div class="nav">
+        <button class="mm-btn" id="wizBack" type="button">Back</button>
+        <span>
+          <button class="mm-btn" id="wizCancel" type="button" style="margin-right:8px;">Cancel</button>
+          <button class="mm-btn pri" id="wizNext" type="button">Next</button>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Save ===== -->
+  <div class="overlay" id="saveOv">
+    <div class="card" style="max-width:460px;">
+      <h3>Save multi model</h3>
+      <div class="frow"><input class="in name" id="saveName" placeholder="Model name"></div>
+      <div class="note" id="saveSummary"></div>
+      <div class="err" id="saveErr"></div>
+      <div class="nav">
+        <span></span>
+        <span>
+          <button class="mm-btn" id="saveCancel" type="button" style="margin-right:8px;">Cancel</button>
+          <button class="mm-btn" id="saveOverwrite" type="button" style="margin-right:8px; display:none;">Overwrite</button>
+          <button class="mm-btn pri" id="saveNew" type="button">Save as new</button>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Saved list ===== -->
+  <div class="overlay" id="listOv">
+    <div class="card">
+      <h3>Saved multi models</h3>
+      <ul class="mlist" id="mList"><li>Loading…</li></ul>
+      <div class="nav"><span></span><button class="mm-btn" id="listClose" type="button">Close</button></div>
+    </div>
+  </div>
+
+  <!-- ===== Confirm ===== -->
+  <div class="overlay" id="confOv">
+    <div class="card" style="max-width:420px;">
+      <h3 id="confMsg">—</h3>
+      <div class="nav"><span></span><span>
+        <button class="mm-btn" id="confCancel" type="button" style="margin-right:8px;">Cancel</button>
+        <button class="mm-btn pri" id="confYes" type="button">Yes</button>
+      </span></div>
+    </div>
+  </div>
+
+<script>
+  var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var COL_L = ['#2c7a7b','#2563eb','#d97706','#7c3aed','#16a34a','#dc2626'];
+  var COL_D = ['#5eead4','#60a5fa','#fbbf24','#c4b5fd','#4ade80','#f87171'];
+  var mq = window.matchMedia('(prefers-color-scheme: dark)');
+  function isDark() { return mq.matches; }
+  function palette() { return isDark() ? COL_D : COL_L; }
+  function axisColor() { return isDark() ? '#94a3b8' : '#64748b'; }
+  function gridColor() { return isDark() ? '#334155' : '#e2e8f0'; }
+
+  var data = null, p1Name = 'Graham', p2Name = null, base = null, stateNames = null;
+  var chartsReady = false;
+  var currentSpec = null, activeModel = null, scenarios = [];
+  var activeMetric = 'pot', sel = 0, splitMembers = false;
+  var METRICS = [['pot','Pot value'],['fixed','Fixed income'],['ann','Annuity income'],['spend','Spend'],['net','Net income']];
+  var DRILL_YEARS = null;
+
+  function shortGBP(n) {
+    var a = Math.abs(n);
+    if (a >= 1e6) { var v = n/1e6; return '£' + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + 'M'; }
+    if (a >= 1e3) return '£' + Math.round(n/1e3) + 'K';
+    return '£' + Math.round(n);
+  }
+  function axisFor(maxVal) {
+    if (!(maxVal > 0)) return { max:1000, ticks:[{ v:0, f:'£0' }] };
+    var steps = [5e3,10e3,20e3,25e3,50e3,100e3,200e3,250e3,500e3,1e6,2e6,5e6];
+    var step = steps[steps.length-1];
+    for (var i=0;i<steps.length;i++){ if (maxVal/steps[i] <= 4){ step = steps[i]; break; } }
+    var max = Math.ceil(maxVal/step)*step, ticks = [];
+    for (var v=0; v<=max+1; v+=step) ticks.push({ v:v, f:shortGBP(v) });
+    return { max:max, ticks:ticks };
+  }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function yearLabel(d){ return MONTHS[d.getMonth()] + ' ' + d.getFullYear(); }
+
+  // ---------- data + base ----------
+  async function loadAll() {
+    var status = document.getElementById('status');
+    try {
+      var res = await Promise.all([
+        App.rest('bd_members'), App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
+        App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
+        App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
+        App.rest('bd_purchases?order=purchase_date.asc'),
+        App.rest('bd_market_crashes?order=start_date.asc'),
+        App.rest('bd_savings_accounts?order=account_name.asc'),
+        App.rest('bd_contribution_exceptions?order=start_date.asc'),
+        App.rest('bd_working_tiers?order=from_date.asc'),
+        App.rest('bd_income_sources?order=member_name.asc'),
+        App.rest('bd_income_amounts?order=member_name.asc'),
+        App.rest('bd_dining_rota'), App.rest('bd_meal_cost')
+      ]);
+      var members=res[0], bills=res[1], dining=res[2], guaranteed=res[3], pensions=res[4],
+          contributions=res[5], logs=res[6], purchases=res[7], crashes=res[8], savingsAccounts=res[9],
+          contributionExceptions=res[10], workingTiers=res[11], incomeSources=res[12], incomeAmounts=res[13],
+          diningRota=res[14], mealCost=res[15];
+
+      var mealCostMap = {};
+      (mealCost||[]).forEach(function(c){ mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost)||0; });
+      var DAY_COLS = ['mon','tue','wed','thu','fri','sat','sun'];
+      var diningAnnual = (diningRota||[]).reduce(function(sum,r){
+        return sum + DAY_COLS.reduce(function(s,col){ return s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]]||0) : 0); }, 0);
+      }, 0);
+
+      data = { members:members, bills:bills, dining:dining, diningAnnual:diningAnnual,
+               guaranteed:guaranteed, pensions:pensions, contributions:contributions, logs:logs,
+               purchases:purchases||[], crashes:crashes||[], savingsAccounts:savingsAccounts||[],
+               contributionExceptions:contributionExceptions||[], workingTiers:workingTiers||[],
+               incomeSources:incomeSources||[], incomeAmounts:incomeAmounts||[], annuities:[] };
+
+      var sortedM = (members||[]).slice().sort(function(a,b){ return String(a.name||'').localeCompare(String(b.name||'')); });
+      p1Name = sortedM[0] ? sortedM[0].name : 'Graham';
+      p2Name = sortedM[1] ? sortedM[1].name : null;
+
+      stateNames = new Set((guaranteed||[]).map(function(x){ return x.income_name; })
+                    .filter(function(n){ return n && n.toLowerCase().indexOf('state') >= 0; }));
+
+      var pRows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name) + '&order=updated_at.desc&limit=1');
+      var p = (pRows && pRows.length) ? pRows[0] : {};
+      var p2phase = null;
+      if (p2Name) {
+        var p2Rows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p2Name) + '&order=updated_at.desc&limit=1');
+        var p2row = (p2Rows && p2Rows.length) ? p2Rows[0] : null;
+        if (p2row) p2phase = {
+          phase1Date: App.parseLocalDate(p2row.shorter_week_date_1), phase1Days: p2row.working_days_1 ? Number(p2row.working_days_1) : 5,
+          phase2Date: App.parseLocalDate(p2row.shorter_week_date_2), phase2Days: p2row.working_days_2 ? Number(p2row.working_days_2) : 5
+        };
+      }
+      base = {
+        growthRate: p.pension_growth_rate != null ? Number(p.pension_growth_rate) : 0.05,
+        gRatio: p.drawdown_ratio_graham != null ? Number(p.drawdown_ratio_graham) : 0.5,
+        spendRed: p.spending_reduction_pct != null ? Number(p.spending_reduction_pct) : 0.5,
+        savingsFundBills: p.savings_fund_bills != null ? !!p.savings_fund_bills : true,
+        withdrawalDefault: (p.withdrawal_method_graham === 'fad') ? 'fad' : 'ufpls',
+        ufplsDivertTf: !!p.ufpls_divert_tf,
+        phase1Date: App.parseLocalDate(p.shorter_week_date_1), phase1Days: p.working_days_1 ? Number(p.working_days_1) : 5,
+        phase2Date: App.parseLocalDate(p.shorter_week_date_2), phase2Days: p.working_days_2 ? Number(p.working_days_2) : 5,
+        p2phase: p2phase,
+        retireYear: (function(){ var d = App.parseLocalDate(p.retirement_date); return d ? d.getFullYear() : new Date().getFullYear(); })()
+      };
+      status.style.display = 'none';
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  // ---------- engine orchestration (no engine change) ----------
+  function scenarioAnnuities(spec, i, year) {
+    if (spec.annMode === 'none') return [];
+    var a;
+    if (spec.annMode === 'all') a = spec.annAll;
+    else { a = spec.annPer[year] || { member:p1Name, year:year, rate:6.0, esc:0.0 }; }
+    return [{
+      annuity_name: 'Annuity', member_name: a.member,
+      purchase_date: a.year + '-06-01', purchase_amount: 0,
+      annuity_rate: a.rate, escalation_pct: a.esc, use_whole_pot: true, enabled: true
+    }];
+  }
+  function scenAttrs(spec, i, year) {
+    var spendPct = (spec.spendMode === 'same') ? spec.spend : (spec.spendPer[year] != null ? spec.spendPer[year] : spec.spend);
+    var wm = { graham: spec.method, julie: spec.method };
+    var cd;
+    if (spec.method === 'fad') { var iso = year + '-06-01'; cd = { graham: iso, julie: p2Name ? iso : null }; }
+    else cd = { graham: null, julie: null };
+    return { spendRed: (Number(spendPct)||0)/100, withdrawalMethod: wm, crystallisationDate: cd,
+             growth: spec.growth, gRatio: spec.gRatio };
+  }
+  function buildPlan(date, at) {
+    var rbm = {}; rbm[p1Name] = date; if (p2Name) rbm[p2Name] = date;
+    return {
+      retirementDate: date, retireByMember: rbm, growthRate: at.growth,
+      phase1Date: base.phase1Date, phase1Days: base.phase1Days,
+      phase2Date: base.phase2Date, phase2Days: base.phase2Days, p2phase: base.p2phase,
+      spendRed: at.spendRed, gRatio: at.gRatio, savingsFundBills: base.savingsFundBills,
+      withdrawalMethod: at.withdrawalMethod, crystallisationDate: at.crystallisationDate,
+      ufplsDivertTf: base.ufplsDivertTf, retired: false
+    };
+  }
+  function buildCfg(d, plan, at) {
+    var js = PensionEngine.forecast(d, plan, 1);
+    var pots = { graham: Math.max(0, js.graham||0), julie: Math.max(0, js.julie||0) };
+    var ownRetire = js.potsAtOwnRetire ? { graham: Math.max(0, js.potsAtOwnRetire.p1||0), julie: Math.max(0, js.potsAtOwnRetire.p2||0) } : pots;
+    return {
+      pots: pots, potsAtOwnRetire: ownRetire, gRatio: at.gRatio, spendRed: at.spendRed,
+      startYear: plan.retirementDate.getFullYear(), retirementDate: plan.retirementDate,
+      retireByMember: plan.retireByMember, savingsFundBills: base.savingsFundBills,
+      withdrawalMethod: at.withdrawalMethod, crystallisationDate: at.crystallisationDate,
+      ufplsDivertTf: base.ufplsDivertTf, sp: PensionEngine.baselineSP(stateNames)
+    };
+  }
+  function extract(rows) {
+    var s = { years:[], pot:[], fixed:[], ann:[], spend:[], net:[], gPot:[], jPot:[], gNet:[], jNet:[] };
+    rows.forEach(function(r){
+      var annInc = (r.g_annuityIncome||0) + (r.j_annuityIncome||0);
+      s.years.push(r.year);
+      s.pot.push(Math.max(0, Math.round(r.combinedClosing||0)));
+      s.fixed.push(Math.max(0, Math.round((r.otherPensions||0) - annInc)));
+      s.ann.push(Math.max(0, Math.round(annInc)));
+      s.spend.push(Math.max(0, Math.round(r.outgoings||0)));
+      s.net.push(Math.max(0, Math.round((r.g_net||0) + (r.j_net||0))));
+      s.gPot.push(Math.max(0, Math.round(r.g_closing||0)));
+      s.jPot.push(Math.max(0, Math.round(r.j_closing||0)));
+      s.gNet.push(Math.max(0, Math.round(r.g_net||0)));
+      s.jNet.push(Math.max(0, Math.round(r.j_net||0)));
+    });
+    return s;
+  }
+  function summarise(s) {
+    var finalPot = s.pot.length ? s.pot[s.pot.length-1] : 0;
+    var lastYear = s.years.length ? s.years[s.years.length-1] : null, dry = null;
+    for (var i=0;i<s.years.length;i++){ if (s.pot[i] < 1000){ dry = s.years[i]; break; } }
+    var minNet = s.net.length ? Math.min.apply(null, s.net) : 0;
+    var avgNet = s.net.length ? Math.round(s.net.reduce(function(a,b){return a+b;},0)/s.net.length) : 0;
+    return { finalPot:finalPot, dry:dry, lastYear:lastYear, minNet:minNet, avgNet:avgNet };
+  }
+  function computeScenarios(spec) {
+    var out = [];
+    var dates = spec.dates.slice().sort(function(a,b){ return a-b; });
+    dates.forEach(function(year, i){
+      var date = new Date(year, (base.phase1Date ? base.phase1Date.getMonth() : new Date().getMonth()), 1);
+      var at = scenAttrs(spec, i, year);
+      var d = Object.assign({}, data, { annuities: scenarioAnnuities(spec, i, year) });
+      var plan = buildPlan(date, at);
+      var cfg = buildCfg(d, plan, at);
+      var rows = PensionEngine.drawdown(d, cfg) || [];
+      var s = extract(rows);
+      out.push({ year:year, date:date, label:'Retire ' + year,
+        spendPct: (spec.spendMode==='same') ? spec.spend : (spec.spendPer[year]!=null?spec.spendPer[year]:spec.spend),
+        method: spec.method, ann: describeAnn(spec, year), series:s, sum:summarise(s) });
+    });
+    return out;
+  }
+  function describeAnn(spec, year) {
+    if (spec.annMode === 'none') return '—';
+    if (spec.annMode === 'all') return 'Whole pot ' + spec.annAll.year + ' (' + spec.annAll.member + ')';
+    var a = spec.annPer[year] || { member:p1Name, year:year };
+    return 'Whole pot ' + a.year + ' (' + a.member + ')';
+  }
+
+  // ---------- output ----------
+  function methodLabel(m){ return m === 'fad' ? 'Flexi' : 'UFPLS'; }
+  function renderOutput() {
+    document.getElementById('empty').style.display = 'none';
+    var out = document.getElementById('output'); out.style.display = 'block';
+    var pal = palette();
+    var chips = '<div class="chips" id="chips">' + METRICS.map(function(m){
+      return '<button class="chip ' + (m[0]===activeMetric?'on':'') + '" data-m="' + m[0] + '">' + m[1] + '</button>';
+    }).join('') + '</div>';
+    var legend = '<div class="legend" id="legend">' + scenarios.map(function(sc,i){
+      return '<span class="k ' + (i===sel?'sel':'') + '" data-i="' + i + '"><span class="sw" style="background:' + pal[i%pal.length] + '"></span>' + esc(sc.label + ' · ' + sc.spendPct + '% · ' + methodLabel(sc.method)) + '</span>';
+    }).join('') + '</div>';
+    var main = '<div class="cbox"><div class="chart-main" id="chartMain"></div></div>';
+    var focus = scenarios[sel] || scenarios[0];
+    var net = '<div class="subh">Net income vs spend · ' + esc(focus ? focus.label : '') + '</div><div class="cbox"><div class="chart-net" id="chartNet"></div></div>';
+
+    var thead = '<tr><th>Scenario</th><th>Retire</th><th>Spend</th><th>Method</th><th>Annuity</th><th>Final pot</th><th>Runs dry</th><th>Min net</th><th>Avg net</th></tr>';
+    var rows = scenarios.map(function(sc,i){
+      var sm = sc.sum;
+      return '<tr data-i="' + i + '" class="' + (i===sel?'sel':'') + '">'
+        + '<td><span class="dot" style="background:' + pal[i%pal.length] + '"></span>S' + (i+1) + '</td>'
+        + '<td>' + sc.year + '</td><td>' + sc.spendPct + '%</td><td>' + methodLabel(sc.method) + '</td><td>' + esc(sc.ann) + '</td>'
+        + '<td>' + shortGBP(sm.finalPot) + '</td>'
+        + '<td class="' + (sm.dry ? 'bad' : 'ok') + '">' + (sm.dry ? sm.dry : 'survives') + '</td>'
+        + '<td>' + shortGBP(sm.minNet) + '</td><td>' + shortGBP(sm.avgNet) + '</td></tr>';
+    }).join('');
+    var table = '<div class="subh">Scenario summary · tap a row to focus</div><table class="t"><thead>' + thead + '</thead><tbody id="sumRows">' + rows + '</tbody></table>';
+
+    out.innerHTML = chips + legend + main + net + table + '<div class="drill" id="drill"></div>';
+
+    document.querySelectorAll('#chips .chip').forEach(function(b){ b.onclick = function(){ activeMetric = b.dataset.m; renderOutput(); }; });
+    document.querySelectorAll('#legend .k').forEach(function(k){ k.onclick = function(){ sel = Number(k.dataset.i); renderOutput(); }; });
+    document.querySelectorAll('#sumRows tr').forEach(function(tr){ tr.onclick = function(){ sel = Number(tr.dataset.i); renderOutput(); }; });
+    renderDrill();
+    if (chartsReady) { drawMain(); drawNet(); }
+  }
+
+  function baseChartOpts(yA) {
+    var ax = axisColor(), gl = gridColor();
+    return {
+      legend:'none', backgroundColor:'transparent', lineWidth:2, pointSize:0, interpolateNulls:true,
+      chartArea:{ left:56, top:12, right:16, bottom:28, width:'82%', height:'80%' },
+      hAxis:{ format:'####', textStyle:{ fontSize:11, color:ax }, gridlines:{ color:'transparent' }, baselineColor:gl },
+      vAxis:{ viewWindow:{ min:0, max:yA.max }, ticks:yA.ticks, textStyle:{ fontSize:11, color:ax }, gridlines:{ color:gl }, baselineColor:gl }
+    };
+  }
+  function drawMain() {
+    var host = document.getElementById('chartMain'); if (!host || !scenarios.length) return;
+    var w = host.clientWidth, h = host.clientHeight; if (w < 8 || h < 8) return;
+    var pal = palette();
+    var years = scenarios[0].series.years;
+    var dt = new google.visualization.DataTable();
+    dt.addColumn('number','Year');
+    scenarios.forEach(function(sc){ dt.addColumn('number', sc.label); });
+    var maxLen = 0; scenarios.forEach(function(sc){ if (sc.series.years.length > maxLen) maxLen = sc.series.years.length; });
+    var allYears = scenarios.reduce(function(best,sc){ return sc.series.years.length > best.length ? sc.series.years : best; }, []);
+    var peak = 0, colors = [], widths = [];
+    allYears.forEach(function(yr, ri){
+      var row = [yr];
+      scenarios.forEach(function(sc){
+        var idx = sc.series.years.indexOf(yr);
+        var v = (idx >= 0) ? sc.series[activeMetric][idx] : null;
+        if (v != null && v > peak) peak = v;
+        row.push(v);
+      });
+      dt.addRow(row);
+    });
+    scenarios.forEach(function(sc,i){ colors.push(pal[i%pal.length]); });
+    var opts = baseChartOpts(axisFor(peak*1.05));
+    opts.colors = colors; opts.width = w; opts.height = h;
+    opts.series = {}; scenarios.forEach(function(sc,i){ opts.series[i] = { lineWidth: (i===sel?4:2) }; });
+    new google.visualization.LineChart(host).draw(dt, opts);
+  }
+  function drawNet() {
+    var host = document.getElementById('chartNet'); if (!host) return;
+    var w = host.clientWidth, h = host.clientHeight; if (w < 8 || h < 8) return;
+    var sc = scenarios[sel] || scenarios[0]; if (!sc) return;
+    var s = sc.series;
+    var dt = new google.visualization.DataTable();
+    dt.addColumn('number','Year'); dt.addColumn('number','Net income'); dt.addColumn('number','Spend');
+    var peak = 0;
+    for (var i=0;i<s.years.length;i++){ if (s.net[i]>peak) peak=s.net[i]; if (s.spend[i]>peak) peak=s.spend[i]; dt.addRow([s.years[i], s.net[i], s.spend[i]]); }
+    var opts = baseChartOpts(axisFor(peak*1.08));
+    opts.colors = [ isDark()?'#5eead4':'#0f6e56', isDark()?'#f59e0b':'#c77c08' ];
+    opts.series = { 1: { lineDashStyle:[6,4] } };
+    opts.width = w; opts.height = h;
+    new google.visualization.LineChart(host).draw(dt, opts);
+  }
+
+  function renderDrill() {
+    var el = document.getElementById('drill'); if (!el) return;
+    var sc = scenarios[sel] || scenarios[0]; if (!sc) { el.innerHTML=''; return; }
+    var s = sc.series;
+    var split = (p2Name && splitMembers);
+    var head = '<div class="drill-head"><span class="subh" style="margin:0;">' + esc(sc.label) + ' · year by year</span>'
+      + (p2Name ? '<label class="toggle"><input type="checkbox" id="splitTog" ' + (splitMembers?'checked':'') + '>Split by member</label>' : '') + '</div>';
+    var th = split
+      ? '<tr><th>Year</th><th>' + esc(p1Name) + ' pot</th><th>' + esc(p2Name) + ' pot</th><th>Fixed</th><th>Annuity</th><th>Spend</th><th>' + esc(p1Name) + ' net</th><th>' + esc(p2Name) + ' net</th></tr>'
+      : '<tr><th>Year</th><th>Pot</th><th>Fixed</th><th>Annuity</th><th>Spend</th><th>Net</th></tr>';
+    var body = s.years.map(function(yr,i){
+      return split
+        ? '<tr><td>' + yr + '</td><td>' + shortGBP(s.gPot[i]) + '</td><td>' + shortGBP(s.jPot[i]) + '</td><td>' + shortGBP(s.fixed[i]) + '</td><td>' + shortGBP(s.ann[i]) + '</td><td>' + shortGBP(s.spend[i]) + '</td><td>' + shortGBP(s.gNet[i]) + '</td><td>' + shortGBP(s.jNet[i]) + '</td></tr>'
+        : '<tr><td>' + yr + '</td><td>' + shortGBP(s.pot[i]) + '</td><td>' + shortGBP(s.fixed[i]) + '</td><td>' + shortGBP(s.ann[i]) + '</td><td>' + shortGBP(s.spend[i]) + '</td><td>' + shortGBP(s.net[i]) + '</td></tr>';
+    }).join('');
+    el.innerHTML = head + '<table class="t"><thead>' + th + '</thead><tbody>' + body + '</tbody></table>';
+    var tog = document.getElementById('splitTog');
+    if (tog) tog.onchange = function(){ splitMembers = tog.checked; renderDrill(); };
+  }
+
+  // ---------- wizard ----------
+  var WIZ_STEPS = ['Dates','Spending','Method','Annuity','Advanced','Review'];
+  var wizStep = 0, wizSpec = null, wizEditing = false;
+
+  function defaultSpec() {
+    var y = base.retireYear || new Date().getFullYear();
+    return {
+      version:1, name:'', base:'live',
+      dates:[y, y+2, y+4],
+      spendMode:'same', spend: Math.round(base.spendRed*100) || 60, spendPer:{},
+      method: base.withdrawalDefault,
+      growth: base.growthRate, gRatio: base.gRatio,
+      annMode:'none', annAll:{ member:p1Name, year:(y+5), rate:6.0, esc:0.0 }, annPer:{}
+    };
+  }
+  function openWizard(spec, editing) {
+    wizSpec = spec || defaultSpec(); wizStep = 0; wizEditing = !!editing;
+    document.getElementById('wizTitle').textContent = editing ? 'Edit multi model' : 'New multi model';
+    document.getElementById('wizErr').textContent = '';
+    document.getElementById('wiz').classList.add('show');
+    renderWizard();
+  }
+  function closeWizard(){ document.getElementById('wiz').classList.remove('show'); }
+  function seg(opts, cur, fn) {
+    return '<span class="seg">' + opts.map(function(o){
+      return '<button class="' + (cur===o[0]?'on':'') + '" data-fn="' + fn + '" data-v="' + o[0] + '">' + o[1] + '</button>';
+    }).join('') + '</span>';
+  }
+  function renderWizard() {
+    var sp = wizSpec;
+    document.getElementById('wizSteps').innerHTML = WIZ_STEPS.map(function(s,i){
+      return '<span class="stp ' + (i===wizStep?'on':'') + '">' + (i+1) + '. ' + s + '</span>';
+    }).join('');
+    var p = document.getElementById('wizPanel'), h = '';
+    var dates = sp.dates.slice().sort(function(a,b){ return a-b; });
+
+    if (wizStep === 0) {
+      h += '<div class="frow"><label>Model name</label><input class="in name" id="wName" value="' + esc(sp.name) + '" placeholder="e.g. Retirement date sweep"></div>';
+      h += '<div class="frow"><label>Base un-varied settings on</label>' + seg([['live','Current settings'],['defaults','App defaults']], sp.base, 'base') + '</div>';
+      h += '<p class="lbl">Add the retirement dates to compare (2–6). Each becomes one scenario, joint across both members.</p><div>';
+      dates.forEach(function(y){ h += '<span class="wchip">' + y + ' <b data-del="' + y + '">×</b></span>'; });
+      h += '</div><div class="frow" style="margin-top:8px;"><label>Add a year</label><input class="in" id="wAddY" type="number" value="' + ((dates[dates.length-1]||base.retireYear)+2) + '"><button class="mm-btn" id="wAdd" type="button">Add</button></div>';
+      h += '<p class="note">' + dates.length + ' scenario' + (dates.length===1?'':'s') + '.</p>';
+    }
+    if (wizStep === 1) {
+      h += '<p class="lbl">Spending, as a % of your working-life spend.</p>' + seg([['same','Same for all'],['per','Per scenario']], sp.spendMode, 'spendMode');
+      if (sp.spendMode === 'same') h += '<div class="frow"><label>Spend %</label><input class="in" id="wSpend" type="number" value="' + sp.spend + '"> %</div>';
+      else dates.forEach(function(y){ var v = sp.spendPer[y]!=null?sp.spendPer[y]:sp.spend; h += '<div class="frow"><label>Retire ' + y + '</label><input class="in" data-spy="' + y + '" type="number" value="' + v + '"> %</div>'; });
+    }
+    if (wizStep === 2) {
+      h += '<p class="lbl">Withdrawal method (applies to all scenarios in this version).</p>' + seg([['ufpls','UFPLS'],['fad','Flexi-Access']], sp.method, 'method');
+      if (sp.method === 'fad') h += '<p class="note">Flexi-Access crystallises at each scenario\u2019s retirement date.</p>';
+    }
+    if (wizStep === 3) {
+      h += '<p class="lbl">Convert a DC pot into guaranteed income.</p>' + seg([['none','No annuity'],['on','Include annuity']], sp.annMode==='none'?'none':'on', 'annOn');
+      if (sp.annMode !== 'none') {
+        h += '<div style="margin:4px 0 10px;">' + seg([['all','Apply to all scenarios'],['per','One per scenario']], sp.annMode, 'annScope') + '</div>';
+        if (sp.annMode === 'all') {
+          if (p2Name) h += '<div class="frow"><label>Member</label>' + seg([[p1Name,p1Name],[p2Name,p2Name]], sp.annAll.member, 'annMember') + '</div>';
+          h += '<div class="frow"><label>Purchase year</label><input class="in" id="wAnnYear" type="number" value="' + sp.annAll.year + '"></div>';
+          h += '<div class="frow"><label>Amount</label><span class="badge">Whole pot</span><span class="note" style="margin:0;">amount disabled — annuitises the full pot</span></div>';
+          h += '<div class="frow"><label>Rate / escalation</label><input class="in" id="wAnnRate" type="number" step="0.1" value="' + sp.annAll.rate + '"> % &nbsp; <input class="in" id="wAnnEsc" type="number" step="0.1" value="' + sp.annAll.esc + '"> %</div>';
+        } else {
+          h += '<p class="lbl">Purchase year defaults to each scenario\u2019s retirement year.</p>';
+          dates.forEach(function(y){
+            var a = sp.annPer[y] || { member:p1Name, year:y, rate:6.0, esc:0.0 };
+            h += '<div class="frow"><label>Retire ' + y + '</label><input class="in" data-anpy="' + y + '" type="number" value="' + (a.year!=null?a.year:y) + '"> <span class="badge">Whole pot</span>'
+              + (p2Name ? ' ' + seg([[p1Name,p1Name],[p2Name,p2Name]], a.member, 'annPerM_' + y) : '') + '</div>';
+          });
+        }
+      }
+    }
+    if (wizStep === 4) {
+      h += '<p class="lbl">Advanced — applies to all scenarios in this version.</p>';
+      h += '<div class="frow"><label>Growth rate</label><input class="in" id="wGrowth" type="number" step="0.1" value="' + (sp.growth*100).toFixed(1) + '"> %</div>';
+      if (p2Name) h += '<div class="frow"><label>' + esc(p1Name) + ' drawdown share</label><input class="in" id="wRatio" type="number" value="' + Math.round(sp.gRatio*100) + '"> %</div>';
+    }
+    if (wizStep === 5) {
+      h += '<p class="lbl">Review the ' + dates.length + ' scenarios, then run.</p>';
+      h += '<table class="t"><thead><tr><th>Scenario</th><th>Spend</th><th>Method</th><th>Annuity</th></tr></thead><tbody>';
+      dates.forEach(function(y){
+        var spd = sp.spendMode==='same'?sp.spend:(sp.spendPer[y]!=null?sp.spendPer[y]:sp.spend);
+        h += '<tr><td>Retire ' + y + '</td><td>' + spd + '%</td><td>' + methodLabel(sp.method) + '</td><td>' + esc(describeAnn(sp, y)) + '</td></tr>';
+      });
+      h += '</tbody></table>';
+      h += '<p class="note">Growth ' + (sp.growth*100).toFixed(1) + '%' + (p2Name ? ' · ' + esc(p1Name) + ' ' + Math.round(sp.gRatio*100) + '% / ' + esc(p2Name) + ' ' + Math.round((1-sp.gRatio)*100) + '%' : '') + '</p>';
+    }
+    p.innerHTML = h;
+    document.getElementById('wizBack').style.visibility = wizStep===0 ? 'hidden' : 'visible';
+    document.getElementById('wizNext').textContent = wizStep===WIZ_STEPS.length-1 ? 'Run scenarios' : 'Next';
+    wireWizard();
+  }
+  function captureWizard() {
+    var sp = wizSpec;
+    var nm = document.getElementById('wName'); if (nm) sp.name = nm.value.trim();
+    var sd = document.getElementById('wSpend'); if (sd) sp.spend = Number(sd.value)||0;
+    document.querySelectorAll('[data-spy]').forEach(function(el){ sp.spendPer[Number(el.dataset.spy)] = Number(el.value)||0; });
+    var ay = document.getElementById('wAnnYear'); if (ay) sp.annAll.year = Number(ay.value)||sp.annAll.year;
+    var ar = document.getElementById('wAnnRate'); if (ar) sp.annAll.rate = Number(ar.value)||0;
+    var ae = document.getElementById('wAnnEsc'); if (ae) sp.annAll.esc = Number(ae.value)||0;
+    document.querySelectorAll('[data-anpy]').forEach(function(el){ var y = Number(el.dataset.anpy); var a = sp.annPer[y] || (sp.annPer[y] = { member:p1Name, year:y, rate:6.0, esc:0.0 }); a.year = Number(el.value)||y; });
+    var gr = document.getElementById('wGrowth'); if (gr) sp.growth = (Number(gr.value)||0)/100;
+    var rt = document.getElementById('wRatio'); if (rt) sp.gRatio = Math.min(1, Math.max(0, (Number(rt.value)||0)/100));
+  }
+  function wireWizard() {
+    var addY = document.getElementById('wAdd');
+    if (addY) addY.onclick = function(){ captureWizard(); var v = Number(document.getElementById('wAddY').value); if (v && wizSpec.dates.indexOf(v)<0 && wizSpec.dates.length<6){ wizSpec.dates.push(v); } renderWizard(); };
+    document.querySelectorAll('[data-del]').forEach(function(b){ b.onclick = function(){ captureWizard(); var y=Number(b.dataset.del); if (wizSpec.dates.length>1) wizSpec.dates = wizSpec.dates.filter(function(d){return d!==y;}); renderWizard(); }; });
+    document.querySelectorAll('[data-fn]').forEach(function(b){
+      b.onclick = function(){
+        captureWizard();
+        var fn = b.dataset.fn, v = b.dataset.v;
+        if (fn==='base') wizSpec.base = v;
+        else if (fn==='spendMode') wizSpec.spendMode = v;
+        else if (fn==='method') wizSpec.method = v;
+        else if (fn==='annOn') wizSpec.annMode = (v==='none') ? 'none' : 'all';
+        else if (fn==='annScope') wizSpec.annMode = v;
+        else if (fn==='annMember') wizSpec.annAll.member = v;
+        else if (fn.indexOf('annPerM_')===0){ var y=Number(fn.slice(8)); var a=wizSpec.annPer[y]||(wizSpec.annPer[y]={member:p1Name,year:y,rate:6.0,esc:0.0}); a.member=v; }
+        renderWizard();
+      };
+    });
+  }
+  function wizNext() {
+    captureWizard();
+    if (wizStep < WIZ_STEPS.length-1) { wizStep++; renderWizard(); return; }
+    if (wizSpec.dates.length < 1) { document.getElementById('wizErr').textContent = 'Add at least one retirement date.'; return; }
+    try {
+      currentSpec = wizSpec; sel = 0; splitMembers = false; activeMetric = 'pot';
+      scenarios = computeScenarios(currentSpec);
+      closeWizard();
+      document.getElementById('btnSave').disabled = false;
+      document.getElementById('btnEdit').disabled = false;
+      updateModelName();
+      renderOutput();
+    } catch (e) { document.getElementById('wizErr').textContent = 'Could not run: ' + e.message; }
+  }
+
+  // ---------- saved models ----------
+  function updateModelName() {
+    var pill = document.getElementById('modelName');
+    if (activeModel) { pill.textContent = 'Model: ' + activeModel.name; pill.style.display='inline-block'; }
+    else { pill.textContent = 'Unsaved model'; pill.style.display = currentSpec ? 'inline-block' : 'none'; }
+  }
+  function specSummary(sp) {
+    var bits = ['Retire ' + sp.dates.slice().sort(function(a,b){return a-b;}).join('/'),
+                'spend ' + (sp.spendMode==='same' ? sp.spend + '%' : 'per scenario'),
+                methodLabel(sp.method), 'growth ' + (sp.growth*100).toFixed(1) + '%'];
+    if (sp.annMode !== 'none') bits.push(sp.annMode==='all' ? 'annuity (all)' : 'annuity (per scenario)');
+    return bits.join(' · ');
+  }
+  function openSave() {
+    document.getElementById('saveErr').textContent = '';
+    document.getElementById('saveName').value = activeModel ? activeModel.name : (currentSpec ? currentSpec.name : '');
+    document.getElementById('saveSummary').textContent = currentSpec ? specSummary(currentSpec) : '';
+    document.getElementById('saveOverwrite').style.display = activeModel ? 'inline-block' : 'none';
+    document.getElementById('saveOv').classList.add('show');
+  }
+  async function doSave(mode) {
+    var name = document.getElementById('saveName').value.trim();
+    if (!name) { document.getElementById('saveErr').textContent = 'Please enter a name.'; return; }
+    if (!currentSpec) { document.getElementById('saveErr').textContent = 'Nothing to save.'; return; }
+    currentSpec.name = name;
+    var now = new Date().toISOString();
+    try {
+      if (mode === 'overwrite' && activeModel) {
+        await App.write('PATCH', 'op_multi_models?id=eq.' + encodeURIComponent(activeModel.id),
+          { name:name, summary:specSummary(currentSpec), payload:currentSpec, updated_at:now });
+        activeModel.name = name;
+      } else {
+        var res = await App.sb.from('op_multi_models').insert({ name:name, summary:specSummary(currentSpec), payload:currentSpec, created_at:now, updated_at:now }).select('id,name');
+        if (res.error) throw res.error;
+        activeModel = res.data && res.data.length ? res.data[0] : null;
+      }
+      document.getElementById('saveOv').classList.remove('show');
+      updateModelName();
+    } catch (e) { document.getElementById('saveErr').textContent = 'Save failed: ' + e.message; }
+  }
+  async function openList() {
+    document.getElementById('listOv').classList.add('show');
+    var ul = document.getElementById('mList'); ul.innerHTML = '<li>Loading…</li>';
+    try {
+      var models = await App.rest('op_multi_models?order=updated_at.desc');
+      if (!models || !models.length) { ul.innerHTML = '<li class="ms">No saved multi models yet.</li>'; return; }
+      ul.innerHTML = '';
+      models.forEach(function(m){
+        var li = document.createElement('li');
+        li.innerHTML = '<span style="flex:1;"><span class="mn">' + esc(m.name) + '</span><br><span class="ms">' + esc(m.summary||'') + '</span></span>'
+          + '<button class="mm-btn pri" data-load="' + m.id + '">Load</button>'
+          + '<button class="mm-btn" data-ren="' + m.id + '">Rename</button>'
+          + '<button class="mm-btn" data-del2="' + m.id + '">Delete</button>';
+        ul.appendChild(li);
+      });
+      ul.querySelectorAll('[data-load]').forEach(function(b){ b.onclick = function(){ loadModel(b.dataset.load); }; });
+      ul.querySelectorAll('[data-ren]').forEach(function(b){ b.onclick = function(){ renameModel(b.dataset.ren); }; });
+      ul.querySelectorAll('[data-del2]').forEach(function(b){ b.onclick = function(){ deleteModel(b.dataset.del2); }; });
+    } catch (e) { ul.innerHTML = '<li class="ms">Could not load: ' + esc(e.message) + '</li>'; }
+  }
+  async function loadModel(id) {
+    try {
+      var rows = await App.rest('op_multi_models?id=eq.' + encodeURIComponent(id));
+      if (!rows || !rows.length) return;
+      var m = rows[0];
+      currentSpec = normaliseSpec(m.payload); activeModel = { id:m.id, name:m.name };
+      sel = 0; splitMembers = false; activeMetric = 'pot';
+      scenarios = computeScenarios(currentSpec);
+      document.getElementById('listOv').classList.remove('show');
+      document.getElementById('btnSave').disabled = false;
+      document.getElementById('btnEdit').disabled = false;
+      updateModelName();
+      renderOutput();
+    } catch (e) { alert('Could not load model: ' + e.message); }
+  }
+  function normaliseSpec(sp) {
+    sp = sp || {};
+    return {
+      version: sp.version||1, name: sp.name||'', base: sp.base||'live',
+      dates: (sp.dates && sp.dates.length) ? sp.dates.slice() : [base.retireYear],
+      spendMode: sp.spendMode||'same', spend: sp.spend!=null?sp.spend:60, spendPer: sp.spendPer||{},
+      method: sp.method||'ufpls', growth: sp.growth!=null?sp.growth:base.growthRate, gRatio: sp.gRatio!=null?sp.gRatio:base.gRatio,
+      annMode: sp.annMode||'none', annAll: sp.annAll||{ member:p1Name, year:base.retireYear, rate:6.0, esc:0.0 }, annPer: sp.annPer||{}
+    };
+  }
+  function renameModel(id) {
+    var name = prompt('New name?');
+    if (name == null || !name.trim()) return;
+    App.write('PATCH', 'op_multi_models?id=eq.' + encodeURIComponent(id), { name:name.trim(), updated_at:new Date().toISOString() })
+      .then(function(){ if (activeModel && activeModel.id===id) { activeModel.name = name.trim(); updateModelName(); } openList(); });
+  }
+  function deleteModel(id) {
+    confirmDo('Delete this multi model?', function(){
+      App.write('DELETE', 'op_multi_models?id=eq.' + encodeURIComponent(id), undefined).then(function(){
+        if (activeModel && activeModel.id===id) { activeModel = null; updateModelName(); }
+        openList();
+      });
+    });
+  }
+  function confirmDo(msg, onYes) {
+    document.getElementById('confMsg').textContent = msg;
+    document.getElementById('confOv').classList.add('show');
+    var yes = document.getElementById('confYes'), no = document.getElementById('confCancel');
+    var clean = function(){ document.getElementById('confOv').classList.remove('show'); yes.onclick=null; no.onclick=null; };
+    yes.onclick = function(){ clean(); onYes(); };
+    no.onclick = clean;
+  }
+
+  // ---------- wiring ----------
+  document.getElementById('btnNew').onclick = function(){ activeModel=null; openWizard(null, false); };
+  document.getElementById('btnNew2').onclick = function(){ activeModel=null; openWizard(null, false); };
+  document.getElementById('btnEdit').onclick = function(){ if (currentSpec) openWizard(normaliseSpec(JSON.parse(JSON.stringify(currentSpec))), true); };
+  document.getElementById('btnSaved').onclick = openList;
+  document.getElementById('btnSave').onclick = openSave;
+  document.getElementById('wizBack').onclick = function(){ captureWizard(); if (wizStep>0){ wizStep--; renderWizard(); } };
+  document.getElementById('wizNext').onclick = wizNext;
+  document.getElementById('wizCancel').onclick = closeWizard;
+  document.getElementById('saveCancel').onclick = function(){ document.getElementById('saveOv').classList.remove('show'); };
+  document.getElementById('saveNew').onclick = function(){ doSave('new'); };
+  document.getElementById('saveOverwrite').onclick = function(){ doSave('overwrite'); };
+  document.getElementById('listClose').onclick = function(){ document.getElementById('listOv').classList.remove('show'); };
+
+  var rt = null;
+  window.addEventListener('resize', function(){ clearTimeout(rt); rt = setTimeout(function(){ if (scenarios.length && chartsReady){ drawMain(); drawNet(); } }, 150); });
+  if (mq.addEventListener) mq.addEventListener('change', function(){ setTimeout(function(){ if (scenarios.length) renderOutput(); }, 60); });
+  window.addEventListener('message', function(ev){ if (ev && ev.data === 'refresh-data') loadAll(); });
+
+  google.charts.load('current', { packages:['corechart'] });
+  google.charts.setOnLoadCallback(function(){ chartsReady = true; if (scenarios.length) { drawMain(); drawNet(); } });
+
+  App.requireLogin(loadAll, { title:'Multi Modelling' });
+</script>
+</body>
+</html>
