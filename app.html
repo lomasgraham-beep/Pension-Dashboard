@@ -277,6 +277,27 @@
     .params input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:34px; height:34px; border-radius:50%; background:var(--accent); border:3px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); cursor:pointer; }
     .params input[type=range]::-moz-range-thumb { width:34px; height:34px; border-radius:50%; background:var(--accent); border:3px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.3); cursor:pointer; }
 
+    /* ---- Nudge buttons flanking each modelling slider (LC-311) ----
+       The slider sits in a flex row between a - and a + button; each press
+       steps the slider by exactly one of its own step values. The buttons
+       replace the slider's fixed 17px side inset with an 8px margin + 8px
+       gap, keeping the thumb clear of the buttons at min/max. */
+    .params .slider-row { display:flex; align-items:center; gap:8px; width:100%; }
+    .params .slider-row > input[type=range] { flex:1 1 auto; width:auto; min-width:0; margin:6px 8px; }
+    #mssBlock .mss-control .slider-row > input[type=range],
+    #eraBlock .mss-control .slider-row > input[type=range] { flex:1 1 auto; width:auto; margin:0 8px; }
+    .params .nudge {
+      flex:0 0 auto; width:34px; height:34px; padding:0;
+      border:1px solid var(--line-strong); border-radius:8px;
+      background:var(--surface); color:var(--accent-dark);
+      font-size:22px; font-weight:700; line-height:1;
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer; -webkit-user-select:none; user-select:none;
+      -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+    }
+    .params .nudge:active { background:var(--accent-soft); border-color:var(--accent); }
+    .params .nudge:disabled { opacity:.35; cursor:default; }
+
     /* segmented day buttons */
     .params .seg { display:flex; gap:0; margin-top:8px; border:1px solid #cbd5e1; border-radius:8px; overflow:hidden; max-width:300px; }
     .params .seg button { flex:1; padding:12px 4px; border:none; background:#fff; color:#475569; font-weight:bold; font-size:14px; cursor:pointer; border-right:1px solid #cbd5e1; }
@@ -387,6 +408,9 @@
       .params input[type=range] { height:10px; margin:4px 0; }
       .params input[type=range]::-webkit-slider-thumb { width:26px; height:26px; }
       .params input[type=range]::-moz-range-thumb { width:26px; height:26px; }
+      .params .slider-row { gap:6px; }
+      .params .slider-row > input[type=range] { margin:4px 6px; }
+      .params .nudge { width:30px; height:30px; font-size:20px; }
       .params .seg button { padding:9px 2px; font-size:13px; }
       .params .actions { margin-top:12px; gap:8px; }
       .params .pbtn { padding:11px 16px; font-size:14px; }
@@ -517,7 +541,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-310</span>
+      <span class="build-stamp">LC-311</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -2630,6 +2654,53 @@
       if (seg) seg.querySelectorAll('button').forEach(b => b.classList.toggle('seg-on', Number(b.dataset.v) === Number(v)));
     }
 
+    // ---- Slider nudge buttons (LC-311) ----
+    // Step a range slider by one of its own steps and fire its native oninput,
+    // so whatever the slider already does on drag (onParam, value-span update)
+    // runs unchanged. Works for every modelling slider, including the ones with
+    // fractional steps (0.25 / 0.1) and the dynamically built tier sliders.
+    function nudge(id, dir) {
+      const el = document.getElementById(id);
+      if (!el || el.disabled) return;
+      const step = parseFloat(el.step) || 1;
+      const min  = (el.min !== '' && el.min != null) ? parseFloat(el.min) : -Infinity;
+      const max  = (el.max !== '' && el.max != null) ? parseFloat(el.max) :  Infinity;
+      const anchor = isFinite(min) ? min : 0;
+      let v = (parseFloat(el.value) || 0) + dir * step;
+      v = anchor + Math.round((v - anchor) / step) * step;   // snap to the step grid
+      v = parseFloat(v.toFixed(6));                          // kill binary float error (e.g. 2.4000000000000004)
+      if (v < min) v = min;
+      if (v > max) v = max;
+      if (String(v) === String(parseFloat(el.value))) return; // already at the rail end
+      el.value = v;
+      el.dispatchEvent(new Event('input', { bubbles: true })); // run the slider's own oninput
+    }
+
+    // Wrap every modelling slider in a -/+ row. Idempotent, so it can be called
+    // again after the tier sliders are (re)built without double-wrapping.
+    function decorateSliders(root) {
+      (root || document).querySelectorAll('.params input[type=range]').forEach(function (el) {
+        if (!el.id) return;                                                       // nudge() needs an id
+        if (el.parentElement && el.parentElement.classList.contains('slider-row')) return; // already done
+        const row = document.createElement('div');
+        row.className = 'slider-row';
+        const mk = function (dir, label) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'nudge';
+          b.textContent = dir < 0 ? '\u2212' : '+';          // proper minus sign
+          b.setAttribute('aria-label', label);
+          b.tabIndex = -1;                                    // keep tab order on the slider itself
+          b.addEventListener('click', function () { nudge(el.id, dir); });
+          return b;
+        };
+        el.parentNode.insertBefore(row, el);
+        row.appendChild(mk(-1, 'decrease'));
+        row.appendChild(el);
+        row.appendChild(mk(1, 'increase'));
+      });
+    }
+
     // ---- What-if tier-change sliders, generated from the real bd_working_tiers ----
     // One slider per tier AFTER the person's first (each = the transition INTO that tier).
     // Lets you drag WHEN the change happens; what-if only, resets on reload.
@@ -2659,6 +2730,7 @@
         }
       });
       host.innerHTML = html;
+      decorateSliders(host);   // give the freshly-built tier sliders their -/+ buttons
     }
     // Tweak 1: cap the Fully-retire slider at the eldest person's 67th birthday.
     // Tweak 2: cap each tier-change slider at the current Fully-retire date.
@@ -3919,6 +3991,7 @@
     }
     // ===================== end SAVED MODELS =====================
 
+    decorateSliders(document);   // -/+ buttons for the static modelling & optimiser sliders (tier sliders decorate on build)
     App.requireLogin(loadEverything, { title: 'My Pension Model' });
   </script>
 
