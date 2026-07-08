@@ -1,32 +1,17 @@
-# LC-320 — Best Plan Finder v2 visibility fix
+# LC-321 direct upload
 
-## Upload this file to the repo root
+Upload only this file to the repository root:
 
-1. `app.html`
+- app.html
 
-## What changed from LC-319
+No separate best_plan_finder_addon.js is required.
 
-- Best Plan Finder v2 is now embedded directly inside `app.html`.
-- `app.html` no longer depends on `best_plan_finder_addon.js` loading separately.
-- This fixes the issue where Best Plan Finder disappeared if the add-on file was missing, stale, cached, or uploaded from the wrong link.
-- Visible build stamp is now `LC-320`.
+## Fix in LC-321
 
-## What remains unchanged
+Best Plan Finder is embedded in app.html and is inserted directly into the Intelligent modelling section (`#optPair`), above the Maximum sustainable spend and Earliest retirement age cards. This matches the position shown in Graham's screenshot.
 
-- `engine.js` unchanged.
-- `optimiser.js` unchanged.
-- `common.js` unchanged.
-- SQL unchanged.
-- Existing saved-model workflow unchanged.
+## Checks
 
-## Best Plan Finder behaviour
-
-Best Plan Finder still provides explicit scenario controls for:
-
-- Withdrawal method.
-- Existing annuities include/exclude.
-- Best Plan annuity include/exclude.
-- Market crashes include/exclude.
-- Fixed annuity amount, date, rate and escalation.
-
-`Apply to current model` updates the current in-browser model only. Use the existing Save Model feature afterwards if happy.
+- Build stamp updated to LC-321.
+- Embedded Best Plan Finder build is bpf4.
+- Inline JavaScript syntax checked with `node --check`.

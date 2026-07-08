@@ -545,7 +545,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-320</span>
+      <span class="build-stamp">LC-321</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1684,7 +1684,7 @@
       const box = document.getElementById(id);
       if (!box) return;
       const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
-      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-320 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-321 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
     }
     function safeOptionalChart(drawFn, chartId, headId) {
       try { drawFn(); }
@@ -4125,11 +4125,11 @@
   </div>
 
 
-  <!-- Best Plan Finder v2 embedded in app.html (LC-320) — no separate add-on file required -->
+  <!-- Best Plan Finder v2 embedded in app.html (LC-321) — no separate add-on file required -->
   <script>
 /* ============================================================
    Best Plan Finder embedded add-on — v2
-   build tag: bpf3 / embedded in app build LC-320
+   build tag: bpf4 / embedded in app build LC-321
 
    Additive browser-side feature for My Pension Project.
    - Does not replace engine.js or optimiser.js.
@@ -4144,7 +4144,7 @@
 (function (global) {
   'use strict';
 
-  const BUILD = 'bpf3';
+  const BUILD = 'bpf4';
   const ANN_NAME = 'Best Plan Finder Annuity';
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const state = { lastResult: null, originalAnnuities: null, applied: false };
@@ -4363,7 +4363,7 @@
     if (qs('bpf_css')) return;
     const st = document.createElement('style'); st.id = 'bpf_css';
     st.textContent = `
-      .bpf-panel{margin:14px 0 0;padding:14px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(135deg,rgba(44,122,123,.10),rgba(44,122,123,.03));box-shadow:var(--shadow)}
+      .bpf-panel{margin:14px 0 0;padding:14px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(135deg,rgba(44,122,123,.10),rgba(44,122,123,.03));box-shadow:var(--shadow)}.opt-pair>.bpf-panel{grid-column:1/-1;margin:0 0 14px}
       .bpf-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px}.bpf-title{font-weight:800;color:var(--ink);font-size:15px}.bpf-sub{font-size:12px;color:var(--ink-soft);margin-top:2px;line-height:1.35}.bpf-build{font-size:11px;color:var(--ink-soft)}
       .bpf-section{margin:10px 0 8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.35)}.bpf-section-title{font-size:12px;font-weight:800;color:var(--accent-dark);text-transform:uppercase;letter-spacing:.04em;margin:0 0 8px}
       .bpf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(176px,1fr));gap:10px}.bpf-field{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px}.bpf-field label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:6px}.bpf-field input,.bpf-field select{width:100%;min-height:38px;padding:8px 9px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface-2);color:var(--ink);font-size:14px}.bpf-chiprow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.bpf-chip{border:1px solid var(--accent-border);background:var(--accent-soft);color:var(--accent-dark);border-radius:999px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;min-height:32px}.bpf-switches{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px}.bpf-tog{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:8px 11px}.bpf-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}.bpf-btn{border:none;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer;min-height:42px}.bpf-run{background:var(--accent);color:white}.bpf-apply{background:#27ae60;color:white}.bpf-apply:disabled{opacity:.45;cursor:default}.bpf-discard{background:var(--surface);color:var(--ink);border:1px solid var(--line-strong)}.bpf-msg{font-size:13px;font-weight:700}.bpf-msg.err{color:#c0392b}.bpf-msg.ok{color:#2f8f5b}.bpf-result{margin-top:12px}.bpf-card{border-radius:12px;border:1px solid var(--line);background:var(--surface);padding:12px}.bpf-card.ok{border-color:#a7f3d0;background:#ecfdf5;color:#065f46}.bpf-card.bad{border-color:#fecaca;background:#fef2f2;color:#991b1b}.bpf-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:10px}.bpf-metric{border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:9px;background:rgba(255,255,255,.55)}.bpf-metric b{display:block;font-size:16px}.bpf-metric span{font-size:11px;opacity:.8}.bpf-dialwrap{display:flex;gap:10px;align-items:center}.bpf-dial{width:76px;height:76px;border-radius:50%;border:8px solid var(--accent-soft);background:var(--surface-2);position:relative;box-shadow:inset 0 0 0 1px var(--line);touch-action:none;flex:0 0 auto}.bpf-dial:after{content:'';position:absolute;left:50%;top:12px;width:4px;height:28px;margin-left:-2px;background:var(--accent);border-radius:3px;transform-origin:50% 26px;transform:rotate(var(--bpf-rot,-45deg))}.bpf-dial:before{content:'';position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;background:var(--accent);border-radius:50%}.bpf-ratebox{flex:1 1 auto}.bpf-note{font-size:11.5px;color:var(--ink-soft);line-height:1.35;margin-top:8px}.bpf-summary{font-size:12px;color:var(--ink-soft);line-height:1.45;margin-top:8px}
@@ -4550,13 +4550,31 @@
 
   function initUi() {
     if (qs('bpf_panel')) return;
-    const anchor = qs('modelRail') || document.querySelector('#Modelling .params') || document.querySelector('#Modelling');
+
+    // LC-321: place Best Plan Finder exactly in the Intelligent modelling section.
+    // The screenshot shows this section as the optPair area containing the
+    // Maximum sustainable spend and Earliest retirement age cards.  Earlier
+    // builds inserted the panel into the left controls rail, which made it
+    // appear missing on wide screens.
+    const optPair = qs('optPair');
+    const rail = qs('modelRail');
+    const fallback = document.querySelector('#Modelling');
+    const anchor = optPair || rail || fallback;
     if (!anchor) return;
+
     buildCss();
     const wrap = document.createElement('div'); wrap.innerHTML = panelHtml();
-    const actions = anchor.querySelector('.actions');
-    if (actions) anchor.insertBefore(wrap.firstElementChild, actions);
-    else anchor.appendChild(wrap.firstElementChild);
+    const panel = wrap.firstElementChild;
+
+    if (optPair) {
+      optPair.insertBefore(panel, optPair.firstElementChild);
+    } else if (rail) {
+      const actions = rail.querySelector('.actions');
+      if (actions) rail.insertBefore(panel, actions);
+      else rail.appendChild(panel);
+    } else {
+      fallback.appendChild(panel);
+    }
     document.querySelectorAll('#bpf_panel .bpf-chip').forEach(btn => btn.addEventListener('click', () => {
       const p = String(btn.dataset.set || '').split(':'); const el = qs(p[0]); if (el) { el.value = p[1]; updateInputSummary(); }
     }));
