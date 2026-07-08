@@ -1,67 +1,63 @@
-# LC-318 Best Plan Finder v1
+# LC-319 — Best Plan Finder v2
 
-Files in this pack:
+## Upload these files to the repo root
 
-- `app.html` — complete LC-318 replacement for the current dashboard shell.
-- `best_plan_finder_addon.js` — new additive Best Plan Finder feature file.
+1. `app.html`
+2. `best_plan_finder_addon.js`
 
-## Upload order
+## What changed from LC-318
 
-1. Upload `best_plan_finder_addon.js` to the repo root.
-2. Upload `app.html` to replace the existing repo `app.html`.
-3. Hard refresh the app.
-4. Confirm the build stamp shows `LC-318`.
+Best Plan Finder now has explicit scenario inputs instead of inheriting everything silently from the current model.
 
-## What changed
+New/changed controls:
 
-- Adds Best Plan Finder to the Intelligent modelling section.
-- Keeps `engine.js` unchanged.
-- Keeps `optimiser.js` unchanged.
-- Adds a new script reference in `app.html`:
+- Withdrawal method:
+  - Use current model settings
+  - Force blended / UFPLS
+  - Force tax-free first
+  - Force flexi-access dates
+- Existing annuities:
+  - Exclude existing annuities
+  - Include existing annuities
+- Market crashes:
+  - Include current crash table
+  - Exclude crashes
+- Best Plan annuity:
+  - Include fixed Best Plan annuity
+  - Exclude Best Plan annuity
 
-```html
-<script src="best_plan_finder_addon.js?v=bpf2"></script>
-```
+Default behaviour:
 
-## Behaviour
+- Existing annuities are excluded from the Best Plan test by default.
+- The fixed Best Plan annuity is included by default.
+- Market crashes are included by default.
+- Withdrawal method defaults to the current model settings.
 
-Best Plan Finder v1 uses:
+## Apply behaviour
 
-- editable earliest retirement date;
-- editable latest date to test;
-- editable minimum pot reserve;
-- reserve scope: combined / Graham / Julie;
-- fixed user-entered annuity purchase amount;
-- editable annuity date, owner, rate and escalation;
-- include-crashes toggle;
-- no-shortfall toggle;
-- must-buy-annuity toggle.
+`Apply to current model` now updates the in-browser current model only.
 
-The agreed annuity rule is:
+It does not write directly to Supabase.
 
-```text
-Use the fixed annuity amount, but fail if the purchase would take the relevant pot below the protected reserve or if the selected member pot cannot afford the annuity.
-```
+It updates:
 
-## Apply to current model
+- The current retirement date slider.
+- The in-memory annuity rows used by the model, based on the Best Plan scenario controls.
+- The normal modelling charts.
 
-`Apply to current model`:
+The existing Save Model feature can then capture the applied scenario.
 
-- updates the visible retirement date;
-- adds the Best Plan Finder annuity to the in-memory model;
-- reruns the normal Modelling charts;
-- does not write directly to Supabase;
-- does not create or overwrite a saved model.
+## Not changed
 
-The LC-318 `app.html` also adjusts the existing Save model collection step so that, after applying Best Plan Finder, the in-memory annuity is captured when you choose Save model.
+- `engine.js` unchanged.
+- `optimiser.js` unchanged.
+- `common.js` unchanged.
+- SQL unchanged.
+- Frame cache-buster unchanged.
 
-## SQL
+## Validation performed
 
-No SQL changes are required.
+- JavaScript syntax check on `best_plan_finder_addon.js`.
+- JavaScript syntax check on the inline script in `app.html`.
 
-## Files not changed
-
-- `engine.js`
-- `optimiser.js`
-- `common.js`
-- Supabase schema / RLS
+Live Supabase/browser behaviour still needs to be verified after upload.
