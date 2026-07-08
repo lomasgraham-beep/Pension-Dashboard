@@ -340,6 +340,13 @@
     .opt-toggle:hover { border-color:var(--accent-border); background:var(--accent-soft); }
     .opt-caret { display:inline-block; font-size:11px; color:var(--accent); transition:transform .12s; }
     .opt-toggle[aria-expanded="true"] .opt-caret { transform:rotate(90deg); }
+    .opt-extra-toggle { grid-column:1 / -1; display:flex; align-items:center; gap:8px; width:100%; margin:0 0 14px; padding:10px 14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); color:var(--ink); font-weight:700; font-size:14px; cursor:pointer; text-align:left; }
+    .opt-extra-toggle:hover { border-color:var(--accent-border); background:var(--accent-soft); }
+    .opt-extra-toggle .opt-extra-caret { display:inline-block; color:var(--accent); font-size:11px; transition:transform .12s; }
+    .opt-extra-toggle[aria-expanded="true"] .opt-extra-caret { transform:rotate(90deg); }
+    .opt-extra-toggle .opt-extra-title { white-space:nowrap; }
+    .opt-extra-toggle .opt-extra-sub { margin-left:auto; color:var(--ink-soft); font-size:12px; font-weight:600; line-height:1.25; text-align:right; }
+    @media (max-width:700px) { .opt-extra-toggle { align-items:flex-start; flex-wrap:wrap; } .opt-extra-toggle .opt-extra-sub { flex-basis:100%; margin-left:22px; text-align:left; } }
     .sw-pill { display:inline-flex; align-items:center; gap:8px; font-size:13px; padding:6px 12px; border:1px solid var(--line); border-radius:7px; background:var(--surface-2); color:var(--ink); }
     .sw-pill b { font-weight:bold; }
     .sw-on { color:var(--pos); } .sw-off { color:var(--warn); }
@@ -545,7 +552,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-322</span>
+      <span class="build-stamp">LC-323</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -774,7 +781,8 @@
     </div>
     <button type="button" class="opt-toggle" id="optToggle" onclick="toggleOptPair()" aria-expanded="false"><span class="opt-caret" aria-hidden="true">&#9654;</span> Intelligent modelling</button>
     <div class="opt-pair" id="optPair" style="display:none;">
-    <div class="params" id="mssBlock">
+    <button type="button" class="opt-extra-toggle" id="optExtraToggle" onclick="toggleOptExtra()" aria-expanded="false"><span class="opt-extra-caret" aria-hidden="true">&#9654;</span><span class="opt-extra-title">Other intelligent modelling tools</span><span class="opt-extra-sub">Maximum sustainable spend &middot; Earliest retirement age</span></button>
+    <div class="params" id="mssBlock" style="display:none;">
       <h3 style="margin:0 0 12px; color:var(--ink); font-size:16px;">Maximum sustainable spend</h3>
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 18px; align-items:start;">
         <div class="ctrl">
@@ -800,7 +808,7 @@
       </div>
       <div id="mss_result" style="margin-top:10px;"></div>
     </div>
-    <div class="params" id="eraBlock">
+    <div class="params" id="eraBlock" style="display:none;">
       <h3 style="margin:0 0 12px; color:var(--ink); font-size:16px;">Earliest retirement age<button type="button" class="info-btn" onclick="toggleInfo(event,'era_info')" aria-label="About earliest retirement age">i</button></h3>
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px 18px; align-items:start;">
         <div class="ctrl">
@@ -1684,7 +1692,7 @@
       const box = document.getElementById(id);
       if (!box) return;
       const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
-      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-322 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-323 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
     }
     function safeOptionalChart(drawFn, chartId, headId) {
       try { drawFn(); }
@@ -3045,6 +3053,13 @@
       p.style.display = open ? '' : 'none';
       b.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
+    function toggleOptExtra() {
+      const m = document.getElementById('mssBlock'), e = document.getElementById('eraBlock'), b = document.getElementById('optExtraToggle');
+      const open = !(b && b.getAttribute('aria-expanded') === 'true');
+      if (m) m.style.display = open ? '' : 'none';
+      if (e) e.style.display = open ? '' : 'none';
+      if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
     function updateSavbIndicator() {
       const on = document.getElementById('m_savebills').checked;
       const el = document.getElementById('ret_savb_state');
@@ -4125,11 +4140,11 @@
   </div>
 
 
-  <!-- Best Plan Finder v2 embedded in app.html (LC-322 layout refinement) — no separate add-on file required -->
+  <!-- Best Plan Finder v2 embedded in app.html (LC-323 layout refinement) — no separate add-on file required -->
   <script>
 /* ============================================================
    Best Plan Finder embedded add-on — v2 layout refinement
-   build tag: bpf5 / embedded in app build LC-322
+   build tag: bpf6 / embedded in app build LC-323
 
    Additive browser-side feature for My Pension Project.
    - Does not replace engine.js or optimiser.js.
@@ -4144,7 +4159,7 @@
 (function (global) {
   'use strict';
 
-  const BUILD = 'bpf5';
+  const BUILD = 'bpf6';
   const ANN_NAME = 'Best Plan Finder Annuity';
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const state = { lastResult: null, originalAnnuities: null, applied: false };
@@ -4595,7 +4610,7 @@
   function initUi() {
     if (qs('bpf_panel')) return;
 
-    // LC-322: place Best Plan Finder exactly in the Intelligent modelling section.
+    // LC-323: place Best Plan Finder exactly in the Intelligent modelling section.
     // The screenshot shows this section as the optPair area containing the
     // Maximum sustainable spend and Earliest retirement age cards.  Earlier
     // builds inserted the panel into the left controls rail, which made it
