@@ -545,7 +545,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-321</span>
+      <span class="build-stamp">LC-322</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1684,7 +1684,7 @@
       const box = document.getElementById(id);
       if (!box) return;
       const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
-      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-321 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-322 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
     }
     function safeOptionalChart(drawFn, chartId, headId) {
       try { drawFn(); }
@@ -4125,11 +4125,11 @@
   </div>
 
 
-  <!-- Best Plan Finder v2 embedded in app.html (LC-321) — no separate add-on file required -->
+  <!-- Best Plan Finder v2 embedded in app.html (LC-322 layout refinement) — no separate add-on file required -->
   <script>
 /* ============================================================
-   Best Plan Finder embedded add-on — v2
-   build tag: bpf4 / embedded in app build LC-321
+   Best Plan Finder embedded add-on — v2 layout refinement
+   build tag: bpf5 / embedded in app build LC-322
 
    Additive browser-side feature for My Pension Project.
    - Does not replace engine.js or optimiser.js.
@@ -4144,7 +4144,7 @@
 (function (global) {
   'use strict';
 
-  const BUILD = 'bpf4';
+  const BUILD = 'bpf5';
   const ANN_NAME = 'Best Plan Finder Annuity';
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const state = { lastResult: null, originalAnnuities: null, applied: false };
@@ -4363,12 +4363,20 @@
     if (qs('bpf_css')) return;
     const st = document.createElement('style'); st.id = 'bpf_css';
     st.textContent = `
-      .bpf-panel{margin:14px 0 0;padding:14px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(135deg,rgba(44,122,123,.10),rgba(44,122,123,.03));box-shadow:var(--shadow)}.opt-pair>.bpf-panel{grid-column:1/-1;margin:0 0 14px}
-      .bpf-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px}.bpf-title{font-weight:800;color:var(--ink);font-size:15px}.bpf-sub{font-size:12px;color:var(--ink-soft);margin-top:2px;line-height:1.35}.bpf-build{font-size:11px;color:var(--ink-soft)}
-      .bpf-section{margin:10px 0 8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.35)}.bpf-section-title{font-size:12px;font-weight:800;color:var(--accent-dark);text-transform:uppercase;letter-spacing:.04em;margin:0 0 8px}
-      .bpf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(176px,1fr));gap:10px}.bpf-field{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px}.bpf-field label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:6px}.bpf-field input,.bpf-field select{width:100%;min-height:38px;padding:8px 9px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface-2);color:var(--ink);font-size:14px}.bpf-chiprow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.bpf-chip{border:1px solid var(--accent-border);background:var(--accent-soft);color:var(--accent-dark);border-radius:999px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;min-height:32px}.bpf-switches{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px}.bpf-tog{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:8px 11px}.bpf-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}.bpf-btn{border:none;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer;min-height:42px}.bpf-run{background:var(--accent);color:white}.bpf-apply{background:#27ae60;color:white}.bpf-apply:disabled{opacity:.45;cursor:default}.bpf-discard{background:var(--surface);color:var(--ink);border:1px solid var(--line-strong)}.bpf-msg{font-size:13px;font-weight:700}.bpf-msg.err{color:#c0392b}.bpf-msg.ok{color:#2f8f5b}.bpf-result{margin-top:12px}.bpf-card{border-radius:12px;border:1px solid var(--line);background:var(--surface);padding:12px}.bpf-card.ok{border-color:#a7f3d0;background:#ecfdf5;color:#065f46}.bpf-card.bad{border-color:#fecaca;background:#fef2f2;color:#991b1b}.bpf-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:10px}.bpf-metric{border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:9px;background:rgba(255,255,255,.55)}.bpf-metric b{display:block;font-size:16px}.bpf-metric span{font-size:11px;opacity:.8}.bpf-dialwrap{display:flex;gap:10px;align-items:center}.bpf-dial{width:76px;height:76px;border-radius:50%;border:8px solid var(--accent-soft);background:var(--surface-2);position:relative;box-shadow:inset 0 0 0 1px var(--line);touch-action:none;flex:0 0 auto}.bpf-dial:after{content:'';position:absolute;left:50%;top:12px;width:4px;height:28px;margin-left:-2px;background:var(--accent);border-radius:3px;transform-origin:50% 26px;transform:rotate(var(--bpf-rot,-45deg))}.bpf-dial:before{content:'';position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;background:var(--accent);border-radius:50%}.bpf-ratebox{flex:1 1 auto}.bpf-note{font-size:11.5px;color:var(--ink-soft);line-height:1.35;margin-top:8px}.bpf-summary{font-size:12px;color:var(--ink-soft);line-height:1.45;margin-top:8px}
-      @media (prefers-color-scheme: dark){.bpf-section{background:rgba(255,255,255,.035)}.bpf-card.ok{background:rgba(6,95,70,.22);color:#a7f3d0}.bpf-card.bad{background:rgba(127,29,29,.24);color:#fecaca}.bpf-metric{background:rgba(255,255,255,.04)}}
-      @media (max-width:600px){.bpf-panel{padding:12px}.bpf-grid{grid-template-columns:1fr}.bpf-actions .bpf-btn{flex:1 1 100%}.bpf-dialwrap{align-items:flex-start}}
+      .bpf-panel{margin:14px 0 0;padding:14px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(135deg,rgba(44,122,123,.10),rgba(44,122,123,.03));box-shadow:var(--shadow)}
+      .opt-pair>.bpf-panel{grid-column:1/-1;margin:0 0 14px}
+      .bpf-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px}
+      .bpf-title{font-weight:800;color:var(--ink);font-size:16px}.bpf-sub{font-size:12px;color:var(--ink-soft);margin-top:2px;line-height:1.35;max-width:900px}.bpf-build{font-size:11px;color:var(--ink-soft)}
+      .bpf-workspace{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(330px,.8fr);gap:14px;align-items:start}.bpf-left,.bpf-right{min-width:0}.bpf-right{position:sticky;top:62px}
+      .bpf-scenario{margin:0 0 10px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.28);overflow:hidden}.bpf-scenario summary{list-style:none;cursor:pointer;padding:10px 12px;display:flex;gap:10px;align-items:center;color:var(--ink);font-size:12.5px;line-height:1.35}.bpf-scenario summary::-webkit-details-marker{display:none}.bpf-scenario summary:before{content:'▸';color:var(--accent);font-weight:800}.bpf-scenario[open] summary:before{content:'▾'}.bpf-scenario b{white-space:nowrap}.bpf-scenario span{color:var(--ink-soft)}
+      .bpf-section{margin:0 0 10px;padding:10px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.35)}.bpf-section-title{font-size:12px;font-weight:800;color:var(--accent-dark);text-transform:uppercase;letter-spacing:.04em;margin:0 0 8px}.bpf-section-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.bpf-section-sub{font-size:11.5px;color:var(--ink-soft);font-weight:500;text-transform:none;letter-spacing:0}
+      .bpf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px}.bpf-grid.scenario-grid{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}.bpf-grid.rules-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.bpf-grid.ann-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.bpf-field{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px;min-width:0}.bpf-field.compact{padding:8px}.bpf-field label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bpf-field input,.bpf-field select{width:100%;min-height:36px;padding:7px 9px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface-2);color:var(--ink);font-size:14px}.bpf-chiprow{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.bpf-chip{border:1px solid var(--accent-border);background:var(--accent-soft);color:var(--accent-dark);border-radius:999px;padding:5px 9px;font-size:11.5px;font-weight:800;cursor:pointer;min-height:30px}.bpf-switches{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}.bpf-tog{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 10px}.bpf-tog input{width:18px;height:18px;accent-color:var(--accent)}
+      .bpf-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}.bpf-btn{border:none;border-radius:10px;padding:11px 14px;font-weight:800;cursor:pointer;min-height:44px;-webkit-tap-highlight-color:transparent}.bpf-run{background:var(--accent);color:white}.bpf-apply{background:#27ae60;color:white}.bpf-apply:disabled{opacity:.45;cursor:default}.bpf-discard{background:var(--surface);color:var(--ink);border:1px solid var(--line-strong)}.bpf-msg{font-size:13px;font-weight:800}.bpf-msg.err{color:#c0392b}.bpf-msg.ok{color:#2f8f5b}
+      .bpf-result-panel{border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden}.bpf-result-head{padding:12px 14px;border-bottom:1px solid var(--line);background:linear-gradient(135deg,rgba(44,122,123,.14),rgba(44,122,123,.04));display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.bpf-result-title{font-size:13px;font-weight:800;color:var(--accent-dark);text-transform:uppercase;letter-spacing:.04em}.bpf-result-sub{font-size:12px;color:var(--ink-soft);margin-top:3px;line-height:1.35}.bpf-result{padding:12px 14px;min-height:210px}.bpf-placeholder{color:var(--ink-soft);font-size:13px;line-height:1.45;border:1px dashed var(--line-strong);border-radius:12px;padding:14px;background:var(--surface-2)}.bpf-result-actions{padding:0 14px 14px}.bpf-result-actions .bpf-actions{margin-top:0}.bpf-result-actions .bpf-btn{flex:1 1 auto}.bpf-card{border-radius:12px;border:1px solid var(--line);background:var(--surface);padding:12px}.bpf-card.ok{border-color:#a7f3d0;background:#ecfdf5;color:#065f46}.bpf-card.bad{border-color:#fecaca;background:#fef2f2;color:#991b1b}.bpf-card h3{margin:0 0 4px;font-size:17px;color:inherit}.bpf-card .lead{font-size:14px;line-height:1.4}.bpf-metrics{display:grid;grid-template-columns:1fr;gap:8px;margin-top:10px}.bpf-metric{border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:10px;background:rgba(255,255,255,.55)}.bpf-metric b{display:block;font-size:18px;line-height:1.1}.bpf-metric span{font-size:11.5px;opacity:.82}.bpf-headroom{margin-top:10px;padding:9px 10px;border-radius:10px;background:rgba(251,191,36,.16);border:1px solid rgba(251,191,36,.45);color:#92400e;font-size:12.5px;line-height:1.35}.bpf-applied{margin:10px 14px 14px;padding:10px 12px;border-left:3px solid #27ae60;border-radius:10px;background:rgba(39,174,96,.10);font-size:12.5px;color:var(--ink);line-height:1.45}.bpf-applied:empty{display:none}
+      .bpf-dialwrap{display:flex;gap:9px;align-items:center}.bpf-dial{width:64px;height:64px;border-radius:50%;border:7px solid var(--accent-soft);background:var(--surface-2);position:relative;box-shadow:inset 0 0 0 1px var(--line);touch-action:none;flex:0 0 auto}.bpf-dial:after{content:'';position:absolute;left:50%;top:9px;width:4px;height:24px;margin-left:-2px;background:var(--accent);border-radius:3px;transform-origin:50% 23px;transform:rotate(var(--bpf-rot,-45deg))}.bpf-dial:before{content:'';position:absolute;left:50%;top:50%;width:11px;height:11px;margin:-5.5px 0 0 -5.5px;background:var(--accent);border-radius:50%}.bpf-ratebox{flex:1 1 auto}.bpf-note{font-size:11.5px;color:var(--ink-soft);line-height:1.35;margin-top:8px}.bpf-summary{font-size:12px;color:var(--ink-soft);line-height:1.45;margin-top:8px}
+      @media (prefers-color-scheme: dark){.bpf-section,.bpf-scenario{background:rgba(255,255,255,.035)}.bpf-card.ok{background:rgba(6,95,70,.22);color:#a7f3d0}.bpf-card.bad{background:rgba(127,29,29,.24);color:#fecaca}.bpf-metric{background:rgba(255,255,255,.04)}.bpf-headroom{background:rgba(251,191,36,.10);color:#fde68a}.bpf-applied{background:rgba(39,174,96,.10)}}
+      @media (max-width:1180px){.bpf-workspace{grid-template-columns:1fr}.bpf-right{position:static}.bpf-metrics{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}.bpf-grid.rules-grid,.bpf-grid.ann-grid{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}}
+      @media (max-width:600px){.bpf-panel{padding:12px}.bpf-grid,.bpf-grid.scenario-grid,.bpf-grid.rules-grid,.bpf-grid.ann-grid{grid-template-columns:1fr}.bpf-result-actions .bpf-actions .bpf-btn{flex:1 1 100%}.bpf-dialwrap{align-items:flex-start}.bpf-scenario summary{align-items:flex-start;flex-direction:column}.bpf-scenario summary:before{display:none}}
     `;
     document.head.appendChild(st);
   }
@@ -4380,36 +4388,61 @@
     return `
       <div class="bpf-panel" id="bpf_panel">
         <div class="bpf-head">
-          <div><div class="bpf-title">Best Plan Finder</div><div class="bpf-sub">Find the earliest safe retirement date. Scenario inputs are explicit, so existing annuities, the Best Plan annuity, crashes and withdrawal method are no longer hidden assumptions.</div></div>
+          <div><div class="bpf-title">Best Plan Finder</div><div class="bpf-sub">Find the earliest safe retirement date. On MacBook the result stays visible on the right while you adjust the scenario on the left.</div></div>
           <div class="bpf-build">build ${BUILD}</div>
         </div>
-        <div class="bpf-section">
-          <div class="bpf-section-title">Scenario inputs</div>
-          <div class="bpf-grid">
-            <div class="bpf-field"><label>Withdrawal method</label><select id="bpf_withdrawal"><option value="current">Use current model settings</option><option value="ufpls">Force blended / UFPLS</option><option value="tffirst">Force tax-free first</option><option value="flexi">Force flexi-access dates</option></select></div>
-            <div class="bpf-field"><label>Existing annuities</label><select id="bpf_existing_annuities"><option value="exclude">Exclude existing annuities</option><option value="include">Include existing annuities</option></select></div>
-            <div class="bpf-field"><label>Market crashes</label><select id="bpf_crashes_mode"><option value="include">Include current crash table</option><option value="exclude">Exclude crashes</option></select></div>
-            <div class="bpf-field"><label>Best Plan annuity</label><select id="bpf_best_annuity"><option value="include">Include fixed Best Plan annuity</option><option value="exclude">Exclude Best Plan annuity</option></select></div>
+        <div class="bpf-workspace">
+          <div class="bpf-left">
+            <details class="bpf-scenario" id="bpf_scenario_box">
+              <summary><b>Scenario inputs</b><span id="bpf_scenario_inline">Current model withdrawal settings · existing annuities excluded · Best Plan annuity included · crashes included</span></summary>
+              <div class="bpf-section" style="border:none;margin:0;border-radius:0;background:transparent;">
+                <div class="bpf-grid scenario-grid">
+                  <div class="bpf-field compact"><label>Withdrawal method</label><select id="bpf_withdrawal"><option value="current">Use current model settings</option><option value="ufpls">Force blended / UFPLS</option><option value="tffirst">Force tax-free first</option><option value="flexi">Force flexi-access dates</option></select></div>
+                  <div class="bpf-field compact"><label>Existing annuities</label><select id="bpf_existing_annuities"><option value="exclude">Exclude existing annuities</option><option value="include">Include existing annuities</option></select></div>
+                  <div class="bpf-field compact"><label>Market crashes</label><select id="bpf_crashes_mode"><option value="include">Include current crash table</option><option value="exclude">Exclude crashes</option></select></div>
+                  <div class="bpf-field compact"><label>Best Plan annuity</label><select id="bpf_best_annuity"><option value="include">Include fixed Best Plan annuity</option><option value="exclude">Exclude Best Plan annuity</option></select></div>
+                </div>
+              </div>
+            </details>
+
+            <div class="bpf-section">
+              <div class="bpf-section-title-row"><div class="bpf-section-title">Retirement window and reserve</div><div class="bpf-section-sub">Rules the plan must pass every month</div></div>
+              <div class="bpf-grid rules-grid">
+                <div class="bpf-field"><label>Earliest retirement</label><input type="date" id="bpf_min_date" value="2027-10-01"></div>
+                <div class="bpf-field"><label>Latest date to test</label><input type="date" id="bpf_max_date" value="2037-01-01"></div>
+                <div class="bpf-field"><label>Minimum pot reserve</label><input type="number" id="bpf_reserve" min="0" step="10000" value="100000"><div class="bpf-chiprow"><button type="button" class="bpf-chip" data-set="bpf_reserve:50000">£50k</button><button type="button" class="bpf-chip" data-set="bpf_reserve:100000">£100k</button><button type="button" class="bpf-chip" data-set="bpf_reserve:150000">£150k</button><button type="button" class="bpf-chip" data-set="bpf_reserve:200000">£200k</button></div></div>
+                <div class="bpf-field"><label>Reserve applies to</label><select id="bpf_scope"><option value="combined">Combined household pot</option><option value="graham">${gName} pot only</option>${hasP2 ? `<option value="julie">${jName} pot only</option>` : ''}</select></div>
+              </div>
+              <div class="bpf-switches"><label class="bpf-tog"><input type="checkbox" id="bpf_shortfall" checked> No shortfall allowed</label><label class="bpf-tog"><input type="checkbox" id="bpf_must_buy" checked> Must buy Best Plan annuity</label></div>
+            </div>
+
+            <div class="bpf-section">
+              <div class="bpf-section-title-row"><div class="bpf-section-title">Fixed annuity</div><div class="bpf-section-sub">Bought only if the reserve still survives</div></div>
+              <div class="bpf-grid ann-grid">
+                <div class="bpf-field"><label>Purchase date</label><input type="date" id="bpf_ann_date" value="2037-01-01"></div>
+                <div class="bpf-field"><label>Fixed amount</label><input type="number" id="bpf_ann_amount" min="0" step="10000" value="300000"><div class="bpf-chiprow"><button type="button" class="bpf-chip" data-set="bpf_ann_amount:200000">£200k</button><button type="button" class="bpf-chip" data-set="bpf_ann_amount:250000">£250k</button><button type="button" class="bpf-chip" data-set="bpf_ann_amount:300000">£300k</button><button type="button" class="bpf-chip" data-set="bpf_ann_amount:350000">£350k</button></div></div>
+                <div class="bpf-field"><label>Owner</label><select id="bpf_owner"><option value="graham">${gName}</option>${hasP2 ? `<option value="julie">${jName}</option>` : ''}</select></div>
+                <div class="bpf-field"><label>Annuity rate</label><div class="bpf-dialwrap"><div class="bpf-dial" id="bpf_rate_dial" role="slider" aria-label="Annuity rate dial"></div><div class="bpf-ratebox"><input type="number" id="bpf_rate" min="0" max="12" step="0.1" value="6.0"><div class="bpf-note">Drag or type exact %.</div></div></div></div>
+                <div class="bpf-field"><label>Escalation</label><input type="number" id="bpf_escalation" min="0" max="10" step="0.1" value="0.0"></div>
+              </div>
+            </div>
           </div>
+
+          <aside class="bpf-right">
+            <div class="bpf-result-panel">
+              <div class="bpf-result-head">
+                <div><div class="bpf-result-title">Best plan result</div><div class="bpf-result-sub">Run the finder, then apply the result to the current model if happy.</div></div>
+              </div>
+              <div class="bpf-result" id="bpf_result"><div class="bpf-placeholder">No run yet. Press <strong>Run Best Plan Finder</strong> to test the earliest safe retirement date against your reserve and fixed annuity rules.</div></div>
+              <div class="bpf-result-actions">
+                <div class="bpf-actions"><button type="button" class="bpf-btn bpf-run" id="bpf_run">Run Finder</button><button type="button" class="bpf-btn bpf-apply" id="bpf_apply" disabled>Apply</button><button type="button" class="bpf-btn bpf-discard" id="bpf_clear">Clear</button></div>
+                <div style="margin-top:8px;"><span id="bpf_msg" class="bpf-msg"></span></div>
+                <div class="bpf-summary" id="bpf_input_summary"></div>
+              </div>
+              <div class="bpf-applied" id="bpf_applied_summary"></div>
+            </div>
+          </aside>
         </div>
-        <div class="bpf-section">
-          <div class="bpf-section-title">Rules and annuity</div>
-          <div class="bpf-grid">
-            <div class="bpf-field"><label>Earliest retirement</label><input type="date" id="bpf_min_date" value="2027-10-01"></div>
-            <div class="bpf-field"><label>Latest date to test</label><input type="date" id="bpf_max_date" value="2037-01-01"></div>
-            <div class="bpf-field"><label>Minimum pot reserve</label><input type="number" id="bpf_reserve" min="0" step="10000" value="100000"><div class="bpf-chiprow"><button type="button" class="bpf-chip" data-set="bpf_reserve:50000">£50k</button><button type="button" class="bpf-chip" data-set="bpf_reserve:100000">£100k</button><button type="button" class="bpf-chip" data-set="bpf_reserve:150000">£150k</button><button type="button" class="bpf-chip" data-set="bpf_reserve:200000">£200k</button></div></div>
-            <div class="bpf-field"><label>Reserve applies to</label><select id="bpf_scope"><option value="combined">Combined household pot</option><option value="graham">${gName} pot only</option>${hasP2 ? `<option value="julie">${jName} pot only</option>` : ''}</select></div>
-            <div class="bpf-field"><label>Annuity purchase date</label><input type="date" id="bpf_ann_date" value="2037-01-01"></div>
-            <div class="bpf-field"><label>Fixed annuity amount</label><input type="number" id="bpf_ann_amount" min="0" step="10000" value="300000"><div class="bpf-chiprow"><button type="button" class="bpf-chip" data-set="bpf_ann_amount:200000">£200k</button><button type="button" class="bpf-chip" data-set="bpf_ann_amount:250000">£250k</button><button type="button" class="bpf-chip" data-set="bpf_ann_amount:300000">£300k</button><button type="button" class="bpf-chip" data-set="bpf_ann_amount:350000">£350k</button></div></div>
-            <div class="bpf-field"><label>Annuity owner</label><select id="bpf_owner"><option value="graham">${gName}</option>${hasP2 ? `<option value="julie">${jName}</option>` : ''}</select></div>
-            <div class="bpf-field"><label>Annuity rate</label><div class="bpf-dialwrap"><div class="bpf-dial" id="bpf_rate_dial" role="slider" aria-label="Annuity rate dial"></div><div class="bpf-ratebox"><input type="number" id="bpf_rate" min="0" max="12" step="0.1" value="6.0"><div class="bpf-note">Drag the dial for rough setting, or type exact %.</div></div></div></div>
-            <div class="bpf-field"><label>Annuity escalation</label><input type="number" id="bpf_escalation" min="0" max="10" step="0.1" value="0.0"></div>
-          </div>
-          <div class="bpf-switches"><label class="bpf-tog"><input type="checkbox" id="bpf_shortfall" checked> No shortfall allowed</label><label class="bpf-tog"><input type="checkbox" id="bpf_must_buy" checked> Must buy Best Plan annuity</label></div>
-        </div>
-        <div class="bpf-actions"><button type="button" class="bpf-btn bpf-run" id="bpf_run">Run Best Plan Finder</button><button type="button" class="bpf-btn bpf-apply" id="bpf_apply" disabled>Apply to current model</button><button type="button" class="bpf-btn bpf-discard" id="bpf_clear">Clear</button><span id="bpf_msg" class="bpf-msg"></span></div>
-        <div class="bpf-summary" id="bpf_input_summary"></div>
-        <div class="bpf-result" id="bpf_result"></div>
       </div>`;
   }
 
@@ -4437,11 +4470,15 @@
     };
   }
   function updateInputSummary() {
+    let summary = '';
+    try { summary = scenarioSummary(readBpfInputs()); }
+    catch (e) { summary = ''; }
+    const inline = qs('bpf_scenario_inline');
+    if (inline) inline.textContent = summary || 'Scenario inputs not ready';
     const el = qs('bpf_input_summary');
-    if (!el) return;
-    try { el.textContent = 'Scenario: ' + scenarioSummary(readBpfInputs()) + '.'; }
-    catch (e) { el.textContent = ''; }
+    if (el) el.textContent = summary ? ('Scenario tested: ' + summary + '.') : '';
   }
+
   function runBestPlan() {
     const out = qs('bpf_result');
     try {
@@ -4464,19 +4501,21 @@
   function renderResult(res) {
     const out = qs('bpf_result');
     if (!res || !res.feasible) {
-      out.innerHTML = '<div class="bpf-card bad"><strong>No feasible date found.</strong><div style="margin-top:6px;">' + esc(res && res.reason ? res.reason : 'No date in the selected range passed all rules.') + '</div>' + (res && res.opts ? '<div class="bpf-note">Scenario tested: ' + esc(scenarioSummary(res.opts)) + '.</div>' : '') + '</div>';
+      out.innerHTML = '<div class="bpf-card bad"><h3>No feasible date found</h3><div class="lead">' + esc(res && res.reason ? res.reason : 'No date in the selected range passed all rules.') + '</div>' + (res && res.opts ? '<div class="bpf-note">Scenario tested: ' + esc(scenarioSummary(res.opts)) + '.</div>' : '') + '</div>';
       return;
     }
     const d = res.detail || {};
     const annIncome = res.opts.includeBestPlanAnnuity ? ((res.opts.annuityAmount || 0) * ((res.opts.annuityRate || 0) / 100)) : 0;
-    out.innerHTML = '<div class="bpf-card ok"><strong>Plan passes.</strong> Earliest safe retirement is <strong>' + esc(dateLabel(res.earliestDate)) + '</strong>.' +
+    const headroom = (Number(d.minPot) || 0) - (Number(res.opts.reserveAmount) || 0);
+    const headroomHtml = Number.isFinite(headroom) ? '<div class="bpf-headroom"><strong>Reserve headroom:</strong> lowest pot is ' + gbp(Math.max(0, headroom)) + ' above the ' + gbp(res.opts.reserveAmount) + ' reserve.</div>' : '';
+    out.innerHTML = '<div class="bpf-card ok"><h3>Plan passes</h3><div class="lead">Earliest safe retirement is <strong>' + esc(dateLabel(res.earliestDate)) + '</strong>.</div>' +
       '<div class="bpf-metrics">' +
-      '<div class="bpf-metric"><b>' + esc(dateLabel(res.earliestDate)) + '</b><span>Earliest date</span></div>' +
-      '<div class="bpf-metric"><b>' + gbp(d.minPot) + '</b><span>Lowest pot (' + esc(dateLabel(d.minPotDate)) + ')</span></div>' +
+      '<div class="bpf-metric"><b>' + esc(dateLabel(res.earliestDate)) + '</b><span>Earliest safe retirement</span></div>' +
+      '<div class="bpf-metric"><b>' + gbp(d.minPot) + '</b><span>Lowest pot · ' + esc(dateLabel(d.minPotDate)) + '</span></div>' +
       '<div class="bpf-metric"><b>' + (res.opts.includeBestPlanAnnuity ? gbp(res.opts.annuityAmount) : 'Excluded') + '</b><span>Best Plan annuity</span></div>' +
-      '<div class="bpf-metric"><b>' + (res.opts.includeBestPlanAnnuity ? (gbp(annIncome) + '/yr') : '—') + '</b><span>Estimated gross annuity income</span></div>' +
+      '<div class="bpf-metric"><b>' + (res.opts.includeBestPlanAnnuity ? (gbp(annIncome) + '/yr') : '—') + '</b><span>Estimated gross income</span></div>' +
       '<div class="bpf-metric"><b>' + gbp(d.endPot) + '</b><span>End pot</span></div>' +
-      '</div><div class="bpf-note">Scenario tested: ' + esc(scenarioSummary(res.opts)) + '. Apply updates the current in-browser model only; use the existing Save Model feature afterwards if happy.</div></div>';
+      '</div>' + headroomHtml + '<div class="bpf-note">Apply updates the current in-browser model only. Review charts, then use Save Model if happy.</div></div>';
   }
 
   function captureOriginalAnnuities() {
@@ -4517,10 +4556,15 @@
       if (typeof recomputeAll === 'function') recomputeAll();
       else if (typeof onParam === 'function') onParam();
       state.applied = true;
-      setMsg('Applied to current model ✓. Review charts, then use Save Model if happy.', 'ok');
+      const applied = qs('bpf_applied_summary');
+      if (applied) {
+        const annTxt = res.opts.includeBestPlanAnnuity ? (gbp(res.opts.annuityAmount) + ' on ' + esc(toInputDate(res.opts.annuityDate)) + ' at ' + (Number(res.opts.annuityRate)||0).toFixed(1) + '%') : 'No Best Plan annuity applied';
+        applied.innerHTML = '<strong>Applied changes:</strong><br>Retirement date set to ' + esc(dateLabel(res.earliestDate)) + '.<br>Best Plan annuity: ' + annTxt + '.<br>Scenario: ' + esc(scenarioSummary(res.opts)) + '.';
+      }
+      setMsg('Applied ✓. Review charts, then use Save Model if happy.', 'ok');
     } catch (e) { setMsg('Apply failed: ' + (e.message || e), 'err'); }
   }
-  function clearResult() { state.lastResult = null; qs('bpf_result').innerHTML = ''; qs('bpf_apply').disabled = true; setMsg('', ''); updateInputSummary(); }
+  function clearResult() { state.lastResult = null; qs('bpf_result').innerHTML = '<div class="bpf-placeholder">No run yet. Press <strong>Run Best Plan Finder</strong> to test the earliest safe retirement date against your reserve and fixed annuity rules.</div>'; qs('bpf_apply').disabled = true; const ap = qs('bpf_applied_summary'); if (ap) ap.innerHTML = ''; setMsg('', ''); updateInputSummary(); }
 
   function initDial() {
     const dial = qs('bpf_rate_dial'), input = qs('bpf_rate'); if (!dial || !input) return;
@@ -4551,7 +4595,7 @@
   function initUi() {
     if (qs('bpf_panel')) return;
 
-    // LC-321: place Best Plan Finder exactly in the Intelligent modelling section.
+    // LC-322: place Best Plan Finder exactly in the Intelligent modelling section.
     // The screenshot shows this section as the optPair area containing the
     // Maximum sustainable spend and Earliest retirement age cards.  Earlier
     // builds inserted the panel into the left controls rail, which made it
