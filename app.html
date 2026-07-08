@@ -9,6 +9,7 @@
   <script src="common.js?v=auth02"></script>
   <script src="engine.js?v=ann1"></script>
   <script src="optimiser.js?v=era02"></script>
+  <script src="best_plan_finder_addon.js?v=bpf2"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -545,7 +546,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-317</span>
+      <span class="build-stamp">LC-318</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1684,7 +1685,7 @@
       const box = document.getElementById(id);
       if (!box) return;
       const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
-      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-317 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-318 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
     }
     function safeOptionalChart(drawFn, chartId, headId) {
       try { drawFn(); }
@@ -2887,7 +2888,7 @@
         retirementDate: idxToDate(document.getElementById('m_retire').value),
         // If the live slider matches the saved baseline, keep per-member dates; if the user has
         // dragged it, treat it as a single shared date for live exploration (override per-member).
-        retireByMember: (savedPlan && savedPlan.retirementDate && idxToDate(document.getElementById('m_retire').value) && idxToDate(document.getElementById('m_retire').value).getTime() === savedPlan.retirementDate.getTime()) ? savedPlan.retireByMember : null,
+        retireByMember: window.__bpfForceSharedRetirement ? null : ((savedPlan && savedPlan.retirementDate && idxToDate(document.getElementById('m_retire').value) && idxToDate(document.getElementById('m_retire').value).getTime() === savedPlan.retirementDate.getTime()) ? savedPlan.retireByMember : null),
         growthRate: parseFloat(document.getElementById('m_growth').value) / 100,
         p2phase: savedPlan ? savedPlan.p2phase : null,
         spendRed: parseFloat(document.getElementById('m_spend').value) / 100,
@@ -3077,7 +3078,7 @@
       });
     });
 
-    function resetPlan() { if (savedPlan) { applyControls(savedPlan); document.getElementById('m_msg').textContent = ''; recomputeAll(); } }
+    function resetPlan() { if (savedPlan) { if (window.BestPlanFinder && BestPlanFinder.clearApplied) BestPlanFinder.clearApplied(); window.__bpfForceSharedRetirement = false; applyControls(savedPlan); document.getElementById('m_msg').textContent = ''; recomputeAll(); } }
 
     async function savePlan() {
       const msg = document.getElementById('m_msg');
@@ -3833,7 +3834,12 @@
       }
       const state = { version: 1, modelling: modelling };
       for (const t of MODEL_COLLECTIONS) {
-        const rows = await App.rest(t.base + '?order=' + t.order);
+        let rows;
+        if (t.key === 'annuities' && window.__bpfAppliedAnnuity && data && Array.isArray(data.annuities)) {
+          rows = data.annuities;
+        } else {
+          rows = await App.rest(t.base + '?order=' + t.order);
+        }
         state[t.key] = (rows || []).map(function(r){ return _mdlStrip(r, MDL_ROW_DROP); });
       }
       return state;
