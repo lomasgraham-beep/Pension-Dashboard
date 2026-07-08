@@ -1,63 +1,32 @@
-# LC-319 — Best Plan Finder v2
+# LC-320 — Best Plan Finder v2 visibility fix
 
-## Upload these files to the repo root
+## Upload this file to the repo root
 
 1. `app.html`
-2. `best_plan_finder_addon.js`
 
-## What changed from LC-318
+## What changed from LC-319
 
-Best Plan Finder now has explicit scenario inputs instead of inheriting everything silently from the current model.
+- Best Plan Finder v2 is now embedded directly inside `app.html`.
+- `app.html` no longer depends on `best_plan_finder_addon.js` loading separately.
+- This fixes the issue where Best Plan Finder disappeared if the add-on file was missing, stale, cached, or uploaded from the wrong link.
+- Visible build stamp is now `LC-320`.
 
-New/changed controls:
-
-- Withdrawal method:
-  - Use current model settings
-  - Force blended / UFPLS
-  - Force tax-free first
-  - Force flexi-access dates
-- Existing annuities:
-  - Exclude existing annuities
-  - Include existing annuities
-- Market crashes:
-  - Include current crash table
-  - Exclude crashes
-- Best Plan annuity:
-  - Include fixed Best Plan annuity
-  - Exclude Best Plan annuity
-
-Default behaviour:
-
-- Existing annuities are excluded from the Best Plan test by default.
-- The fixed Best Plan annuity is included by default.
-- Market crashes are included by default.
-- Withdrawal method defaults to the current model settings.
-
-## Apply behaviour
-
-`Apply to current model` now updates the in-browser current model only.
-
-It does not write directly to Supabase.
-
-It updates:
-
-- The current retirement date slider.
-- The in-memory annuity rows used by the model, based on the Best Plan scenario controls.
-- The normal modelling charts.
-
-The existing Save Model feature can then capture the applied scenario.
-
-## Not changed
+## What remains unchanged
 
 - `engine.js` unchanged.
 - `optimiser.js` unchanged.
 - `common.js` unchanged.
 - SQL unchanged.
-- Frame cache-buster unchanged.
+- Existing saved-model workflow unchanged.
 
-## Validation performed
+## Best Plan Finder behaviour
 
-- JavaScript syntax check on `best_plan_finder_addon.js`.
-- JavaScript syntax check on the inline script in `app.html`.
+Best Plan Finder still provides explicit scenario controls for:
 
-Live Supabase/browser behaviour still needs to be verified after upload.
+- Withdrawal method.
+- Existing annuities include/exclude.
+- Best Plan annuity include/exclude.
+- Market crashes include/exclude.
+- Fixed annuity amount, date, rate and escalation.
+
+`Apply to current model` updates the current in-browser model only. Use the existing Save Model feature afterwards if happy.
