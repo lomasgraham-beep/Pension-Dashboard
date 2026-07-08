@@ -9,7 +9,7 @@
   <script src="common.js?v=auth02"></script>
   <script src="engine.js?v=ann1"></script>
   <script src="optimiser.js?v=era02"></script>
-  <script src="best_plan_finder_addon.js?v=bpf2"></script>
+  <script src="best_plan_finder_addon.js?v=bpf3"></script>
   <style>
     :root {
       --accent:#2c7a7b;            /* slate-teal */
@@ -546,7 +546,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-318</span>
+      <span class="build-stamp">LC-319</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1685,7 +1685,7 @@
       const box = document.getElementById(id);
       if (!box) return;
       const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
-      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-318 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-319 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
     }
     function safeOptionalChart(drawFn, chartId, headId) {
       try { drawFn(); }
