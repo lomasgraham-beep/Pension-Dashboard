@@ -1,8 +1,12 @@
-# LC-323 Direct Upload
+# LC-324 Direct Upload
 
-Upload `app.html` to the repo root.
+Upload `app.html` to the repository root.
 
 Changes:
-- Best Plan Finder remains visible under Intelligent modelling.
-- Maximum sustainable spend and Earliest retirement age are collapsed by default under "Other intelligent modelling tools".
-- No engine.js, optimiser.js, common.js, or SQL changes.
+- Best Plan Finder result pane is more compact.
+- Result metrics use a two-column grid on MacBook/iPad widths.
+- Reserve headroom is now a compact result metric rather than a full-width strip.
+- iPhone remains single-column.
+
+No separate add-on file is required.
+No changes to engine.js, optimiser.js, common.js, or SQL.

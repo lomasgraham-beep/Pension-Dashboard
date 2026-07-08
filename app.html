@@ -552,7 +552,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-323</span>
+      <span class="build-stamp">LC-324</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1692,7 +1692,7 @@
       const box = document.getElementById(id);
       if (!box) return;
       const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
-      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-323 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-324 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
     }
     function safeOptionalChart(drawFn, chartId, headId) {
       try { drawFn(); }
@@ -4140,11 +4140,11 @@
   </div>
 
 
-  <!-- Best Plan Finder v2 embedded in app.html (LC-323 layout refinement) — no separate add-on file required -->
+  <!-- Best Plan Finder v2 embedded in app.html (LC-324 compact result layout) — no separate add-on file required -->
   <script>
 /* ============================================================
    Best Plan Finder embedded add-on — v2 layout refinement
-   build tag: bpf6 / embedded in app build LC-323
+   build tag: bpf7 / embedded in app build LC-324
 
    Additive browser-side feature for My Pension Project.
    - Does not replace engine.js or optimiser.js.
@@ -4159,7 +4159,7 @@
 (function (global) {
   'use strict';
 
-  const BUILD = 'bpf6';
+  const BUILD = 'bpf7';
   const ANN_NAME = 'Best Plan Finder Annuity';
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const state = { lastResult: null, originalAnnuities: null, applied: false };
@@ -4387,11 +4387,11 @@
       .bpf-section{margin:0 0 10px;padding:10px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.35)}.bpf-section-title{font-size:12px;font-weight:800;color:var(--accent-dark);text-transform:uppercase;letter-spacing:.04em;margin:0 0 8px}.bpf-section-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.bpf-section-sub{font-size:11.5px;color:var(--ink-soft);font-weight:500;text-transform:none;letter-spacing:0}
       .bpf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px}.bpf-grid.scenario-grid{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}.bpf-grid.rules-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.bpf-grid.ann-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.bpf-field{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px;min-width:0}.bpf-field.compact{padding:8px}.bpf-field label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bpf-field input,.bpf-field select{width:100%;min-height:36px;padding:7px 9px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface-2);color:var(--ink);font-size:14px}.bpf-chiprow{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.bpf-chip{border:1px solid var(--accent-border);background:var(--accent-soft);color:var(--accent-dark);border-radius:999px;padding:5px 9px;font-size:11.5px;font-weight:800;cursor:pointer;min-height:30px}.bpf-switches{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}.bpf-tog{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 10px}.bpf-tog input{width:18px;height:18px;accent-color:var(--accent)}
       .bpf-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}.bpf-btn{border:none;border-radius:10px;padding:11px 14px;font-weight:800;cursor:pointer;min-height:44px;-webkit-tap-highlight-color:transparent}.bpf-run{background:var(--accent);color:white}.bpf-apply{background:#27ae60;color:white}.bpf-apply:disabled{opacity:.45;cursor:default}.bpf-discard{background:var(--surface);color:var(--ink);border:1px solid var(--line-strong)}.bpf-msg{font-size:13px;font-weight:800}.bpf-msg.err{color:#c0392b}.bpf-msg.ok{color:#2f8f5b}
-      .bpf-result-panel{border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden}.bpf-result-head{padding:12px 14px;border-bottom:1px solid var(--line);background:linear-gradient(135deg,rgba(44,122,123,.14),rgba(44,122,123,.04));display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.bpf-result-title{font-size:13px;font-weight:800;color:var(--accent-dark);text-transform:uppercase;letter-spacing:.04em}.bpf-result-sub{font-size:12px;color:var(--ink-soft);margin-top:3px;line-height:1.35}.bpf-result{padding:12px 14px;min-height:210px}.bpf-placeholder{color:var(--ink-soft);font-size:13px;line-height:1.45;border:1px dashed var(--line-strong);border-radius:12px;padding:14px;background:var(--surface-2)}.bpf-result-actions{padding:0 14px 14px}.bpf-result-actions .bpf-actions{margin-top:0}.bpf-result-actions .bpf-btn{flex:1 1 auto}.bpf-card{border-radius:12px;border:1px solid var(--line);background:var(--surface);padding:12px}.bpf-card.ok{border-color:#a7f3d0;background:#ecfdf5;color:#065f46}.bpf-card.bad{border-color:#fecaca;background:#fef2f2;color:#991b1b}.bpf-card h3{margin:0 0 4px;font-size:17px;color:inherit}.bpf-card .lead{font-size:14px;line-height:1.4}.bpf-metrics{display:grid;grid-template-columns:1fr;gap:8px;margin-top:10px}.bpf-metric{border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:10px;background:rgba(255,255,255,.55)}.bpf-metric b{display:block;font-size:18px;line-height:1.1}.bpf-metric span{font-size:11.5px;opacity:.82}.bpf-headroom{margin-top:10px;padding:9px 10px;border-radius:10px;background:rgba(251,191,36,.16);border:1px solid rgba(251,191,36,.45);color:#92400e;font-size:12.5px;line-height:1.35}.bpf-applied{margin:10px 14px 14px;padding:10px 12px;border-left:3px solid #27ae60;border-radius:10px;background:rgba(39,174,96,.10);font-size:12.5px;color:var(--ink);line-height:1.45}.bpf-applied:empty{display:none}
+      .bpf-result-panel{border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden}.bpf-result-head{padding:12px 14px;border-bottom:1px solid var(--line);background:linear-gradient(135deg,rgba(44,122,123,.14),rgba(44,122,123,.04));display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.bpf-result-title{font-size:13px;font-weight:800;color:var(--accent-dark);text-transform:uppercase;letter-spacing:.04em}.bpf-result-sub{font-size:12px;color:var(--ink-soft);margin-top:3px;line-height:1.35}.bpf-result{padding:10px 12px;min-height:145px}.bpf-placeholder{color:var(--ink-soft);font-size:13px;line-height:1.45;border:1px dashed var(--line-strong);border-radius:12px;padding:14px;background:var(--surface-2)}.bpf-result-actions{padding:0 12px 12px}.bpf-result-actions .bpf-actions{margin-top:0}.bpf-result-actions .bpf-btn{flex:1 1 auto}.bpf-card{border-radius:12px;border:1px solid var(--line);background:var(--surface);padding:10px}.bpf-card.ok{border-color:#a7f3d0;background:#ecfdf5;color:#065f46}.bpf-card.bad{border-color:#fecaca;background:#fef2f2;color:#991b1b}.bpf-card h3{margin:0 0 3px;font-size:16px;color:inherit}.bpf-card .lead{font-size:13px;line-height:1.35}.bpf-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:9px}.bpf-metric{border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:8px;background:rgba(255,255,255,.55);min-width:0}.bpf-metric b{display:block;font-size:16px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bpf-metric span{display:block;font-size:11px;opacity:.82;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bpf-metric.warn{background:rgba(251,191,36,.16);border-color:rgba(251,191,36,.45);color:#92400e}.bpf-headroom{margin-top:8px;padding:7px 9px;border-radius:10px;background:rgba(251,191,36,.16);border:1px solid rgba(251,191,36,.45);color:#92400e;font-size:12px;line-height:1.3}.bpf-applied{margin:8px 12px 12px;padding:9px 11px;border-left:3px solid #27ae60;border-radius:10px;background:rgba(39,174,96,.10);font-size:12px;color:var(--ink);line-height:1.4}.bpf-applied:empty{display:none}
       .bpf-dialwrap{display:flex;gap:9px;align-items:center}.bpf-dial{width:64px;height:64px;border-radius:50%;border:7px solid var(--accent-soft);background:var(--surface-2);position:relative;box-shadow:inset 0 0 0 1px var(--line);touch-action:none;flex:0 0 auto}.bpf-dial:after{content:'';position:absolute;left:50%;top:9px;width:4px;height:24px;margin-left:-2px;background:var(--accent);border-radius:3px;transform-origin:50% 23px;transform:rotate(var(--bpf-rot,-45deg))}.bpf-dial:before{content:'';position:absolute;left:50%;top:50%;width:11px;height:11px;margin:-5.5px 0 0 -5.5px;background:var(--accent);border-radius:50%}.bpf-ratebox{flex:1 1 auto}.bpf-note{font-size:11.5px;color:var(--ink-soft);line-height:1.35;margin-top:8px}.bpf-summary{font-size:12px;color:var(--ink-soft);line-height:1.45;margin-top:8px}
       @media (prefers-color-scheme: dark){.bpf-section,.bpf-scenario{background:rgba(255,255,255,.035)}.bpf-card.ok{background:rgba(6,95,70,.22);color:#a7f3d0}.bpf-card.bad{background:rgba(127,29,29,.24);color:#fecaca}.bpf-metric{background:rgba(255,255,255,.04)}.bpf-headroom{background:rgba(251,191,36,.10);color:#fde68a}.bpf-applied{background:rgba(39,174,96,.10)}}
-      @media (max-width:1180px){.bpf-workspace{grid-template-columns:1fr}.bpf-right{position:static}.bpf-metrics{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}.bpf-grid.rules-grid,.bpf-grid.ann-grid{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}}
-      @media (max-width:600px){.bpf-panel{padding:12px}.bpf-grid,.bpf-grid.scenario-grid,.bpf-grid.rules-grid,.bpf-grid.ann-grid{grid-template-columns:1fr}.bpf-result-actions .bpf-actions .bpf-btn{flex:1 1 100%}.bpf-dialwrap{align-items:flex-start}.bpf-scenario summary{align-items:flex-start;flex-direction:column}.bpf-scenario summary:before{display:none}}
+      @media (max-width:1180px){.bpf-workspace{grid-template-columns:1fr}.bpf-right{position:static}.bpf-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.bpf-grid.rules-grid,.bpf-grid.ann-grid{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}}
+      @media (max-width:600px){.bpf-panel{padding:12px}.bpf-grid,.bpf-grid.scenario-grid,.bpf-grid.rules-grid,.bpf-grid.ann-grid,.bpf-metrics{grid-template-columns:1fr}.bpf-result-actions .bpf-actions .bpf-btn{flex:1 1 100%}.bpf-dialwrap{align-items:flex-start}.bpf-scenario summary{align-items:flex-start;flex-direction:column}.bpf-scenario summary:before{display:none}}
     `;
     document.head.appendChild(st);
   }
@@ -4522,7 +4522,7 @@
     const d = res.detail || {};
     const annIncome = res.opts.includeBestPlanAnnuity ? ((res.opts.annuityAmount || 0) * ((res.opts.annuityRate || 0) / 100)) : 0;
     const headroom = (Number(d.minPot) || 0) - (Number(res.opts.reserveAmount) || 0);
-    const headroomHtml = Number.isFinite(headroom) ? '<div class="bpf-headroom"><strong>Reserve headroom:</strong> lowest pot is ' + gbp(Math.max(0, headroom)) + ' above the ' + gbp(res.opts.reserveAmount) + ' reserve.</div>' : '';
+    const headroomMetric = Number.isFinite(headroom) ? '<div class="bpf-metric warn"><b>' + gbp(Math.max(0, headroom)) + '</b><span>Reserve headroom</span></div>' : '';
     out.innerHTML = '<div class="bpf-card ok"><h3>Plan passes</h3><div class="lead">Earliest safe retirement is <strong>' + esc(dateLabel(res.earliestDate)) + '</strong>.</div>' +
       '<div class="bpf-metrics">' +
       '<div class="bpf-metric"><b>' + esc(dateLabel(res.earliestDate)) + '</b><span>Earliest safe retirement</span></div>' +
@@ -4530,7 +4530,8 @@
       '<div class="bpf-metric"><b>' + (res.opts.includeBestPlanAnnuity ? gbp(res.opts.annuityAmount) : 'Excluded') + '</b><span>Best Plan annuity</span></div>' +
       '<div class="bpf-metric"><b>' + (res.opts.includeBestPlanAnnuity ? (gbp(annIncome) + '/yr') : '—') + '</b><span>Estimated gross income</span></div>' +
       '<div class="bpf-metric"><b>' + gbp(d.endPot) + '</b><span>End pot</span></div>' +
-      '</div>' + headroomHtml + '<div class="bpf-note">Apply updates the current in-browser model only. Review charts, then use Save Model if happy.</div></div>';
+      headroomMetric +
+      '</div><div class="bpf-note">Apply updates the current in-browser model only. Review charts, then use Save Model if happy.</div></div>';
   }
 
   function captureOriginalAnnuities() {
@@ -4610,7 +4611,7 @@
   function initUi() {
     if (qs('bpf_panel')) return;
 
-    // LC-323: place Best Plan Finder exactly in the Intelligent modelling section.
+    // LC-324: place Best Plan Finder exactly in the Intelligent modelling section and compact the result pane.
     // The screenshot shows this section as the optPair area containing the
     // Maximum sustainable spend and Earliest retirement age cards.  Earlier
     // builds inserted the panel into the left controls rail, which made it
