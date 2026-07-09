@@ -553,7 +553,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-326</span>
+      <span class="build-stamp">LC-327</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -776,7 +776,7 @@
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
     </div>
-    <!-- Intelligent Modelling moved to a standalone top-level tab in LC-326. -->
+    <!-- Intelligent Modelling moved to a standalone top-level tab in LC-327. -->
     <div class="modelbar modelbar-after-intel">
       <button class="mdl-btn mdl-btn-primary" onclick="openSaveOverlay()">Save model</button>
       <button class="mdl-btn" onclick="openLoadOverlay()">Load model</button>
@@ -1651,7 +1651,7 @@
       const box = document.getElementById(id);
       if (!box) return;
       const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
-      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-326 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-327 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
     }
     function safeOptionalChart(drawFn, chartId, headId) {
       try { drawFn(); }
@@ -3499,7 +3499,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front29';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front30';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -4102,7 +4102,7 @@
   </div>
 
 
-  <!-- Best Plan Finder moved to intelligent_modelling.html in LC-326. -->
+  <!-- Best Plan Finder moved to intelligent_modelling.html in LC-327. -->
 
 
 </body>
