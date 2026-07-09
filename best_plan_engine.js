@@ -1,6 +1,6 @@
 /* ============================================================
    best_plan_engine.js — Intelligent Modelling sandbox controller
-   build: bpe3 / target app build LC-328
+   build: bpe4 / target app build LC-329
 
    Uses the existing PensionEngine as the single source of pension maths.
    It never mutates the main Modelling page state and never writes to Supabase.
@@ -8,7 +8,7 @@
 (function (global) {
   'use strict';
 
-  const BUILD = 'bpe3';
+  const BUILD = 'bpe4';
   const ANN_NAME = 'Best Plan Finder Annuity';
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -216,7 +216,9 @@
 
   function decorateRows(rows, cfg) {
     // Adds sandbox-only metadata so the Intelligent Modelling page can show the
-    // tax-free-first event clearly without changing the shared PensionEngine maths.
+    // tax-free-first / FAD PCLS event clearly without changing the shared PensionEngine maths.
+    // Monthly engine rows expose the opening tax-free/taxable pots and closing pots; this helper
+    // turns that into an explicit before/after audit trail for the chart and table.
     if (!rows) return rows;
     const monthly = rows.monthly || [];
     const wm = cfg && cfg.withdrawalMethod ? cfg.withdrawalMethod : {};
@@ -224,16 +226,64 @@
     const gIdx = (wm.graham === 'fad' && cd.graham) ? monthIdx(cd.graham) : null;
     const jIdx = (wm.julie === 'fad' && cd.julie) ? monthIdx(cd.julie) : null;
     let gPcls = 0, jPcls = 0, firstIdx = null;
+    const events = [];
+    const byYear = {};
+
     monthly.forEach(r => {
       const idx = r.year * 12 + r.month;
-      if (gIdx != null && idx === gIdx) { gPcls += Number(r.g_taxFree) || 0; firstIdx = firstIdx == null ? idx : Math.min(firstIdx, idx); }
-      if (jIdx != null && idx === jIdx) { jPcls += Number(r.j_taxFree) || 0; firstIdx = firstIdx == null ? idx : Math.min(firstIdx, idx); }
+      const gEvent = gIdx != null && idx === gIdx;
+      const jEvent = jIdx != null && idx === jIdx;
+      if (!gEvent && !jEvent) return;
+
+      const gBefore = (Number(r.g_taxFree) || 0) + (Number(r.g_taxable) || 0);
+      const jBefore = (Number(r.j_taxFree) || 0) + (Number(r.j_taxable) || 0);
+      const combinedBefore = gBefore + jBefore;
+      const thisGPcls = gEvent ? (Number(r.g_taxFree) || 0) : 0;
+      const thisJPcls = jEvent ? (Number(r.j_taxFree) || 0) : 0;
+      const pcls = thisGPcls + thisJPcls;
+      const combinedAfterPcls = Math.max(0, combinedBefore - pcls);
+      const monthEndPension = Number(r.combinedClosing != null ? r.combinedClosing : ((Number(r.g_closing) || 0) + (Number(r.j_closing) || 0))) || 0;
+      const surplusEnd = Number(r.surplusBalance) || 0;
+
+      gPcls += thisGPcls;
+      jPcls += thisJPcls;
+      firstIdx = firstIdx == null ? idx : Math.min(firstIdx, idx);
+      byYear[r.year] = (byYear[r.year] || 0) + pcls;
+
+      r.pclsEvent = true;
+      r.gPclsTaken = thisGPcls;
+      r.jPclsTaken = thisJPcls;
+      r.pclsTaken = pcls;
+      r.combinedPensionBeforePcls = combinedBefore;
+      r.combinedPensionAfterPcls = combinedAfterPcls;
+      r.monthEndPensionAfterPcls = monthEndPension;
+      r.surplusIncreaseFromPcls = pcls;
+
+      events.push({
+        idx: idx,
+        date: idxToDate(idx),
+        year: r.year,
+        label: r.label || dateLabel(idxToDate(idx)),
+        gBefore: gBefore,
+        jBefore: jBefore,
+        combinedBefore: combinedBefore,
+        gPclsTaken: thisGPcls,
+        jPclsTaken: thisJPcls,
+        pclsTaken: pcls,
+        combinedAfterPcls: combinedAfterPcls,
+        monthEndPensionAfterPcls: monthEndPension,
+        surplusIncreaseFromPcls: pcls,
+        surplusEnd: surplusEnd
+      });
     });
+
     rows.sandboxMeta = Object.assign({}, rows.sandboxMeta || {}, {
       pclsTaken: gPcls + jPcls,
       gPclsTaken: gPcls,
       jPclsTaken: jPcls,
-      pclsDate: firstIdx == null ? null : idxToDate(firstIdx)
+      pclsDate: firstIdx == null ? null : idxToDate(firstIdx),
+      pclsEvents: events,
+      pclsByYear: byYear
     });
     return rows;
   }
