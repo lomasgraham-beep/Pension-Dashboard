@@ -1,26 +1,21 @@
-# LC-331 direct upload pack
+# LC-332 direct upload pack
 
-Upload these files to the repo root:
+Upload these files to the GitHub repo root:
 
-- app.html
-- intelligent_modelling.html
-- best_plan_engine.js
+- `app.html`
+- `intelligent_modelling.html`
+- `best_plan_engine.js`
 
 ## Changes
 
-- Reworked Intelligent Modelling into a MacBook-friendly two-column workspace.
-- Left panel contains grouped scenario controls.
-- Right panel contains result summary, charts and yearly table.
-- Replaced the large loaded banner with a compact read-only status pill.
-- Collapsed the sandbox explanation behind a small Sandbox mode disclosure.
-- Added empty-state result panels.
-- Added compact scenario summary strips above successful results.
-- Kept iPad/iPhone stacked and touch-friendly.
+- Adds a remembered Joint / Graham / Julie filter to the Intelligent Modelling chart area.
+- Applies the selected view to the pot chart, income/outgoings chart, and yearly table.
+- Keeps the Intelligent Modelling tools read-only and divorced from the main Modelling page.
+- Updates the app build stamp to LC-332 and bumps the framed-page cache buster to `front35`.
 
 ## Unchanged
 
 - No SQL.
 - No Supabase writes.
 - No Save or Apply.
-- Main Modelling remains divorced from Intelligent Modelling.
-- engine.js, optimiser.js and common.js are not changed.
+- `engine.js`, `optimiser.js`, and `common.js` unchanged.
