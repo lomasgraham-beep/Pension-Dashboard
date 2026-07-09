@@ -1,4 +1,4 @@
-# LC-329 Direct Upload Pack
+# LC-330 direct upload pack
 
 Upload these files to the repository root:
 
@@ -8,16 +8,17 @@ Upload these files to the repository root:
 
 ## Changes
 
-- Intelligent Modelling now shows explicit Tax Free First / PCLS before-and-after values.
-- Pot charts are labelled as pension pot values after PCLS.
-- PCLS events are annotated on the monthly pot chart.
-- Year table includes a Tax-free cash moved column.
-- Main Modelling remains fully divorced: no Apply, no Save, no Supabase writes.
+- Intelligent Modelling controls now remember their last browser values using localStorage.
+- This includes Model/withdrawal selections and Best Plan annuity include/exclude.
+- Values are remembered locally in the browser only.
+- No Supabase writes.
+- No Apply button.
+- No Save feature.
+- Main Modelling remains divorced from Intelligent Modelling.
+- app.html build stamp updated to LC-330 and frame cache-buster bumped to front33.
+- intelligent_modelling.html build updated to im5.
+- best_plan_engine.js is included unchanged from bpe4.
 
-## Build labels
+## Upload notes
 
-- app.html: LC-329
-- intelligent_modelling.html: build im4
-- best_plan_engine.js: bpe4
-
-No SQL. No engine.js changes. No optimiser.js changes. No common.js changes.
+After uploading, hard refresh the app and check the top stamp shows LC-330.

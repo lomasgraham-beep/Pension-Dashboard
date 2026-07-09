@@ -1,6 +1,6 @@
 /* ============================================================
    best_plan_engine.js — Intelligent Modelling sandbox controller
-   build: bpe4 / target app build LC-329
+   build: bpe1 / target app build LC-326
 
    Uses the existing PensionEngine as the single source of pension maths.
    It never mutates the main Modelling page state and never writes to Supabase.
@@ -8,7 +8,7 @@
 (function (global) {
   'use strict';
 
-  const BUILD = 'bpe4';
+  const BUILD = 'bpe1';
   const ANN_NAME = 'Best Plan Finder Annuity';
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -118,7 +118,6 @@
 
   function applyWithdrawalMode(plan, mode, fadDate) {
     mode = mode || 'current';
-    plan.withdrawalModeOverride = mode;
     if (mode === 'current') return plan;
     if (mode === 'ufpls') {
       plan.withdrawalMethodGraham = 'ufpls'; plan.withdrawalMethodJulie = 'ufpls';
@@ -205,87 +204,12 @@
       savingsFundBills: plan.savingsFundBills,
       withdrawalMethod: { graham: plan.withdrawalMethodGraham || 'ufpls', julie: plan.withdrawalMethodJulie || 'ufpls' },
       crystallisationDate: {
-        graham: (plan.withdrawalModeOverride === 'tffirst' && retireByMember && state.p1Name && retireByMember[state.p1Name]) ? retireByMember[state.p1Name] : (plan.crystallisationDateGraham ? parseDate(plan.crystallisationDateGraham) : null),
-        julie: (plan.withdrawalModeOverride === 'tffirst' && retireByMember && state.p2Name && retireByMember[state.p2Name]) ? retireByMember[state.p2Name] : (plan.crystallisationDateJulie ? parseDate(plan.crystallisationDateJulie) : null)
+        graham: plan.crystallisationDateGraham ? parseDate(plan.crystallisationDateGraham) : null,
+        julie: plan.crystallisationDateJulie ? parseDate(plan.crystallisationDateJulie) : null
       },
       ufplsDivertTf: !!plan.ufplsDivertTf,
       sp: sp
     };
-  }
-
-
-  function decorateRows(rows, cfg) {
-    // Adds sandbox-only metadata so the Intelligent Modelling page can show the
-    // tax-free-first / FAD PCLS event clearly without changing the shared PensionEngine maths.
-    // Monthly engine rows expose the opening tax-free/taxable pots and closing pots; this helper
-    // turns that into an explicit before/after audit trail for the chart and table.
-    if (!rows) return rows;
-    const monthly = rows.monthly || [];
-    const wm = cfg && cfg.withdrawalMethod ? cfg.withdrawalMethod : {};
-    const cd = cfg && cfg.crystallisationDate ? cfg.crystallisationDate : {};
-    const gIdx = (wm.graham === 'fad' && cd.graham) ? monthIdx(cd.graham) : null;
-    const jIdx = (wm.julie === 'fad' && cd.julie) ? monthIdx(cd.julie) : null;
-    let gPcls = 0, jPcls = 0, firstIdx = null;
-    const events = [];
-    const byYear = {};
-
-    monthly.forEach(r => {
-      const idx = r.year * 12 + r.month;
-      const gEvent = gIdx != null && idx === gIdx;
-      const jEvent = jIdx != null && idx === jIdx;
-      if (!gEvent && !jEvent) return;
-
-      const gBefore = (Number(r.g_taxFree) || 0) + (Number(r.g_taxable) || 0);
-      const jBefore = (Number(r.j_taxFree) || 0) + (Number(r.j_taxable) || 0);
-      const combinedBefore = gBefore + jBefore;
-      const thisGPcls = gEvent ? (Number(r.g_taxFree) || 0) : 0;
-      const thisJPcls = jEvent ? (Number(r.j_taxFree) || 0) : 0;
-      const pcls = thisGPcls + thisJPcls;
-      const combinedAfterPcls = Math.max(0, combinedBefore - pcls);
-      const monthEndPension = Number(r.combinedClosing != null ? r.combinedClosing : ((Number(r.g_closing) || 0) + (Number(r.j_closing) || 0))) || 0;
-      const surplusEnd = Number(r.surplusBalance) || 0;
-
-      gPcls += thisGPcls;
-      jPcls += thisJPcls;
-      firstIdx = firstIdx == null ? idx : Math.min(firstIdx, idx);
-      byYear[r.year] = (byYear[r.year] || 0) + pcls;
-
-      r.pclsEvent = true;
-      r.gPclsTaken = thisGPcls;
-      r.jPclsTaken = thisJPcls;
-      r.pclsTaken = pcls;
-      r.combinedPensionBeforePcls = combinedBefore;
-      r.combinedPensionAfterPcls = combinedAfterPcls;
-      r.monthEndPensionAfterPcls = monthEndPension;
-      r.surplusIncreaseFromPcls = pcls;
-
-      events.push({
-        idx: idx,
-        date: idxToDate(idx),
-        year: r.year,
-        label: r.label || dateLabel(idxToDate(idx)),
-        gBefore: gBefore,
-        jBefore: jBefore,
-        combinedBefore: combinedBefore,
-        gPclsTaken: thisGPcls,
-        jPclsTaken: thisJPcls,
-        pclsTaken: pcls,
-        combinedAfterPcls: combinedAfterPcls,
-        monthEndPensionAfterPcls: monthEndPension,
-        surplusIncreaseFromPcls: pcls,
-        surplusEnd: surplusEnd
-      });
-    });
-
-    rows.sandboxMeta = Object.assign({}, rows.sandboxMeta || {}, {
-      pclsTaken: gPcls + jPcls,
-      gPclsTaken: gPcls,
-      jPclsTaken: jPcls,
-      pclsDate: firstIdx == null ? null : idxToDate(firstIdx),
-      pclsEvents: events,
-      pclsByYear: byYear
-    });
-    return rows;
   }
 
   function closingFor(row, scope) {
@@ -334,7 +258,7 @@
       const plan = scenarioPlan(state, Object.assign({}, opts, { retirementDate: retireDate, retireByMember: null }));
       const runData = scenarioData(state, opts);
       const cfg = buildDrawdownCfg(state, runData, plan);
-      const rows = decorateRows(PensionEngine.drawdown(runData, cfg), cfg);
+      const rows = PensionEngine.drawdown(runData, cfg);
       const ev = evaluateRows(rows, opts);
       if (ev.pass) return { feasible: true, earliestDate: retireDate, tried, detail: ev, plan, cfg, rows, opts };
       if (!firstFail) firstFail = ev;
@@ -354,8 +278,7 @@
       includeCrashes: !!opts.includeCrashes
     });
     if (res && res.feasible) {
-      const runCfg = Object.assign({}, cfg, { spendRed: res.maxSpendRed });
-      const rows = decorateRows(PensionEngine.drawdown(runData, runCfg), runCfg);
+      const rows = PensionEngine.drawdown(runData, Object.assign({}, cfg, { spendRed: res.maxSpendRed }));
       const ev = evaluateRows(rows, { reserveScope: 'combined', reserveAmount: 0, noShortfall: true });
       res.rows = rows; res.lowestPot = ev.minPot; res.lowestPotDate = ev.minPotDate; res.endPot = ev.endPot;
     }
@@ -365,20 +288,16 @@
   function runEra(state, opts) {
     if (!global.PensionOptimiser || !PensionOptimiser.earliestRetirement) throw new Error('PensionOptimiser.earliestRetirement is not loaded.');
     const runData = scenarioData(state, opts);
+    const base = scenarioPlan(state, opts);
     const combine = opts.combineRetirement !== false;
     const p2Fixed = (!combine && state.basePlan && state.basePlan.retireByMember && state.p2Name) ? state.basePlan.retireByMember[state.p2Name] : null;
-    function retireByMemberFor(retireDate) {
-      if (!(state.p2Name && p2Fixed)) return null;
-      const rbm = {};
-      if (state.p1Name) rbm[state.p1Name] = retireDate;
-      rbm[state.p2Name] = p2Fixed;
-      return rbm;
-    }
     const rebuildForDate = function (retireDate) {
-      const p = scenarioPlan(state, Object.assign({}, opts, { retirementDate: retireDate, retireByMember: retireByMemberFor(retireDate), spendRed: opts.spendRed }));
+      let rbm = null;
+      if (state.p2Name && p2Fixed) { rbm = {}; if (state.p1Name) rbm[state.p1Name] = retireDate; rbm[state.p2Name] = p2Fixed; }
+      const p = scenarioPlan(state, Object.assign({}, opts, { retirementDate: retireDate, retireByMember: rbm, spendRed: opts.spendRed }));
       return buildDrawdownCfg(state, runData, p);
     };
-    const res = PensionOptimiser.earliestRetirement(runData, {
+    return PensionOptimiser.earliestRetirement(runData, {
       rebuildForDate,
       minDate: parseDate(opts.minDate),
       maxDate: parseDate(opts.maxDate),
@@ -386,21 +305,7 @@
       nestEggFloor: Number(opts.nestEggFloor) || 0,
       includeCrashes: !!opts.includeCrashes
     });
-    if (res && res.feasible && res.earliestDate) {
-      const ret = parseDate(res.earliestDate);
-      const p = scenarioPlan(state, Object.assign({}, opts, { retirementDate: ret, retireByMember: retireByMemberFor(ret), spendRed: opts.spendRed }));
-      const cfg = buildDrawdownCfg(state, runData, p);
-      const rows = decorateRows(PensionEngine.drawdown(runData, cfg), cfg);
-      const ev = evaluateRows(rows, { reserveScope: 'combined', reserveAmount: Number(opts.nestEggFloor) || 0, noShortfall: true });
-      res.rows = rows;
-      res.lowestPot = ev.minPot;
-      res.lowestPotDate = ev.minPotDate;
-      res.endPot = ev.endPot;
-      res.plan = p;
-      res.cfg = cfg;
-    }
-    return res;
   }
 
-  global.BestPlanEngine = { BUILD, ANN_NAME, loadState, scenarioPlan, scenarioData, buildDrawdownCfg, decorateRows, findBestPlan, runMss, runEra, evaluateRows, parseDate, toInputDate, dateLabel, gbp };
+  global.BestPlanEngine = { BUILD, ANN_NAME, loadState, scenarioPlan, scenarioData, buildDrawdownCfg, findBestPlan, runMss, runEra, evaluateRows, parseDate, toInputDate, dateLabel, gbp };
 })(typeof window !== 'undefined' ? window : globalThis);

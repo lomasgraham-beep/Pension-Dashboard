@@ -25,9 +25,9 @@
 </style>
 </head>
 <body>
-  <div class="top"><div><h1>Intelligent Modelling</h1><div class="build">build im4 · app LC-329</div></div><div id="whoami" class="build"></div></div>
+  <div class="top"><div><h1>Intelligent Modelling</h1><div class="build">build im5 · app LC-330</div></div><div id="whoami" class="build"></div></div>
   <div id="status" class="s-load">Loading intelligent modelling sandbox…</div>
-  <div class="intro"><b>Sandbox mode:</b> these tools read your current saved data, clone it, and run separate calculations. They do not update the main Modelling page, do not write to Supabase, and do not save anything. If you like a result, manually enter it into the main model.</div>
+  <div class="intro"><b>Sandbox mode:</b> these tools read your current saved data, clone it, and run separate calculations. They do not update the main Modelling page, do not write to Supabase, and do not save anything. Tool inputs are remembered locally in this browser only. If you like a result, manually enter it into the main model.</div>
   <div class="tabs" role="tablist">
     <button class="tab on" data-page="bpf">Best Plan Finder</button>
     <button class="tab" data-page="mss">Maximum Sustainable Spend</button>
@@ -107,14 +107,55 @@
   function setResult(id, html){ q(id).innerHTML = html || ''; try { if (window.parent && window.parent !== window) window.parent.postMessage('app-activity','*'); } catch(e){} }
   function chartNum(v){ const n=Number(v); return Number.isFinite(n) ? n : 0; }
 
+  const MEMORY_KEY = 'pensionDashboard.intelligentModelling.controls.v1';
+  let memoryReady = false;
+  function memoryIds(){
+    return Array.from(document.querySelectorAll('.page input[id], .page select[id]')).map(el => el.id).filter(Boolean);
+  }
+  function readMemory(){
+    try {
+      const raw = window.localStorage ? localStorage.getItem(MEMORY_KEY) : null;
+      return raw ? JSON.parse(raw) : {};
+    } catch(e) { return {}; }
+  }
+  function saveRememberedControls(){
+    if (!memoryReady) return;
+    try {
+      const data = { savedAt: new Date().toISOString() };
+      const active = document.querySelector('.tab.on');
+      if (active && active.dataset && active.dataset.page) data.activePage = active.dataset.page;
+      memoryIds().forEach(id => { const el = q(id); if (el) data[id] = el.value; });
+      localStorage.setItem(MEMORY_KEY, JSON.stringify(data));
+    } catch(e) { /* local storage can be unavailable in private or restricted browsers */ }
+  }
+  function applyRememberedControls(){
+    const data = readMemory();
+    memoryIds().forEach(id => {
+      const el = q(id); if (!el || data[id] == null) return;
+      const value = String(data[id]);
+      if (el.tagName === 'SELECT') {
+        if (Array.from(el.options).some(o => o.value === value)) el.value = value;
+      } else {
+        el.value = value;
+      }
+    });
+    if (data.activePage && q('page-' + data.activePage)) showPage(data.activePage);
+  }
+  function attachRememberedControls(){
+    document.querySelectorAll('.page input[id], .page select[id]').forEach(el => {
+      el.addEventListener('change', saveRememberedControls);
+      el.addEventListener('input', saveRememberedControls);
+    });
+  }
+
   if (window.google && google.charts) {
     google.charts.load('current', { packages:['corechart'] });
     google.charts.setOnLoadCallback(function(){ chartsReady = true; while(pendingCharts.length){ const c = pendingCharts.shift(); drawSandboxCharts(c.prefix, c.rows, c.title); } });
   }
 
-  function showPage(id){ document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.page===id)); document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on',p.id==='page-'+id)); }
-  function chipSet(btn){ const p=String(btn.dataset.set||'').split(':'); if(p.length===2 && q(p[0])) q(p[0]).value=p[1]; }
-  function hideJulieIfSingle(){ if(state && !state.p2Name){ ['bpf_scope','bpf_owner'].forEach(id=>{ const s=q(id); if(!s)return; Array.from(s.options).forEach(o=>{ if(o.value==='julie') o.hidden=true; }); }); } }
+  function showPage(id){ document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.page===id)); document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on',p.id==='page-'+id)); saveRememberedControls(); }
+  function chipSet(btn){ const p=String(btn.dataset.set||'').split(':'); if(p.length===2 && q(p[0])){ q(p[0]).value=p[1]; saveRememberedControls(); } }
+  function hideJulieIfSingle(){ if(state && !state.p2Name){ ['bpf_scope','bpf_owner'].forEach(id=>{ const s=q(id); if(!s)return; Array.from(s.options).forEach(o=>{ if(o.value==='julie') o.hidden=true; }); if(s.value==='julie') s.value = id==='bpf_scope' ? 'combined' : 'graham'; }); } }
 
   function commonOpts(prefix){
     return {
@@ -303,10 +344,13 @@
     ['bpf_spend','era_spend'].forEach(id=>{ q(id).value=spend; });
     q('mss_retire').value=rd; q('bpf_fad_date').value=rd; q('mss_fad_date').value=rd; q('era_fad_date').value=rd;
     if (!q('bpf_min').value) q('bpf_min').value=rd;
+    applyRememberedControls();
     hideJulieIfSingle();
+    memoryReady = true;
+    attachRememberedControls();
   }
   async function boot(){
-    try{ state=await BestPlanEngine.loadState(); populate(); q('status').className='s-ok'; q('status').textContent='Loaded sandbox data for '+state.p1Name+(state.p2Name?' and '+state.p2Name:'')+'. Tools are read-only and separate from the main model.'; }
+    try{ state=await BestPlanEngine.loadState(); populate(); q('status').className='s-ok'; q('status').textContent='Loaded sandbox data for '+state.p1Name+(state.p2Name?' and '+state.p2Name:'')+'. Tools are read-only, separate from the main model, and remembered locally on this browser.'; }
     catch(e){ q('status').className='s-err'; q('status').textContent='Could not load intelligent modelling: '+(e.message||e); }
   }
   document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.page)));
