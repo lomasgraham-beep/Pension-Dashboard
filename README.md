@@ -1,24 +1,31 @@
-# LC-330 direct upload pack
+# LC-326 — Standalone Intelligent Modelling
 
 Upload these files to the repository root:
 
-- app.html
-- intelligent_modelling.html
-- best_plan_engine.js
+1. `app.html`
+2. `intelligent_modelling.html`
+3. `best_plan_engine.js`
 
-## Changes
+## What changed
 
-- Intelligent Modelling controls now remember their last browser values using localStorage.
-- This includes Model/withdrawal selections and Best Plan annuity include/exclude.
-- Values are remembered locally in the browser only.
-- No Supabase writes.
-- No Apply button.
-- No Save feature.
-- Main Modelling remains divorced from Intelligent Modelling.
-- app.html build stamp updated to LC-330 and frame cache-buster bumped to front33.
-- intelligent_modelling.html build updated to im5.
-- best_plan_engine.js is included unchanged from bpe4.
+- Added a new top-level **Intelligent Modelling** tab.
+- Moved intelligent modelling tools out of the main Modelling page.
+- Removed Best Plan Finder, Maximum Sustainable Spend, and Earliest Retirement Age from the main Retirement Model page.
+- Rebuilt the intelligent tools as read-only sandbox pages:
+  - Best Plan Finder
+  - Maximum Sustainable Spend
+  - Earliest Retirement Age
+- The sandbox reads Supabase data and uses `PensionEngine`, but it does not mutate the main model state and does not write to Supabase.
+- No Apply button. No Save. If a result looks good, manually enter it into the main model.
 
-## Upload notes
+## Files unchanged
 
-After uploading, hard refresh the app and check the top stamp shows LC-330.
+- `engine.js`
+- `optimiser.js`
+- `common.js`
+- SQL schema
+
+## Test
+
+After upload, hard refresh and confirm the app build stamp shows `LC-326`.
+Open **Intelligent Modelling** from the top navigation and run each tool.
