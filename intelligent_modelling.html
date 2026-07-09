@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Intelligent Modelling</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=auth02"></script>
+<script src="engine.js?v=ann1"></script>
+<script src="optimiser.js?v=era02"></script>
+<script src="best_plan_engine.js?v=bpe1"></script>
+<style>
+  :root{--accent:#2c7a7b;--accent-dark:#236668;--accent-soft:#e6f2f2;--accent-border:#b8dadb;--page:#eef2f3;--surface:#fff;--surface-2:#f7f9fa;--ink:#26333a;--ink-soft:#64748b;--line:#e2e8f0;--line-strong:#cbd5e1;--ok:#0f9d6e;--bad:#c0392b;--warn:#b7791f;--shadow:0 1px 3px rgba(20,40,50,.06),0 4px 12px rgba(20,40,50,.05);--radius:12px}
+  *{box-sizing:border-box} body{font-family:'Segoe UI',Tahoma,sans-serif;margin:0;padding:16px;background:var(--page);color:var(--ink);font-size:15px} h1{font-size:22px;margin:0;color:var(--ink)} .top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}.build{font-size:12px;color:var(--ink-soft)}
+  .intro{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;box-shadow:var(--shadow);font-size:13px;line-height:1.45;color:var(--ink-soft)} .intro b{color:var(--ink)}
+  #status{padding:10px 14px;border-radius:8px;font-weight:700;margin-bottom:12px;font-size:14px}.s-load{background:#eff6ff;color:#1e3a8a}.s-ok{background:#d1fae5;color:#065f46}.s-err{background:#fdecea;color:#c0392b}
+  .tabs{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 12px}.tab{border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-soft);border-radius:10px;padding:11px 15px;min-height:44px;font-weight:700;cursor:pointer}.tab.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .page{display:none}.page.on{display:block}.tool{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px}.tool-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:12px}.tool-title{font-size:17px;font-weight:800}.tool-sub{font-size:12.5px;color:var(--ink-soft);line-height:1.4;margin-top:2px}.section{background:linear-gradient(135deg,rgba(44,122,123,.08),rgba(44,122,123,.02));border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}.section-title{font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--accent-dark);margin:0 0 9px}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.field{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px;min-height:80px}.field label{display:block;font-size:12px;font-weight:800;color:var(--ink-soft);margin-bottom:7px}.field input,.field select{width:100%;min-height:38px;padding:8px 9px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface-2);color:var(--ink);font-size:14px}.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.chip{border:1px solid var(--accent-border);background:var(--accent-soft);color:var(--accent-dark);border-radius:999px;padding:6px 9px;font-size:12px;font-weight:800;cursor:pointer;min-height:31px}.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}.btn{border:0;border-radius:10px;padding:11px 16px;min-height:44px;font-weight:900;cursor:pointer}.btn-primary{background:var(--accent);color:white}.btn-ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line-strong)}.msg{font-size:13px;font-weight:800}.msg.ok{color:var(--ok)}.msg.err{color:var(--bad)}
+  .result{margin-top:12px}.result-card{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:13px}.result-card.ok{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}.result-card.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}.metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.metric{background:rgba(255,255,255,.65);border:1px solid rgba(15,23,42,.08);border-radius:10px;padding:10px}.metric b{display:block;font-size:17px;line-height:1.1}.metric span{font-size:11px;opacity:.82}.note{font-size:12px;color:var(--ink-soft);line-height:1.45;margin-top:8px}.warn-metric{background:#fff7cc;border-color:#d6a900;color:#7a4a00}.table-wrap{overflow-x:auto;margin-top:10px}.small-table{width:100%;border-collapse:collapse;font-size:13px}.small-table th,.small-table td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}.small-table th:first-child,.small-table td:first-child{text-align:left}.small-table th{color:var(--ink-soft);font-weight:800;background:var(--surface-2)}
+  @media (max-width:1100px){.grid,.grid.three{grid-template-columns:repeat(2,minmax(0,1fr))}.metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (max-width:640px){body{padding:12px}.tool{padding:12px}.grid,.grid.three,.metric-grid{grid-template-columns:1fr}.tab{flex:1 1 100%}.actions .btn{flex:1 1 100%}}
+  @media (prefers-color-scheme:dark){:root{--accent:#5eead4;--accent-dark:#2dd4bf;--accent-soft:#134e4a;--accent-border:#334155;--page:#0f172a;--surface:#1e293b;--surface-2:#162132;--ink:#e2e8f0;--ink-soft:#94a3b8;--line:#334155;--line-strong:#475569;--ok:#34d399;--bad:#f87171;--warn:#fbbf24}body{background:var(--page);color:var(--ink)}input,select{background:#0f172a!important;color:#e2e8f0!important;border-color:#475569!important}.result-card.ok{background:rgba(6,95,70,.25);border-color:#34d399;color:#a7f3d0}.result-card.bad{background:rgba(127,29,29,.28);border-color:#f87171;color:#fecaca}.metric{background:rgba(255,255,255,.05);border-color:#334155}.warn-metric{background:rgba(251,191,36,.18);border-color:#f59e0b;color:#fde68a}.small-table th{background:#0f172a}}
+</style>
+</head>
+<body>
+  <div class="top"><div><h1>Intelligent Modelling</h1><div class="build">build im1 · app LC-326</div></div><div id="whoami" class="build"></div></div>
+  <div id="status" class="s-load">Loading intelligent modelling sandbox…</div>
+  <div class="intro"><b>Sandbox mode:</b> these tools read your current saved data, clone it, and run separate calculations. They do not update the main Modelling page, do not write to Supabase, and do not save anything. If you like a result, manually enter it into the main model.</div>
+  <div class="tabs" role="tablist">
+    <button class="tab on" data-page="bpf">Best Plan Finder</button>
+    <button class="tab" data-page="mss">Maximum Sustainable Spend</button>
+    <button class="tab" data-page="era">Earliest Retirement Age</button>
+  </div>
+
+  <div id="page-bpf" class="page on tool">
+    <div class="tool-head"><div><div class="tool-title">Best Plan Finder</div><div class="tool-sub">Finds the earliest safe retirement date using explicit scenario inputs, a protected reserve and an optional fixed annuity.</div></div></div>
+    <div class="section"><div class="section-title">Scenario inputs</div><div class="grid">
+      <div class="field"><label>Withdrawal method</label><select id="bpf_wm"><option value="current">Use saved model settings</option><option value="ufpls">Force blended / UFPLS</option><option value="tffirst">Force tax-free first</option><option value="faddate">Force flexi-access date</option></select></div>
+      <div class="field"><label>Flexi-access date</label><input type="date" id="bpf_fad_date"></div>
+      <div class="field"><label>Existing annuities</label><select id="bpf_existing_ann"><option value="exclude">Exclude existing annuities</option><option value="include">Include existing annuities</option></select></div>
+      <div class="field"><label>Market crashes</label><select id="bpf_crashes"><option value="include">Include current crash table</option><option value="exclude">Exclude crashes</option></select></div>
+    </div></div>
+    <div class="section"><div class="section-title">Rules and fixed annuity</div><div class="grid">
+      <div class="field"><label>Earliest retirement</label><input type="date" id="bpf_min" value="2027-10-01"></div>
+      <div class="field"><label>Latest date to test</label><input type="date" id="bpf_max" value="2037-01-01"></div>
+      <div class="field"><label>Growth rate %</label><input type="number" id="bpf_growth" min="0" max="12" step="0.1"></div>
+      <div class="field"><label>Spending level %</label><input type="number" id="bpf_spend" min="0" max="250" step="1"></div>
+      <div class="field"><label>Minimum pot reserve</label><input type="number" id="bpf_reserve" min="0" step="10000" value="100000"><div class="chips"><button class="chip" data-set="bpf_reserve:50000">£50k</button><button class="chip" data-set="bpf_reserve:100000">£100k</button><button class="chip" data-set="bpf_reserve:150000">£150k</button><button class="chip" data-set="bpf_reserve:200000">£200k</button></div></div>
+      <div class="field"><label>Reserve applies to</label><select id="bpf_scope"><option value="combined">Combined household pot</option><option value="graham">Graham pot only</option><option value="julie">Julie pot only</option></select></div>
+      <div class="field"><label>Best Plan annuity</label><select id="bpf_best_ann"><option value="include">Include fixed Best Plan annuity</option><option value="exclude">Exclude Best Plan annuity</option></select></div>
+      <div class="field"><label>Purchase date</label><input type="date" id="bpf_ann_date" value="2037-01-01"></div>
+      <div class="field"><label>Fixed amount</label><input type="number" id="bpf_ann_amount" min="0" step="10000" value="300000"><div class="chips"><button class="chip" data-set="bpf_ann_amount:200000">£200k</button><button class="chip" data-set="bpf_ann_amount:250000">£250k</button><button class="chip" data-set="bpf_ann_amount:300000">£300k</button><button class="chip" data-set="bpf_ann_amount:350000">£350k</button></div></div>
+      <div class="field"><label>Owner</label><select id="bpf_owner"><option value="graham">Graham</option><option value="julie">Julie</option></select></div>
+      <div class="field"><label>Annuity rate %</label><input type="number" id="bpf_ann_rate" min="0" max="15" step="0.1" value="6.0"></div>
+      <div class="field"><label>Escalation %</label><input type="number" id="bpf_esc" min="0" max="10" step="0.1" value="0.0"></div>
+      <div class="field"><label>No shortfall allowed</label><select id="bpf_shortfall"><option value="yes">Yes</option><option value="no">No</option></select></div>
+      <div class="field"><label>Must buy annuity</label><select id="bpf_mustbuy"><option value="yes">Yes</option><option value="no">No</option></select></div>
+    </div><div class="actions"><button class="btn btn-primary" id="run_bpf">Run Best Plan Finder</button><button class="btn btn-ghost" id="clear_bpf">Clear</button><span id="msg_bpf" class="msg"></span></div><div id="res_bpf" class="result"></div></div>
+  </div>
+
+  <div id="page-mss" class="page tool">
+    <div class="tool-head"><div><div class="tool-title">Maximum Sustainable Spend</div><div class="tool-sub">Finds the highest spending level that survives using this page’s own standalone assumptions.</div></div></div>
+    <div class="section"><div class="section-title">Standalone assumptions</div><div class="grid">
+      <div class="field"><label>Retirement date</label><input type="date" id="mss_retire"></div>
+      <div class="field"><label>Growth rate %</label><input type="number" id="mss_growth" min="0" max="12" step="0.1"></div>
+      <div class="field"><label>Withdrawal method</label><select id="mss_wm"><option value="current">Use saved model settings</option><option value="ufpls">Force blended / UFPLS</option><option value="tffirst">Force tax-free first</option><option value="faddate">Force flexi-access date</option></select></div>
+      <div class="field"><label>Flexi-access date</label><input type="date" id="mss_fad_date"></div>
+      <div class="field"><label>Existing annuities</label><select id="mss_existing_ann"><option value="include">Include existing annuities</option><option value="exclude">Exclude existing annuities</option></select></div>
+      <div class="field"><label>Market crashes</label><select id="mss_crashes"><option value="include">Include current crash table</option><option value="exclude">Exclude crashes</option></select></div>
+      <div class="field"><label>Bridge floor %</label><input type="number" id="mss_bridge" min="0" max="100" step="1" value="10"></div>
+      <div class="field"><label>End-of-life floor %</label><input type="number" id="mss_eol" min="0" max="100" step="1" value="10"></div>
+      <div class="field"><label>Spend cap %</label><input type="number" id="mss_cap" min="100" max="500" step="5" value="200"></div>
+    </div><div class="actions"><button class="btn btn-primary" id="run_mss">Run Maximum Sustainable Spend</button><button class="btn btn-ghost" id="clear_mss">Clear</button><span id="msg_mss" class="msg"></span></div><div id="res_mss" class="result"></div></div>
+  </div>
+
+  <div id="page-era" class="page tool">
+    <div class="tool-head"><div><div class="tool-title">Earliest Retirement Age</div><div class="tool-sub">Finds the earliest feasible retirement date using standalone controls, not the main Modelling sliders.</div></div></div>
+    <div class="section"><div class="section-title">Standalone assumptions</div><div class="grid">
+      <div class="field"><label>Earliest date to test</label><input type="date" id="era_min" value="2027-10-01"></div>
+      <div class="field"><label>Latest date to test</label><input type="date" id="era_max" value="2037-01-01"></div>
+      <div class="field"><label>Growth rate %</label><input type="number" id="era_growth" min="0" max="12" step="0.1"></div>
+      <div class="field"><label>Spending level %</label><input type="number" id="era_spend" min="0" max="250" step="1"></div>
+      <div class="field"><label>Withdrawal method</label><select id="era_wm"><option value="current">Use saved model settings</option><option value="ufpls">Force blended / UFPLS</option><option value="tffirst">Force tax-free first</option><option value="faddate">Force flexi-access date</option></select></div>
+      <div class="field"><label>Flexi-access date</label><input type="date" id="era_fad_date"></div>
+      <div class="field"><label>Existing annuities</label><select id="era_existing_ann"><option value="include">Include existing annuities</option><option value="exclude">Exclude existing annuities</option></select></div>
+      <div class="field"><label>Market crashes</label><select id="era_crashes"><option value="include">Include current crash table</option><option value="exclude">Exclude crashes</option></select></div>
+      <div class="field"><label>Nest-egg floor £</label><input type="number" id="era_floor" min="0" step="5000" value="0"></div>
+      <div class="field"><label>Combine retirement</label><select id="era_combine"><option value="yes">Both retire on found date</option><option value="no">Only Graham moves</option></select></div>
+    </div><div class="actions"><button class="btn btn-primary" id="run_era">Run Earliest Retirement Age</button><button class="btn btn-ghost" id="clear_era">Clear</button><span id="msg_era" class="msg"></span></div><div id="res_era" class="result"></div></div>
+  </div>
+
+<script>
+(function(){
+  let state = null;
+  const q = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const gbp = n => BestPlanEngine.gbp(n);
+  const dlab = d => BestPlanEngine.dateLabel(d);
+  const toInputDate = d => BestPlanEngine.toInputDate(d);
+  function num(id, fallback){ const n = Number(String(q(id).value || '').replace(/,/g,'')); return Number.isFinite(n) ? n : fallback; }
+  function pctToRate(id, fallback){ return num(id, fallback) / 100; }
+  function msg(id, text, kind){ const el=q(id); if(!el)return; el.textContent=text||''; el.className='msg '+(kind||''); }
+  function setResult(id, html){ q(id).innerHTML = html || ''; try { if (window.parent && window.parent !== window) window.parent.postMessage('app-activity','*'); } catch(e){} }
+
+  function showPage(id){ document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.page===id)); document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on',p.id==='page-'+id)); }
+  function chipSet(btn){ const p=String(btn.dataset.set||'').split(':'); if(p.length===2 && q(p[0])) q(p[0]).value=p[1]; }
+  function hideJulieIfSingle(){ if(state && !state.p2Name){ ['bpf_scope','bpf_owner'].forEach(id=>{ const s=q(id); if(!s)return; Array.from(s.options).forEach(o=>{ if(o.value==='julie') o.hidden=true; }); }); } }
+
+  function commonOpts(prefix){
+    return {
+      growthRate: pctToRate(prefix+'_growth', state.basePlan.growthRate*100),
+      spendRed: q(prefix+'_spend') ? pctToRate(prefix+'_spend', state.basePlan.spendRed*100) : state.basePlan.spendRed,
+      withdrawalMode: q(prefix+'_wm') ? q(prefix+'_wm').value : 'current',
+      fadDate: q(prefix+'_fad_date') ? q(prefix+'_fad_date').value : '',
+      includeExistingAnnuities: q(prefix+'_existing_ann') ? q(prefix+'_existing_ann').value === 'include' : true,
+      includeCrashes: q(prefix+'_crashes') ? q(prefix+'_crashes').value === 'include' : true,
+      includeBestPlanAnnuity: false
+    };
+  }
+  function bpfOpts(){ return Object.assign(commonOpts('bpf'), {
+    minDate:q('bpf_min').value, maxDate:q('bpf_max').value,
+    reserveAmount:num('bpf_reserve',100000), reserveScope:q('bpf_scope').value,
+    includeBestPlanAnnuity:q('bpf_best_ann').value === 'include',
+    annuityDate:q('bpf_ann_date').value, annuityAmount:num('bpf_ann_amount',300000), annuityRate:num('bpf_ann_rate',6), escalationPct:num('bpf_esc',0), owner:q('bpf_owner').value,
+    noShortfall:q('bpf_shortfall').value === 'yes', mustBuyAnnuity:q('bpf_mustbuy').value === 'yes'
+  }); }
+
+  function renderMetrics(items){ return '<div class="metric-grid">' + items.map(m => '<div class="metric '+(m.cls||'')+'"><b>'+esc(m.v)+'</b><span>'+esc(m.k)+'</span></div>').join('') + '</div>'; }
+  function runBpf(){ msg('msg_bpf','Running…',''); setResult('res_bpf',''); try{ const opts=bpfOpts(); const res=BestPlanEngine.findBestPlan(state, opts); if(!res.feasible){ msg('msg_bpf','No passing date','err'); setResult('res_bpf','<div class="result-card bad"><strong>No feasible date found.</strong><div class="note">'+esc(res.reason)+'</div></div>'); return; } const d=res.detail, annIncome=(opts.annuityAmount||0)*(opts.annuityRate||0)/100, headroom=(d.minPot||0)-(opts.reserveAmount||0); msg('msg_bpf','Found ✓','ok'); setResult('res_bpf','<div class="result-card ok"><strong>Plan passes</strong><div class="note">Earliest safe retirement is <b>'+esc(dlab(res.earliestDate))+'</b>. This is a sandbox result only.</div>'+renderMetrics([{k:'Earliest safe retirement',v:dlab(res.earliestDate)},{k:'Lowest pot · '+dlab(d.minPotDate),v:gbp(d.minPot)},{k:'Reserve headroom',v:gbp(headroom),cls:'warn-metric'},{k:'Best Plan annuity',v:gbp(opts.annuityAmount)},{k:'Estimated gross income',v:gbp(annIncome)+'/yr'},{k:'End pot',v:gbp(d.endPot)}])+'</div>'); }catch(e){ msg('msg_bpf',e.message||String(e),'err'); } }
+  function clearBpf(){ msg('msg_bpf','',''); setResult('res_bpf',''); }
+
+  function runMss(){ msg('msg_mss','Running…',''); setResult('res_mss',''); try{ const opts=Object.assign(commonOpts('mss'), { retirementDate:q('mss_retire').value, bridgePct:num('mss_bridge',10)/100, eolPct:num('mss_eol',10)/100, spendCap:num('mss_cap',200)/100 }); const res=BestPlanEngine.runMss(state, opts); if(!res.feasible){ msg('msg_mss','Not sustainable','err'); setResult('res_mss','<div class="result-card bad"><strong>Not sustainable.</strong><div class="note">'+esc(res.reason||'The plan fails even at the lower spend test.')+'</div></div>'); return; } msg('msg_mss','Found ✓','ok'); const pct=Math.round((res.maxSpendRed||0)*100); setResult('res_mss','<div class="result-card ok"><strong>Maximum sustainable spend found</strong><div class="note">Read-only sandbox result. Nothing has been changed in the main model.</div>'+renderMetrics([{k:'Maximum spend level',v:pct+'%'},{k:'Monthly discretionary estimate',v:gbp(res.maxDiscMonthly||0)},{k:'Lowest pot',v:gbp(res.lowestPot)},{k:'Lowest pot date',v:dlab(res.lowestPotDate)},{k:'End pot',v:gbp(res.endPot)},{k:'Crashes',v:opts.includeCrashes?'Included':'Excluded'}])+'</div>'); }catch(e){ msg('msg_mss',e.message||String(e),'err'); } }
+  function clearMss(){ msg('msg_mss','',''); setResult('res_mss',''); }
+
+  function runEra(){ msg('msg_era','Running…',''); setResult('res_era',''); try{ const opts=Object.assign(commonOpts('era'), { minDate:q('era_min').value, maxDate:q('era_max').value, nestEggFloor:num('era_floor',0), combineRetirement:q('era_combine').value==='yes', who:'graham' }); const res=BestPlanEngine.runEra(state, opts); if(!res.feasible){ msg('msg_era','No feasible date','err'); const e=res.detail||{}; setResult('res_era','<div class="result-card bad"><strong>No feasible date in range.</strong><div class="note">Lowest pot tested was '+esc(gbp(e.minPot))+(e.minPotYear?' in '+esc(e.minPotYear):'')+'.</div></div>'); return; } const e=res.detail||{}; msg('msg_era','Found ✓','ok'); setResult('res_era','<div class="result-card ok"><strong>Earliest retirement found</strong><div class="note">Sandbox result only. The main model has not been changed.</div>'+renderMetrics([{k:'Earliest safe retirement',v:dlab(res.earliestDate)},{k:'Lowest pot',v:gbp(e.minPot)},{k:'Lowest pot year',v:e.minPotYear||'—'},{k:'Pot at State Pension age',v:gbp(e.potAtSPA)},{k:'Pot at end of life',v:gbp(e.potAtEOL)},{k:'Nest-egg floor',v:gbp(opts.nestEggFloor)}])+'</div>'); }catch(e){ msg('msg_era',e.message||String(e),'err'); } }
+  function clearEra(){ msg('msg_era','',''); setResult('res_era',''); }
+
+  function populate(){
+    const bp=state.basePlan, rd=toInputDate(bp.retirementDate), growth=(bp.growthRate*100).toFixed(1), spend=Math.round(bp.spendRed*100);
+    ['bpf_growth','mss_growth','era_growth'].forEach(id=>{ q(id).value=growth; });
+    ['bpf_spend','era_spend'].forEach(id=>{ q(id).value=spend; });
+    q('mss_retire').value=rd; q('bpf_fad_date').value=rd; q('mss_fad_date').value=rd; q('era_fad_date').value=rd;
+    if (!q('bpf_min').value) q('bpf_min').value=rd;
+    hideJulieIfSingle();
+  }
+  async function boot(){
+    try{ state=await BestPlanEngine.loadState(); populate(); q('status').className='s-ok'; q('status').textContent='Loaded sandbox data for '+state.p1Name+(state.p2Name?' and '+state.p2Name:'')+'. Tools are read-only and separate from the main model.'; }
+    catch(e){ q('status').className='s-err'; q('status').textContent='Could not load intelligent modelling: '+(e.message||e); }
+  }
+  document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.page)));
+  document.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',ev=>{ ev.preventDefault(); chipSet(b); }));
+  q('run_bpf').addEventListener('click',runBpf); q('clear_bpf').addEventListener('click',clearBpf);
+  q('run_mss').addEventListener('click',runMss); q('clear_mss').addEventListener('click',clearMss);
+  q('run_era').addEventListener('click',runEra); q('clear_era').addEventListener('click',clearEra);
+  App.requireLogin(boot,{title:'Intelligent Modelling'});
+})();
+</script>
+</body>
+</html>
