@@ -23,13 +23,17 @@
   .result{margin-top:0}.result:empty{border:1px dashed var(--line-strong);border-radius:12px;min-height:160px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;text-align:center;color:var(--ink-soft);padding:18px}.result:empty::before{content:attr(data-empty);max-width:360px;line-height:1.45}.result-card{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px}.result-card.ok{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}.result-card.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}.scenario-strip{margin-bottom:10px;background:var(--surface-2);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:10px 12px;color:var(--ink);font-size:13px;font-weight:800;line-height:1.45}.metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.metric{background:rgba(255,255,255,.65);border:1px solid rgba(15,23,42,.08);border-radius:10px;padding:10px}.metric b{display:block;font-size:20px;line-height:1.12}.metric span{font-size:12.5px;opacity:.9}.note{font-size:13px;color:var(--ink-soft);line-height:1.5;margin-top:8px}.warn-metric{background:#ffd166;border-color:#b45309;color:#3b2600;box-shadow:inset 0 0 0 1px rgba(180,83,9,.28)}.info-metric{background:#e6fffb;border-color:#81e6d9;color:#134e4a}.pcls-panel{margin-top:10px;border:1px solid var(--accent-border);border-left:4px solid var(--accent);background:var(--surface-2);border-radius:12px;padding:11px;color:var(--ink)}.pcls-title{font-weight:900;font-size:14px;margin-bottom:4px;color:var(--accent-dark)}.pcls-note{font-size:13px;color:var(--ink-soft);line-height:1.45;margin-bottom:8px}.pcls-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.pcls-item{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px}.pcls-item b{display:block;font-size:18px}.pcls-item span{font-size:12.5px;color:var(--ink-soft)}
   .chart-panel{margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:12px}.chart-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}.chart-title{font-size:17px;font-weight:900;color:var(--ink)}.chart-tabs{display:inline-flex;gap:0;border:1px solid var(--line-strong);border-radius:10px;overflow:hidden;background:var(--surface-2)}.chart-tab{border:0;border-right:1px solid var(--line-strong);background:transparent;color:var(--ink-soft);padding:10px 14px;min-height:42px;font-weight:900;cursor:pointer;font-size:14px}.chart-tab:last-child{border-right:0}.chart-tab.on{background:var(--accent);color:#fff}.chart-tools{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}.member-filter{display:inline-flex;gap:0;border:1px solid var(--line-strong);border-radius:10px;overflow:hidden;background:var(--surface-2)}.member-label{display:inline-flex;align-items:center;padding:0 10px;min-height:42px;border-right:1px solid var(--line-strong);font-size:13px;font-weight:900;color:var(--ink-soft)}.member-tab{border:0;border-right:1px solid var(--line-strong);background:transparent;color:var(--ink-soft);padding:10px 14px;min-height:42px;font-weight:900;cursor:pointer;font-size:14px}.member-tab:last-child{border-right:0}.member-tab.on{background:var(--accent-dark);color:#fff}.member-tab[hidden]{display:none!important}.chart-view{display:none}.chart-view.on{display:block}.chart-box{width:100%;height:390px}.chart-note{font-size:13px;color:var(--ink-soft);margin:3px 0 11px;line-height:1.45}.chart-error{border:1px solid var(--warn);border-left:4px solid var(--warn);border-radius:10px;padding:12px;background:var(--surface-2);font-size:13px;color:var(--ink)}
   .table-wrap{overflow-x:auto;margin-top:10px}.small-table{width:100%;border-collapse:collapse;font-size:14px}.small-table th,.small-table td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}.small-table th:first-child,.small-table td:first-child{text-align:left}.small-table th{color:var(--ink-soft);font-weight:900;background:var(--surface-2);font-size:13px}.shortfall-row td{background:#fff1f1;color:#991b1b}
+
+  .help-btn{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;margin-left:6px;border:1px solid var(--accent-border);border-radius:999px;background:var(--accent-soft);color:var(--accent-dark);font-size:12px;font-weight:900;line-height:1;cursor:help;vertical-align:middle;touch-action:manipulation}.help-btn:hover,.help-btn:focus-visible{outline:none;background:var(--accent);border-color:var(--accent);color:#fff}.help-tip{position:fixed;z-index:9999;max-width:320px;padding:11px 12px;border:1px solid var(--accent-border);border-left:4px solid var(--accent);border-radius:12px;background:var(--surface);color:var(--ink);box-shadow:0 12px 30px rgba(15,23,42,.22);font-size:13.5px;line-height:1.45;font-weight:700;display:none}.help-tip.on{display:block}.help-tip b{display:block;margin-bottom:4px;color:var(--accent-dark);font-size:13px;text-transform:uppercase;letter-spacing:.04em}.help-tip small{display:block;margin-top:6px;color:var(--ink-soft);font-weight:700}.help-tip:after{content:"";position:absolute;top:-7px;left:22px;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:7px solid var(--surface)}
   @media (max-width:1180px){.workspace{grid-template-columns:1fr}.control-panel{position:static;max-height:none;overflow:visible;padding-right:0}.output-panel{margin-top:4px}.grid,.grid.three{grid-template-columns:repeat(2,minmax(0,1fr))}.metric-grid,.pcls-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.chart-box{height:340px}.tabs{top:0}.actions{position:static;background:transparent}}
   @media (max-width:640px){body{padding:12px}.top-status{align-items:flex-start}.tool{padding:10px}.grid,.grid.three,.metric-grid,.pcls-grid{grid-template-columns:1fr}.tab{flex:1 1 100%}.actions .btn{flex:1 1 100%}.chart-head{align-items:stretch}.chart-tools{display:grid;grid-template-columns:1fr}.chart-tabs{display:grid;grid-template-columns:1fr}.chart-tab{border-right:0;border-bottom:1px solid var(--line-strong)}.chart-tab:last-child{border-bottom:0}.member-filter{display:grid;grid-template-columns:auto 1fr 1fr 1fr}.member-tab{border-right:0;border-left:1px solid var(--line-strong)}.member-label{border-right:0}.chart-box{height:300px}.result:empty{min-height:120px}.tabs{position:static}}
   @media (prefers-color-scheme:dark){:root{--accent:#5eead4;--accent-dark:#2dd4bf;--accent-soft:#134e4a;--accent-border:#334155;--page:#0f172a;--surface:#1e293b;--surface-2:#162132;--ink:#e2e8f0;--ink-soft:#94a3b8;--line:#334155;--line-strong:#475569;--ok:#34d399;--bad:#f87171;--warn:#fbbf24}body{background:var(--page);color:var(--ink)}.tabs{background:linear-gradient(180deg,var(--page) 70%,rgba(15,23,42,0))}input,select{background:#0f172a!important;color:#e2e8f0!important;border-color:#475569!important}.result-card.ok{background:rgba(6,95,70,.25);border-color:#34d399;color:#a7f3d0}.result-card.bad{background:rgba(127,29,29,.28);border-color:#f87171;color:#fecaca}.metric{background:rgba(255,255,255,.05);border-color:#334155}.warn-metric{background:rgba(245,158,11,.32);border-color:#fbbf24;color:#fff3b0;box-shadow:inset 0 0 0 1px rgba(251,191,36,.35)}.info-metric{background:rgba(20,184,166,.18);border-color:#2dd4bf;color:#99f6e4}.small-table th{background:#0f172a}.shortfall-row td{background:rgba(127,29,29,.24)!important;color:#fecaca!important}.chart-error{background:#162132}.pcls-panel{background:#162132;border-color:#2dd4bf}.pcls-item{background:rgba(255,255,255,.05);border-color:#334155}.actions{background:linear-gradient(180deg,rgba(30,41,59,0),var(--surface) 28%)}#status.s-ok{background:rgba(6,95,70,.25);border-color:#34d399;color:#a7f3d0}.scenario-strip{background:#162132;border-color:#334155}}
+
+  @media (prefers-color-scheme: dark){.help-btn{background:rgba(94,234,212,.14);border-color:rgba(94,234,212,.35);color:#5eead4}.help-btn:hover,.help-btn:focus-visible{background:#2dd4bf;color:#042f2e;border-color:#2dd4bf}.help-tip{background:#0f172a;color:#e5eef7;border-color:rgba(94,234,212,.35);box-shadow:0 18px 34px rgba(0,0,0,.52)}.help-tip b{color:#5eead4}.help-tip small{color:#a7b6c8}.help-tip:after{border-bottom-color:#0f172a}}
 </style>
 </head>
 <body>
-  <div class="top"><div><h1>Intelligent Modelling</h1><div class="build">build im8 · app LC-333</div></div><div class="top-status"><div id="status" class="s-load">Loading sandbox…</div><div id="whoami" class="build">Read-only tools · local memory</div></div></div>
+  <div class="top"><div><h1>Intelligent Modelling</h1><div class="build">build im9 · app LC-334</div></div><div class="top-status"><div id="status" class="s-load">Loading sandbox…</div><div id="whoami" class="build">Read-only tools · local memory</div></div></div>
   <div class="tabs" role="tablist">
     <button class="tab on" data-page="bpf">Best Plan Finder</button>
     <button class="tab" data-page="mss">Maximum Sustainable Spend</button>
@@ -135,6 +139,73 @@
   function msg(id, text, kind){ const el=q(id); if(!el)return; el.textContent=text||''; el.className='msg '+(kind||''); }
   function setResult(id, html){ q(id).innerHTML = html || ''; try { if (window.parent && window.parent !== window) window.parent.postMessage('app-activity','*'); } catch(e){} }
   function chartNum(v){ const n=Number(v); return Number.isFinite(n) ? n : 0; }
+
+  const HELP_COPY = {
+    bpf_wm: ['Withdrawal method','Chooses how pension money is taken in this Best Plan Finder test only. Use saved model settings copies your saved plan. UFPLS/blended models blended withdrawals. Tax-free first shows the 25% PCLS movement. Flexi-access switches on the chosen date.'],
+    bpf_fad_date: ['Flexi-access date','The date this sandbox test switches into flexi-access drawdown, but only when the withdrawal method is set to Force flexi-access date.'],
+    bpf_min: ['Earliest retirement','The first retirement date the finder is allowed to test. It works forward from here until it finds the earliest date that passes.'],
+    bpf_max: ['Latest date to test','The last retirement date the finder is allowed to test. If no date passes by here, the result fails.'],
+    bpf_spend: ['Spending level','The spending level used in this sandbox run compared with your saved model. 100% means full planned spending. 70% means 70% of that amount.'],
+    bpf_reserve: ['Minimum pot reserve','The protected amount that must still be left. The plan fails if the selected reserve pot drops below this amount.'],
+    bpf_scope: ['Reserve applies to','Chooses which pot is checked against the minimum reserve: combined household, Graham only, or Julie only.'],
+    bpf_shortfall: ['No shortfall allowed','If Yes, the plan fails if income and drawdown cannot cover spending in any month.'],
+    bpf_mustbuy: ['Must buy annuity','If Yes, the plan only passes if the Best Plan annuity can definitely be bought on the purchase date. If No, the annuity is optional.'],
+    bpf_best_ann: ['Best Plan annuity','Includes or excludes the new fixed annuity you are testing. This does not affect the main model or saved annuities.'],
+    bpf_ann_date: ['Purchase date','The date the sandbox tries to buy the fixed Best Plan annuity.'],
+    bpf_ann_amount: ['Fixed amount','The lump sum taken from the pension pot to buy the Best Plan annuity.'],
+    bpf_owner: ['Owner','Chooses whose pension pot buys the Best Plan annuity and who receives the annuity income.'],
+    bpf_ann_rate: ['Annuity rate','The gross annual income percentage used for the annuity. Example: 6% on £300,000 gives about £18,000 per year before tax.'],
+    bpf_esc: ['Escalation','The yearly increase applied to the annuity income. 0% means level income.'],
+    bpf_growth: ['Growth rate','The annual investment growth assumption used in this sandbox test.'],
+    bpf_existing_ann: ['Existing annuities','Choose whether annuities already saved in your data are included in this sandbox run.'],
+    bpf_crashes: ['Market crashes','Choose whether this run includes your saved market crash scenarios.'],
+    mss_retire: ['Retirement date','The retirement date used when testing the maximum sustainable spending level.'],
+    mss_growth: ['Growth rate','The annual investment growth assumption used for this Maximum Sustainable Spend test.'],
+    mss_wm: ['Withdrawal method','Chooses how pension money is taken in this Maximum Sustainable Spend test only. It does not change the main model.'],
+    mss_fad_date: ['Flexi-access date','The date this sandbox test switches into flexi-access drawdown, if that withdrawal method is selected.'],
+    mss_crashes: ['Market crashes','Choose whether this Maximum Sustainable Spend test includes your saved crash scenarios.'],
+    mss_bridge: ['Bridge floor','The minimum pot floor during the bridge period before State Pension age, expressed as a percentage of the starting pot.'],
+    mss_eol: ['End-of-life floor','The minimum pot floor required near the end of the projection, expressed as a percentage of the starting pot.'],
+    mss_cap: ['Spend cap','The highest spending level the search is allowed to test. This stops the finder searching unrealistically high spending levels.'],
+    mss_existing_ann: ['Existing annuities','Choose whether saved annuities are included in this Maximum Sustainable Spend run.'],
+    era_min: ['Earliest date to test','The first retirement date the Earliest Retirement Age tool is allowed to test.'],
+    era_max: ['Latest date to test','The last retirement date the tool is allowed to test. If no date passes by here, the result fails.'],
+    era_growth: ['Growth rate','The annual investment growth assumption used in this Earliest Retirement Age test.'],
+    era_spend: ['Spending level','The spending level used in this sandbox run compared with your saved model. 100% means full spending; 70% means 70%.'],
+    era_wm: ['Withdrawal method','Chooses how pension money is taken in this Earliest Retirement Age test only. It does not change the main model.'],
+    era_fad_date: ['Flexi-access date','The date this sandbox test switches into flexi-access drawdown, if that withdrawal method is selected.'],
+    era_existing_ann: ['Existing annuities','Choose whether saved annuities are included in this Earliest Retirement Age run.'],
+    era_crashes: ['Market crashes','Choose whether this run includes your saved market crash scenarios.'],
+    era_floor: ['Nest-egg floor','The minimum pot value that must remain for the Earliest Retirement Age test to pass.'],
+    era_combine: ['Combine retirement','Choose whether both people retire on the found date, or only Graham moves to the found retirement date.']
+  };
+  function closeHelpTip(){ const tip=q('helpTip'); if(tip) tip.classList.remove('on'); document.querySelectorAll('.help-btn[aria-expanded="true"]').forEach(b=>b.setAttribute('aria-expanded','false')); }
+  function showHelpTip(btn){
+    const help = HELP_COPY[btn.dataset.helpFor]; if(!help) return;
+    let tip=q('helpTip');
+    if(!tip){ tip=document.createElement('div'); tip.id='helpTip'; tip.className='help-tip'; tip.setAttribute('role','tooltip'); document.body.appendChild(tip); }
+    tip.innerHTML='<b>'+esc(help[0])+'</b><div>'+esc(help[1])+'</div><small>Tap outside to close.</small>';
+    tip.classList.add('on');
+    btn.setAttribute('aria-expanded','true');
+    const r=btn.getBoundingClientRect();
+    const pad=10;
+    const top=Math.min(window.innerHeight - tip.offsetHeight - pad, Math.max(pad, r.bottom + 9));
+    let left=Math.max(pad, Math.min(window.innerWidth - tip.offsetWidth - pad, r.left - 18));
+    tip.style.top=top+'px';
+    tip.style.left=left+'px';
+  }
+  function initHelpCallouts(){
+    Object.keys(HELP_COPY).forEach(id => {
+      const el=q(id); if(!el) return;
+      const field=el.closest('.field'); if(!field) return;
+      const label=field.querySelector('label'); if(!label || label.querySelector('.help-btn')) return;
+      const btn=document.createElement('button');
+      btn.type='button'; btn.className='help-btn'; btn.textContent='i'; btn.dataset.helpFor=id;
+      btn.setAttribute('aria-label','Help: '+HELP_COPY[id][0]); btn.setAttribute('aria-expanded','false'); btn.title=HELP_COPY[id][1];
+      label.appendChild(btn);
+    });
+  }
+
 
   const MEMORY_KEY = 'pensionDashboard.intelligentModelling.controls.v1';
   let memoryReady = false;
@@ -443,6 +514,7 @@
     ['bpf_spend','era_spend'].forEach(id=>{ q(id).value=spend; });
     q('mss_retire').value=rd; q('bpf_fad_date').value=rd; q('mss_fad_date').value=rd; q('era_fad_date').value=rd;
     if (!q('bpf_min').value) q('bpf_min').value=rd;
+    initHelpCallouts();
     applyRememberedControls();
     hideJulieIfSingle();
     chartMemberView = normaliseMemberView(chartMemberView);
@@ -456,7 +528,19 @@
     catch(e){ q('status').className='s-err'; q('status').textContent='Could not load intelligent modelling: '+(e.message||e); }
   }
   document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.page)));
-  document.addEventListener('click', function(ev){ const t=ev.target; if (!t || !t.classList) return; if (t.classList.contains('chart-tab')) showChartView(t.dataset.chartPrefix, t.dataset.chartView); if (t.classList.contains('member-tab')) setChartMemberView(t.dataset.memberView); });
+  document.addEventListener('click', function(ev){
+    const t=ev.target; if (!t || !t.classList) return;
+    if (t.classList.contains('help-btn')) { ev.preventDefault(); ev.stopPropagation(); const open=t.getAttribute('aria-expanded')==='true'; closeHelpTip(); if(!open) showHelpTip(t); return; }
+    if (!t.closest || !t.closest('.help-tip')) closeHelpTip();
+    if (t.classList.contains('chart-tab')) showChartView(t.dataset.chartPrefix, t.dataset.chartView);
+    if (t.classList.contains('member-tab')) setChartMemberView(t.dataset.memberView);
+  });
+  document.addEventListener('mouseover', function(ev){ const t=ev.target; if(t && t.classList && t.classList.contains('help-btn')) showHelpTip(t); });
+  document.addEventListener('mouseout', function(ev){ const t=ev.target; if(t && t.classList && t.classList.contains('help-btn')) closeHelpTip(); });
+  document.addEventListener('focusin', function(ev){ const t=ev.target; if(t && t.classList && t.classList.contains('help-btn')) showHelpTip(t); });
+  document.addEventListener('keydown', function(ev){ if(ev.key==='Escape') closeHelpTip(); });
+  window.addEventListener('resize', closeHelpTip, {passive:true});
+  window.addEventListener('scroll', closeHelpTip, {passive:true});
   document.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',ev=>{ ev.preventDefault(); chipSet(b); }));
   if (q('bpf_best_ann')) q('bpf_best_ann').addEventListener('change', syncBpfAnnuityGroup);
   q('run_bpf').addEventListener('click',runBpf); q('clear_bpf').addEventListener('click',clearBpf);

@@ -1,4 +1,4 @@
-# LC-333 direct upload pack
+# LC-334 Direct Upload Pack
 
 Upload these files to the repo root:
 
@@ -6,18 +6,16 @@ Upload these files to the repo root:
 - intelligent_modelling.html
 - best_plan_engine.js
 
-Changes in LC-333:
+## Changes
 
-- Removed the full-width Sandbox mode banner from Intelligent Modelling.
-- Increased font sizes in result cards, control labels, chart controls, chart titles/axes/legends and the yearly table.
-- Increased chart height slightly for readability on MacBook and iPad.
-- Strengthened Reserve headroom amber/yellow styling in light mode and dark mode.
-- Kept Intelligent Modelling read-only and divorced from the main Modelling page.
-- No SQL, no Supabase writes, no Save, no Apply.
-- engine.js, optimiser.js and common.js unchanged.
+- Adds small help/callout icons to key Intelligent Modelling fields.
+- Help works by hover on desktop and tap/focus on touch devices.
+- Adds dark-mode friendly tooltip styling.
+- Keeps Intelligent Modelling read-only and divorced from the main Modelling page.
+- No Supabase writes, no SQL, no Save, no Apply.
 
-Build labels:
+## Build labels
 
-- app.html: LC-333
-- intelligent_modelling.html: build im8
+- app.html: LC-334
+- intelligent_modelling.html: build im9
 - best_plan_engine.js: bpe4 unchanged
