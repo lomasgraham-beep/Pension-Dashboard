@@ -1,4 +1,4 @@
-# LC-326 — Standalone Intelligent Modelling
+# LC-327 direct upload pack
 
 Upload these files to the repository root:
 
@@ -6,26 +6,30 @@ Upload these files to the repository root:
 2. `intelligent_modelling.html`
 3. `best_plan_engine.js`
 
+## Build labels
+
+- `app.html`: LC-327
+- `intelligent_modelling.html`: build im2
+- `best_plan_engine.js`: bpe2
+
 ## What changed
 
-- Added a new top-level **Intelligent Modelling** tab.
-- Moved intelligent modelling tools out of the main Modelling page.
-- Removed Best Plan Finder, Maximum Sustainable Spend, and Earliest Retirement Age from the main Retirement Model page.
-- Rebuilt the intelligent tools as read-only sandbox pages:
-  - Best Plan Finder
-  - Maximum Sustainable Spend
-  - Earliest Retirement Age
-- The sandbox reads Supabase data and uses `PensionEngine`, but it does not mutate the main model state and does not write to Supabase.
-- No Apply button. No Save. If a result looks good, manually enter it into the main model.
+- Adds sandbox result charts to Intelligent Modelling.
+- Best Plan Finder, Maximum Sustainable Spend, and Earliest Retirement Age now show:
+  - pot projection chart,
+  - income/outgoings chart,
+  - yearly output table.
+- Charts are based only on the Intelligent Modelling sandbox run output.
+- No Apply button.
+- No Save.
+- No Supabase writes.
+- Main Modelling page remains divorced from Intelligent Modelling.
 
-## Files unchanged
+## Unchanged
 
 - `engine.js`
 - `optimiser.js`
 - `common.js`
 - SQL schema
 
-## Test
-
-After upload, hard refresh and confirm the app build stamp shows `LC-326`.
-Open **Intelligent Modelling** from the top navigation and run each tool.
+After upload, hard refresh and confirm the app build stamp shows LC-327.

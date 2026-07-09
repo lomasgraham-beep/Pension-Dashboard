@@ -1,6 +1,6 @@
 /* ============================================================
    best_plan_engine.js — Intelligent Modelling sandbox controller
-   build: bpe1 / target app build LC-326
+   build: bpe2 / target app build LC-327
 
    Uses the existing PensionEngine as the single source of pension maths.
    It never mutates the main Modelling page state and never writes to Supabase.
@@ -8,7 +8,7 @@
 (function (global) {
   'use strict';
 
-  const BUILD = 'bpe1';
+  const BUILD = 'bpe2';
   const ANN_NAME = 'Best Plan Finder Annuity';
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -288,16 +288,20 @@
   function runEra(state, opts) {
     if (!global.PensionOptimiser || !PensionOptimiser.earliestRetirement) throw new Error('PensionOptimiser.earliestRetirement is not loaded.');
     const runData = scenarioData(state, opts);
-    const base = scenarioPlan(state, opts);
     const combine = opts.combineRetirement !== false;
     const p2Fixed = (!combine && state.basePlan && state.basePlan.retireByMember && state.p2Name) ? state.basePlan.retireByMember[state.p2Name] : null;
+    function retireByMemberFor(retireDate) {
+      if (!(state.p2Name && p2Fixed)) return null;
+      const rbm = {};
+      if (state.p1Name) rbm[state.p1Name] = retireDate;
+      rbm[state.p2Name] = p2Fixed;
+      return rbm;
+    }
     const rebuildForDate = function (retireDate) {
-      let rbm = null;
-      if (state.p2Name && p2Fixed) { rbm = {}; if (state.p1Name) rbm[state.p1Name] = retireDate; rbm[state.p2Name] = p2Fixed; }
-      const p = scenarioPlan(state, Object.assign({}, opts, { retirementDate: retireDate, retireByMember: rbm, spendRed: opts.spendRed }));
+      const p = scenarioPlan(state, Object.assign({}, opts, { retirementDate: retireDate, retireByMember: retireByMemberFor(retireDate), spendRed: opts.spendRed }));
       return buildDrawdownCfg(state, runData, p);
     };
-    return PensionOptimiser.earliestRetirement(runData, {
+    const res = PensionOptimiser.earliestRetirement(runData, {
       rebuildForDate,
       minDate: parseDate(opts.minDate),
       maxDate: parseDate(opts.maxDate),
@@ -305,6 +309,20 @@
       nestEggFloor: Number(opts.nestEggFloor) || 0,
       includeCrashes: !!opts.includeCrashes
     });
+    if (res && res.feasible && res.earliestDate) {
+      const ret = parseDate(res.earliestDate);
+      const p = scenarioPlan(state, Object.assign({}, opts, { retirementDate: ret, retireByMember: retireByMemberFor(ret), spendRed: opts.spendRed }));
+      const cfg = buildDrawdownCfg(state, runData, p);
+      const rows = PensionEngine.drawdown(runData, cfg);
+      const ev = evaluateRows(rows, { reserveScope: 'combined', reserveAmount: Number(opts.nestEggFloor) || 0, noShortfall: true });
+      res.rows = rows;
+      res.lowestPot = ev.minPot;
+      res.lowestPotDate = ev.minPotDate;
+      res.endPot = ev.endPot;
+      res.plan = p;
+      res.cfg = cfg;
+    }
+    return res;
   }
 
   global.BestPlanEngine = { BUILD, ANN_NAME, loadState, scenarioPlan, scenarioData, buildDrawdownCfg, findBestPlan, runMss, runEra, evaluateRows, parseDate, toInputDate, dateLabel, gbp };
