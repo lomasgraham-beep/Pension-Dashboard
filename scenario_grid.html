@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
   :root {
-    --accent:#2c7a7b; --amber:#d97706;
+    --accent:#1d3a63; --amber:#d97706;
     --ink:#2c3e50; --sub:#64748b; --line:#d3e3e3;
     --bg:#e8f0f0; --cell:#ffffff; --cellborder:#d4e4e4;
     --cellshadow:0 1px 3px rgba(15,52,52,0.10);
@@ -83,7 +83,7 @@
   /* ---- automatic dark mode ---- */
   @media (prefers-color-scheme: dark) {
     :root {
-      --accent:#5eead4; --amber:#fbbf24;
+      --accent:#38d6e6; --amber:#fbbf24;
       --ink:#e2e8f0; --sub:#94a3b8; --line:#334155;
       --bg:#0b1120; --cell:#1e293b; --cellborder:#334155;
       --cellshadow:0 1px 3px rgba(0,0,0,0.45);
@@ -156,7 +156,7 @@
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
   const isDark = () => mq.matches;
   function lineColors() {
-    return isDark() ? ['#5eead4', '#fbbf24'] : ['#2c7a7b', '#d97706'];
+    return isDark() ? ['#38d6e6', '#fbbf24'] : ['#1d3a63', '#d97706'];
   }
   function axisColor() { return isDark() ? '#94a3b8' : '#64748b'; }
   function gridColor() { return isDark() ? '#334155' : '#e2e8f0'; }

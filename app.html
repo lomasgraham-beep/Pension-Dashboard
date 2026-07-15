@@ -11,10 +11,10 @@
   <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
-      --accent:#2c7a7b;            /* slate-teal */
-      --accent-dark:#236668;
-      --accent-soft:#e6f2f2;       /* faint teal wash for highlights */
-      --accent-border:#b8dadb;
+      --accent:#1d3a63;            /* navy accent */
+      --accent-dark:#14294a;
+      --accent-soft:#e6f5f7;       /* faint aqua wash for highlights */
+      --accent-border:#bfe4e9;
       --page:#eef2f3;              /* tinted-neutral page background */
       --surface:#ffffff;           /* cards / panels */
       --surface-2:#f7f9fa;         /* subtle inset background */
@@ -103,7 +103,7 @@
 
     /* hero band */
     .ov-hero { display:grid; grid-template-columns:1.7fr 1fr 1fr; gap:12px; align-items:stretch; margin-bottom:14px; }
-    .ov-hero .lead { background:linear-gradient(135deg,var(--accent-soft),#f3fafa); border:1px solid var(--accent-border); border-radius:var(--radius); padding:16px 18px; text-align:left; }
+    .ov-hero .lead { background:linear-gradient(135deg,var(--accent-soft),#eef7f9); border:1px solid var(--accent-border); border-radius:var(--radius); padding:16px 18px; text-align:left; }
     .ov-hero .lead h3 { color:var(--accent-dark); margin:0 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:0.04em; }
     .ov-hero .lead .value { font-size:34px; font-weight:700; color:var(--accent-dark); line-height:1.05; }
     .ov-hero .mtile { text-align:left; padding:14px 15px; }
@@ -190,8 +190,8 @@
     tr.crash-row td { background:#fef2f2; }
     .crash-info { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; min-width:26px; border:none; border-radius:50%; background:#dc2626; color:#fff; font-size:14px; font-weight:700; font-style:italic; font-family:Georgia,serif; margin-left:6px; cursor:pointer; vertical-align:middle; padding:0; -webkit-tap-highlight-color:transparent; }
     .crash-info:active { background:#991b1b; }
-    .annuity-info { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; min-width:26px; border:none; border-radius:50%; background:#2c7a7b; color:#fff; font-size:14px; font-weight:700; margin-left:6px; cursor:pointer; vertical-align:middle; padding:0; -webkit-tap-highlight-color:transparent; }
-    .annuity-info:active { background:#236668; }
+    .annuity-info { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; min-width:26px; border:none; border-radius:50%; background:#1d3a63; color:#fff; font-size:14px; font-weight:700; margin-left:6px; cursor:pointer; vertical-align:middle; padding:0; -webkit-tap-highlight-color:transparent; }
+    .annuity-info:active { background:#14294a; }
     tr.annuity-row td { background:#f0fdfa; }
     #crashTip { position:absolute; display:none; z-index:9999; background:#1e293b; color:#fff; font-size:13px; line-height:1.4; padding:10px 12px; border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,0.25); pointer-events:none; }
     #rTable th:first-child, #rTable td:first-child { white-space:nowrap; }
@@ -440,7 +440,7 @@
   /* ---- Automatic dark mode (follows device setting) ---- */
   @media (prefers-color-scheme: dark) {
     :root {
-      --accent:#5eead4; --accent-dark:#2dd4bf; --accent-soft:#134e4a; --accent-border:#334155;
+      --accent:#38d6e6; --accent-dark:#22c4d6; --accent-soft:#0e3a52; --accent-border:#334155;
       --page:#0f172a; --surface:#1e293b; --surface-2:#162132;
       --ink:#e2e8f0; --ink-soft:#94a3b8; --line:#334155; --line-strong:#475569;
     }
@@ -470,7 +470,7 @@
     td { border-color:#334155 !important; color:#cbd5e1 !important; }
     #rTable td, #rTable th { color:#cbd5e1 !important; }
     /* re-apply accent colours on top, at higher specificity so they still show */
-    #rTable td[style*="color:#2c7a7b"] { color:#5eead4 !important; }
+    #rTable td[style*="color:#1d3a63"] { color:#38d6e6 !important; }
     #rTable td[style*="color:#c0392b"] { color:#f87171 !important; }
     #rTable td[style*="color:#e67e22"] { color:#fbbf24 !important; }
     #rTable td[style*="color:#2563eb"] { color:#7dd3fc !important; }
@@ -483,7 +483,7 @@
     /* brighten ALL the meaningful accent figures so they read on dark */
     [style*="color:#2563eb"] { color:#60a5fa !important; }   /* loan - blue */
     [style*="color:#1e40af"], .tier-pill { color:#93c5fd !important; }
-    [style*="color:#2c7a7b"] { color:#5eead4 !important; }   /* cash/savings - teal */
+    [style*="color:#1d3a63"] { color:#38d6e6 !important; }   /* cash/savings - teal */
     [style*="color:#c0392b"] { color:#f87171 !important; }   /* bills - red */
     [style*="color:#e67e22"] { color:#fbbf24 !important; }   /* dining - amber */
     [style*="color:#27ae60"], [style*="color:#16a34a"] { color:#4ade80 !important; } /* income/growth - green */
@@ -492,7 +492,7 @@
     #status.s-load, .s-load { background:#1e293b !important; color:#93c5fd !important; }
     #crashTip { background:#020617 !important; }
     .crash-info { background:#dc2626 !important; }
-    .annuity-info { background:#2c7a7b !important; }
+    .annuity-info { background:#1d3a63 !important; }
     tr.annuity-row td { background:transparent !important; }
     .topbar { color:#94a3b8 !important; }
     a, .topbar a { color:#60a5fa !important; }
@@ -553,7 +553,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-334</span>
+      <span class="build-stamp">LC-335</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -648,7 +648,7 @@
         <div id="ovTrajHost"></div>
         <div class="ov-traj-legend">
           <span><span style="display:inline-block; width:18px; height:3px; background:var(--accent); vertical-align:middle; margin-right:6px;"></span>Logged history</span>
-          <span><span style="display:inline-block; width:18px; height:0; border-top:3px dashed #7cb9ba; vertical-align:middle; margin-right:6px;"></span>Projected to retirement</span>
+          <span><span style="display:inline-block; width:18px; height:0; border-top:3px dashed #5bb8c4; vertical-align:middle; margin-right:6px;"></span>Projected to retirement</span>
         </div>
       </div>
 
@@ -1297,7 +1297,7 @@
     // Leaf: { label, val:(r,v,s)=>num, style?, neg?(render −), grow?(green/red small) }
     function retSegModel() {
       const joint = (currentView === 'Joint');
-      const RED='color:#c0392b;', ORANGE='color:#e67e22;', BLUE='color:#2563eb;', GREEN='color:#27ae60;', TEAL='color:#2c7a7b;', PURPLE='color:#6b5b95;', B='font-weight:bold;';
+      const RED='color:#c0392b;', ORANGE='color:#e67e22;', BLUE='color:#2563eb;', GREEN='color:#27ae60;', TEAL='color:#1d3a63;', PURPLE='color:#6b5b95;', B='font-weight:bold;';
       const segs = [];
       // DC Pots
       if (retSegShown.pots) {
@@ -1651,7 +1651,7 @@
       const box = document.getElementById(id);
       if (!box) return;
       const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
-      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-334 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-335 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
     }
     function safeOptionalChart(drawFn, chartId, headId) {
       try { drawFn(); }
@@ -1766,7 +1766,7 @@
             2: { targetAxisIndex:0, color:'#c39bd3' },  // Julie guaranteed
             3: { targetAxisIndex:0, color:'#85c1e9' },  // Graham guaranteed
             4: { targetAxisIndex:0, color:'#e67e22' },  // Julie annuity (amber)
-            5: { targetAxisIndex:0, color:'#2c7a7b' },  // Graham annuity (teal)
+            5: { targetAxisIndex:0, color:'#1d3a63' },  // Graham annuity (teal)
             6: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
           };
         } else {
@@ -1797,7 +1797,7 @@
           incSeries = {
             0: { targetAxisIndex:0, color:'#3498db' },  // drawdown
             1: { targetAxisIndex:0, color:'#9b59b6' },  // guaranteed
-            2: { targetAxisIndex:0, color:'#2c7a7b' },  // annuity (teal)
+            2: { targetAxisIndex:0, color:'#1d3a63' },  // annuity (teal)
             3: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
           };
         } else {
@@ -1871,7 +1871,7 @@
       const potFixedIdx = joint ? 5 : 3;
       const potSeries = {};
       potSeries[potSpendIdx] = { type: 'line', targetAxisIndex: 1, color: '#2c3e50', lineWidth: 3, pointSize: 4 };
-      potSeries[potFixedIdx] = { type: 'line', targetAxisIndex: 1, color: '#16a085', lineWidth: 3, pointSize: 4, lineDashStyle: [6, 4] };
+      potSeries[potFixedIdx] = { type: 'line', targetAxisIndex: 1, color: '#17b5c4', lineWidth: 3, pointSize: 4, lineDashStyle: [6, 4] };
       const spendVAxis = phone
         ? { viewWindow: { min: 0, max: spendMax }, ticks: shortTicks(spendMax), textStyle: axisText }
         : { title: 'Spend & pension income (£)', viewWindow: { min: 0, max: spendMax }, format: '£#,###', textStyle: axisText };
@@ -1890,13 +1890,13 @@
             { label: p2Name + ' taxable',  color: potColors[2], type: 'bar' },
             { label: p1Name + ' taxable',  color: potColors[3], type: 'bar' },
             { label: 'Annual spend',       color: '#2c3e50',    type: 'line' },
-            { label: 'Pension income (net)', color: '#16a085',  type: 'line' }
+            { label: 'Pension income (net)', color: '#17b5c4',  type: 'line' }
           ]
         : [
             { label: 'Tax-Free Pot',       color: potColors[0], type: 'bar' },
             { label: 'Taxable Pot',        color: potColors[1], type: 'bar' },
             { label: 'Annual spend',       color: '#2c3e50',    type: 'line' },
-            { label: 'Pension income (net)', color: '#16a085',  type: 'line' }
+            { label: 'Pension income (net)', color: '#17b5c4',  type: 'line' }
           ];
       renderCustomLegend(document.getElementById('potChart').closest('.chart-wrap'), potLegendEntries);
 
@@ -1920,7 +1920,7 @@
         );
         if (hasAnnuity) incLegendEntries.push(
           { label: p2Name + ' annuity', color: '#e67e22', type: 'bar' },
-          { label: p1Name + ' annuity', color: '#2c7a7b', type: 'bar' }
+          { label: p1Name + ' annuity', color: '#1d3a63', type: 'bar' }
         );
         incLegendEntries.push({ label: 'Total drawdown', color: '#f39c12', type: 'line' });
       } else {
@@ -1928,7 +1928,7 @@
           { label: 'Drawdown',          color: '#3498db', type: 'bar' },
           { label: 'Guaranteed income', color: '#9b59b6', type: 'bar' }
         );
-        if (hasAnnuity) incLegendEntries.push({ label: 'Annuity income', color: '#2c7a7b', type: 'bar' });
+        if (hasAnnuity) incLegendEntries.push({ label: 'Annuity income', color: '#1d3a63', type: 'bar' });
         incLegendEntries.push({ label: 'Total drawdown', color: '#f39c12', type: 'line' });
       }
       renderCustomLegend(document.getElementById('incomeChart').closest('.chart-wrap'), incLegendEntries);
@@ -1980,7 +1980,7 @@
         seriesType: 'line',
         series: {
           0: { type: 'area', color: '#c0392b', areaOpacity: 0.12, lineWidth: 0, enableInteractivity: false, visibleInLegend: false },
-          1: { type: 'line', color: '#2c7a7b', lineWidth: 3 }
+          1: { type: 'line', color: '#1d3a63', lineWidth: 3 }
         },
         legend: { position: 'none' },
         chartArea: phone ? { left: 60, right: 16, top: 40, bottom: 70, height: '64%' } : { left: 88, right: 30, top: 44, bottom: 70 },
@@ -2062,7 +2062,7 @@
       const top = Math.ceil(Math.max(peak, 1) * 1.05 / 1000) * 1000;
 
       // a pleasant palette for the account segments (surplus colours come from surplusCols)
-      const palette = ['#2c7a7b', '#e67e22', '#0e7490', '#b7791f', '#9b2c2c', '#2f855a', '#553c9a'];
+      const palette = ['#1d3a63', '#e67e22', '#0e7490', '#b7791f', '#9b2c2c', '#2f855a', '#553c9a'];
       const acctColors = showAccts.map((_, i) => palette[i % palette.length]);
       const allColors = acctColors.concat(surplusCols.map(c => c.color));
       const phone = window.innerWidth <= 600;
@@ -2108,7 +2108,7 @@
       // one line per annuity
       viewWindows.forEach(w => dt.addColumn('number', (w.name || 'Annuity') + ' (' + w.member + ')'));
 
-      const palette = ['#2c7a7b', '#e67e22', '#6b5b95', '#c0392b', '#2471a3', '#27ae60'];
+      const palette = ['#1d3a63', '#e67e22', '#6b5b95', '#c0392b', '#2471a3', '#27ae60'];
       const years = []; for (let y = firstYear; y <= lastYear; y++) years.push(y);
 
       // cumulative income per annuity: starts at -purchase amount in its purchase year,
@@ -2178,7 +2178,7 @@
 
     let _ovSparkSeq = 0;
     function ovTok(n){ return (getComputedStyle(document.documentElement).getPropertyValue(n) || '').trim(); }
-    function ovAccent(){ return ovTok('--accent') || '#2c7a7b'; }
+    function ovAccent(){ return ovTok('--accent') || '#1d3a63'; }
     function ovInk(){ return ovTok('--ink') || '#26333a'; }
     function ovInkSoft(){ return ovTok('--ink-soft') || '#64748b'; }
     function ovTrack(){ return ovTok('--line') || '#e2e8f0'; }
@@ -2338,7 +2338,7 @@
       if (!card || !host) return;
       const total = g + j;
       if (!total || !p2Name || (g <= 0 && j <= 0)){ card.style.display = 'none'; return; }
-      const segs = [{ v: g, color: ovAccent(), label: p1Name }, { v: j, color: '#7cb9ba', label: p2Name }];
+      const segs = [{ v: g, color: ovAccent(), label: p1Name }, { v: j, color: '#5bb8c4', label: p2Name }];
       const r = 52, c = 2 * Math.PI * r; let off = 0, rings = '';
       segs.forEach(s => {
         const len = s.v / total * c;
@@ -2395,7 +2395,7 @@
         .filter(r => r.v > 0).sort((a, b) => b.v - a.v);
       const total = rows.reduce((s, r) => s + r.v, 0);
       if (!rows.length){ host.innerHTML = ''; return; }
-      const colFor = m => m === p1Name ? ovAccent() : (m === p2Name ? '#7cb9ba' : '#94a3b8');
+      const colFor = m => m === p1Name ? ovAccent() : (m === p2Name ? '#5bb8c4' : '#94a3b8');
       host.innerHTML = '<div class="bp-head">By pension</div>' + rows.map(r => {
         const pc = total ? r.v / total * 100 : 0;
         return '<div class="ov-bp-row">' +
@@ -2497,7 +2497,7 @@
         '<text x="' + (px(retYear) - 4) + '" y="' + (py(target) - 12) + '" text-anchor="end" font-size="12" font-weight="700" fill="' + accent + '">retire</text>';
       host.innerHTML = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" style="display:block">' +
         grid + xl +
-        (proj.length ? '<path d="' + path(proj) + '" fill="none" stroke="#7cb9ba" stroke-width="2.5" stroke-dasharray="6 6" stroke-linecap="round"/>' : '') +
+        (proj.length ? '<path d="' + path(proj) + '" fill="none" stroke="#5bb8c4" stroke-width="2.5" stroke-dasharray="6 6" stroke-linecap="round"/>' : '') +
         '<path d="' + path(actual) + '" fill="none" stroke="' + accent + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' +
         markers + '</svg>';
     }
@@ -3259,7 +3259,7 @@
       return '<circle cx="' + x.toFixed(1) + '" cy="' + y + '" r="' + r + '" fill="' + colour + '" style="stroke:var(--surface);stroke-width:2"/>';
     }
     function biasLink(x1, x2, y) {
-      return '<line x1="' + x1.toFixed(1) + '" y1="' + y + '" x2="' + x2.toFixed(1) + '" y2="' + y + '" stroke="#2c7a7b" stroke-width="3" stroke-linecap="round" opacity="0.5"/>';
+      return '<line x1="' + x1.toFixed(1) + '" y1="' + y + '" x2="' + x2.toFixed(1) + '" y2="' + y + '" stroke="#1d3a63" stroke-width="3" stroke-linecap="round" opacity="0.5"/>';
     }
     function computeBias() {
       const rows = drawdownRows || [];
@@ -3293,7 +3293,7 @@
         svg += biasLink(cashX, annX, y);
       }
       if (hasCash) svg += biasDot(cashX, y, r, '#2f74a8');
-      if (hasDC) svg += biasDot(cx, y, r, '#2c7a7b');
+      if (hasDC) svg += biasDot(cx, y, r, '#1d3a63');
       if (hasAnn) svg += biasDot(annX, y, r, '#b07d1a');
       if (showLabels) {
         svg += '<text x="8" y="30" text-anchor="start" font-size="9" style="fill:var(--ink-soft)">Cash</text>';
@@ -3499,7 +3499,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front37';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front38';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size

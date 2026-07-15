@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
   :root {
-    --accent:#2c7a7b; --amber:#d97706; --ink:#2c3e50; --sub:#64748b; --line:#d3e3e3;
+    --accent:#1d3a63; --amber:#d97706; --ink:#2c3e50; --sub:#64748b; --line:#d3e3e3;
     --bg:#e8f0f0; --cell:#ffffff; --cellborder:#d4e4e4; --headbg:#ffffff;
     --ok:#0f9d6e; --bad:#dc3030;
   }
@@ -153,29 +153,29 @@
 
   @media (max-width:600px) { .result-cards { grid-template-columns:1fr; } .scenario-grid { grid-template-columns:1fr 1fr; } .metric-control { width:100%; overflow:auto; } .result-card .cv { font-size:15px; } .chart-tools { align-items:flex-start; } table.t { font-size:12px; } }
   @media (prefers-color-scheme: dark) {
-    :root { --accent:#5eead4; --amber:#fbbf24; --ink:#e2e8f0; --sub:#94a3b8; --line:#334155; --bg:#0b1120; --cell:#1e293b; --cellborder:#334155; --headbg:#0f172a; --ok:#34d399; --bad:#f87171; }
+    :root { --accent:#38d6e6; --amber:#fbbf24; --ink:#e2e8f0; --sub:#94a3b8; --line:#334155; --bg:#0b1120; --cell:#1e293b; --cellborder:#334155; --headbg:#0f172a; --ok:#34d399; --bad:#f87171; }
     .mm-btn { background:#0f172a; color:#e2e8f0; border-color:#475569; }
-    .mm-pill, .wchip, .badge, .viewing-pill { background:#0f2b2b; color:#5eead4; }
+    .mm-pill, .wchip, .badge, .viewing-pill { background:#0f2b2b; color:#38d6e6; }
     .scenario-card { background:#0f172a; border-color:#475569; }
-    .scenario-card.sel { background:#0f2b2b; border-color:#5eead4; box-shadow:inset 0 0 0 1px #5eead4; }
+    .scenario-card.sel { background:#0f2b2b; border-color:#38d6e6; box-shadow:inset 0 0 0 1px #38d6e6; }
     .insight.ok { background:#0f2b2b; color:#bbf7d0; }
     .insight.warn { background:#2b2110; color:#fde68a; }
     .insight.bad { background:#3b1d1d; color:#fecaca; }
     .metric-control, .accordion { background:#0f172a; border-color:#475569; }
     .metric-control button { color:#94a3b8; border-color:#475569; }
-    .metric-control button.on { background:#0f6e56; color:#e2fff5; }
+    .metric-control button.on { background:#1d3a63; color:#eafcff; }
     .acc-body { border-color:#475569; }
     .chip, .chart-mode { background:#0f172a; color:#94a3b8; border-color:#475569; }
     .chart-mode button { color:#94a3b8; }
-    .chart-mode button.on { background:#0f6e56; color:#e2fff5; }
-    .chip.on { background:#0f6e56; color:#e2fff5; border-color:#0f6e56; }
+    .chart-mode button.on { background:#1d3a63; color:#eafcff; }
+    .chip.on { background:#1d3a63; color:#eafcff; border-color:#1d3a63; }
     .seg button { background:#0f172a; color:#94a3b8; }
-    .seg button.on { background:#0f6e56; color:#e2fff5; }
+    .seg button.on { background:#1d3a63; color:#eafcff; }
     .in { background:#0f172a; color:#e2e8f0; border-color:#475569; }
     .dstep { background:#0f2020; }
-    .nudge { background:#0f172a; color:#5eead4; border-color:#475569; }
+    .nudge { background:#0f172a; color:#38d6e6; border-color:#475569; }
     .stp { background:#0f172a; color:#94a3b8; }
-    .stp.on { background:#0f6e56; color:#e2fff5; border-color:#0f6e56; }
+    .stp.on { background:#1d3a63; color:#eafcff; border-color:#1d3a63; }
     table.t tbody tr.sel td { background:#0f2b2b; }
     #status.s-load, .s-load { background:#1e293b; color:#93c5fd; }
     #status.s-err, .s-err { background:#3b1d1d; color:#f87171; }
@@ -187,7 +187,7 @@
   <div class="mm-head">
     <span class="mm-title">Multi Modelling</span>
     <span class="mm-pill" id="modelName" style="display:none;"></span>
-    <span style="font-size:11px; color:var(--sub);">(build: mm6)</span>
+    <span style="font-size:11px; color:var(--sub);">(build: mm7)</span>
     <span class="spacer"></span>
     <button class="mm-btn pri" id="btnNew" type="button">+ New multi model</button>
     <button class="mm-btn" id="btnEdit" type="button" disabled>Edit</button>
@@ -208,8 +208,8 @@
   <div class="overlay" id="confOv"><div class="card" style="max-width:420px;"><h3 id="confMsg">—</h3><div class="nav"><span></span><span><button class="mm-btn" id="confCancel" type="button" style="margin-right:8px;">Cancel</button><button class="mm-btn pri" id="confYes" type="button">Yes</button></span></div></div></div>
 <script>
   var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var COL_L = ['#2c7a7b','#2563eb','#d97706','#7c3aed','#16a34a','#dc2626'];
-  var COL_D = ['#5eead4','#60a5fa','#fbbf24','#c4b5fd','#4ade80','#f87171'];
+  var COL_L = ['#1d3a63','#2563eb','#d97706','#7c3aed','#16a34a','#dc2626'];
+  var COL_D = ['#38d6e6','#60a5fa','#fbbf24','#c4b5fd','#4ade80','#f87171'];
   var mq = window.matchMedia('(prefers-color-scheme: dark)');
   function isDark() { return mq.matches; }
   function palette() { return isDark() ? COL_D : COL_L; }
@@ -272,7 +272,7 @@
   function renderOutput() { document.getElementById('empty').style.display = 'none'; var out = document.getElementById('output'); out.style.display = 'block'; try { var focus = scenarios[sel] || scenarios[0]; var cards = resultCardsHTML(); var chooser = scenarioSelectorHTML(); var insight = selectedInsightHTML(focus); var controls = metricControlsHTML(); var mainTitle = '<div class="subh">' + esc(metricLabel(activeMetric) + (chartMode==='diffSel' ? ' · difference from selected' : '')) + '</div><div class="chart-note">' + esc(metricNote(activeMetric)) + '</div>'; var main = mainTitle + '<div class="cbox"><div class="chart-main" id="chartMain"></div></div>'; var compare = accordionHTML('compare', 'detailed comparison', '▥', compareOpen, detailedComparisonHTML()); var detail = accordionHTML('detail', 'year-by-year detail', '▦', detailOpen, '<div id="drill"></div>'); out.innerHTML = cards + chooser + insight + controls + main + compare + detail; document.querySelectorAll('#metricCtl [data-m]').forEach(function(b){ b.onclick = function(){ activeMetric = b.dataset.m; renderOutput(); }; }); document.querySelectorAll('#chartMode [data-cm]').forEach(function(b){ b.onclick = function(){ chartMode = b.dataset.cm; renderOutput(); }; }); document.querySelectorAll('#scenarioGrid [data-i], #sumRows tr').forEach(function(el){ el.onclick = function(){ sel = Number(el.dataset.i); renderOutput(); }; }); document.querySelectorAll('[data-acc]').forEach(function(b){ b.onclick = function(){ if (b.dataset.acc==='compare') compareOpen = !compareOpen; if (b.dataset.acc==='detail') detailOpen = !detailOpen; renderOutput(); }; }); if (detailOpen) renderDrill(); if (chartsReady) { safeDrawMain(); } } catch(e) { console.error('Multi model render failed', e); out.innerHTML = '<div class="cbox"><b>Could not render multi model results.</b><br><span class="bad">' + esc(e.message || e) + '</span></div>'; } }
   function baseChartOpts(yA) { var ax = axisColor(), gl = gridColor(); return { legend:'none', backgroundColor:'transparent', lineWidth:2, pointSize:0, interpolateNulls:true, chartArea:{ left:56, top:12, right:16, bottom:28, width:'82%', height:'80%' }, hAxis:{ format:'####', textStyle:{ fontSize:11, color:ax }, gridlines:{ color:'transparent' }, baselineColor:gl }, vAxis:{ viewWindow:{ min:(yA.min!=null?yA.min:0), max:yA.max }, ticks:yA.ticks, textStyle:{ fontSize:11, color:ax }, gridlines:{ color:gl }, baselineColor:gl } }; }
   function drawMain() { var host = document.getElementById('chartMain'); if (!host || !scenarios.length || !window.google || !google.visualization) return; var w = host.clientWidth, h = host.clientHeight; if (w < 8 || h < 8) return; var pal = palette(); var dt = new google.visualization.DataTable(); dt.addColumn('number','Year'); scenarios.forEach(function(sc){ dt.addColumn('number', sc.label); }); var allYears = scenarios.reduce(function(best,sc){ return (sc.series.years||[]).length > best.length ? sc.series.years : best; }, []); var peak = 0, peakAbs = 0, colors = [], ref = scenarios[sel] || scenarios[0]; allYears.forEach(function(yr){ var y = finiteOrNull(yr); if (y == null) return; var row = [y]; var refIdx = ref ? ref.series.years.indexOf(yr) : -1; var refVal = (refIdx >= 0) ? finiteOrNull(ref.series[activeMetric][refIdx]) : null; scenarios.forEach(function(sc){ var idx = sc.series.years.indexOf(yr); var v = (idx >= 0) ? finiteOrNull(sc.series[activeMetric][idx]) : null; if (chartMode === 'diffSel' && v != null && refVal != null) v = finiteOrNull(v - refVal); if (v != null) { if (v > peak) peak = v; if (Math.abs(v) > peakAbs) peakAbs = Math.abs(v); } row.push(v); }); dt.addRow(row); }); scenarios.forEach(function(sc,i){ colors.push(pal[i%pal.length]); }); var opts = baseChartOpts(chartMode === 'diffSel' ? axisForSigned(peakAbs*1.08) : axisFor(peak*1.05)); opts.colors = colors; opts.width = w; opts.height = h; opts.series = {}; scenarios.forEach(function(sc,i){ opts.series[i] = { lineWidth: (i===sel?4:2), lineDashStyle:(chartMode==='diffSel' && i===sel ? [3,3] : null) }; }); new google.visualization.LineChart(host).draw(dt, opts); }
-  function drawNet() { var host = document.getElementById('chartNet'); if (!host) return; var w = host.clientWidth, h = host.clientHeight; if (w < 8 || h < 8) return; var sc = scenarios[sel] || scenarios[0]; if (!sc) return; var s = sc.series; var dt = new google.visualization.DataTable(); dt.addColumn('number','Year'); dt.addColumn('number','Net income'); dt.addColumn('number','Spend'); var peak = 0; for (var i=0;i<s.years.length;i++){ if (s.net[i]>peak) peak=s.net[i]; if (s.spend[i]>peak) peak=s.spend[i]; dt.addRow([s.years[i], s.net[i], s.spend[i]]); } var opts = baseChartOpts(axisFor(peak*1.08)); opts.colors = [ isDark()?'#5eead4':'#0f6e56', isDark()?'#f59e0b':'#c77c08' ]; opts.series = { 1: { lineDashStyle:[6,4] } }; opts.width = w; opts.height = h; new google.visualization.LineChart(host).draw(dt, opts); }
+  function drawNet() { var host = document.getElementById('chartNet'); if (!host) return; var w = host.clientWidth, h = host.clientHeight; if (w < 8 || h < 8) return; var sc = scenarios[sel] || scenarios[0]; if (!sc) return; var s = sc.series; var dt = new google.visualization.DataTable(); dt.addColumn('number','Year'); dt.addColumn('number','Net income'); dt.addColumn('number','Spend'); var peak = 0; for (var i=0;i<s.years.length;i++){ if (s.net[i]>peak) peak=s.net[i]; if (s.spend[i]>peak) peak=s.spend[i]; dt.addRow([s.years[i], s.net[i], s.spend[i]]); } var opts = baseChartOpts(axisFor(peak*1.08)); opts.colors = [ isDark()?'#38d6e6':'#1d3a63', isDark()?'#f59e0b':'#c77c08' ]; opts.series = { 1: { lineDashStyle:[6,4] } }; opts.width = w; opts.height = h; new google.visualization.LineChart(host).draw(dt, opts); }
   function renderDrill() { var el = document.getElementById('drill'); if (!el) return; var sc = scenarios[sel] || scenarios[0]; if (!sc) { el.innerHTML=''; return; } var s = sc.series; var split = (p2Name && splitMembers); var head = '<div class="drill-head"><span class="subh" style="margin:0;">' + esc(sc.label) + ' · year by year</span>' + (p2Name ? '<label class="toggle"><input type="checkbox" id="splitTog" ' + (splitMembers?'checked':'') + '>Split by member</label>' : '') + '</div>'; var th = split ? '<tr><th>Year</th><th>' + esc(p1Name) + ' pot</th><th>' + esc(p2Name) + ' pot</th><th>Fixed</th><th>Annuity</th><th>Spend</th><th>' + esc(p1Name) + ' net</th><th>' + esc(p2Name) + ' net</th><th>Surplus / shortfall</th><th>Status</th></tr>' : '<tr><th>Year</th><th>Pot</th><th>Fixed</th><th>Annuity</th><th>Spend</th><th>Net</th><th>Surplus / shortfall</th><th>Status</th></tr>'; var body = s.years.map(function(yr,i){ var gap = (s.net[i]||0) - (s.spend[i]||0), cls = gap < 0 ? 'bad' : 'ok', txt = gap < 0 ? 'Shortfall' : 'OK'; return split ? '<tr><td>' + yr + '</td><td>' + shortGBP(s.gPot[i]) + '</td><td>' + shortGBP(s.jPot[i]) + '</td><td>' + shortGBP(s.fixed[i]) + '</td><td>' + shortGBP(s.ann[i]) + '</td><td>' + shortGBP(s.spend[i]) + '</td><td>' + shortGBP(s.gNet[i]) + '</td><td>' + shortGBP(s.jNet[i]) + '</td><td class="' + cls + '">' + signedGBP(gap) + '</td><td class="risk ' + cls + '">' + txt + '</td></tr>' : '<tr><td>' + yr + '</td><td>' + shortGBP(s.pot[i]) + '</td><td>' + shortGBP(s.fixed[i]) + '</td><td>' + shortGBP(s.ann[i]) + '</td><td>' + shortGBP(s.spend[i]) + '</td><td>' + shortGBP(s.net[i]) + '</td><td class="' + cls + '">' + signedGBP(gap) + '</td><td class="risk ' + cls + '">' + txt + '</td></tr>'; }).join(''); el.innerHTML = head + '<table class="t"><thead>' + th + '</thead><tbody>' + body + '</tbody></table>'; var tog = document.getElementById('splitTog'); if (tog) tog.onchange = function(){ splitMembers = tog.checked; renderDrill(); }; }
   var WIZ_STEPS = ['Dates','Spending','Method','Annuity','Advanced','Review']; var wizStep = 0, wizSpec = null, wizEditing = false;
   function defaultSpec() { var y = base.retireYear || new Date().getFullYear(), m = base.retireMonth || 6; return { version:1, name:'', base:'live', dates:[], spendMode:'same', spend:Math.round(base.spendRed*100) || 60, spendPer:{}, method:base.withdrawalDefault, growth:base.growthRate, gRatio:base.gRatio, annMode:'none', annAll:{ member:p1Name, date:clampKey(dkey(y+5, m)), rate:6.0, esc:0.0 }, annPer:{} }; }

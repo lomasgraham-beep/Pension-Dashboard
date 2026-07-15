@@ -6,7 +6,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=err27"></script>
 <style>
-  :root { --accent:#2c7a7b; --accent-dark:#236668; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
+  :root { --accent:#1d3a63; --accent-dark:#14294a; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
   h2 { color:var(--ink); margin:0 0 4px; }
   .note { color:var(--ink-soft); font-size:13px; margin:0 0 14px; }
@@ -176,7 +176,7 @@
     const label = whole + ' yr' + (whole !== 1 ? 's' : '') + (mo ? ' ' + mo + ' mo' : '');
     // visual indicator: shade by how many years until payback
     // < 12 yrs = good (teal), 12-20 = amber, > 20 = warn red
-    const colour = yrs < 12 ? '#2c7a7b' : yrs < 20 ? '#92400e' : '#c0392b';
+    const colour = yrs < 12 ? '#1d3a63' : yrs < 20 ? '#92400e' : '#c0392b';
     return '<span class="pb-yrs" style="color:' + colour + ';">' + label + '</span>';
   }
   // net monthly approximation: gross less 20% basic-rate tax above personal allowance (~£12,570/yr)
@@ -200,7 +200,7 @@
       if (a.use_whole_pot) {
         const dateLabel = a.purchase_date ? new Date(a.purchase_date).toLocaleDateString('en-GB', { month:'short', year:'numeric' }) : '\u2014';
         const payback = num(a.annuity_rate) ? (100 / num(a.annuity_rate)) : null;
-        const pbColour = payback ? (payback < 12 ? '#2c7a7b' : payback < 20 ? '#92400e' : '#c0392b') : '#94a3b8';
+        const pbColour = payback ? (payback < 12 ? '#1d3a63' : payback < 20 ? '#92400e' : '#c0392b') : '#94a3b8';
         return '<tr style="' + (a.enabled === false ? 'opacity:0.45;' : '') + '">' +
           '<td>' + (a.annuity_name || '\u2014') + '<span class="member-pill">' + (a.member_name || '') + '</span> <span style="font-size:9px;color:#92400e;font-weight:bold;">WHOLE POT</span></td>' +
           '<td>' + dateLabel + '</td>' +
@@ -222,7 +222,7 @@
       const netPos = net != null && net > 0;
       const dateLabel = a.purchase_date ? new Date(a.purchase_date).toLocaleDateString('en-GB', { month:'short', year:'numeric' }) : '—';
       const pbPct = payback ? Math.min(100, 100 / payback * 20).toFixed(1) : 0;
-      const pbColour = payback ? (payback < 12 ? '#2c7a7b' : payback < 20 ? '#92400e' : '#c0392b') : '#94a3b8';
+      const pbColour = payback ? (payback < 12 ? '#1d3a63' : payback < 20 ? '#92400e' : '#c0392b') : '#94a3b8';
       return '<tr style="' + (a.enabled === false ? 'opacity:0.45;' : '') + '">' +
         '<td>' + (a.annuity_name || '—') + '<span class="member-pill">' + (a.member_name || '') + '</span></td>' +
         '<td>' + dateLabel + '</td>' +
