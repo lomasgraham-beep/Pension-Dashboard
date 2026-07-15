@@ -13,6 +13,9 @@
   .addbar { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:8px; }
   .addbar label { display:block; font-weight:bold; font-size:13px; color:#475569; margin-bottom:5px; }
   input[type=text] { padding:11px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:15px; box-sizing:border-box; }
+  textarea { padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:14px; box-sizing:border-box; width:100%; resize:vertical; min-height:60px; }
+  .btn-save { background:#1d3a63; color:#fff; }
+  .charc { font-size:11px; color:#94a3b8; margin-top:2px; }
   .btn { border:none; border-radius:8px; padding:12px 18px; font-size:15px; font-weight:bold; cursor:pointer; min-height:48px; }
   .btn-add { background:#27ae60; color:#fff; }
   .btn-del { background:#fff5f5; color:#c0392b; border:1px solid #f5c6cb; padding:8px 14px; min-height:0; font-size:14px; }
@@ -31,6 +34,7 @@
     .note, .inuse { color:#94a3b8 !important; }
     .addbar label { color:#cbd5e1 !important; }
     input[type=text] { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    textarea { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
     table { color:#cbd5e1 !important; }
     th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
     td { border-color:#334155 !important; color:#cbd5e1 !important; }
@@ -41,7 +45,7 @@
 </head>
 <body>
   <h1>Bill Categories</h1>
-  <p class="note">Manage the category codes used by Household Bills. Add a category here first, then it becomes available in the bills dropdown. <span style="color:#94a3b8;">(categories build: v1)</span></p>
+  <p class="note">Manage the category codes used by Household Bills. Add a category here first, then it becomes available in the bills dropdown. <span style="color:#94a3b8;">(categories build: v2)</span></p>
   <div id="status">Loading…</div>
 
   <div class="panel" id="panel" style="display:none;">
@@ -56,8 +60,17 @@
       </div>
       <button class="btn btn-add" onclick="addCat()">+ Add category</button>
     </div>
-    <p class="inuse" id="addHint">Short codes work best (they appear in the bills table and summary). The description is a friendly label.</p>
-    <table id="catTable"><thead><tr><th>Code</th><th>Description</th><th>In use by</th><th></th></tr></thead><tbody></tbody></table>
+    <div style="margin-bottom:8px;">
+      <label style="display:block; font-weight:bold; font-size:13px; color:#475569; margin-bottom:5px;">Category Definition <span style="font-weight:normal; color:#94a3b8;">(optional, up to 1000 characters)</span></label>
+      <textarea id="newDef" placeholder="A longer free-text explanation of what belongs in this category&hellip;" maxlength="1000" oninput="charCount(this,'newDefCount')"></textarea>
+      <div class="charc" id="newDefCount">0 / 1000</div>
+    </div>
+    <p class="inuse" id="addHint">Short codes work best (they appear in the bills table and summary). The description is a friendly label; the definition is longer free text shown at the top of the Household Bills page when you filter to this category.</p>
+    <div style="margin:10px 0 4px;">
+      <button class="btn btn-save" onclick="saveDefs()">Save definitions</button>
+      <span class="inuse" id="defHint" style="margin-left:10px;">Edit any definition below, then Save.</span>
+    </div>
+    <table id="catTable"><thead><tr><th>Code</th><th>Description</th><th>Category Definition</th><th>In use by</th><th></th></tr></thead><tbody></tbody></table>
   </div>
 
 <script>
@@ -72,7 +85,7 @@
         App.rest('bd_bill_category?order=code.asc'),
         App.rest('bd_household_bills?select=category_code')
       ]);
-      cats = (catRows || []).map(c => ({ code: c.code, description: c.description || '' }));
+      cats = (catRows || []).map(c => ({ code: c.code, description: c.description || '', definition: c.definition || '' }));
       usage = {};
       (bills || []).forEach(b => { if (b.category_code) usage[b.category_code] = (usage[b.category_code] || 0) + 1; });
       status.style.display = 'none';
@@ -81,9 +94,11 @@
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
 
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
   function renderRows() {
     const tb = document.querySelector('#catTable tbody');
-    if (!cats.length) { tb.innerHTML = '<tr><td colspan="4" style="color:#94a3b8;">No categories yet — add one above.</td></tr>'; return; }
+    if (!cats.length) { tb.innerHTML = '<tr><td colspan="5" style="color:#94a3b8;">No categories yet — add one above.</td></tr>'; return; }
     tb.innerHTML = cats.map(c => {
       const code = c.code;
       const n = usage[code] || 0;
@@ -91,22 +106,59 @@
       const delBtn = n === 0
         ? '<button class="btn-del" onclick="delCat(\'' + encodeURIComponent(code) + '\')">Delete</button>'
         : '<span class="inuse">in use — can\'t delete</span>';
-      return '<tr><td><strong>' + code + '</strong></td><td>' + (c.description || '') + '</td><td class="inuse">' + useText + '</td><td style="text-align:right;">' + delBtn + '</td></tr>';
+      const cnt = (c.definition || '').length;
+      const defCell =
+        '<textarea class="def-input" data-code="' + esc(code).replace(/"/g, '&quot;') + '" maxlength="1000" ' +
+        'oninput="charCount(this, this.nextElementSibling.id)">' + esc(c.definition) + '</textarea>' +
+        '<div class="charc" id="defc-' + esc(code).replace(/"/g, '&quot;') + '">' + cnt + ' / 1000</div>';
+      return '<tr><td><strong>' + esc(code) + '</strong></td><td>' + esc(c.description) + '</td>' +
+             '<td style="min-width:260px;">' + defCell + '</td>' +
+             '<td class="inuse">' + useText + '</td>' +
+             '<td style="text-align:right; white-space:nowrap;">' + delBtn + '</td></tr>';
     }).join('');
+  }
+
+  function charCount(ta, targetId) {
+    const el = document.getElementById(targetId);
+    if (el) el.textContent = (ta.value || '').length + ' / 1000';
+  }
+
+  async function saveDefs() {
+    const status = document.getElementById('status');
+    const areas = [...document.querySelectorAll('#catTable .def-input')];
+    const changed = [];
+    areas.forEach(ta => {
+      const code = ta.getAttribute('data-code');
+      const val = ta.value || '';
+      const orig = (cats.find(c => c.code === code) || {}).definition || '';
+      if (val !== orig) changed.push({ code, definition: val });
+    });
+    if (!changed.length) { status.style.display = 'block'; status.className = ''; status.textContent = 'No definition changes to save.'; return; }
+    status.style.display = 'block'; status.className = ''; status.textContent = 'Saving\u2026';
+    try {
+      for (const ch of changed) {
+        await App.write('PATCH', 'bd_bill_category?code=eq.' + encodeURIComponent(ch.code), { definition: ch.definition || null });
+      }
+      status.className = 's-ok'; status.textContent = '\u2713 Saved ' + changed.length + (changed.length === 1 ? ' definition.' : ' definitions.');
+      notify();
+      await load();
+    } catch (e) { status.className = 's-err'; status.textContent = 'Save failed: ' + e.message; }
   }
 
   async function addCat() {
     const status = document.getElementById('status');
     const box = document.getElementById('newCode');
     const descBox = document.getElementById('newDesc');
+    const defBox = document.getElementById('newDef');
     const code = (box.value || '').trim();
     const desc = (descBox.value || '').trim();
+    const def = (defBox.value || '').trim();
     if (!code) { box.focus(); return; }
     if (!desc) { status.style.display = 'block'; status.className = 's-err'; status.textContent = 'Please enter a description.'; descBox.focus(); return; }
     if (cats.some(c => c.code.toLowerCase() === code.toLowerCase())) { status.style.display = 'block'; status.className = 's-err'; status.textContent = 'That category already exists.'; return; }
     try {
-      await App.write('POST', 'bd_bill_category', { code: code, description: desc });
-      box.value = ''; descBox.value = '';
+      await App.write('POST', 'bd_bill_category', { code: code, description: desc, definition: def || null });
+      box.value = ''; descBox.value = ''; defBox.value = ''; charCount(defBox, 'newDefCount');
       status.style.display = 'block'; status.className = 's-ok'; status.textContent = '✓ Added “' + code + '”.';
       notify();
       await load();

@@ -31,6 +31,8 @@
   .proj-per { font-size:15px; font-weight:600; color:var(--ink-soft); }
   .proj-sub { font-size:12px; color:var(--ink-soft); }
   .proj-top { margin-top:0; margin-left:auto; text-align:right; }
+  .catdef { background:var(--surface-2); border:1px solid var(--line); border-left:4px solid var(--accent-dark); border-radius:8px; padding:12px 14px; margin:4px 0 14px; font-size:15px; line-height:1.5; color:var(--ink); white-space:pre-wrap; }
+  .catdef .catdef-head { display:block; font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:4px; }
 
   /* ---- "Paid in" month-schedule picker ---- */
   td.sched, th.sched { width:150px; }
@@ -98,7 +100,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: paymonths4)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: paymonths5)</span></p>
   <div class="bar" style="align-items:flex-start;">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -111,6 +113,7 @@
     <label style="font-size:13px; font-weight:bold; color:var(--ink-soft);">Filter by category:</label>
     <select id="filterCat" onchange="render()" style="padding:8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px;"><option value="All">All categories</option></select>
   </div>
+  <div class="catdef" id="catDef" style="display:none;"></div>
   <table id="tbl">
     <thead><tr><th>Bill Name</th><th>Category</th><th>Paid by</th><th>Account</th><th>Premium &pound;</th><th>Frequency</th><th>Annual &pound;</th><th class="sched">Paid in<br><span style="font-weight:normal;font-size:11px;">(months)</span></th><th>Reduce?</th><th>Taper 70</th><th>Taper 80</th><th>Taper 90</th><th></th></tr></thead>
     <tbody><tr><td colspan="13">Loading&hellip;</td></tr></tbody>
@@ -144,7 +147,7 @@
     };
   })();
 
-  let rows = [], dirty = false, deleted = [], categoryCodes = [], memberNames = [], bankAccounts = [];
+  let rows = [], dirty = false, deleted = [], categoryCodes = [], memberNames = [], bankAccounts = [], categoryDefs = {};
   const tbody = document.querySelector('#tbl tbody');
   const fmt = App.fmt;
   const MABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -329,8 +332,20 @@
       .map(x => rowHtml(x.r, x.i)).join('');
     tbody.innerHTML = html || '<tr><td colspan="13">No bills in this view. Use \u201cAdd bill\u201d or change the filter.</td></tr>';
     updateProj();
+    updateCatDef();
   }
   function mark() { syncDom(); setDirty(); updateProj(); }
+
+  // Show the current category's definition (free text from bd_bill_category) at the top when filtered.
+  function updateCatDef() {
+    const cat = document.getElementById('filterCat').value;
+    const box = document.getElementById('catDef');
+    const def = (cat && cat !== 'All') ? (categoryDefs[cat] || '') : '';
+    if (!def.trim()) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    box.innerHTML = '<span class="catdef-head">' + esc(cat) + '</span>' + esc(def);
+    box.style.display = 'block';
+  }
 
   function collect() { syncDom(); return rows; }
 
@@ -384,7 +399,7 @@
     const status = document.getElementById('status');
     try {
       rows = await App.rest('bd_household_bills?order=category_code.asc,bill_name.asc');
-      try { const cc = await App.rest('bd_bill_category?order=code.asc'); categoryCodes = (cc || []).map(c => c.code); } catch (e) { categoryCodes = []; }
+      try { const cc = await App.rest('bd_bill_category?order=code.asc'); categoryCodes = (cc || []).map(c => c.code); categoryDefs = {}; (cc || []).forEach(c => { categoryDefs[c.code] = c.definition || ''; }); } catch (e) { categoryCodes = []; categoryDefs = {}; }
       try { const mm = await App.rest('bd_members?order=name.asc'); memberNames = (mm || []).map(m => m.name).filter(Boolean); } catch (e) { memberNames = []; }
       try { const ba = await App.rest('bd_bank_account?order=account_id.asc'); bankAccounts = (ba || []).map(a => a.account_id).filter(Boolean); } catch (e) { bankAccounts = []; }
       deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
