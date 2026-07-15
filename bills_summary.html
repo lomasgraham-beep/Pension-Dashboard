@@ -85,7 +85,7 @@
 </head>
 <body>
   <h1>Summary of Household Bills</h1>
-  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. <span style="color:#94a3b8;">(summary build: v10)</span></p>
+  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. <span style="color:#94a3b8;">(summary build: v11)</span></p>
   <div id="status">Loading…</div>
 
   <div id="ageRow" class="agebar-row" style="display:none;">
@@ -141,18 +141,23 @@
     return 1.0;   // "Now" — no taper
   }
 
-  function annualOf(premium, frequency) {
+  // Monthly bills honour the "Paid in (months)" mask (pay_months): a bill charged in only N months
+  // costs premium x N (null/invalid/full mask = all 12). Matches engine.js ann2 + bills.html.
+  function annualOf(premium, frequency, payMonths) {
     const p = Number(premium) || 0;
     if (frequency === 'Weekly') return p * 52;
     if (frequency === 'Annual') return p * 1;
-    return p * 12;   // Monthly (and fallback)
+    // Monthly (and fallback)
+    const pm = payMonths;
+    const n = (pm && /^[01]{12}$/.test(pm)) ? (pm.match(/1/g) || []).length : 12;
+    return p * n;
   }
 
   function aggForAge(ageKey) {
     const map = {};
     allBills.forEach(b => {
       const cat = b.category_code || 'Uncategorised';
-      const annual = annualOf(b.premium, b.frequency) * taperFor(b, ageKey);
+      const annual = annualOf(b.premium, b.frequency, b.pay_months) * taperFor(b, ageKey);
       if (!map[cat]) map[cat] = { code: cat, total: 0, bills: [] };
       map[cat].total += annual;
       map[cat].bills.push({ name: b.bill_name || '(unnamed)', frequency: b.frequency, month: Number(b.bill_month), annual: annual });

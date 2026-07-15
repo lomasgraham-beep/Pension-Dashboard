@@ -93,7 +93,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today. <strong>Paid in</strong> sets which months a bill is actually charged &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar). <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: paymonths1)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: paymonths2)</span></p>
   <div class="bar">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -146,11 +146,18 @@
   const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
 
   // Exact replica of the database's generated formula for total_annual.
-  function annualOf(premium, frequency) {
+  // Yearly cost today. Monthly bills honour the "Paid in (months)" mask: a bill charged in only
+  // N months of the year costs premium x N (null/invalid/full mask = all 12). Weekly (x52) and
+  // Annual (x1) are unaffected. This matches engine.js build ann2 (billEffectiveAnnual).
+  function annualOf(premium, frequency, payMonths) {
     const p = Number(premium) || 0;
     if (frequency === 'Weekly') return p * 52;
-    if (frequency === 'Monthly') return p * 12;
     if (frequency === 'Annual') return p * 1;
+    if (frequency === 'Monthly') {
+      const pm = payMonths;
+      const n = (pm && /^[01]{12}$/.test(pm)) ? (pm.match(/1/g) || []).length : 12;
+      return p * n;
+    }
     return 0;
   }
 
@@ -232,6 +239,8 @@
     const arr = activeMonths(r);
     td.querySelectorAll('.mchip').forEach((c, k) => c.classList.toggle('on', !!arr[k]));
     const b = td.querySelector('.sched-btn'); if (b) b.textContent = schedLabel(r) + ' \u25be';
+    // the mask now drives the Annual figure, so refresh this row's annual cell too
+    const tr = td.closest('tr'); if (tr) { const ac = tr.querySelector('.annual-cell'); if (ac) ac.textContent = fmt(annualOf(r.premium, r.frequency, r.pay_months)); }
   }
   function pickMonth(btn, k) {
     const tr = btn.closest('tr'), td = btn.closest('td'), i = Number(tr.dataset.i), r = rows[i]; if (!r) return;
@@ -265,7 +274,7 @@
       '<td><select class="f-account" onchange="mark()" style="min-width:120px;">' + acctOptions(r.paid_account) + '</select></td>' +
       '<td><input type="number" class="f-premium" step="1" value="' + (r.premium != null ? r.premium : 0) + '" oninput="rowCalc(this)"></td>' +
       '<td><select class="f-freq" onchange="onFreq(this)">' + freqOpt(r.frequency) + '</select></td>' +
-      '<td class="annual-cell" style="font-weight:bold; color:var(--accent-dark);">' + fmt(annualOf(r.premium, r.frequency)) + '</td>' +
+      '<td class="annual-cell" style="font-weight:bold; color:var(--accent-dark);">' + fmt(annualOf(r.premium, r.frequency, r.pay_months)) + '</td>' +
       '<td class="sched">' + scheduleCellHtml(r) + '</td>' +
       '<td style="text-align:center;"><input type="checkbox" class="f-red" ' + (r.spend_reduction ? 'checked' : '') + ' onchange="mark()" style="width:auto;"></td>' +
       '<td><input type="number" class="f-t70 taper" step="0.05" min="0" max="1" value="' + (r.taper_at_70 != null ? r.taper_at_70 : 1) + '" oninput="mark()"></td>' +
@@ -278,7 +287,8 @@
   function rowCalc(el) {
     const tr = el.closest('tr');
     const prem = tr.querySelector('.f-premium').value, freq = tr.querySelector('.f-freq').value;
-    tr.querySelector('.annual-cell').textContent = fmt(annualOf(prem, freq));
+    const r = rows[Number(tr.dataset.i)];               // mask lives on the model, not the DOM
+    tr.querySelector('.annual-cell').textContent = fmt(annualOf(prem, freq, r ? r.pay_months : null));
     mark();
   }
 
@@ -320,7 +330,7 @@
   function collect() { syncDom(); return rows; }
 
   function updateProj() {
-    const total = rows.reduce((s, r) => s + annualOf(r.premium, r.frequency), 0);
+    const total = rows.reduce((s, r) => s + annualOf(r.premium, r.frequency, r.pay_months), 0);
     const cat = document.getElementById('filterCat').value;
     const shown = cat === 'All' ? rows.length : rows.filter(r => (r.category_code || '') === cat).length;
     const label = cat === 'All' ? (rows.length + ' bills') : (shown + ' of ' + rows.length + ' bills shown');

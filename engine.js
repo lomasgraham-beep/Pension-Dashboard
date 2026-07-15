@@ -1,6 +1,8 @@
 /* ============================================================
    engine.js  —  Pension modelling engine (pure JavaScript)
-   build tag: ann1  (additive: annuity "whole pot" purchase mode; inert when use_whole_pot is off)
+   build tag: ann2  (additive: mask-aware bill costing — a Monthly bill with a partial
+                     pay_months mask now costs premium x active-months instead of premium x 12;
+                     inert when MASK_AWARE_BILLS is false. See billEffectiveAnnual below.)
 
    This is the SAME maths that runs in the Scenario Lab, which was
    validated against the Supabase functions (calculate_joint_retirement
@@ -24,6 +26,28 @@
   const INFL = 0.025;     // inflation on outgoings & guaranteed income
   const GROWTH = 0.05;    // pot growth during the drawdown phase
   const PA = 12570;       // personal allowance (frozen)
+
+  // ---- Mask-aware bill costing (build ann2) ----
+  // The DB's total_annual generated column is premium x 12 for Monthly bills and ignores the
+  // "Paid in (months)" mask (pay_months). So a bill charged only 8 months of the year was being
+  // modelled at premium x 12. This corrects that: a MONTHLY bill with a partial pay_months mask
+  // costs premium x (active months). Every other bill is untouched.
+  //
+  // Inertness: when MASK_AWARE_BILLS is false, billEffectiveAnnual(b) returns exactly
+  // (Number(b.total_annual) || 0) — i.e. the pre-ann2 expression, byte-for-byte — so the engine's
+  // output is identical to build ann1. When true, only monthly bills whose pay_months mask has
+  // fewer than 12 active months change value.
+  const MASK_AWARE_BILLS = true;
+  function billEffectiveAnnual(b) {
+    const full = Number(b.total_annual) || 0;
+    if (!MASK_AWARE_BILLS) return full;                     // inert path == pre-ann2 behaviour
+    if (b.frequency !== 'Monthly') return full;             // weekly (x52) / annual (x1) unchanged
+    const pm = b.pay_months;
+    if (!pm || !/^[01]{12}$/.test(pm)) return full;         // null / invalid mask = all 12 = unchanged
+    const n = (pm.match(/1/g) || []).length;
+    if (n >= 12) return full;                               // fully-on mask = unchanged
+    return (Number(b.premium) || 0) * n;                    // partial mask: premium x active months
+  }
 
   // ---- helpers ----
   function latestPots(data) {
@@ -615,7 +639,7 @@
       }
 
       const inflFactor = Math.pow(1 + INFL, Math.floor(elapsed));   // annual step: flat within each year since retirement
-      const billsM = bills.reduce((s, b) => s + (Number(b.total_annual) || 0) * (b.spend_reduction ? spendRed : 1.0) * taperFor(b, oldest), 0) / 12 * inflFactor;
+      const billsM = bills.reduce((s, b) => s + billEffectiveAnnual(b) * (b.spend_reduction ? spendRed : 1.0) * taperFor(b, oldest), 0) / 12 * inflFactor;
       // Dining: new model uses a single annual figure (rota × meal costs), subject to the
       // spending-reduction slider, no age-taper. Falls back to the legacy dining array if not supplied.
       let diningAnnual;
