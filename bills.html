@@ -30,6 +30,7 @@
   .proj-total { font-size:32px; font-weight:800; line-height:1.05; color:var(--accent-dark); margin:2px 0 4px; }
   .proj-per { font-size:15px; font-weight:600; color:var(--ink-soft); }
   .proj-sub { font-size:12px; color:var(--ink-soft); }
+  .proj-top { margin-top:0; margin-left:auto; text-align:right; }
 
   /* ---- "Paid in" month-schedule picker ---- */
   td.sched, th.sched { width:150px; }
@@ -97,13 +98,14 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: paymonths3)</span></p>
-  <div class="bar">
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). <span style="color:var(--accent-dark);">(bills build: paymonths4)</span></p>
+  <div class="bar" style="align-items:flex-start;">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
     <button class="btn btn-add" onclick="addRow()">+ Add bill</button>
     <span class="unsaved" id="unsaved">&#9679; Unsaved changes</span>
     <span class="msg" id="msg"></span>
+    <div class="proj proj-top" id="proj"></div>
   </div>
   <div class="bar" style="margin-top:-4px;">
     <label style="font-size:13px; font-weight:bold; color:var(--ink-soft);">Filter by category:</label>
@@ -113,7 +115,6 @@
     <thead><tr><th>Bill Name</th><th>Category</th><th>Paid by</th><th>Account</th><th>Premium &pound;</th><th>Frequency</th><th>Annual &pound;</th><th class="sched">Paid in<br><span style="font-weight:normal;font-size:11px;">(months)</span></th><th>Reduce?</th><th>Taper 70</th><th>Taper 80</th><th>Taper 90</th><th></th></tr></thead>
     <tbody><tr><td colspan="13">Loading&hellip;</td></tr></tbody>
   </table>
-  <div class="proj" id="proj"></div>
 
 <script>
   (function(){
