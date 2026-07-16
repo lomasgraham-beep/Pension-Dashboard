@@ -66,7 +66,7 @@
 </head>
 <body>
   <h1>Holidays <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(52-week plan)</span></h1>
-  <p class="note">Plan each week's holiday: type &amp; level (per-night cost from Holiday Costs), round-trip miles for fuel, incidentals, and eating out (looked up from Meal Costs). Each week totals automatically; the year total feeds the retirement model. <span style="color:#94a3b8;">(holidays build: v4)</span></p>
+  <p class="note">Plan each week's holiday: type &amp; level (per-night cost from Holiday Costs), round-trip miles for fuel, incidentals, and eating out (looked up from Meal Costs). Each week totals automatically; the year total feeds the retirement model. <span style="color:#94a3b8;">(holidays build: v5)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div class="bar" id="bar" style="display:none;">
@@ -165,14 +165,14 @@
     return '<div class="row">' +
         '<div class="fld"><label>Type</label><select onchange="onField(' + w.id + ',\'category\',this.value)">' + catOptions(w.category) + '</select></div>' +
         '<div class="fld"><label>Level</label><select onchange="onField(' + w.id + ',\'level\',this.value)">' + lvlOptions(w.level) + '</select></div>' +
-        '<div class="fld"><label>Nights</label><input type="number" step="1" min="0" value="' + (w.nights != null ? w.nights : 0) + '" onchange="onField(' + w.id + ',\'nights\',this.value)"></div>' +
+        '<div class="fld"><label>Nights</label><input type="number" step="1" min="0" value="' + (w.nights != null ? w.nights : 0) + '" onfocus="holBlankZero(this)" onblur="holRestoreZero(this)" onchange="onField(' + w.id + ',\'nights\',this.value)"></div>' +
         '<div class="fld"><label>Trip name (optional)</label><input type="text" value="' + esc(w.label) + '" oninput="onField(' + w.id + ',\'label\',this.value)"></div>' +
       '</div>' +
       '<div class="row">' +
-        '<div class="fld"><label>Round-trip miles</label><input type="number" step="1" min="0" value="' + (w.miles != null ? w.miles : 0) + '" oninput="onField(' + w.id + ',\'miles\',this.value)"></div>' +
+        '<div class="fld"><label>Round-trip miles</label><input type="number" step="1" min="0" value="' + (w.miles != null ? w.miles : 0) + '" onfocus="holBlankZero(this)" onblur="holRestoreZero(this)" oninput="onField(' + w.id + ',\'miles\',this.value)"></div>' +
         '<div class="fld tow"><input type="checkbox" ' + (w.towing ? 'checked' : '') + ' onchange="onField(' + w.id + ',\'towing\',this.checked)"><label>Towing caravan</label></div>' +
         '<div class="fuelout" id="fuel_' + w.id + '"></div>' +
-        '<div class="fld"><label>Incidentals £</label><input type="number" step="1" min="0" value="' + (w.incidentals != null ? w.incidentals : 0) + '" oninput="onField(' + w.id + ',\'incidentals\',this.value)"></div>' +
+        '<div class="fld"><label>Incidentals £</label><input type="number" step="1" min="0" value="' + (w.incidentals != null ? w.incidentals : 0) + '" onfocus="holBlankZero(this)" onblur="holRestoreZero(this)" oninput="onField(' + w.id + ',\'incidentals\',this.value)"></div>' +
       '</div>' +
       '<div class="eat-title">Eating out</div>' +
       '<div id="eat_' + w.id + '">' + eatGrid(w) + '</div>' +
@@ -274,6 +274,9 @@
   function toggle(no) { collapsed[no] = !(collapsed[no] !== false); applyState(no); }
   function collapseAll() { for (let n = 1; n <= WEEKS; n++) { collapsed[n] = true; applyState(n); } }
   function expandAll() { for (let n = 1; n <= WEEKS; n++) { collapsed[n] = false; applyState(n); } }
+
+  function holBlankZero(el) { if (el.value === '0') el.value = ''; }
+  function holRestoreZero(el) { if (el.value.trim() === '') el.value = '0'; }
 
   function resetWeekObj(w) {
     w.label = null; w.category = null; w.level = null;
