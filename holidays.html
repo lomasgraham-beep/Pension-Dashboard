@@ -66,7 +66,7 @@
 </head>
 <body>
   <h1>Holidays <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(52-week plan)</span></h1>
-  <p class="note">Plan each week's holiday: type &amp; level (per-night cost from Holiday Costs), round-trip miles for fuel, incidentals, and eating out (looked up from Meal Costs). Each week totals automatically; the year total feeds the retirement model. <span style="color:#94a3b8;">(holidays build: v5)</span></p>
+  <p class="note">Plan each week's holiday: type &amp; level (per-night cost from Holiday Costs), round-trip miles for fuel, incidentals, and eating out (looked up from Meal Costs). Each week totals automatically; the year total feeds the retirement model. <span style="color:#94a3b8;">(holidays build: v6)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div class="bar" id="bar" style="display:none;">
@@ -86,6 +86,10 @@
   const LEVELS = [['L', 'Low'], ['M', 'Medium'], ['H', 'High']];
   const MEALS = App.HOLIDAY_MEALS;   // Breakfast, Lunch, Dinner, Drinks
   const fmt = App.fmt;
+  const YEAR = new Date().getFullYear();
+  const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  // approximate month for a week number in the current year: week 1 starts 1 Jan, +7 days per week
+  function monthFor(no) { return MONTHS_SHORT[new Date(YEAR, 0, 1 + (no - 1) * 7).getMonth()]; }
 
   let plan = [];         // bd_holiday_plan rows (this phase), one per week
   let ctx = null;        // holiday cost lookup context
@@ -189,7 +193,7 @@
       const lbl = (w && w.label) ? '<span class="label">' + esc(w.label) + '</span>' : '';
       html += '<div class="wk">' +
         '<div class="wk-head" onclick="toggle(' + no + ')">' +
-          '<span><span class="chev" id="chev_' + no + '">' + (isC ? '\u25B8' : '\u25BE') + '</span> Week ' + no + lbl + '</span>' +
+          '<span><span class="chev" id="chev_' + no + '">' + (isC ? '\u25B8' : '\u25BE') + '</span> Week ' + no + ' \u00b7 ' + monthFor(no) + lbl + '</span>' +
           '<span class="wktot" id="wt_' + no + '">' + fmt(tot) + '</span>' +
         '</div>' +
         '<div class="wk-body" id="wkbody_' + no + '" style="display:' + (isC ? 'none' : 'block') + ';">' +
