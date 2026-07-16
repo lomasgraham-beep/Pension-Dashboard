@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Holiday Summary</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=hol1"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1000px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:14px; }
+  .bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  .btn { border:none; border-radius:8px; padding:11px 16px; font-size:15px; font-weight:bold; cursor:pointer; min-height:46px; background:#64748b; color:#fff; }
+  .grand { font-weight:bold; color:#2c3e50; font-size:18px; margin-left:auto; }
+  .grand b { color:#0e7490; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+
+  .card { border:1px solid #e2e8f0; border-radius:8px; overflow:auto; background:#fff; }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:11px 12px; border-bottom:1px solid #eef2f7; text-align:right; font-size:15px; white-space:nowrap; }
+  thead th { background:#2c3e50; color:#fff; font-size:13px; text-transform:uppercase; letter-spacing:.02em; border-bottom:none; }
+  th.cat, td.cat { text-align:left; font-weight:bold; color:#2c3e50; }
+  td.wk { text-align:center; color:#64748b; }
+  td.money { font-variant-numeric:tabular-nums; }
+  td.accom { color:#0f766e; }
+  td.fuel  { color:#9a3412; }
+  td.eat   { color:#166534; }
+  td.inc   { color:#7c3aed; }
+  td.total { font-weight:bold; color:#2c3e50; background:#f8fafc; font-variant-numeric:tabular-nums; }
+  td.pct   { color:#64748b; }
+  tbody tr:hover td { background:#f1f5f9; }
+  tbody tr.zero td.cat { color:#94a3b8; font-weight:normal; }
+  tfoot td { border-top:2px solid #cbd5e1; font-weight:bold; color:#2c3e50; background:#eef4f7; }
+  tfoot td.total { background:#dceef1; color:#0e7490; }
+
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1 { color:#f1f5f9 !important; } .note { color:#94a3b8 !important; }
+    .grand { color:#f1f5f9 !important; } .grand b { color:#67e8f9 !important; }
+    .btn { background:#475569 !important; }
+    .card { background:#1e293b !important; border-color:#334155 !important; }
+    thead th { background:#0b2818 !important; color:#86efac !important; }
+    th, td { border-color:#334155 !important; }
+    th.cat, td.cat { color:#f1f5f9 !important; }
+    td.wk { color:#94a3b8 !important; }
+    td.accom { color:#5eead4 !important; }
+    td.fuel  { color:#fdba74 !important; }
+    td.eat   { color:#86efac !important; }
+    td.inc   { color:#c4b5fd !important; }
+    td.total { color:#f1f5f9 !important; background:#0f172a !important; }
+    td.pct   { color:#94a3b8 !important; }
+    tbody tr:hover td { background:#243244 !important; }
+    tbody tr.zero td.cat { color:#64748b !important; }
+    tfoot td { border-top-color:#475569 !important; color:#f1f5f9 !important; background:#132434 !important; }
+    tfoot td.total { background:#0e3a44 !important; color:#67e8f9 !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Holiday Summary <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(cost by type)</span></h1>
+  <p class="note">Every holiday week grouped by its type (Caravan / Hotel / Air B&amp;B / Other), showing accommodation, fuel, eating out and incidentals. Figures use the live Holiday Costs, Meal Costs and fuel settings and match the Holidays planner. <span style="color:#94a3b8;">(holiday summary build: v1)</span></p>
+  <div id="status">Loading&hellip;</div>
+
+  <div class="bar" id="bar" style="display:none;">
+    <button class="btn" onclick="load()">Refresh</button>
+    <span class="grand">Year total: <b id="grandTotal">&pound;0</b></span>
+  </div>
+
+  <div class="card" id="card" style="display:none;">
+    <table>
+      <thead>
+        <tr>
+          <th class="cat">Type</th>
+          <th>Weeks</th>
+          <th>Accommodation</th>
+          <th>Fuel</th>
+          <th>Eating out</th>
+          <th>Incidentals</th>
+          <th>Total</th>
+          <th>% of year</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+      <tfoot id="foot"></tfoot>
+    </table>
+  </div>
+
+<script>
+  const CATS = [['Caravan', 'Caravan'], ['Hotel', 'Hotel'], ['AirBnB', 'Air B&B'], ['Other', 'Other']];
+  const CAT_CODES = CATS.map(c => c[0]);
+  const PHASE = 'retired';
+  const fmt = App.fmt;
+
+  function blank() { return { weeks: 0, accom: 0, fuel: 0, eat: 0, inc: 0, total: 0 }; }
+
+  async function load() {
+    const status = document.getElementById('status');
+    status.style.display = 'block'; status.className = ''; status.textContent = 'Loading\u2026';
+    try {
+      const [planRows, costRows, mealRows, sRows] = await Promise.all([
+        App.rest('bd_holiday_plan?phase=eq.' + PHASE + '&order=week_no.asc'),
+        App.rest('bd_holiday_cost'),
+        App.rest('bd_meal_cost'),
+        App.rest('bd_holiday_settings?id=eq.1')
+      ]);
+      const ctx = App.holidayCtx(costRows || [], mealRows || [], (sRows && sRows[0]) || {});
+      build(planRows || [], ctx);
+      status.style.display = 'none';
+      document.getElementById('bar').style.display = 'flex';
+      document.getElementById('card').style.display = 'block';
+    } catch (e) {
+      status.className = 's-err'; status.style.display = 'block';
+      status.textContent = 'Could not load: ' + e.message;
+    }
+  }
+
+  function build(plan, ctx) {
+    // one accumulator per known category, plus a lazy "Uncategorised" bucket
+    const acc = {};
+    CAT_CODES.forEach(c => { acc[c] = blank(); });
+    let uncat = null;
+
+    plan.forEach(w => {
+      const b = App.holidayWeekBreakdown(w, ctx);
+      if (!(b.total > 0)) return;   // a week with no cost doesn't belong to any type
+      const key = (w.category && CAT_CODES.indexOf(w.category) !== -1) ? w.category : null;
+      let bucket;
+      if (key) { bucket = acc[key]; }
+      else { if (!uncat) uncat = blank(); bucket = uncat; }
+      bucket.weeks += 1;
+      bucket.accom += b.accom;
+      bucket.fuel += b.fuel;
+      bucket.eat += b.eat;
+      bucket.inc += b.incidentals;
+      bucket.total += b.total;
+    });
+
+    const grand = blank();
+    CAT_CODES.forEach(c => addInto(grand, acc[c]));
+    if (uncat) addInto(grand, uncat);
+
+    let html = '';
+    CATS.forEach(([code, label]) => { html += rowHtml(label, acc[code], grand.total); });
+    if (uncat) html += rowHtml('Uncategorised', uncat, grand.total);
+    document.getElementById('rows').innerHTML = html;
+
+    document.getElementById('foot').innerHTML =
+      '<tr>' +
+        '<td class="cat">All types</td>' +
+        '<td>' + grand.weeks + '</td>' +
+        '<td class="money">' + fmt(grand.accom) + '</td>' +
+        '<td class="money">' + fmt(grand.fuel) + '</td>' +
+        '<td class="money">' + fmt(grand.eat) + '</td>' +
+        '<td class="money">' + fmt(grand.inc) + '</td>' +
+        '<td class="total">' + fmt(grand.total) + '</td>' +
+        '<td class="pct">' + (grand.total > 0 ? '100%' : '\u2014') + '</td>' +
+      '</tr>';
+
+    document.getElementById('grandTotal').textContent = fmt(grand.total);
+  }
+
+  function addInto(dst, src) {
+    dst.weeks += src.weeks; dst.accom += src.accom; dst.fuel += src.fuel;
+    dst.eat += src.eat; dst.inc += src.inc; dst.total += src.total;
+  }
+
+  function rowHtml(label, a, grandTotal) {
+    const pct = grandTotal > 0 ? (a.total / grandTotal * 100) : 0;
+    const zero = a.total <= 0 ? ' class="zero"' : '';
+    return '<tr' + zero + '>' +
+      '<td class="cat">' + label + '</td>' +
+      '<td class="wk">' + (a.weeks || 0) + '</td>' +
+      '<td class="money accom">' + fmt(a.accom) + '</td>' +
+      '<td class="money fuel">' + fmt(a.fuel) + '</td>' +
+      '<td class="money eat">' + fmt(a.eat) + '</td>' +
+      '<td class="money inc">' + fmt(a.inc) + '</td>' +
+      '<td class="total">' + fmt(a.total) + '</td>' +
+      '<td class="pct">' + (a.total > 0 ? pct.toFixed(1) + '%' : '\u2014') + '</td>' +
+      '</tr>';
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  App.requireLogin(load, { title: 'Holiday Summary' });
+</script>
+</body>
+</html>
