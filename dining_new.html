@@ -12,6 +12,7 @@
   .bar { position:sticky; top:0; z-index:5; background:#f4f7f6; padding:10px 0; display:flex; gap:12px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #e2e8f0; margin-bottom:12px; }
   .btn { border:none; border-radius:8px; padding:11px 16px; font-size:15px; font-weight:bold; cursor:pointer; min-height:46px; background:#27ae60; color:#fff; }
   .btn-light { background:#64748b; }
+  .btn-danger { background:#c0392b; }
   .wk-head { cursor:pointer; user-select:none; }
   .chev { display:inline-block; width:1em; color:#cbd5e1; }
   .grand { font-weight:bold; color:#2c3e50; font-size:16px; }
@@ -24,6 +25,17 @@
   td.tot { text-align:right; font-weight:bold; color:#9a3412; background:#fff7ed; white-space:nowrap; padding-right:10px; }
   th.tot { background:#ffedd5; color:#9a3412; text-align:right; }
   select.cell { width:54px; padding:6px 2px; border:1px solid #e2e8f0; border-radius:5px; font-size:14px; text-align:center; background:#fff; }
+  .wk-tools { padding:2px 10px 10px; }
+  .btn-clearwk { border:none; border-radius:6px; background:#fdecea; color:#c0392b; font-weight:bold; font-size:13px; padding:8px 14px; cursor:pointer; margin-top:10px; }
+  .btn-copywk { border:none; border-radius:6px; background:#e0f2fe; color:#075985; font-weight:bold; font-size:13px; padding:8px 14px; cursor:pointer; margin:10px 0 0 8px; }
+  .copy-panel { margin:0 10px 12px; padding:12px; border:1px solid #bae6fd; border-radius:8px; background:#f0f9ff; }
+  .copy-head { font-weight:bold; color:#075985; margin-bottom:6px; }
+  .copy-grid { display:flex; flex-wrap:wrap; gap:6px 10px; margin:8px 0; }
+  .copy-wk { font-size:15px; display:inline-flex; align-items:center; gap:5px; background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:7px 9px; min-width:80px; cursor:pointer; }
+  .copy-wk input { width:18px; height:18px; }
+  .copy-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+  .btn-copy-mini { border:none; border-radius:6px; background:#cbd5e1; color:#1e293b; font-weight:bold; font-size:13px; padding:8px 12px; cursor:pointer; }
+  .btn-copy-go { border:none; border-radius:6px; background:#0284c7; color:#fff; font-weight:bold; font-size:14px; padding:9px 16px; cursor:pointer; }
   #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
   .s-err { background:#fdecea !important; color:#c0392b !important; }
   .s-ok { background:#d1fae5 !important; color:#065f46 !important; }
@@ -41,19 +53,26 @@
     td.tot { background:#2a1a0f !important; color:#fdba74 !important; }
     th.tot { background:#3a2410 !important; color:#fdba74 !important; }
     select.cell { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    .btn-clearwk { background:#3a1a1a !important; color:#f87171 !important; }
+    .btn-copywk { background:#0c2a3a !important; color:#7dd3fc !important; }
+    .copy-panel { background:#0b1f2e !important; border-color:#155e75 !important; }
+    .copy-head { color:#7dd3fc !important; }
+    .copy-wk { background:#0f172a !important; border-color:#475569 !important; color:#e2e8f0 !important; }
+    .btn-copy-mini { background:#334155 !important; color:#e2e8f0 !important; }
     #status { background:#1e293b !important; color:#93c5fd !important; }
   }
 </style>
 </head>
 <body>
   <h1>Dining <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(52-week rota)</span></h1>
-  <p class="note">Set each meal's level (L/M/H) per day across 52 weeks. Costs are looked up from Meal Costs. Each row totals automatically; the year total feeds retirement modelling once switched on. <span style="color:#94a3b8;">(dining build: v3)</span></p>
-  <div id="status">Loading…</div>
+  <p class="note">Set each meal's level (L/M/H) per day across 52 weeks. Costs are looked up from Meal Costs. Each row totals automatically; the year total feeds retirement modelling once switched on. Use <b>Clear week</b> / <b>Copy to weeks&hellip;</b> inside a week, or <b>Clear all</b> above. <span style="color:#94a3b8;">(dining build: v4)</span></p>
+  <div id="status">Loading&hellip;</div>
 
   <div class="bar" id="bar" style="display:none;">
     <button class="btn" onclick="saveAll()">Save changes</button>
     <button class="btn btn-light" onclick="expandAll()">Expand all</button>
     <button class="btn btn-light" onclick="collapseAll()">Collapse all</button>
+    <button class="btn btn-danger" onclick="clearAll()">Clear all</button>
     <span id="msg" style="font-weight:bold;"></span>
     <span class="grand" style="margin-left:auto;">Year total: <span id="grandTotal">£0</span></span>
   </div>
@@ -64,6 +83,10 @@
   const DAYS = [['mon', 'M'], ['tue', 'T'], ['wed', 'W'], ['thu', 'Th'], ['fri', 'F'], ['sat', 'S'], ['sun', 'Su']];
   const WEEKS = 52;
   const fmt = App.fmt;
+  const YEAR = new Date().getFullYear();
+  const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  // approximate month for a week number in the current year: week 1 starts 1 Jan, +7 days per week
+  function monthFor(no) { return MONTHS_SHORT[new Date(YEAR, 0, 1 + (no - 1) * 7).getMonth()]; }
 
   let rota = [];        // bd_dining_rota rows
   let costMap = {};     // "Meal|L" -> integer cost
@@ -121,13 +144,19 @@
       const collapsed = weekCollapsed[w] !== false;   // default collapsed
       html += '<div class="wk">' +
         '<div class="wk-head" onclick="toggleWeek(' + w + ')">' +
-          '<span><span class="chev" id="chev_' + w + '">' + (collapsed ? '\u25B8' : '\u25BE') + '</span> Week ' + w + '</span>' +
+          '<span><span class="chev" id="chev_' + w + '">' + (collapsed ? '\u25B8' : '\u25BE') + '</span> Week ' + w + ' \u00b7 ' + monthFor(w) + '</span>' +
           '<span id="wt_' + w + '">' + fmt(weekTotal) + '</span>' +
         '</div>' +
         '<div class="wk-body" id="wkbody_' + w + '" style="display:' + (collapsed ? 'none' : 'block') + ';">' +
         '<table><thead><tr><th style="text-align:left;padding-left:10px;">Meal</th>' +
         DAYS.map(([, lbl]) => '<th>' + lbl + '</th>').join('') +
-        '<th class="tot">Total</th></tr></thead><tbody>' + body + '</tbody></table></div></div>';
+        '<th class="tot">Total</th></tr></thead><tbody>' + body + '</tbody></table>' +
+        '<div class="wk-tools">' +
+          '<button class="btn-clearwk" onclick="clearWeek(' + w + ')">Clear week ' + w + '</button>' +
+          '<button class="btn-copywk" onclick="toggleCopy(' + w + ')">Copy to weeks\u2026</button>' +
+        '</div>' +
+        '<div class="copy-panel" id="copy_' + w + '" style="display:none;"></div>' +
+        '</div></div>';
     }
     document.getElementById('weeks').innerHTML = html;
     recalcGrand();
@@ -164,6 +193,79 @@
   function toggleWeek(w) { weekCollapsed[w] = !(weekCollapsed[w] !== false); applyWeekState(w); }
   function collapseAll() { for (let w = 1; w <= WEEKS; w++) { weekCollapsed[w] = true; applyWeekState(w); } }
   function expandAll() { for (let w = 1; w <= WEEKS; w++) { weekCollapsed[w] = false; applyWeekState(w); } }
+
+  // ---- Clear / Copy ----------------------------------------------------
+
+  function clearWeek(w) {
+    if (!confirm('Clear all meals for Week ' + w + '? This will be permanent once you Save.')) return;
+    MEALS.forEach(meal => {
+      const r = rowFor(w, meal);
+      if (!r) return;
+      DAYS.forEach(([col]) => { r[col] = null; });
+      dirty[r.id] = true;
+    });
+    render();
+    const msg = document.getElementById('msg');
+    msg.style.color = '#c0392b'; msg.textContent = 'Week ' + w + ' cleared \u2014 press Save to keep.';
+  }
+
+  function clearAll() {
+    if (!confirm('Clear dining data for ALL 52 weeks? This will be permanent once you Save.')) return;
+    rota.forEach(r => { DAYS.forEach(([col]) => { r[col] = null; }); dirty[r.id] = true; });
+    render();
+    const msg = document.getElementById('msg');
+    msg.style.color = '#c0392b'; msg.textContent = 'All weeks cleared \u2014 press Save to keep the change.';
+  }
+
+  function copyWeekData(srcWeek, dstWeek) {
+    MEALS.forEach(meal => {
+      const src = rowFor(srcWeek, meal);
+      const dst = rowFor(dstWeek, meal);
+      if (!src || !dst) return;
+      DAYS.forEach(([col]) => { dst[col] = src[col] || null; });
+      dirty[dst.id] = true;
+    });
+  }
+
+  function copyGridHtml(w) {
+    let boxes = '';
+    for (let no = 1; no <= WEEKS; no++) {
+      if (no === w) continue;
+      boxes += '<label class="copy-wk"><input type="checkbox" data-wk="' + no + '"> ' + no + ' ' + monthFor(no) + '</label>';
+    }
+    return '<div class="copy-head">Copy Week ' + w + ' to (overwrites the selected weeks):</div>' +
+      '<div class="copy-actions"><button class="btn-copy-mini" onclick="copySelAll(' + w + ',true)">Select all</button>' +
+      '<button class="btn-copy-mini" onclick="copySelAll(' + w + ',false)">Clear</button></div>' +
+      '<div class="copy-grid">' + boxes + '</div>' +
+      '<div class="copy-actions"><button class="btn-copy-go" onclick="doCopy(' + w + ')">Copy to selected</button>' +
+      '<button class="btn-copy-mini" onclick="toggleCopy(' + w + ')">Cancel</button></div>';
+  }
+
+  function toggleCopy(w) {
+    const panel = document.getElementById('copy_' + w); if (!panel) return;
+    if (panel.style.display === 'none') { panel.innerHTML = copyGridHtml(w); panel.style.display = 'block'; }
+    else { panel.style.display = 'none'; panel.innerHTML = ''; }
+  }
+
+  function copySelAll(w, val) {
+    document.querySelectorAll('#copy_' + w + ' input[type=checkbox][data-wk]').forEach(b => { b.checked = val; });
+  }
+
+  function doCopy(w) {
+    const targets = [];
+    document.querySelectorAll('#copy_' + w + ' input[type=checkbox][data-wk]').forEach(b => {
+      if (b.checked) targets.push(Number(b.getAttribute('data-wk')));
+    });
+    if (!targets.length) { alert('Select at least one week to copy to.'); return; }
+    if (!confirm('Copy Week ' + w + ' to ' + targets.length + ' week(s)? This overwrites their data.')) return;
+    let n = 0;
+    targets.forEach(t => { if (t !== w) { copyWeekData(w, t); n++; } });
+    render();
+    const msg = document.getElementById('msg');
+    msg.style.color = '#065f46'; msg.textContent = 'Copied Week ' + w + ' to ' + n + ' week(s) \u2014 press Save to keep.';
+  }
+
+  // ----------------------------------------------------------------------
 
   async function saveAll() {
     const msg = document.getElementById('msg');
