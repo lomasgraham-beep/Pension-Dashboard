@@ -12,6 +12,8 @@
   .bar { position:sticky; top:0; z-index:5; background:#f4f7f6; padding:10px 0; display:flex; gap:12px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #e2e8f0; margin-bottom:12px; }
   .btn { border:none; border-radius:8px; padding:11px 16px; font-size:15px; font-weight:bold; cursor:pointer; min-height:46px; background:#27ae60; color:#fff; }
   .btn-light { background:#64748b; }
+  .btn-danger { background:#c0392b; }
+  .btn-clearwk { border:none; border-radius:6px; background:#fdecea; color:#c0392b; font-weight:bold; font-size:13px; padding:8px 14px; cursor:pointer; margin-top:10px; }
   .grand { font-weight:bold; color:#2c3e50; font-size:16px; }
   .wk { border:1px solid #e2e8f0; border-radius:8px; margin-bottom:14px; overflow:hidden; background:#fff; }
   .wk-head { background:#2c3e50; color:#fff; font-weight:bold; padding:8px 12px; display:flex; justify-content:space-between; cursor:pointer; user-select:none; }
@@ -55,6 +57,7 @@
     table.eat td { border-color:#334155 !important; }
     table.eat td.meal { background:#1e293b !important; color:#f1f5f9 !important; }
     .fuelout, .wktot, .brk b { color:#fdba74 !important; }
+    .btn-clearwk { background:#3a1a1a !important; color:#f87171 !important; }
     .brk { color:#94a3b8 !important; }
     #status { background:#1e293b !important; color:#93c5fd !important; }
   }
@@ -62,13 +65,14 @@
 </head>
 <body>
   <h1>Holidays <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(52-week plan)</span></h1>
-  <p class="note">Plan each week's holiday: type &amp; level (per-night cost from Holiday Costs), round-trip miles for fuel, incidentals, and eating out (looked up from Meal Costs). Each week totals automatically; the year total feeds the retirement model. <span style="color:#94a3b8;">(holidays build: v2)</span></p>
+  <p class="note">Plan each week's holiday: type &amp; level (per-night cost from Holiday Costs), round-trip miles for fuel, incidentals, and eating out (looked up from Meal Costs). Each week totals automatically; the year total feeds the retirement model. <span style="color:#94a3b8;">(holidays build: v3)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div class="bar" id="bar" style="display:none;">
     <button class="btn" onclick="saveAll()">Save changes</button>
     <button class="btn btn-light" onclick="expandAll()">Expand all</button>
     <button class="btn btn-light" onclick="collapseAll()">Collapse all</button>
+    <button class="btn btn-danger" onclick="clearAll()">Clear all</button>
     <span id="msg" style="font-weight:bold;"></span>
     <span class="grand" style="margin-left:auto;">Year total: <span id="grandTotal">£0</span></span>
   </div>
@@ -171,7 +175,8 @@
       '</div>' +
       '<div class="eat-title">Eating out</div>' +
       '<div id="eat_' + w.id + '">' + eatGrid(w) + '</div>' +
-      '<div class="brk" id="brk_' + w.id + '"></div>';
+      '<div class="brk" id="brk_' + w.id + '"></div>' +
+      '<button class="btn-clearwk" onclick="clearWeek(' + w.id + ')">Clear week ' + w.week_no + '</button>';
   }
 
   function render() {
@@ -268,6 +273,35 @@
   function toggle(no) { collapsed[no] = !(collapsed[no] !== false); applyState(no); }
   function collapseAll() { for (let n = 1; n <= WEEKS; n++) { collapsed[n] = true; applyState(n); } }
   function expandAll() { for (let n = 1; n <= WEEKS; n++) { collapsed[n] = false; applyState(n); } }
+
+  function resetWeekObj(w) {
+    w.label = null; w.category = null; w.level = null;
+    w.nights = 0; w.miles = 0; w.towing = false; w.incidentals = 0;
+    w.eating_out = {}; MEALS.forEach(m => { w.eating_out[m] = []; });
+  }
+
+  function clearWeek(id) {
+    const w = plan.find(x => x.id === id); if (!w) return;
+    if (!confirm('Clear all data for Week ' + w.week_no + '? This will be permanent once you Save.')) return;
+    resetWeekObj(w);
+    dirty[id] = true;
+    // re-render just this week's body and drop the header label
+    const body = document.getElementById('wkbody_' + w.week_no);
+    if (body) body.innerHTML = bodyHtml(w);
+    const chev = document.getElementById('chev_' + w.week_no);
+    const headSpan = chev ? chev.parentElement : null;
+    if (headSpan) { const lab = headSpan.querySelector('.label'); if (lab) lab.remove(); }
+    refreshWeek(w);
+    recalcGrand();
+  }
+
+  function clearAll() {
+    if (!confirm('Clear holiday data for ALL 52 weeks? This will be permanent once you Save.')) return;
+    plan.forEach(w => { resetWeekObj(w); dirty[w.id] = true; });
+    render();
+    const msg = document.getElementById('msg');
+    msg.style.color = '#c0392b'; msg.textContent = 'All weeks cleared \u2014 press Save to keep the change.';
+  }
 
   async function saveAll() {
     const msg = document.getElementById('msg');
