@@ -553,7 +553,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-347</span>
+      <span class="build-stamp">LC-348</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -991,6 +991,7 @@
       <button id="subbtn-DiningNew" class="subtab-link" onclick="showSub(event,'DiningNew')">Dining</button>
       <button id="subbtn-HolidayCosts" class="subtab-link" onclick="showSub(event,'HolidayCosts')">Holiday Costs</button>
       <button id="subbtn-Holidays" class="subtab-link" onclick="showSub(event,'Holidays')">Holidays</button>
+      <button id="subbtn-HolidaySummary" class="subtab-link" onclick="showSub(event,'HolidaySummary')">Holiday Summary</button>
       <button id="subbtn-InsSavings" class="subtab-link" onclick="showSub(event,'InsSavings')">Insurance Savings</button>
       <button id="subbtn-CreditCard" class="subtab-link" onclick="showSub(event,'CreditCard')">Credit Card</button>
       <span class="subtab-group-label">Actual costs</span>
@@ -1010,6 +1011,7 @@
     <div id="sub-DiningNew" class="subtabcontent"><iframe id="frame-DiningNew" class="app-frame" title="Dining"></iframe></div>
     <div id="sub-HolidayCosts" class="subtabcontent"><iframe id="frame-HolidayCosts" class="app-frame" title="Holiday Costs"></iframe></div>
     <div id="sub-Holidays" class="subtabcontent"><iframe id="frame-Holidays" class="app-frame" title="Holidays"></iframe></div>
+    <div id="sub-HolidaySummary" class="subtabcontent"><iframe id="frame-HolidaySummary" class="app-frame" title="Holiday Summary"></iframe></div>
     <div id="sub-MealCosts" class="subtabcontent"><iframe id="frame-MealCosts" class="app-frame" title="Meal Costs"></iframe></div>
     <div id="sub-BillsSummary" class="subtabcontent"><iframe id="frame-BillsSummary" class="app-frame" title="Summary of Household Bills"></iframe></div>
     <div id="sub-BillCats" class="subtabcontent"><iframe id="frame-BillCats" class="app-frame" title="Bill Categories"></iframe></div>
@@ -1655,7 +1657,7 @@
       const box = document.getElementById(id);
       if (!box) return;
       const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
-      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-347 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-348 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
     }
     function safeOptionalChart(drawFn, chartId, headId) {
       try { drawFn(); }
@@ -3503,8 +3505,8 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front50';   // frame-file cache-buster: bump when any framed page changes
-    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', HolidayCosts:'holiday_costs.html', Holidays:'holidays.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
+    const FV = '?v=front51';   // frame-file cache-buster: bump when any framed page changes
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', HolidayCosts:'holiday_costs.html', Holidays:'holidays.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
