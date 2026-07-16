@@ -6,8 +6,8 @@
   <title>My Pension Model</title>
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="common.js?v=auth02"></script>
-  <script src="engine.js?v=ann2"></script>
+  <script src="common.js?v=hol1"></script>
+  <script src="engine.js?v=ann3"></script>
   <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
@@ -553,7 +553,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-339</span>
+      <span class="build-stamp">LC-340</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -989,6 +989,8 @@
       <button id="subbtn-BillCats" class="subtab-link" onclick="showSub(event,'BillCats')">Bill Categories</button>
       <button id="subbtn-MealCosts" class="subtab-link" onclick="showSub(event,'MealCosts')">Meal Costs</button>
       <button id="subbtn-DiningNew" class="subtab-link" onclick="showSub(event,'DiningNew')">Dining</button>
+      <button id="subbtn-HolidayCosts" class="subtab-link" onclick="showSub(event,'HolidayCosts')">Holiday Costs</button>
+      <button id="subbtn-Holidays" class="subtab-link" onclick="showSub(event,'Holidays')">Holidays</button>
       <button id="subbtn-InsSavings" class="subtab-link" onclick="showSub(event,'InsSavings')">Insurance Savings</button>
       <button id="subbtn-CreditCard" class="subtab-link" onclick="showSub(event,'CreditCard')">Credit Card</button>
       <span class="subtab-group-label">Actual costs</span>
@@ -1006,6 +1008,8 @@
     <div id="sub-PayPal" class="subtabcontent"><iframe id="frame-PayPal" class="app-frame" title="PayPal"></iframe></div>
     <div id="sub-InsSavings" class="subtabcontent"><iframe id="frame-InsSavings" class="app-frame" title="Insurance Savings"></iframe></div>
     <div id="sub-DiningNew" class="subtabcontent"><iframe id="frame-DiningNew" class="app-frame" title="Dining"></iframe></div>
+    <div id="sub-HolidayCosts" class="subtabcontent"><iframe id="frame-HolidayCosts" class="app-frame" title="Holiday Costs"></iframe></div>
+    <div id="sub-Holidays" class="subtabcontent"><iframe id="frame-Holidays" class="app-frame" title="Holidays"></iframe></div>
     <div id="sub-MealCosts" class="subtabcontent"><iframe id="frame-MealCosts" class="app-frame" title="Meal Costs"></iframe></div>
     <div id="sub-BillsSummary" class="subtabcontent"><iframe id="frame-BillsSummary" class="app-frame" title="Summary of Household Bills"></iframe></div>
     <div id="sub-BillCats" class="subtabcontent"><iframe id="frame-BillCats" class="app-frame" title="Bill Categories"></iframe></div>
@@ -1651,7 +1655,7 @@
       const box = document.getElementById(id);
       if (!box) return;
       const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
-      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-339 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-340 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
     }
     function safeOptionalChart(drawFn, chartId, headId) {
       try { drawFn(); }
@@ -3499,8 +3503,8 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front42';   // frame-file cache-buster: bump when any framed page changes
-    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
+    const FV = '?v=front43';   // frame-file cache-buster: bump when any framed page changes
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', HolidayCosts:'holiday_costs.html', Holidays:'holidays.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
@@ -3641,7 +3645,7 @@
     async function loadEverything() {
       const status = document.getElementById('status');
       try {
-        const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases, crashes, savingsAccounts, contributionExceptions, workingTiers, incomeSources, incomeAmounts, diningRota, mealCost, annuities] = await Promise.all([
+        const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases, crashes, savingsAccounts, contributionExceptions, workingTiers, incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings] = await Promise.all([
           App.rest('bd_members'), App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
           App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
           App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
@@ -3654,7 +3658,10 @@
           App.rest('bd_income_amounts?order=member_name.asc'),
           App.rest('bd_dining_rota'),
           App.rest('bd_meal_cost'),
-          App.rest('bd_annuities?order=purchase_date.asc')
+          App.rest('bd_annuities?order=purchase_date.asc'),
+          App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
+          App.rest('bd_holiday_cost'),
+          App.rest('bd_holiday_settings?id=eq.1')
         ]);
         // new dining annual total = Σ (each filled rota cell × its meal-cost lookup)
         const mealCostMap = {};
@@ -3663,7 +3670,9 @@
         const diningAnnual = (diningRota || []).reduce((sum, r) => {
           return sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0);
         }, 0);
-        data = { members, bills, dining, diningAnnual: diningAnnual,
+        // holiday annual total (retired phase) via the shared helper — single source of truth
+        const holidayAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], (holidaySettings && holidaySettings[0]) || {}), 'retired');
+        data = { members, bills, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual,
                  guaranteed, pensions, contributions, logs,
                  purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [],
                  incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
