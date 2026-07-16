@@ -42,12 +42,12 @@
 </head>
 <body>
   <h1>Holiday Costs</h1>
-  <p class="note">Per-night accommodation prices by type and level, the fuel rate used to cost driving, and the savings pot that holidays are saved into. These feed the Holidays planner and the retirement model. <span style="color:#94a3b8;">(holiday costs build: v1)</span></p>
+  <p class="note">Per-night accommodation prices by type and level, the fuel rate used to cost driving, and the savings pot that holidays are saved into. These feed the Holidays planner and the retirement model. <span style="color:#94a3b8;">(holiday costs build: v2)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div class="panel" id="costPanel" style="display:none;">
     <h2>Accommodation &mdash; price per night</h2>
-    <p class="sub">The nightly price for each holiday type at Low, Medium and High. The planner multiplies this by the number of nights.</p>
+    <p class="sub">The nightly price for each holiday type at Low, Medium and High, in whole pounds. The planner multiplies this by the number of nights.</p>
     <table id="costTable"><thead><tr><th>Type</th><th>Level</th><th>Price per night (£)</th></tr></thead><tbody></tbody></table>
   </div>
 
@@ -113,9 +113,9 @@
       html += '<tr class="cat-head"><td colspan="3">' + label + '</td></tr>';
       LEVELS.forEach(([lc, ll]) => {
         const r = findCost(code, lc);
-        const val = r && r.cost != null ? r.cost : 0;
+        const val = r && r.cost != null ? Math.round(r.cost) : 0;
         html += '<tr><td></td><td class="lvl">' + ll + '</td>' +
-          '<td><input type="number" step="0.01" min="0" id="hc_' + code + '_' + lc + '" value="' + val + '"></td></tr>';
+          '<td><input type="number" step="1" min="0" id="hc_' + code + '_' + lc + '" value="' + val + '"></td></tr>';
       });
     });
     tb.innerHTML = html;
@@ -160,8 +160,7 @@
         for (const [lc] of LEVELS) {
           const el = document.getElementById('hc_' + code + '_' + lc);
           if (!el) continue;
-          let v = parseFloat(el.value); if (isNaN(v) || v < 0) v = 0;
-          v = Math.round(v * 100) / 100;
+          let v = parseInt(el.value, 10); if (isNaN(v) || v < 0) v = 0;
           const r = findCost(code, lc);
           if (r) { if (Number(r.cost) !== v) await App.write('PATCH', 'bd_holiday_cost?id=eq.' + r.id, { cost: v }); }
           else await App.write('POST', 'bd_holiday_cost', { category: code, level: lc, cost: v });
