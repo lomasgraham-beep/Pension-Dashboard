@@ -14,6 +14,15 @@
   .btn-light { background:#64748b; }
   .btn-danger { background:#c0392b; }
   .btn-clearwk { border:none; border-radius:6px; background:#fdecea; color:#c0392b; font-weight:bold; font-size:13px; padding:8px 14px; cursor:pointer; margin-top:10px; }
+  .btn-copywk { border:none; border-radius:6px; background:#e0f2fe; color:#075985; font-weight:bold; font-size:13px; padding:8px 14px; cursor:pointer; margin:10px 0 0 8px; }
+  .copy-panel { margin-top:10px; padding:12px; border:1px solid #bae6fd; border-radius:8px; background:#f0f9ff; }
+  .copy-head { font-weight:bold; color:#075985; margin-bottom:6px; }
+  .copy-grid { display:flex; flex-wrap:wrap; gap:6px 10px; margin:8px 0; }
+  .copy-wk { font-size:15px; display:inline-flex; align-items:center; gap:5px; background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:7px 9px; min-width:66px; cursor:pointer; }
+  .copy-wk input { width:18px; height:18px; }
+  .copy-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+  .btn-copy-mini { border:none; border-radius:6px; background:#cbd5e1; color:#1e293b; font-weight:bold; font-size:13px; padding:8px 12px; cursor:pointer; }
+  .btn-copy-go { border:none; border-radius:6px; background:#0284c7; color:#fff; font-weight:bold; font-size:14px; padding:9px 16px; cursor:pointer; }
   .grand { font-weight:bold; color:#2c3e50; font-size:16px; }
   .wk { border:1px solid #e2e8f0; border-radius:8px; margin-bottom:14px; overflow:hidden; background:#fff; }
   .wk-head { background:#2c3e50; color:#fff; font-weight:bold; padding:8px 12px; display:flex; justify-content:space-between; cursor:pointer; user-select:none; }
@@ -59,6 +68,11 @@
     .fuelout, .brk b { color:#fdba74 !important; }
     .wktot { color:#f1f5f9 !important; }
     .btn-clearwk { background:#3a1a1a !important; color:#f87171 !important; }
+    .btn-copywk { background:#0c2a3a !important; color:#7dd3fc !important; }
+    .copy-panel { background:#0b1f2e !important; border-color:#155e75 !important; }
+    .copy-head { color:#7dd3fc !important; }
+    .copy-wk { background:#0f172a !important; border-color:#475569 !important; color:#e2e8f0 !important; }
+    .btn-copy-mini { background:#334155 !important; color:#e2e8f0 !important; }
     .brk { color:#94a3b8 !important; }
     #status { background:#1e293b !important; color:#93c5fd !important; }
   }
@@ -66,7 +80,7 @@
 </head>
 <body>
   <h1>Holidays <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(52-week plan)</span></h1>
-  <p class="note">Plan each week's holiday: type &amp; level (per-night cost from Holiday Costs), round-trip miles for fuel, incidentals, and eating out (looked up from Meal Costs). Each week totals automatically; the year total feeds the retirement model. <span style="color:#94a3b8;">(holidays build: v6)</span></p>
+  <p class="note">Plan each week's holiday: type &amp; level (per-night cost from Holiday Costs), round-trip miles for fuel, incidentals, and eating out (looked up from Meal Costs). Each week totals automatically; the year total feeds the retirement model. <span style="color:#94a3b8;">(holidays build: v7)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div class="bar" id="bar" style="display:none;">
@@ -181,7 +195,9 @@
       '<div class="eat-title">Eating out</div>' +
       '<div id="eat_' + w.id + '">' + eatGrid(w) + '</div>' +
       '<div class="brk" id="brk_' + w.id + '"></div>' +
-      '<button class="btn-clearwk" onclick="clearWeek(' + w.id + ')">Clear week ' + w.week_no + '</button>';
+      '<button class="btn-clearwk" onclick="clearWeek(' + w.id + ')">Clear week ' + w.week_no + '</button>' +
+      '<button class="btn-copywk" onclick="toggleCopy(' + w.id + ')">Copy to weeks\u2026</button>' +
+      '<div class="copy-panel" id="copy_' + w.id + '" style="display:none;"></div>';
   }
 
   function render() {
@@ -281,6 +297,58 @@
 
   function holBlankZero(el) { if (el.value === '0') el.value = ''; }
   function holRestoreZero(el) { if (el.value.trim() === '') el.value = '0'; }
+
+  function copyWeekData(src, dst) {
+    dst.label = src.label;
+    dst.category = src.category;
+    dst.level = src.level;
+    dst.nights = src.nights;
+    dst.miles = src.miles;
+    dst.towing = src.towing;
+    dst.incidentals = src.incidentals;
+    dst.eating_out = {};
+    MEALS.forEach(m => { dst.eating_out[m] = (src.eating_out[m] || []).slice(); });
+  }
+
+  function copyGridHtml(id) {
+    const src = plan.find(x => x.id === id); if (!src) return '';
+    let boxes = '';
+    for (let no = 1; no <= WEEKS; no++) {
+      if (no === src.week_no) continue;
+      boxes += '<label class="copy-wk"><input type="checkbox" data-wk="' + no + '"> ' + no + ' ' + monthFor(no) + '</label>';
+    }
+    return '<div class="copy-head">Copy Week ' + src.week_no + ' to (overwrites the selected weeks):</div>' +
+      '<div class="copy-actions"><button class="btn-copy-mini" onclick="copySelAll(' + id + ',true)">Select all</button>' +
+      '<button class="btn-copy-mini" onclick="copySelAll(' + id + ',false)">Clear</button></div>' +
+      '<div class="copy-grid">' + boxes + '</div>' +
+      '<div class="copy-actions"><button class="btn-copy-go" onclick="doCopy(' + id + ')">Copy to selected</button>' +
+      '<button class="btn-copy-mini" onclick="toggleCopy(' + id + ')">Cancel</button></div>';
+  }
+
+  function toggleCopy(id) {
+    const panel = document.getElementById('copy_' + id); if (!panel) return;
+    if (panel.style.display === 'none') { panel.innerHTML = copyGridHtml(id); panel.style.display = 'block'; }
+    else { panel.style.display = 'none'; panel.innerHTML = ''; }
+  }
+
+  function copySelAll(id, val) {
+    document.querySelectorAll('#copy_' + id + ' input[type=checkbox][data-wk]').forEach(b => { b.checked = val; });
+  }
+
+  function doCopy(id) {
+    const src = plan.find(x => x.id === id); if (!src) return;
+    const targets = [];
+    document.querySelectorAll('#copy_' + id + ' input[type=checkbox][data-wk]').forEach(b => {
+      if (b.checked) targets.push(Number(b.getAttribute('data-wk')));
+    });
+    if (!targets.length) { alert('Select at least one week to copy to.'); return; }
+    if (!confirm('Copy Week ' + src.week_no + ' to ' + targets.length + ' week(s)? This overwrites their data.')) return;
+    let n = 0;
+    targets.forEach(no => { const dst = weekFor(no); if (dst && dst.id !== src.id) { copyWeekData(src, dst); dirty[dst.id] = true; n++; } });
+    render();
+    const msg = document.getElementById('msg');
+    msg.style.color = '#065f46'; msg.textContent = 'Copied Week ' + src.week_no + ' to ' + n + ' week(s) \u2014 press Save to keep.';
+  }
 
   function resetWeekObj(w) {
     w.label = null; w.category = null; w.level = null;
