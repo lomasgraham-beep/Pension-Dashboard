@@ -46,7 +46,7 @@
   async function loadState() {
     if (!global.App || !App.rest) throw new Error('App helpers are not loaded.');
     if (!global.PensionEngine) throw new Error('PensionEngine is not loaded.');
-    const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases, crashes, savingsAccounts, contributionExceptions, workingTiers, incomeSources, incomeAmounts, diningRota, mealCost, annuities] = await Promise.all([
+    const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases, crashes, savingsAccounts, contributionExceptions, workingTiers, incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings] = await Promise.all([
       App.rest('bd_members'), App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
       App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
       App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
@@ -59,13 +59,17 @@
       App.rest('bd_income_amounts?order=member_name.asc'),
       App.rest('bd_dining_rota'),
       App.rest('bd_meal_cost'),
-      App.rest('bd_annuities?order=purchase_date.asc')
+      App.rest('bd_annuities?order=purchase_date.asc'),
+      App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
+      App.rest('bd_holiday_cost'),
+      App.rest('bd_holiday_settings?id=eq.1')
     ]);
     const mealCostMap = {};
     (mealCost || []).forEach(c => { mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
     const DAY_COLS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
     const diningAnnual = (diningRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
-    const data = { members, bills, dining, diningAnnual, guaranteed, pensions, contributions, logs, purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [], incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
+    const holidayAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], (holidaySettings && holidaySettings[0]) || {}), 'retired');
+    const data = { members, bills, dining, diningAnnual, holidayAnnual, guaranteed, pensions, contributions, logs, purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [], incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
     const sortedM = (members || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const p1Name = sortedM[0] ? sortedM[0].name : 'Graham';
     const p2Name = sortedM[1] ? sortedM[1].name : null;

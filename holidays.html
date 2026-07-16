@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Holidays</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=hol1"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1000px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:14px; }
+  .bar { position:sticky; top:0; z-index:5; background:#f4f7f6; padding:10px 0; display:flex; gap:12px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #e2e8f0; margin-bottom:12px; }
+  .btn { border:none; border-radius:8px; padding:11px 16px; font-size:15px; font-weight:bold; cursor:pointer; min-height:46px; background:#27ae60; color:#fff; }
+  .btn-light { background:#64748b; }
+  .grand { font-weight:bold; color:#2c3e50; font-size:16px; }
+  .wk { border:1px solid #e2e8f0; border-radius:8px; margin-bottom:14px; overflow:hidden; background:#fff; }
+  .wk-head { background:#2c3e50; color:#fff; font-weight:bold; padding:8px 12px; display:flex; justify-content:space-between; cursor:pointer; user-select:none; }
+  .wk-head .label { font-weight:normal; color:#cbd5e1; font-size:13px; margin-left:8px; }
+  .chev { display:inline-block; width:1em; color:#cbd5e1; }
+  .wk-body { padding:12px; }
+  .row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; }
+  .fld { display:flex; flex-direction:column; }
+  .fld label { font-size:12px; font-weight:bold; color:#64748b; margin-bottom:3px; text-transform:uppercase; }
+  .fld input[type=number], .fld input[type=text], .fld select { padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; background:#fff; }
+  .fld input[type=number] { width:96px; text-align:right; }
+  .fld input[type=text] { width:180px; }
+  .fld.tow { flex-direction:row; align-items:center; gap:6px; }
+  .fld.tow label { margin:0; text-transform:none; font-size:13px; color:#2c3e50; }
+  .fuelout { font-size:14px; color:#9a3412; font-weight:bold; padding-bottom:8px; }
+  .eat-title { font-size:13px; font-weight:bold; color:#2c3e50; margin:6px 0; }
+  .eat-hint { font-size:13px; color:#94a3b8; font-style:italic; }
+  table.eat { border-collapse:collapse; }
+  table.eat th, table.eat td { padding:4px 6px; border:1px solid #eef2f7; text-align:center; font-size:13px; }
+  table.eat th { background:#f0fdf4; color:#166534; }
+  table.eat td.meal { text-align:left; font-weight:bold; color:#2c3e50; background:#fff; white-space:nowrap; }
+  select.cell { width:52px; padding:5px 2px; border:1px solid #e2e8f0; border-radius:5px; font-size:13px; text-align:center; background:#fff; }
+  .brk { font-size:13px; color:#64748b; margin-top:10px; }
+  .brk b { color:#9a3412; }
+  .wktot { font-weight:bold; color:#9a3412; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1 { color:#f1f5f9 !important; } .note { color:#94a3b8 !important; }
+    .bar { background:#0f172a !important; border-color:#334155 !important; }
+    .grand { color:#f1f5f9 !important; }
+    .wk { background:#1e293b !important; border-color:#334155 !important; }
+    .wk-head { background:#1e293b !important; color:#f1f5f9 !important; border-bottom:1px solid #334155; }
+    .fld label { color:#94a3b8 !important; }
+    .fld.tow label { color:#e2e8f0 !important; }
+    .fld input, .fld select, select.cell { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    .eat-title { color:#f1f5f9 !important; }
+    table.eat th { background:#0b2818 !important; color:#86efac !important; }
+    table.eat td { border-color:#334155 !important; }
+    table.eat td.meal { background:#1e293b !important; color:#f1f5f9 !important; }
+    .fuelout, .wktot, .brk b { color:#fdba74 !important; }
+    .brk { color:#94a3b8 !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Holidays <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(52-week plan)</span></h1>
+  <p class="note">Plan each week's holiday: type &amp; level (per-night cost from Holiday Costs), round-trip miles for fuel, incidentals, and eating out (looked up from Meal Costs). Each week totals automatically; the year total feeds the retirement model. <span style="color:#94a3b8;">(holidays build: v1)</span></p>
+  <div id="status">Loading&hellip;</div>
+
+  <div class="bar" id="bar" style="display:none;">
+    <button class="btn" onclick="saveAll()">Save changes</button>
+    <button class="btn btn-light" onclick="expandAll()">Expand all</button>
+    <button class="btn btn-light" onclick="collapseAll()">Collapse all</button>
+    <span id="msg" style="font-weight:bold;"></span>
+    <span class="grand" style="margin-left:auto;">Year total: <span id="grandTotal">£0</span></span>
+  </div>
+  <div id="weeks"></div>
+
+<script>
+  const PHASE = 'retired';
+  const WEEKS = 52;
+  const CATS = [['Caravan', 'Caravan'], ['Hotel', 'Hotel'], ['AirBnB', 'Air B&B'], ['Other', 'Other']];
+  const LEVELS = [['L', 'Low'], ['M', 'Medium'], ['H', 'High']];
+  const MEALS = App.HOLIDAY_MEALS;   // Breakfast, Lunch, Dinner, Drinks
+  const fmt = App.fmt;
+
+  let plan = [];         // bd_holiday_plan rows (this phase), one per week
+  let ctx = null;        // holiday cost lookup context
+  let dirty = {};        // id -> true
+  const collapsed = {};  // week_no -> true(collapsed); default collapsed
+
+  function notify() { try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {} }
+
+  function normGrid(w) {
+    let g = w.eating_out;
+    if (typeof g === 'string') { try { g = JSON.parse(g); } catch (e) { g = {}; } }
+    if (!g || typeof g !== 'object') g = {};
+    MEALS.forEach(m => { if (!Array.isArray(g[m])) g[m] = []; });
+    w.eating_out = g;
+  }
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      const [planRows, costRows, mealRows, sRows] = await Promise.all([
+        App.rest('bd_holiday_plan?phase=eq.' + PHASE + '&order=week_no.asc'),
+        App.rest('bd_holiday_cost'),
+        App.rest('bd_meal_cost'),
+        App.rest('bd_holiday_settings?id=eq.1')
+      ]);
+      plan = planRows || [];
+      plan.forEach(normGrid);
+      ctx = App.holidayCtx(costRows || [], mealRows || [], (sRows && sRows[0]) || {});
+      dirty = {};
+      status.style.display = 'none';
+      document.getElementById('bar').style.display = 'flex';
+      render();
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  function weekFor(no) { return plan.find(w => Number(w.week_no) === no); }
+
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+  function catOptions(sel) {
+    let o = '<option value="">&mdash;</option>';
+    CATS.forEach(([c, l]) => o += '<option value="' + c + '"' + (sel === c ? ' selected' : '') + '>' + l + '</option>');
+    return o;
+  }
+  function lvlOptions(sel) {
+    let o = '<option value="">&mdash;</option>';
+    LEVELS.forEach(([c, l]) => o += '<option value="' + c + '"' + (sel === c ? ' selected' : '') + '>' + l + '</option>');
+    return o;
+  }
+
+  // meal×night grid for one week
+  function eatGrid(w) {
+    const nights = Math.max(0, Number(w.nights) || 0);
+    if (nights <= 0) return '<p class="eat-hint">Set nights above to plan eating out.</p>';
+    let head = '<tr><th>Meal</th>';
+    for (let n = 1; n <= nights; n++) head += '<th>N' + n + '</th>';
+    head += '</tr>';
+    let body = '';
+    MEALS.forEach(meal => {
+      const arr = w.eating_out[meal] || [];
+      let cells = '<td class="meal">' + meal + '</td>';
+      for (let n = 0; n < nights; n++) {
+        const v = arr[n] || '';
+        cells += '<td><select class="cell" onchange="onMeal(' + w.id + ',\'' + meal + '\',' + n + ',this.value)">' +
+          '<option value=""></option>' +
+          '<option' + (v === 'L' ? ' selected' : '') + '>L</option>' +
+          '<option' + (v === 'M' ? ' selected' : '') + '>M</option>' +
+          '<option' + (v === 'H' ? ' selected' : '') + '>H</option>' +
+          '</select></td>';
+      }
+      body += '<tr>' + cells + '</tr>';
+    });
+    return '<table class="eat"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+  }
+
+  function bodyHtml(w) {
+    return '<div class="row">' +
+        '<div class="fld"><label>Type</label><select onchange="onField(' + w.id + ',\'category\',this.value)">' + catOptions(w.category) + '</select></div>' +
+        '<div class="fld"><label>Level</label><select onchange="onField(' + w.id + ',\'level\',this.value)">' + lvlOptions(w.level) + '</select></div>' +
+        '<div class="fld"><label>Nights</label><input type="number" step="1" min="0" value="' + (w.nights != null ? w.nights : 0) + '" onchange="onField(' + w.id + ',\'nights\',this.value)"></div>' +
+        '<div class="fld"><label>Trip name (optional)</label><input type="text" value="' + esc(w.label) + '" oninput="onField(' + w.id + ',\'label\',this.value)"></div>' +
+      '</div>' +
+      '<div class="row">' +
+        '<div class="fld"><label>Round-trip miles</label><input type="number" step="1" min="0" value="' + (w.miles != null ? w.miles : 0) + '" oninput="onField(' + w.id + ',\'miles\',this.value)"></div>' +
+        '<div class="fld tow"><input type="checkbox" ' + (w.towing ? 'checked' : '') + ' onchange="onField(' + w.id + ',\'towing\',this.checked)"><label>Towing caravan</label></div>' +
+        '<div class="fuelout" id="fuel_' + w.id + '"></div>' +
+        '<div class="fld"><label>Incidentals £</label><input type="number" step="1" min="0" value="' + (w.incidentals != null ? w.incidentals : 0) + '" oninput="onField(' + w.id + ',\'incidentals\',this.value)"></div>' +
+      '</div>' +
+      '<div class="eat-title">Eating out</div>' +
+      '<div id="eat_' + w.id + '">' + eatGrid(w) + '</div>' +
+      '<div class="brk" id="brk_' + w.id + '"></div>';
+  }
+
+  function render() {
+    let html = '';
+    for (let no = 1; no <= WEEKS; no++) {
+      const w = weekFor(no);
+      const isC = collapsed[no] !== false;   // default collapsed
+      const tot = w ? App.holidayWeekTotal(w, ctx) : 0;
+      const lbl = (w && w.label) ? '<span class="label">' + esc(w.label) + '</span>' : '';
+      html += '<div class="wk">' +
+        '<div class="wk-head" onclick="toggle(' + no + ')">' +
+          '<span><span class="chev" id="chev_' + no + '">' + (isC ? '\u25B8' : '\u25BE') + '</span> Week ' + no + lbl + '</span>' +
+          '<span class="wktot" id="wt_' + no + '">' + fmt(tot) + '</span>' +
+        '</div>' +
+        '<div class="wk-body" id="wkbody_' + no + '" style="display:' + (isC ? 'none' : 'block') + ';">' +
+          (w ? bodyHtml(w) : '<p class="eat-hint">Missing week row — re-run the SQL seed.</p>') +
+        '</div></div>';
+    }
+    document.getElementById('weeks').innerHTML = html;
+    for (let no = 1; no <= WEEKS; no++) { const w = weekFor(no); if (w) refreshWeek(w); }
+    recalcGrand();
+  }
+
+  function refreshWeek(w) {
+    const b = App.holidayWeekBreakdown(w, ctx);
+    const fuelEl = document.getElementById('fuel_' + w.id);
+    if (fuelEl) fuelEl.textContent = 'Fuel: ' + fmt(b.fuel);
+    const brkEl = document.getElementById('brk_' + w.id);
+    if (brkEl) brkEl.innerHTML = 'Accom <b>' + fmt(b.accom) + '</b> &middot; Fuel <b>' + fmt(b.fuel) +
+      '</b> &middot; Incidentals <b>' + fmt(b.incidentals) + '</b> &middot; Eating out <b>' + fmt(b.eat) +
+      '</b> &nbsp;=&nbsp; Week total <b>' + fmt(b.total) + '</b>';
+    const wtEl = document.getElementById('wt_' + w.week_no);
+    if (wtEl) wtEl.textContent = fmt(b.total);
+  }
+
+  function recalcGrand() {
+    const total = plan.reduce((s, w) => s + App.holidayWeekTotal(w, ctx), 0);
+    document.getElementById('grandTotal').textContent = fmt(total);
+  }
+
+  function onField(id, field, value) {
+    const w = plan.find(x => x.id === id); if (!w) return;
+    if (field === 'nights') {
+      const n = Math.max(0, Math.round(Number(value) || 0));
+      w.nights = n;
+      // resize each meal array to n (keep existing, pad/truncate)
+      MEALS.forEach(m => {
+        const arr = w.eating_out[m] || [];
+        if (arr.length > n) arr.length = n;
+        while (arr.length < n) arr.push('');
+        w.eating_out[m] = arr;
+      });
+      // re-render just this week's eating grid
+      const eatEl = document.getElementById('eat_' + id);
+      if (eatEl) eatEl.innerHTML = eatGrid(w);
+    } else if (field === 'towing') {
+      w.towing = !!value;
+    } else if (field === 'miles' || field === 'incidentals') {
+      w[field] = Number(value) || 0;
+    } else if (field === 'label') {
+      w.label = value;
+      const wtHead = document.getElementById('chev_' + w.week_no);
+      // update the header label live
+      const headSpan = wtHead ? wtHead.parentElement : null;
+      if (headSpan) {
+        let lab = headSpan.querySelector('.label');
+        if (!lab && value) { lab = document.createElement('span'); lab.className = 'label'; headSpan.appendChild(lab); }
+        if (lab) lab.textContent = value || '';
+      }
+    } else {
+      w[field] = value || null;
+    }
+    dirty[id] = true;
+    refreshWeek(w);
+    recalcGrand();
+  }
+
+  function onMeal(id, meal, nightIdx, value) {
+    const w = plan.find(x => x.id === id); if (!w) return;
+    if (!Array.isArray(w.eating_out[meal])) w.eating_out[meal] = [];
+    w.eating_out[meal][nightIdx] = value || '';
+    dirty[id] = true;
+    refreshWeek(w);
+    recalcGrand();
+  }
+
+  function applyState(no) {
+    const isC = collapsed[no] !== false;
+    const body = document.getElementById('wkbody_' + no);
+    const chev = document.getElementById('chev_' + no);
+    if (body) body.style.display = isC ? 'none' : 'block';
+    if (chev) chev.textContent = isC ? '\u25B8' : '\u25BE';
+  }
+  function toggle(no) { collapsed[no] = !(collapsed[no] !== false); applyState(no); }
+  function collapseAll() { for (let n = 1; n <= WEEKS; n++) { collapsed[n] = true; applyState(n); } }
+  function expandAll() { for (let n = 1; n <= WEEKS; n++) { collapsed[n] = false; applyState(n); } }
+
+  async function saveAll() {
+    const msg = document.getElementById('msg');
+    const ids = Object.keys(dirty).map(Number);
+    if (!ids.length) { msg.style.color = '#64748b'; msg.textContent = 'No changes to save.'; return; }
+    msg.style.color = '#1e3a8a'; msg.textContent = 'Saving ' + ids.length + ' week(s)\u2026';
+    try {
+      for (const id of ids) {
+        const w = plan.find(x => x.id === id); if (!w) continue;
+        // trim each meal array to nights before saving
+        const n = Math.max(0, Number(w.nights) || 0);
+        const grid = {};
+        MEALS.forEach(m => {
+          const arr = (w.eating_out[m] || []).slice(0, n);
+          while (arr.length < n) arr.push('');
+          grid[m] = arr;
+        });
+        const payload = {
+          label: w.label || null,
+          category: w.category || null,
+          level: w.level || null,
+          nights: n,
+          miles: Number(w.miles) || 0,
+          towing: !!w.towing,
+          incidentals: Number(w.incidentals) || 0,
+          eating_out: grid
+        };
+        await App.write('PATCH', 'bd_holiday_plan?id=eq.' + id, payload);
+      }
+      dirty = {};
+      msg.style.color = '#065f46'; msg.textContent = '\u2713 Saved. Reopen the dashboard to update projections.';
+      notify();
+    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  App.requireLogin(load, { title: 'Holidays' });
+</script>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Holiday Costs</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=hol1"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:720px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  h2 { color:#2c3e50; font-size:18px; margin:0 0 4px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
+  .sub { color:#64748b; font-size:13px; margin:0 0 12px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:10px 12px; border-bottom:1px solid #e2e8f0; text-align:left; }
+  th { background:#f8fafc; color:#475569; font-size:14px; }
+  td.lvl { font-weight:bold; }
+  input[type=number] { width:110px; padding:9px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; text-align:right; }
+  select { padding:9px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; background:#fff; min-width:220px; }
+  .btn { border:none; border-radius:8px; padding:12px 18px; font-size:15px; font-weight:bold; cursor:pointer; min-height:48px; background:#27ae60; color:#fff; }
+  .cat-head td { background:#eef2f7; font-weight:bold; color:#2c3e50; font-size:15px; }
+  .fuel-grid { display:grid; grid-template-columns:auto 130px; gap:12px 16px; align-items:center; max-width:420px; }
+  .fuel-grid label { font-weight:bold; font-size:14px; color:#2c3e50; }
+  .fuel-note { color:#64748b; font-size:13px; margin:12px 0 0; line-height:1.5; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1, h2 { color:#f1f5f9 !important; } .note, .sub, .fuel-note { color:#94a3b8 !important; }
+    .panel { background:#1e293b !important; border-color:#334155 !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    .cat-head td { background:#162132 !important; color:#f1f5f9 !important; }
+    .fuel-grid label { color:#e2e8f0 !important; }
+    input[type=number], select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Holiday Costs</h1>
+  <p class="note">Per-night accommodation prices by type and level, the fuel rate used to cost driving, and the savings pot that holidays are saved into. These feed the Holidays planner and the retirement model. <span style="color:#94a3b8;">(holiday costs build: v1)</span></p>
+  <div id="status">Loading&hellip;</div>
+
+  <div class="panel" id="costPanel" style="display:none;">
+    <h2>Accommodation &mdash; price per night</h2>
+    <p class="sub">The nightly price for each holiday type at Low, Medium and High. The planner multiplies this by the number of nights.</p>
+    <table id="costTable"><thead><tr><th>Type</th><th>Level</th><th>Price per night (£)</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="panel" id="fuelPanel" style="display:none;">
+    <h2>Fuel</h2>
+    <p class="sub">Used to cost each holiday's driving from its round-trip miles.</p>
+    <div class="fuel-grid">
+      <label for="ppl">Price per litre (£)</label>
+      <input type="number" step="0.01" min="0" id="ppl">
+      <label for="mpgN">MPG &mdash; normal driving</label>
+      <input type="number" step="0.1" min="0" id="mpgN">
+      <label for="mpgT">MPG &mdash; towing a caravan</label>
+      <input type="number" step="0.1" min="0" id="mpgT">
+    </div>
+    <p class="fuel-note">Fuel per holiday = round-trip&nbsp;miles &divide; MPG = gallons, &times;&nbsp;4.546 = litres, &times;&nbsp;price per litre. Towing uses the towing MPG. <span id="fuelEg"></span></p>
+  </div>
+
+  <div class="panel" id="potPanel" style="display:none;">
+    <h2>Holiday savings pot</h2>
+    <p class="sub">The savings account that holds the money set aside for holidays. The monthly set-aside (annual holiday cost &divide; 12) shows on the Budget against the account that funds this pot &mdash; the same way insurance savings work. Pots are accounts with &ldquo;Funded from&rdquo; set on Bank Accounts.</p>
+    <select id="potSel"><option value="">&mdash; none &mdash;</option></select>
+  </div>
+
+  <div class="panel" id="savePanel" style="display:none;">
+    <button class="btn" onclick="saveAll()">Save changes</button>
+    <span id="msg" style="margin-left:12px; font-weight:bold;"></span>
+  </div>
+
+<script>
+  const CATS = [['Caravan', 'Caravan'], ['Hotel', 'Hotel'], ['AirBnB', 'Air B&B'], ['Other', 'Other']];
+  const LEVELS = [['L', 'Low'], ['M', 'Medium'], ['H', 'High']];
+
+  let costRows = [];      // bd_holiday_cost
+  let settings = null;    // bd_holiday_settings (single row)
+  let accounts = [];      // bd_bank_account
+
+  function notify() { try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {} }
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      const [cRows, sRows, aRows] = await Promise.all([
+        App.rest('bd_holiday_cost'),
+        App.rest('bd_holiday_settings?id=eq.1'),
+        App.rest('bd_bank_account?order=account_id.asc')
+      ]);
+      costRows = cRows || [];
+      settings = (sRows && sRows[0]) || { id: 1, price_per_litre: 1.63, mpg_normal: 40, mpg_towing: 27, savings_account: '' };
+      accounts = aRows || [];
+      status.style.display = 'none';
+      ['costPanel', 'fuelPanel', 'potPanel', 'savePanel'].forEach(id => document.getElementById(id).style.display = 'block');
+      render();
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  function findCost(cat, lvl) { return costRows.find(r => r.category === cat && r.level === lvl); }
+
+  function render() {
+    // accommodation table
+    const tb = document.querySelector('#costTable tbody');
+    let html = '';
+    CATS.forEach(([code, label]) => {
+      html += '<tr class="cat-head"><td colspan="3">' + label + '</td></tr>';
+      LEVELS.forEach(([lc, ll]) => {
+        const r = findCost(code, lc);
+        const val = r && r.cost != null ? r.cost : 0;
+        html += '<tr><td></td><td class="lvl">' + ll + '</td>' +
+          '<td><input type="number" step="0.01" min="0" id="hc_' + code + '_' + lc + '" value="' + val + '"></td></tr>';
+      });
+    });
+    tb.innerHTML = html;
+
+    // fuel settings
+    document.getElementById('ppl').value = settings.price_per_litre != null ? settings.price_per_litre : 1.63;
+    document.getElementById('mpgN').value = settings.mpg_normal != null ? settings.mpg_normal : 40;
+    document.getElementById('mpgT').value = settings.mpg_towing != null ? settings.mpg_towing : 27;
+    ['ppl', 'mpgN', 'mpgT'].forEach(id => document.getElementById(id).addEventListener('input', updateEg));
+    updateEg();
+
+    // savings pot dropdown — pots are accounts with funded_from set
+    const sel = document.getElementById('potSel');
+    const pots = accounts.filter(a => a.account_id && a.funded_from != null && String(a.funded_from).trim() !== '');
+    let opts = '<option value="">&mdash; none &mdash;</option>';
+    (pots.length ? pots : accounts.filter(a => a.account_id)).forEach(a => {
+      const bits = [a.bank_name, a.account_holder].filter(Boolean).join(' \u00b7 ');
+      const lbl = a.account_id + (bits ? ' (' + bits + ')' : '');
+      opts += '<option value="' + a.account_id + '"' + (settings.savings_account === a.account_id ? ' selected' : '') + '>' + esc(lbl) + '</option>';
+    });
+    sel.innerHTML = opts;
+  }
+
+  function updateEg() {
+    const ppl = parseFloat(document.getElementById('ppl').value) || 0;
+    const mpgN = parseFloat(document.getElementById('mpgN').value) || 0;
+    const mpgT = parseFloat(document.getElementById('mpgT').value) || 0;
+    function cost(miles, mpg) { return (mpg > 0 && ppl > 0) ? (miles / mpg) * 4.54609 * ppl : 0; }
+    const eg = document.getElementById('fuelEg');
+    eg.textContent = 'Example: 200 round-trip miles \u2248 ' + App.fmt(cost(200, mpgN)) +
+      ' normal, ' + App.fmt(cost(200, mpgT)) + ' towing.';
+  }
+
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+  async function saveAll() {
+    const msg = document.getElementById('msg');
+    msg.style.color = '#1e3a8a'; msg.textContent = 'Saving\u2026';
+    try {
+      // accommodation prices (PATCH changed rows)
+      for (const [code] of CATS) {
+        for (const [lc] of LEVELS) {
+          const el = document.getElementById('hc_' + code + '_' + lc);
+          if (!el) continue;
+          let v = parseFloat(el.value); if (isNaN(v) || v < 0) v = 0;
+          v = Math.round(v * 100) / 100;
+          const r = findCost(code, lc);
+          if (r) { if (Number(r.cost) !== v) await App.write('PATCH', 'bd_holiday_cost?id=eq.' + r.id, { cost: v }); }
+          else await App.write('POST', 'bd_holiday_cost', { category: code, level: lc, cost: v });
+        }
+      }
+      // settings
+      const potVal = document.getElementById('potSel').value || null;
+      const payload = {
+        price_per_litre: Math.round((parseFloat(document.getElementById('ppl').value) || 0) * 100) / 100,
+        mpg_normal: parseFloat(document.getElementById('mpgN').value) || 0,
+        mpg_towing: parseFloat(document.getElementById('mpgT').value) || 0,
+        savings_account: potVal
+      };
+      await App.write('PATCH', 'bd_holiday_settings?id=eq.1', payload);
+
+      msg.style.color = '#065f46'; msg.textContent = '\u2713 Saved.';
+      notify();
+      await load();
+    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  App.requireLogin(load, { title: 'Holiday Costs' });
+</script>
+</body>
+</html>

@@ -1,5 +1,7 @@
 /* ============================================================
    engine.js  —  Pension modelling engine (pure JavaScript)
+   build tag: ann3  (additive: holiday costing feeds outgoings via data.holidayAnnual, behind
+                     HOLIDAY_COSTS. Inert when the flag is off or no holidayAnnual is supplied.)
    build tag: ann2  (additive: mask-aware bill costing — a Monthly bill with a partial
                      pay_months mask now costs premium x active-months instead of premium x 12;
                      inert when MASK_AWARE_BILLS is false. See billEffectiveAnnual below.)
@@ -38,6 +40,18 @@
   // output is identical to build ann1. When true, only monthly bills whose pay_months mask has
   // fewer than 12 active months change value.
   const MASK_AWARE_BILLS = true;
+
+  // ---- Holiday costing (build ann3) ----
+  // Adds a single annual holiday figure (weeks × per-night accommodation + fuel + incidentals +
+  // eating-out) to household outgoings, alongside dining. Subject to the spending-reduction slider
+  // like dining; no age-taper.
+  //
+  // Inertness: when HOLIDAY_COSTS is false, holidayM is forced to 0 regardless of the data, so the
+  // engine's output is identical to build ann2. It is also 0 whenever data.holidayAnnual is not
+  // supplied — so any caller that hasn't been updated to pass a holiday figure behaves exactly as
+  // before. Only when the flag is true AND a holidayAnnual is supplied does spend rise.
+  const HOLIDAY_COSTS = true;
+
   function billEffectiveAnnual(b) {
     const full = Number(b.total_annual) || 0;
     if (!MASK_AWARE_BILLS) return full;                     // inert path == pre-ann2 behaviour
@@ -650,6 +664,13 @@
       }
       const diningM = diningAnnual / 12 * inflFactor;
 
+      // Holidays: single annual figure (rota of weeks × costs), spending-slider aware like dining.
+      // Inert unless HOLIDAY_COSTS is true AND a holidayAnnual figure was supplied (see note above).
+      let holidayM = 0;
+      if (HOLIDAY_COSTS && data.holidayAnnual != null) {
+        holidayM = (Number(data.holidayAnnual) || 0) * spendRed / 12 * inflFactor;
+      }
+
       // ---- Savings accounts for THIS month ----
       // For each account: add contribution (within its window) unless at its own cap (then withhold and
       // redirect to living costs); then apply interest per its frequency/type. Only instant-access
@@ -722,7 +743,7 @@
       // finance payments + any deposit shortfall are extra outgoings the drawdown must cover;
       // withheld instant-access contributions reduce the cost the drawdown must cover.
       const cashOutM = financeThisMonth + depositShortfall;
-      let outM = billsM + diningM + cashOutM;
+      let outM = billsM + diningM + holidayM + cashOutM;
 
       // Withheld contributions from instant-access accounts cover living costs, reducing drawdown
       // (capped so drawdown can't go below zero across the household).

@@ -97,6 +97,78 @@
   const parseLocalDate = (s) => { if (!s) return null; const p = String(s).split('T')[0].split('-'); return p.length < 3 ? null : new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])); };
   const toInputDate = (d) => { if (!d) return ""; if (typeof d === 'string') { const p = d.split('T')[0]; return p; } return d.getFullYear() + '-' + ("0" + (d.getMonth() + 1)).slice(-2) + '-' + ("0" + d.getDate()).slice(-2); };
 
+  // ---- holiday costing (shared single source of truth) ----
+  // Every engine-feed site and the planner page use these, so the annual figure
+  // is always computed the same way and never goes stale when a price/rate changes.
+  //
+  //   holidayCtx(costRows, mealRows, settings)  -> a reusable lookup context
+  //   holidayWeekBreakdown(week, ctx)           -> { accom, fuel, incidentals, eat, total }
+  //   holidayWeekTotal(week, ctx)               -> number (the week's total cost)
+  //   holidayAnnual(planRows, ctx, phase)       -> Σ of week totals for that phase
+  //
+  // Fuel: miles ÷ mpg = UK gallons; × 4.54609 = litres; × £/litre = fuel cost.
+  // Towing uses the towing mpg. Eating-out is a meal×night grid looked up from meal costs.
+  const LITRES_PER_UK_GALLON = 4.54609;
+  const HOLIDAY_MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Drinks'];
+
+  function holidayCtx(costRows, mealRows, settings) {
+    const costMap = {};   // "Category|Level" -> per-night cost
+    (costRows || []).forEach(function (c) { costMap[c.category + '|' + c.level] = Number(c.cost) || 0; });
+    const mealMap = {};   // "Meal|Level" -> cost
+    (mealRows || []).forEach(function (m) { mealMap[m.meal_type + '|' + m.level] = Number(m.cost) || 0; });
+    const s = settings || {};
+    return {
+      costMap: costMap, mealMap: mealMap,
+      pricePerLitre: Number(s.price_per_litre) || 0,
+      mpgNormal: Number(s.mpg_normal) || 0,
+      mpgTowing: Number(s.mpg_towing) || 0
+    };
+  }
+
+  // eating_out may arrive as a jsonb object (PostgREST) or a JSON string; normalise to an object.
+  function parseGrid(g) {
+    if (!g) return {};
+    if (typeof g === 'string') { try { return JSON.parse(g) || {}; } catch (e) { return {}; } }
+    return g;
+  }
+
+  function holidayWeekBreakdown(week, ctx) {
+    const nights = Number(week.nights) || 0;
+    // accommodation: per-night price × nights
+    let accom = 0;
+    if (week.category && week.level) accom = (ctx.costMap[week.category + '|' + week.level] || 0) * nights;
+    // fuel: gallons -> litres -> £
+    let fuel = 0;
+    const miles = Number(week.miles) || 0;
+    const mpg = week.towing ? ctx.mpgTowing : ctx.mpgNormal;
+    if (miles > 0 && mpg > 0 && ctx.pricePerLitre > 0) {
+      fuel = (miles / mpg) * LITRES_PER_UK_GALLON * ctx.pricePerLitre;
+    }
+    // incidentals
+    const incidentals = Number(week.incidentals) || 0;
+    // eating out: sum every filled cell in the meal×night grid
+    let eat = 0;
+    const grid = parseGrid(week.eating_out);
+    HOLIDAY_MEALS.forEach(function (meal) {
+      const arr = grid[meal];
+      if (!Array.isArray(arr)) return;
+      arr.forEach(function (lvl) { if (lvl) eat += (ctx.mealMap[meal + '|' + lvl] || 0); });
+    });
+    return { accom: accom, fuel: fuel, incidentals: incidentals, eat: eat, total: accom + fuel + incidentals + eat };
+  }
+
+  function holidayWeekTotal(week, ctx) { return holidayWeekBreakdown(week, ctx).total; }
+
+  function holidayAnnual(planRows, ctx, phase) {
+    const want = phase || 'retired';
+    let total = 0;
+    (planRows || []).forEach(function (w) {
+      if ((w.phase || 'retired') !== want) return;
+      total += holidayWeekTotal(w, ctx);
+    });
+    return Math.round(total * 100) / 100;
+  }
+
   // ---- login (auth) gate ----
   // Injects a login overlay if the page doesn't already have one, then
   // calls onReady(session) once the user is signed in (now or already).
@@ -247,6 +319,9 @@
     getHeaders: getHeaders,
     rest: rest, rpc: rpc, write: write, memberNames: memberNames,
     fmt: fmt, fmtDiff: fmtDiff, parseLocalDate: parseLocalDate, toInputDate: toInputDate,
+    holidayCtx: holidayCtx, holidayWeekBreakdown: holidayWeekBreakdown,
+    holidayWeekTotal: holidayWeekTotal, holidayAnnual: holidayAnnual,
+    HOLIDAY_MEALS: HOLIDAY_MEALS,
     requireLogin: requireLogin, doLogin: doLogin, doLogout: doLogout,
     token: () => authToken
   };

@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monthly Budget</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=err71"></script>
+<script src="common.js?v=hol1"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1100px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin-bottom:2px; }
@@ -74,7 +74,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Per-person budget for the month you're viewing: net income in, the bills that actually leave each account that month, and what's left. Use the controls to step to next month or jump ahead; the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box is an estimate for reference only and is not part of any total here. Insurances due in the month shown are listed under Cash Summary. <span style="color:#94a3b8;">(budget build: v23)</span></p>
+  <p class="note">Per-person budget for the month you're viewing: net income in, the bills that actually leave each account that month, and what's left. Use the controls to step to next month or jump ahead; the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box is an estimate for reference only and is not part of any total here. Insurances due in the month shown are listed under Cash Summary. <span style="color:#94a3b8;">(budget build: v24)</span></p>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
     <button class="nav-btn" id="prevBtn" onclick="stepMonth(-1)">&#9664; Prev</button>
@@ -179,7 +179,7 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, tiers, incAmts, otherInc, pensContribs, bankAccts, billCats, diningRota, mealCost] = await Promise.all([
+      const [members, bills, tiers, incAmts, otherInc, pensContribs, bankAccts, billCats, diningRota, mealCost, holidayPlan, holidayCost, holidaySettings] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_working_tiers?order=from_date.asc'),
@@ -189,14 +189,28 @@
         App.rest('bd_bank_account?order=account_id.asc'),
         App.rest('bd_bill_category?order=code.asc'),
         App.rest('bd_dining_rota'),
-        App.rest('bd_meal_cost')
+        App.rest('bd_meal_cost'),
+        App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
+        App.rest('bd_holiday_cost'),
+        App.rest('bd_holiday_settings?id=eq.1')
       ]);
       const names = (members || []).map(m => m.name).filter(Boolean);
       if (!names.length) { status.textContent = 'No members found.'; return; }
       const mealCostMap = {};
       (mealCost || []).forEach(c => { mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
       const diningAnnual = (diningRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
-      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual };
+      // holiday monthly set-aside = annual holiday cost ÷ 12, shown against the pot's funding account
+      const holSettings = (holidaySettings && holidaySettings[0]) || {};
+      const holidayAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], holSettings), 'retired');
+      const holidayMonthly = holidayAnnual / 12;
+      let holidayFundingAcct = null;
+      const potId = holSettings.savings_account ? String(holSettings.savings_account).trim() : '';
+      if (potId) {
+        const potAcct = (bankAccts || []).find(a => (a.account_id || '').trim() === potId);
+        holidayFundingAcct = (potAcct && potAcct.funded_from != null && String(potAcct.funded_from).trim() !== '')
+          ? String(potAcct.funded_from).trim() : potId;   // funding account, or the pot itself if not funded-from
+      }
+      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct };
       names.forEach(n => { selectedTier[n] = currentTierDays(n, DATA.tiers); });
       status.style.display = 'none';
       initNav();
@@ -328,6 +342,11 @@
       if (potSum > 0) {
         rows += '<tr class="pot-line"><td>Insurance/car savings</td><td class="amt">' + fmt(potSum) + '</td></tr>';
         boxTotal += potSum; boxAvg += potSum;
+      }
+      // holiday savings set-aside: smoothed monthly against this pot's funding account
+      if (d.holidayFundingAcct && acctId === d.holidayFundingAcct && d.holidayMonthly > 0) {
+        rows += '<tr class="pot-line"><td>Holiday savings</td><td class="amt">' + fmt(d.holidayMonthly) + '</td></tr>';
+        boxTotal += d.holidayMonthly; boxAvg += d.holidayMonthly;
       }
       totalBillsAvg += boxAvg;     // count the average even if nothing is charged this particular month
       if (!rows) return;           // nothing actually leaves this account this month → no box
