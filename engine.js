@@ -1,5 +1,8 @@
 /* ============================================================
    engine.js  —  Pension modelling engine (pure JavaScript)
+   build tag: ann4  (additive: each row now exposes holidayTotal (= holidayM) alongside diningTotal,
+                     so views can itemise the holiday cost. Pure exposure of an already-computed
+                     figure — changes no calculation; inert (holidayTotal is 0) when holidays are off.)
    build tag: ann3  (additive: holiday costing feeds outgoings via data.holidayAnnual, behind
                      HOLIDAY_COSTS. Inert when the flag is off or no holidayAnnual is supplied.)
    build tag: ann2  (additive: mask-aware bill costing — a Monthly bill with a partial
@@ -635,7 +638,7 @@
         accYear = yr;
         acc = {
           year: yr, gAge: gDobYr != null ? yr - gDobYr : 0, jAge: jDobYr != null ? yr - jDobYr : 0,
-          outgoings: 0, billsTotal: 0, diningTotal: 0, gTarget: 0, jTarget: 0,
+          outgoings: 0, billsTotal: 0, diningTotal: 0, holidayTotal: 0, gTarget: 0, jTarget: 0,
           taxFree: gTf + jTf, taxable: gTx + jTx,
           g_taxFree: gTf, g_taxable: gTx, j_taxFree: jTf, j_taxable: jTx,
           g_tfGrowth: 0, g_txGrowth: 0, j_tfGrowth: 0, j_txGrowth: 0, tfGrowth: 0, txGrowth: 0, crash: null,
@@ -900,7 +903,7 @@
       monthlyRows.push({
         year: yr, month: (idx % 12), label: MONTH_NAMES[idx % 12] + ' ' + yr,
         gAge: gAge, jAge: jAge,
-        outgoings: outM, billsTotal: billsM, diningTotal: diningM, gTarget: gTargetM, jTarget: jTargetM,
+        outgoings: outM, billsTotal: billsM, diningTotal: diningM, holidayTotal: holidayM, gTarget: gTargetM, jTarget: jTargetM,
         taxFree: oGTf + oJTf, taxable: oGTx + oJTx,
         g_taxFree: oGTf, g_taxable: oGTx, j_taxFree: oJTf, j_taxable: oJTx,
         g_tfGrowth: gTfGrowth, g_txGrowth: gTxGrowth, j_tfGrowth: jTfGrowth, j_txGrowth: jTxGrowth,
@@ -923,7 +926,7 @@
         acctBalances: savingsAccts.map(a => ({ name: a.name, member: a.member, bal: a.bal }))
       });
 
-      acc.outgoings += outM; acc.billsTotal += billsM; acc.diningTotal += diningM;
+      acc.outgoings += outM; acc.billsTotal += billsM; acc.diningTotal += diningM; acc.holidayTotal += holidayM;
       acc.gTarget += gTargetM; acc.jTarget += jTargetM;
       acc.stateGross += gRes.inc.stateGross + jRes.inc.stateGross;
       acc.g_other += gRes.inc.total; acc.j_other += jRes.inc.total;
