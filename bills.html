@@ -34,6 +34,13 @@
   .catdef { background:var(--surface-2); border:1px solid var(--line); border-left:4px solid var(--accent-dark); border-radius:8px; padding:12px 14px; margin:4px 0 14px; font-size:15px; line-height:1.5; color:var(--ink); white-space:pre-wrap; }
   .catdef .catdef-head { display:block; font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:4px; }
 
+  /* ---- Derived (read-only) rows: Holidays / Dining pulled from their planners ---- */
+  .derived td { background:#cdd9ea; color:var(--ink); }
+  .derived .d-name { font-style:italic; font-weight:bold; border-left:3px solid var(--accent-dark); }
+  .derived .d-src { font-weight:normal; color:#5b6b7d; font-size:12px; }
+  .derived .d-annual { font-weight:bold; color:var(--accent-dark); }
+  .derived .d-mut { color:#5b6b7d; }
+
   /* ---- "Paid in" month-schedule picker ---- */
   td.sched, th.sched { width:150px; }
   .sched-btn { background:var(--surface-2); border:1px solid var(--line-strong); border-radius:6px; padding:7px 10px; font-size:13px; font-weight:bold; color:var(--ink); cursor:pointer; min-width:64px; }
@@ -92,6 +99,10 @@
     .mchip.on { background:#1d3a63 !important; color:#fff !important; border-color:#1d3a63 !important; }
     .mscbtn { background:#0f172a !important; color:#38d6e6 !important; border-color:#475569 !important; }
     .sched-static { color:#94a3b8 !important; }
+    .derived td { background:#243a5e !important; color:#dbe4f0 !important; }
+    .derived .d-name { border-left-color:#38d6e6 !important; color:#f1f5f9 !important; }
+    .derived .d-src, .derived .d-mut { color:#9fb2c9 !important; }
+    .derived .d-annual { color:#7dd3fc !important; }
   }
 
 
@@ -100,7 +111,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). The greyed <strong>Holidays</strong> line is drawn from the Holidays planner &mdash; it&rsquo;s read-only here and counts towards the yearly total, but isn&rsquo;t a saved bill. <span style="color:var(--accent-dark);">(bills build: paymonths6)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). The darker <strong>Holidays</strong> and <strong>Dining</strong> lines are drawn from their planners &mdash; read-only here and counted towards the yearly total, but not saved as bills. <span style="color:var(--accent-dark);">(bills build: paymonths7)</span></p>
   <div class="bar" style="align-items:flex-start;">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -149,7 +160,9 @@
 
   let rows = [], dirty = false, deleted = [], categoryCodes = [], memberNames = [], bankAccounts = [], categoryDefs = {};
   const HOL_CAT = 'Holiday';   // existing category the derived holiday line sits under
+  const DIN_CAT = 'Dining';    // label the derived dining line sits under
   let holAnnual = 0;           // live holiday-planner yearly total (display-only; NOT a saved bill)
+  let dinAnnual = 0;           // live dining-rota yearly total (display-only; NOT a saved bill)
   const tbody = document.querySelector('#tbl tbody');
   const fmt = App.fmt;
   const MABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -321,28 +334,32 @@
 
   function populateCatFilter() {
     const sel = document.getElementById('filterCat'); const cur = sel.value;
-    const cats = [...new Set(rows.map(r => r.category_code).filter(c => c))].sort();
+    const set = new Set(rows.map(r => r.category_code).filter(c => c));
+    if (dinAnnual > 0) set.add(DIN_CAT);   // derived lines are filterable even with no real bill in the category
+    if (holAnnual > 0) set.add(HOL_CAT);
+    const cats = [...set].sort();
     sel.innerHTML = '<option value="All">All categories</option>' + cats.map(c => '<option>' + c + '</option>').join('');
     sel.value = [...sel.options].some(o => o.value === cur) ? cur : 'All';
   }
 
-  // Greyed, read-only line for the holiday-planner total. Not part of `rows`, never saved.
-  function holidayRowHtml() {
-    return '<tr style="opacity:0.62; background:var(--surface-2);">' +
-      '<td style="font-style:italic;">Holidays <span style="font-weight:normal; color:var(--ink-soft); font-size:12px;">(from planner)</span></td>' +
-      '<td>' + HOL_CAT + '</td>' +
-      '<td class="sched-static">&mdash;</td>' +
-      '<td class="sched-static">&mdash;</td>' +
-      '<td class="sched-static">&mdash;</td>' +
-      '<td class="sched-static">Annual</td>' +
-      '<td style="font-weight:bold; color:var(--accent-dark);">' + fmt(holAnnual) + '</td>' +
-      '<td class="sched"><span class="sched-static">All</span></td>' +
-      '<td style="text-align:center;" class="sched-static">&mdash;</td>' +
-      '<td class="sched-static">&mdash;</td><td class="sched-static">&mdash;</td><td class="sched-static">&mdash;</td>' +
-      '<td><span class="sched-static">edit in Holidays tab</span></td>' +
+  // Darker, read-only line for a planner-derived total. Not part of `rows`, never saved.
+  function derivedRowHtml(name, cat, annual, srcNote, editTab) {
+    return '<tr class="derived">' +
+      '<td class="d-name">' + name + ' <span class="d-src">(' + srcNote + ')</span></td>' +
+      '<td>' + cat + '</td>' +
+      '<td class="d-mut">&mdash;</td>' +
+      '<td class="d-mut">&mdash;</td>' +
+      '<td class="d-mut">&mdash;</td>' +
+      '<td>Annual</td>' +
+      '<td class="d-annual">' + fmt(annual) + '</td>' +
+      '<td class="sched"><span class="d-mut">All</span></td>' +
+      '<td style="text-align:center;" class="d-mut">&mdash;</td>' +
+      '<td class="d-mut">&mdash;</td><td class="d-mut">&mdash;</td><td class="d-mut">&mdash;</td>' +
+      '<td><span class="d-mut">edit in ' + editTab + '</span></td>' +
       '</tr>';
   }
   function holidayInView(cat) { return holAnnual > 0 && (cat === 'All' || cat === HOL_CAT); }
+  function diningInView(cat)  { return dinAnnual > 0 && (cat === 'All' || cat === DIN_CAT); }
 
   function render() {
     const cat = document.getElementById('filterCat').value;
@@ -350,8 +367,10 @@
     const html = rows.map((r, i) => ({ r, i }))
       .filter(x => cat === 'All' || (x.r.category_code || '') === cat)
       .map(x => rowHtml(x.r, x.i)).join('');
-    const holHtml = holidayInView(cat) ? holidayRowHtml() : '';
-    const body = holHtml + html;
+    let derived = '';
+    if (diningInView(cat))  derived += derivedRowHtml('Dining', DIN_CAT, dinAnnual, 'from rota', 'Dining tab');
+    if (holidayInView(cat)) derived += derivedRowHtml('Holidays', HOL_CAT, holAnnual, 'from planner', 'Holidays tab');
+    const body = derived + html;
     tbody.innerHTML = body || '<tr><td colspan="13">No bills in this view. Use \u201cAdd bill\u201d or change the filter.</td></tr>';
     updateProj();
     updateCatDef();
@@ -375,12 +394,13 @@
     const cat = document.getElementById('filterCat').value;
     const inView = r => cat === 'All' || (r.category_code || '') === cat;
     let total = rows.reduce((s, r) => s + (inView(r) ? annualOf(r.premium, r.frequency, r.pay_months) : 0), 0);
-    const withHol = holidayInView(cat);
-    if (withHol) total += holAnnual;
+    const extras = [];
+    if (diningInView(cat))  { total += dinAnnual; extras.push('dining'); }
+    if (holidayInView(cat)) { total += holAnnual; extras.push('holidays'); }
     const shown = rows.filter(inView).length;
     const scope = cat === 'All' ? 'All categories' : cat;
     let sub = cat === 'All' ? (rows.length + ' bills') : (shown + ' of ' + rows.length + ' bills shown');
-    if (withHol) sub += ' + holidays';
+    if (extras.length) sub += ' + ' + extras.join(' + ');
     const esc = String(scope).replace(/</g, '&lt;');
     document.getElementById('proj').innerHTML =
       '<div class="proj-scope">' + esc + ' \u00b7 total per year today</div>' +
@@ -427,17 +447,23 @@
       try { const cc = await App.rest('bd_bill_category?order=code.asc'); categoryCodes = (cc || []).map(c => c.code); categoryDefs = {}; (cc || []).forEach(c => { categoryDefs[c.code] = c.definition || ''; }); } catch (e) { categoryCodes = []; categoryDefs = {}; }
       try { const mm = await App.rest('bd_members?order=name.asc'); memberNames = (mm || []).map(m => m.name).filter(Boolean); } catch (e) { memberNames = []; }
       try { const ba = await App.rest('bd_bank_account?order=account_id.asc'); bankAccounts = (ba || []).map(a => a.account_id).filter(Boolean); } catch (e) { bankAccounts = []; }
-      // Holiday planner yearly total — display-only line; never written to bd_household_bills.
+      // Holiday planner & dining rota yearly totals — display-only lines; never written to bd_household_bills.
       try {
-        const [hPlan, hCost, hMeal, hSet] = await Promise.all([
+        const [hPlan, hCost, hMeal, hSet, dRota] = await Promise.all([
           App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
           App.rest('bd_holiday_cost'),
           App.rest('bd_meal_cost'),
-          App.rest('bd_holiday_settings?id=eq.1')
+          App.rest('bd_holiday_settings?id=eq.1'),
+          App.rest('bd_dining_rota')
         ]);
         const ctx = App.holidayCtx(hCost || [], hMeal || [], (hSet && hSet[0]) || {});
         holAnnual = App.holidayAnnual(hPlan || [], ctx, 'retired');
-      } catch (e) { holAnnual = 0; }
+        // dining annual = Σ (each filled rota cell × its meal-cost lookup) — same as engine ann2
+        const mealMap = {};
+        (hMeal || []).forEach(c => { mealMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
+        const DAY_COLS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        dinAnnual = (dRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
+      } catch (e) { holAnnual = 0; dinAnnual = 0; }
       deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
       populateCatFilter(); render(); status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }

@@ -85,7 +85,7 @@
 </head>
 <body>
   <h1>Summary of Household Bills</h1>
-  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. The <strong>Holiday</strong> category includes the Holidays planner total (flat &mdash; holidays aren&rsquo;t age-tapered). <span style="color:#94a3b8;">(summary build: v12)</span></p>
+  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. The <strong>Holiday</strong> and <strong>Dining</strong> categories include their planner totals (flat &mdash; neither is age-tapered). <span style="color:#94a3b8;">(summary build: v13)</span></p>
   <div id="status">Loading…</div>
 
   <div id="ageRow" class="agebar-row" style="display:none;">
@@ -131,7 +131,9 @@
   const OTHER_THRESHOLD = 0.02;   // categories under this share of the total roll into "Other"
 
   const HOL_CAT = 'Holiday';   // existing category the derived holiday total sits under
+  const DIN_CAT = 'Dining';    // label the derived dining total sits under
   let holAnnual = 0;           // holiday-planner yearly total (flat across ages; not age-tapered)
+  let dinAnnual = 0;           // dining-rota yearly total (flat across ages; not age-tapered)
   let allBills = [];
   let sel = 0;
   const expanded = new Set();   // category codes currently drilled open (persists across age changes)
@@ -164,6 +166,12 @@
       map[cat].total += annual;
       map[cat].bills.push({ name: b.bill_name || '(unnamed)', frequency: b.frequency, month: Number(b.bill_month), annual: annual });
     });
+    // Dining rota total — flat across ages (not age-tapered), added to the Dining category.
+    if (dinAnnual > 0) {
+      if (!map[DIN_CAT]) map[DIN_CAT] = { code: DIN_CAT, total: 0, bills: [] };
+      map[DIN_CAT].total += dinAnnual;
+      map[DIN_CAT].bills.push({ name: 'Dining (from rota)', frequency: 'Annual', month: 0, annual: dinAnnual });
+    }
     // Holidays planner total — flat across ages (holidays aren't age-tapered), added to the Holiday category.
     if (holAnnual > 0) {
       if (!map[HOL_CAT]) map[HOL_CAT] = { code: HOL_CAT, total: 0, bills: [] };
@@ -297,18 +305,23 @@
     try {
       status.textContent = 'Loading… (fetching bills)';
       allBills = await App.rest('bd_household_bills?order=bill_name.asc');
-      // Holiday planner yearly total (display-only; merges into the Holiday category).
+      // Holiday planner & dining rota yearly totals (display-only; merge into their categories).
       try {
-        const [hPlan, hCost, hMeal, hSet] = await Promise.all([
+        const [hPlan, hCost, hMeal, hSet, dRota] = await Promise.all([
           App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
           App.rest('bd_holiday_cost'),
           App.rest('bd_meal_cost'),
-          App.rest('bd_holiday_settings?id=eq.1')
+          App.rest('bd_holiday_settings?id=eq.1'),
+          App.rest('bd_dining_rota')
         ]);
         const ctx = App.holidayCtx(hCost || [], hMeal || [], (hSet && hSet[0]) || {});
         holAnnual = App.holidayAnnual(hPlan || [], ctx, 'retired');
-      } catch (e) { holAnnual = 0; }
-      if ((!allBills || !allBills.length) && !(holAnnual > 0)) { status.textContent = 'No bills found. Add some on the Household Bills tab.'; return; }
+        const mealMap = {};
+        (hMeal || []).forEach(c => { mealMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
+        const DAY_COLS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        dinAnnual = (dRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
+      } catch (e) { holAnnual = 0; dinAnnual = 0; }
+      if ((!allBills || !allBills.length) && !(holAnnual > 0) && !(dinAnnual > 0)) { status.textContent = 'No bills found. Add some on the Household Bills tab.'; return; }
       allBills = allBills || [];
       status.style.display = 'none';
       document.getElementById('ageRow').style.display = 'flex';
