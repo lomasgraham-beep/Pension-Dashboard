@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Summary of Household Bills</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=auth01"></script>
+<script src="common.js?v=hol1"></script>
 <style>
   :root { --accent:#1d3a63; --accent-dark:#14294a; --accent-soft:#e6f5f7; --accent-border:#bfe4e9; --on-accent:#ffffff; --other:#94a3b8; }
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:980px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
@@ -85,7 +85,7 @@
 </head>
 <body>
   <h1>Summary of Household Bills</h1>
-  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. <span style="color:#94a3b8;">(summary build: v11)</span></p>
+  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. The <strong>Holiday</strong> category includes the Holidays planner total (flat &mdash; holidays aren&rsquo;t age-tapered). <span style="color:#94a3b8;">(summary build: v12)</span></p>
   <div id="status">Loading…</div>
 
   <div id="ageRow" class="agebar-row" style="display:none;">
@@ -130,6 +130,8 @@
   ];
   const OTHER_THRESHOLD = 0.02;   // categories under this share of the total roll into "Other"
 
+  const HOL_CAT = 'Holiday';   // existing category the derived holiday total sits under
+  let holAnnual = 0;           // holiday-planner yearly total (flat across ages; not age-tapered)
   let allBills = [];
   let sel = 0;
   const expanded = new Set();   // category codes currently drilled open (persists across age changes)
@@ -162,6 +164,12 @@
       map[cat].total += annual;
       map[cat].bills.push({ name: b.bill_name || '(unnamed)', frequency: b.frequency, month: Number(b.bill_month), annual: annual });
     });
+    // Holidays planner total — flat across ages (holidays aren't age-tapered), added to the Holiday category.
+    if (holAnnual > 0) {
+      if (!map[HOL_CAT]) map[HOL_CAT] = { code: HOL_CAT, total: 0, bills: [] };
+      map[HOL_CAT].total += holAnnual;
+      map[HOL_CAT].bills.push({ name: 'Holidays (from planner)', frequency: 'Annual', month: 0, annual: holAnnual });
+    }
     const cats = Object.values(map).sort((a, b) => b.total - a.total);
     const grand = cats.reduce((s, c) => s + c.total, 0);
     return { cats, grand };
@@ -289,7 +297,19 @@
     try {
       status.textContent = 'Loading… (fetching bills)';
       allBills = await App.rest('bd_household_bills?order=bill_name.asc');
-      if (!allBills || !allBills.length) { status.textContent = 'No bills found. Add some on the Household Bills tab.'; return; }
+      // Holiday planner yearly total (display-only; merges into the Holiday category).
+      try {
+        const [hPlan, hCost, hMeal, hSet] = await Promise.all([
+          App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
+          App.rest('bd_holiday_cost'),
+          App.rest('bd_meal_cost'),
+          App.rest('bd_holiday_settings?id=eq.1')
+        ]);
+        const ctx = App.holidayCtx(hCost || [], hMeal || [], (hSet && hSet[0]) || {});
+        holAnnual = App.holidayAnnual(hPlan || [], ctx, 'retired');
+      } catch (e) { holAnnual = 0; }
+      if ((!allBills || !allBills.length) && !(holAnnual > 0)) { status.textContent = 'No bills found. Add some on the Household Bills tab.'; return; }
+      allBills = allBills || [];
       status.style.display = 'none';
       document.getElementById('ageRow').style.display = 'flex';
       document.getElementById('kpiGrid').style.display = 'grid';
