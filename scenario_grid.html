@@ -5,7 +5,7 @@
 <title>Scenario Grid</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=hol1"></script>
-<script src="engine.js?v=ann4"></script>
+<script src="engine.js?v=ann5"></script>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
   :root {
@@ -102,7 +102,7 @@
   <div class="grid-head">
     <div class="gh-left">
       <span class="gh-title">Scenario Grid</span>
-      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid7)</span></span>
+      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid8)</span></span>
       <span class="spend-ctl"><label>Spend %</label>
         <input id="sp0" type="number" min="0" max="200" step="5" value="50" inputmode="numeric">
         <input id="sp1" type="number" min="0" max="200" step="5" value="60" inputmode="numeric">
@@ -413,7 +413,7 @@
       // pull exactly the dataset the dashboard engine uses
       const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases,
              crashes, savingsAccounts, contributionExceptions, workingTiers,
-             incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings] = await Promise.all([
+             incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings, diningSettings] = await Promise.all([
         App.rest('bd_members'), App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
         App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
         App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
@@ -428,7 +428,8 @@
         App.rest('bd_annuities?order=purchase_date.asc'),
         App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
         App.rest('bd_holiday_cost'),
-        App.rest('bd_holiday_settings?id=eq.1')
+        App.rest('bd_holiday_settings?id=eq.1'),
+        App.rest('bd_dining_settings?id=eq.1')
       ]);
 
       // dining annual = Σ (each filled rota cell × its meal-cost lookup) — same as the shell
@@ -438,8 +439,11 @@
       const diningAnnual = (diningRota || []).reduce((sum, r) =>
         sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
       const holidayAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], (holidaySettings && holidaySettings[0]) || {}), 'retired');
+      const _hs = (holidaySettings && holidaySettings[0]) || {}, _ds = (diningSettings && diningSettings[0]) || {};
+      const holidayTaper = { taper_at_70: _hs.taper_at_70, taper_at_80: _hs.taper_at_80, taper_at_90: _hs.taper_at_90 };
+      const diningTaper = { taper_at_70: _ds.taper_at_70, taper_at_80: _ds.taper_at_80, taper_at_90: _ds.taper_at_90 };
 
-      data = { members, bills, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual,
+      data = { members, bills, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual, holidayTaper: holidayTaper, diningTaper: diningTaper,
                guaranteed, pensions, contributions, logs,
                purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [],
                contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [],

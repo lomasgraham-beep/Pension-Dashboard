@@ -50,6 +50,11 @@
   .wktot { font-weight:bold; color:#fff; }
   #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
   .s-err { background:#fdecea !important; color:#c0392b !important; }
+  .taper-card { border:1px solid #99f6e4; border-radius:8px; background:#f0fdfa; padding:12px 14px; margin-bottom:14px; }
+  .taper-head { font-weight:bold; color:#0f766e; font-size:15px; }
+  .taper-sub { color:#64748b; font-size:13px; margin:4px 0 10px; }
+  .taper-row { display:flex; gap:16px; flex-wrap:wrap; }
+  .taper-row .fld input[type=number] { width:80px; }
 
   @media (prefers-color-scheme: dark) {
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
@@ -75,13 +80,26 @@
     .btn-copy-mini { background:#334155 !important; color:#e2e8f0 !important; }
     .brk { color:#94a3b8 !important; }
     #status { background:#1e293b !important; color:#93c5fd !important; }
+    .taper-card { background:#062a2a !important; border-color:#155e58 !important; }
+    .taper-head { color:#5eead4 !important; }
+    .taper-sub { color:#94a3b8 !important; }
   }
 </style>
 </head>
 <body>
   <h1>Holidays <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(52-week plan)</span></h1>
-  <p class="note">Plan each week's holiday: type &amp; level (per-night cost from Holiday Costs), round-trip miles for fuel, incidentals, and eating out (looked up from Meal Costs). Each week totals automatically; the year total feeds the retirement model. <span style="color:#94a3b8;">(holidays build: v7)</span></p>
+  <p class="note">Plan each week's holiday: type &amp; level (per-night cost from Holiday Costs), round-trip miles for fuel, incidentals, and eating out (looked up from Meal Costs). Each week totals automatically; the year total feeds the retirement model. <span style="color:#94a3b8;">(holidays build: v8)</span></p>
   <div id="status">Loading&hellip;</div>
+
+  <div class="taper-card" id="taperCard" style="display:none;">
+    <div class="taper-head">Age-based holiday spending reduction</div>
+    <div class="taper-sub">Multiplier applied to holiday spending once the older of you reaches each age. 1 = no reduction, 0.8 = spend 80%. Same scale as the Bills page; leave at 1 for no taper. Save to apply.</div>
+    <div class="taper-row">
+      <div class="fld"><label>At 70</label><input type="number" id="tap70" step="0.05" min="0" max="1" value="1"></div>
+      <div class="fld"><label>At 80</label><input type="number" id="tap80" step="0.05" min="0" max="1" value="1"></div>
+      <div class="fld"><label>At 90</label><input type="number" id="tap90" step="0.05" min="0" max="1" value="1"></div>
+    </div>
+  </div>
 
   <div class="bar" id="bar" style="display:none;">
     <button class="btn" onclick="saveAll()">Save changes</button>
@@ -107,6 +125,9 @@
 
   let plan = [];         // bd_holiday_plan rows (this phase), one per week
   let ctx = null;        // holiday cost lookup context
+  let settings = null;   // bd_holiday_settings (single row) — holds age-taper multipliers
+  function tnum(v, d) { return v != null && isFinite(Number(v)) ? Number(v) : d; }
+  function readTaper(id) { let v = parseFloat(document.getElementById(id).value); if (!isFinite(v)) v = 1; v = Math.max(0, Math.min(1, v)); return Math.round(v * 100) / 100; }
   let dirty = {};        // id -> true
   const collapsed = {};  // week_no -> true(collapsed); default collapsed
 
@@ -131,9 +152,14 @@
       ]);
       plan = planRows || [];
       plan.forEach(normGrid);
-      ctx = App.holidayCtx(costRows || [], mealRows || [], (sRows && sRows[0]) || {});
+      settings = (sRows && sRows[0]) || {};
+      ctx = App.holidayCtx(costRows || [], mealRows || [], settings);
+      document.getElementById('tap70').value = tnum(settings.taper_at_70, 1);
+      document.getElementById('tap80').value = tnum(settings.taper_at_80, 1);
+      document.getElementById('tap90').value = tnum(settings.taper_at_90, 1);
       dirty = {};
       status.style.display = 'none';
+      document.getElementById('taperCard').style.display = 'block';
       document.getElementById('bar').style.display = 'flex';
       render();
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
@@ -382,9 +408,15 @@
   async function saveAll() {
     const msg = document.getElementById('msg');
     const ids = Object.keys(dirty).map(Number);
-    if (!ids.length) { msg.style.color = '#64748b'; msg.textContent = 'No changes to save.'; return; }
-    msg.style.color = '#1e3a8a'; msg.textContent = 'Saving ' + ids.length + ' week(s)\u2026';
+    const t70 = readTaper('tap70'), t80 = readTaper('tap80'), t90 = readTaper('tap90');
+    const taperChanged = !settings || tnum(settings.taper_at_70, 1) !== t70 || tnum(settings.taper_at_80, 1) !== t80 || tnum(settings.taper_at_90, 1) !== t90;
+    if (!ids.length && !taperChanged) { msg.style.color = '#64748b'; msg.textContent = 'No changes to save.'; return; }
+    msg.style.color = '#1e3a8a'; msg.textContent = 'Saving\u2026';
     try {
+      if (taperChanged) {
+        await App.write('PATCH', 'bd_holiday_settings?id=eq.1', { taper_at_70: t70, taper_at_80: t80, taper_at_90: t90 });
+        settings = Object.assign({}, settings, { taper_at_70: t70, taper_at_80: t80, taper_at_90: t90 });
+      }
       for (const id of ids) {
         const w = plan.find(x => x.id === id); if (!w) continue;
         // trim each meal array to nights before saving

@@ -1,5 +1,10 @@
 /* ============================================================
    engine.js  —  Pension modelling engine (pure JavaScript)
+   build tag: ann5  (additive: single-figure dining + holiday terms now take an optional household
+                     age-taper (data.diningTaper / data.holidayTaper, each a { taper_at_70/80/90 }
+                     object) applied via the existing taperFor helper on the older member's age.
+                     Inert (taperFor returns 1.0) when the taper objects are absent or all 1.0/null,
+                     so output is identical to ann4 until a taper value is set below 1.)
    build tag: ann4  (additive: each row now exposes holidayTotal (= holidayM) alongside diningTotal,
                      so views can itemise the holiday cost. Pure exposure of an already-computed
                      figure — changes no calculation; inert (holidayTotal is 0) when holidays are off.)
@@ -658,20 +663,27 @@
       const inflFactor = Math.pow(1 + INFL, Math.floor(elapsed));   // annual step: flat within each year since retirement
       const billsM = bills.reduce((s, b) => s + billEffectiveAnnual(b) * (b.spend_reduction ? spendRed : 1.0) * taperFor(b, oldest), 0) / 12 * inflFactor;
       // Dining: new model uses a single annual figure (rota × meal costs), subject to the
-      // spending-reduction slider, no age-taper. Falls back to the legacy dining array if not supplied.
-      let diningAnnual;
+      // spending-reduction slider AND an optional household age-taper (data.diningTaper, a single
+      // { taper_at_70/80/90 } object applied via the same taperFor helper the bills use, keyed on the
+      // older member's age). Falls back to the legacy dining array (per-row taper) if not supplied.
+      // When data.diningTaper is absent or all its values are 1.0/null, taperFor returns 1.0, so the
+      // output is identical to build ann4.
+      let diningAnnual, diningTaperMult = 1.0;
       if (data.diningAnnual != null) {
         diningAnnual = (Number(data.diningAnnual) || 0) * spendRed;
+        diningTaperMult = taperFor(data.diningTaper || {}, oldest);
       } else {
         diningAnnual = dining.reduce((s, d) => s + (Number(d.annual_total) || 0) * (d.spend_reduction ? spendRed : 1.0) * taperFor(d, oldest), 0);
       }
-      const diningM = diningAnnual / 12 * inflFactor;
+      const diningM = diningAnnual * diningTaperMult / 12 * inflFactor;
 
-      // Holidays: single annual figure (rota of weeks × costs), spending-slider aware like dining.
-      // Inert unless HOLIDAY_COSTS is true AND a holidayAnnual figure was supplied (see note above).
+      // Holidays: single annual figure (rota of weeks × costs), spending-slider aware like dining,
+      // plus the same optional household age-taper (data.holidayTaper, a { taper_at_70/80/90 } object).
+      // Inert unless HOLIDAY_COSTS is true AND a holidayAnnual figure was supplied (see note above);
+      // when data.holidayTaper is absent/1.0, taperFor returns 1.0 so the result matches build ann4.
       let holidayM = 0;
       if (HOLIDAY_COSTS && data.holidayAnnual != null) {
-        holidayM = (Number(data.holidayAnnual) || 0) * spendRed / 12 * inflFactor;
+        holidayM = (Number(data.holidayAnnual) || 0) * spendRed * taperFor(data.holidayTaper || {}, oldest) / 12 * inflFactor;
       }
 
       // ---- Savings accounts for THIS month ----
