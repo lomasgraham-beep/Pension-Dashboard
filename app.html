@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=hol1"></script>
-  <script src="engine.js?v=ann4"></script>
+  <script src="engine.js?v=ann5"></script>
   <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
@@ -553,7 +553,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-351</span>
+      <span class="build-stamp">LC-352</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1660,7 +1660,7 @@
       const box = document.getElementById(id);
       if (!box) return;
       const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
-      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-351 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-352 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
     }
     function safeOptionalChart(drawFn, chartId, headId) {
       try { drawFn(); }
@@ -3508,7 +3508,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front54';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front55';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', HolidayCosts:'holiday_costs.html', Holidays:'holidays.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -3650,7 +3650,7 @@
     async function loadEverything() {
       const status = document.getElementById('status');
       try {
-        const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases, crashes, savingsAccounts, contributionExceptions, workingTiers, incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings] = await Promise.all([
+        const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases, crashes, savingsAccounts, contributionExceptions, workingTiers, incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings, diningSettings] = await Promise.all([
           App.rest('bd_members'), App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
           App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
           App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
@@ -3666,7 +3666,8 @@
           App.rest('bd_annuities?order=purchase_date.asc'),
           App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
           App.rest('bd_holiday_cost'),
-          App.rest('bd_holiday_settings?id=eq.1')
+          App.rest('bd_holiday_settings?id=eq.1'),
+          App.rest('bd_dining_settings?id=eq.1')
         ]);
         // new dining annual total = Σ (each filled rota cell × its meal-cost lookup)
         const mealCostMap = {};
@@ -3677,7 +3678,12 @@
         }, 0);
         // holiday annual total (retired phase) via the shared helper — single source of truth
         const holidayAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], (holidaySettings && holidaySettings[0]) || {}), 'retired');
-        data = { members, bills, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual,
+        // Age-taper multipliers (single household set each) — engine defaults to 1.0 if absent.
+        const hs = (holidaySettings && holidaySettings[0]) || {};
+        const ds = (diningSettings && diningSettings[0]) || {};
+        const holidayTaper = { taper_at_70: hs.taper_at_70, taper_at_80: hs.taper_at_80, taper_at_90: hs.taper_at_90 };
+        const diningTaper = { taper_at_70: ds.taper_at_70, taper_at_80: ds.taper_at_80, taper_at_90: ds.taper_at_90 };
+        data = { members, bills, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual, holidayTaper: holidayTaper, diningTaper: diningTaper,
                  guaranteed, pensions, contributions, logs,
                  purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [],
                  incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
