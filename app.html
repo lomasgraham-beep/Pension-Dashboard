@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=hol1"></script>
-  <script src="engine.js?v=ann3"></script>
+  <script src="engine.js?v=ann4"></script>
   <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
@@ -553,7 +553,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-350</span>
+      <span class="build-stamp">LC-351</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1245,9 +1245,9 @@
 
     // ---------- per-view field pickers ----------
     function vrow(r) {
-      if (currentView === p1Name) { const g = savedPlan.gRatio; return { dining:r.diningTotal*g, bills:r.billsTotal*g, loan:(r.cashFinance||0)*g, savToBills:(r.cashCapDraw||0)*g, tf:r.g_taxFree, tx:r.g_taxable, tfG:r.g_tfGrowth||0, txG:r.g_txGrowth||0, other:r.g_other, draw:r.g_draw, income:r.g_income, close:r.g_closing, surplus:r.g_surplusBalance||0 }; }
-      if (currentView === p2Name)  { const j = 1 - savedPlan.gRatio; return { dining:r.diningTotal*j, bills:r.billsTotal*j, loan:(r.cashFinance||0)*j, savToBills:(r.cashCapDraw||0)*j, tf:r.j_taxFree, tx:r.j_taxable, tfG:r.j_tfGrowth||0, txG:r.j_txGrowth||0, other:r.j_other, draw:r.j_draw, income:r.j_income, close:r.j_closing, surplus:r.j_surplusBalance||0 }; }
-      return { dining:r.diningTotal, bills:r.billsTotal, loan:(r.cashFinance||0), savToBills:(r.cashCapDraw||0), tf:r.taxFree, tx:r.taxable, tfG:r.tfGrowth||0, txG:r.txGrowth||0, other:r.otherPensions, draw:r.drawdown, income:r.totalIncome, close:r.combinedClosing, surplus:r.surplusBalance||0 };
+      if (currentView === p1Name) { const g = savedPlan.gRatio; return { dining:r.diningTotal*g, holiday:(r.holidayTotal||0)*g, bills:r.billsTotal*g, loan:(r.cashFinance||0)*g, savToBills:(r.cashCapDraw||0)*g, tf:r.g_taxFree, tx:r.g_taxable, tfG:r.g_tfGrowth||0, txG:r.g_txGrowth||0, other:r.g_other, draw:r.g_draw, income:r.g_income, close:r.g_closing, surplus:r.g_surplusBalance||0 }; }
+      if (currentView === p2Name)  { const j = 1 - savedPlan.gRatio; return { dining:r.diningTotal*j, holiday:(r.holidayTotal||0)*j, bills:r.billsTotal*j, loan:(r.cashFinance||0)*j, savToBills:(r.cashCapDraw||0)*j, tf:r.j_taxFree, tx:r.j_taxable, tfG:r.j_tfGrowth||0, txG:r.j_txGrowth||0, other:r.j_other, draw:r.j_draw, income:r.j_income, close:r.j_closing, surplus:r.j_surplusBalance||0 }; }
+      return { dining:r.diningTotal, holiday:(r.holidayTotal||0), bills:r.billsTotal, loan:(r.cashFinance||0), savToBills:(r.cashCapDraw||0), tf:r.taxFree, tx:r.taxable, tfG:r.tfGrowth||0, txG:r.txGrowth||0, other:r.otherPensions, draw:r.drawdown, income:r.totalIncome, close:r.combinedClosing, surplus:r.surplusBalance||0 };
     }
 
     function setRetGran(g) { retGran = g; renderRetirementTable(); }
@@ -1343,11 +1343,12 @@
       // Spending
       if (retSegShown.spend) {
         if (!retGroupExp.spend) {
-          segs.push({ key:'spend', label:'Spending', toggle:true, expanded:false, leaves:[{ label:'Spending', val:(r,v)=>v.bills+v.dining+v.loan, style:B+RED }] });
+          segs.push({ key:'spend', label:'Spending', toggle:true, expanded:false, leaves:[{ label:'Spending', val:(r,v)=>v.bills+v.dining+(v.holiday||0)+v.loan, style:B+RED }] });
         } else {
           segs.push({ key:'spend', label:'Spending', toggle:true, expanded:true, leaves:[
             { label:'Bills', val:(r,v)=>v.bills, style:B+RED },
             { label:'Dining', val:(r,v)=>v.dining, style:B+ORANGE },
+            { label:'Holidays', val:(r,v)=>v.holiday||0, style:B+TEAL },
             { label:'Loan Payment', val:(r,v)=>v.loan, style:B+BLUE }
           ] });
         }
@@ -1425,8 +1426,9 @@
       const net = (who === 'g') ? (r.g_net || 0) : (r.j_net || 0);
       const savToBills = (r.cashCapDraw || 0) * ratio;
       const bills = (r.billsTotal || 0) * ratio, dining = (r.diningTotal || 0) * ratio;
+      const holiday = (r.holidayTotal || 0) * ratio;
       const loan = (r.cashFinance || 0) * ratio, purch = (r.cashShortfall || 0) * ratio;
-      const costTotal = bills + dining + loan + purch;
+      const costTotal = bills + dining + holiday + loan + purch;
 
       let incLines = sources.map(s => {
         const tag = s.kind === 'annuity' ? ' (annuity)' : s.kind === 'state' ? ' (state)' : ' (pension)';
@@ -1438,6 +1440,7 @@
 
       let costLines = `<div class="ss-line"><span>Bills</span><b>${ssMoney(bills)}</b></div>`
         + `<div class="ss-line"><span>Dining</span><b>${ssMoney(dining)}</b></div>`;
+      if (holiday > 0.5) costLines += `<div class="ss-line"><span>Holidays</span><b>${ssMoney(holiday)}</b></div>`;
       if (loan > 0.5) costLines += `<div class="ss-line"><span>Loan payment</span><b>${ssMoney(loan)}</b></div>`;
       if (purch > 0.5) costLines += `<div class="ss-line"><span>Purchase</span><b>${ssMoney(purch)}</b></div>`;
       costLines += `<div class="ss-line ss-total"><span>Total costs (their share)</span><b>${ssMoney(costTotal)}</b></div>`;
@@ -1657,7 +1660,7 @@
       const box = document.getElementById(id);
       if (!box) return;
       const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
-      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-350 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-351 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
     }
     function safeOptionalChart(drawFn, chartId, headId) {
       try { drawFn(); }
@@ -3505,7 +3508,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front53';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front54';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', HolidayCosts:'holiday_costs.html', Holidays:'holidays.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', BillsSummary:'bills_summary.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
