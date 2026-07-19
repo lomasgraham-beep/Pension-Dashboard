@@ -37,8 +37,11 @@
   .tablewrap { overflow-x:auto; border:1px solid #e2e8f0; border-radius:10px; background:#fff; }
   table { border-collapse:collapse; width:100%; min-width:820px; }
   th, td { padding:9px 10px; font-size:14px; text-align:right; white-space:nowrap; border-bottom:1px solid #eef2f7; font-variant-numeric:tabular-nums; }
-  th { background:var(--surface-2); color:var(--ink); font-size:12px; text-transform:uppercase; letter-spacing:.03em; position:sticky; top:0; }
+  th { background:var(--surface-2); color:var(--ink); font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+  th.grp { text-align:center; color:var(--accent-dark); border-bottom:1px solid var(--line); }
   th.mon, td.mon { text-align:left; }
+  td.inc { background:#f2faf6; }
+  th.grp:first-of-type { background:#eef7f1; }
   td.avail { font-weight:800; }
   td.avail.pos { color:var(--good); }
   td.avail.neg { color:var(--bad); }
@@ -79,6 +82,8 @@
     .headline .big { color:#38d6e6 !important; } .headline .big.neg { color:#f87171 !important; } .headline .meta { color:#94a3b8 !important; }
     .tablewrap { background:#1e293b !important; border-color:#334155 !important; }
     th { background:#0f172a !important; color:#cbd5e1 !important; }
+    th.grp { color:#38d6e6 !important; border-color:#334155 !important; }
+    td.inc { background:#132a20 !important; }
     td { border-color:#334155 !important; color:#cbd5e1 !important; }
     tr.mrow:hover td { background:#243244 !important; }
     tr.total td { background:#162132 !important; color:#f1f5f9 !important; border-color:#475569 !important; }
@@ -94,7 +99,7 @@
 </head>
 <body>
   <h1>What I Could Save</h1>
-  <p class="note">Month-by-month for the year you pick: what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. The last column is what's left to save. Costs are inflated to the chosen year at 2.5%; income is held at today's level. Tap any month to see the account-level breakdown. <span style="color:#94a3b8;">(save-forecast build: sf1)</span></p>
+  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. The last column is what's left to save. Costs are inflated to the chosen year at 2.5%; income is held at today's level. Tap any month to see the account-level breakdown. <span style="color:#94a3b8;">(save-forecast build: sf2)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="controls" class="controls" style="display:none;">
@@ -231,11 +236,18 @@
         addBill(memberAcct[owner][acct].bills, nm, charge);
       });
 
-      // ---- income by working-days pattern (flat monthly) ----
-      const salaryByDays = {};   // days -> monthly total across members
-      (incAmts || []).forEach(a => { const d = Number(a.working_days); salaryByDays[d] = (salaryByDays[d] || 0) + (Number(a.net_monthly) || 0); });
-      const otherIncome = (otherInc || []).reduce((s, o) => s + (Number(o.net_monthly) || 0), 0);
-      const daysWithSalary = new Set(Object.keys(salaryByDays).map(Number));
+      // ---- income by member + working-days pattern (flat monthly) ----
+      const salaryByMemberDays = {};   // member -> { days -> monthly total }
+      const otherByMember = {};        // member -> monthly total (tier-independent)
+      cols.forEach(n => { salaryByMemberDays[n] = {}; otherByMember[n] = 0; });
+      (incAmts || []).forEach(a => {
+        const nm = a.member_name; if (cols.indexOf(nm) < 0) return;
+        const dd = Number(a.working_days);
+        salaryByMemberDays[nm][dd] = (salaryByMemberDays[nm][dd] || 0) + (Number(a.net_monthly) || 0);
+      });
+      (otherInc || []).forEach(o => { const nm = o.member_name; if (cols.indexOf(nm) >= 0) otherByMember[nm] += (Number(o.net_monthly) || 0); });
+      const daysWithSalary = new Set();
+      cols.forEach(n => Object.keys(salaryByMemberDays[n]).forEach(d => daysWithSalary.add(Number(d))));
 
       // ---- joint retirement year = later of the two retirement dates ----
       let jointRetYear = null;
@@ -248,7 +260,7 @@
       maxYear = (jointRetYear && jointRetYear >= CUR_Y) ? jointRetYear : CUR_Y;
 
       DATA = { cols, acctHolder, acctBank, memberMonth, memberAcct, cardMonth, cardBills,
-               paypalMonth, paypalBills, diningMonth, holidayMonth, salaryByDays, otherIncome,
+               paypalMonth, paypalBills, diningMonth, holidayMonth, salaryByMemberDays, otherByMember,
                daysWithSalary, jointRetYear };
 
       selYear = CUR_Y;
@@ -282,23 +294,26 @@
     render();
   }
 
-  function incomeFor(days) { return (DATA.salaryByDays[days] || 0) + DATA.otherIncome; }
+  function incomeForMember(name, days) { return (DATA.salaryByMemberDays[name][days] || 0) + DATA.otherByMember[name]; }
+  function incomeTotal(days) { return DATA.cols.reduce((s, n) => s + incomeForMember(n, days), 0); }
 
   function monthValues(m) {
     const d = DATA, f = inflFactor(selYear);
+    const incCols = d.cols.map(n => incomeForMember(n, selDays));   // flat: not inflated, same every month
     const cols = d.cols.map(n => d.memberMonth[n][m] * f);
     const dining = d.diningMonth[m] * f;
     const holiday = d.holidayMonth[m] * f;
     const card = d.cardMonth[m] * f;
     const paypal = d.paypalMonth[m] * f;
     const total = cols.reduce((s, v) => s + v, 0) + dining + holiday + card + paypal;
-    const income = incomeFor(selDays);
-    return { cols, dining, holiday, card, paypal, total, income, available: income - total };
+    const income = incCols.reduce((s, v) => s + v, 0);
+    return { incCols, cols, dining, holiday, card, paypal, total, income, available: income - total };
   }
 
   function render() {
     const d = DATA; if (!d) return;
-    const income = incomeFor(selDays);
+    const income = incomeTotal(selDays);
+    const nMem = d.cols.length;
 
     // headline: annual available for the chosen pattern/year
     let annualTotal = 0; for (let m = 0; m < 12; m++) annualTotal += monthValues(m).total;
@@ -312,24 +327,31 @@
       (selYear > CUR_Y ? ' (inflated &times;' + inflFactor(selYear).toFixed(3) + ')' : '') + '</div>' + warn;
     hn.style.display = 'block';
 
-    // header row
-    const heads = ['<th class="mon">Month</th>']
-      .concat(d.cols.map(n => '<th>' + esc(n) + '</th>'))
-      .concat(['<th>Dining</th>','<th>Holidays</th>','<th>Card</th>','<th>PayPal</th>','<th>Total</th>','<th>Available</th>']);
-    document.getElementById('thead').innerHTML = '<tr>' + heads.join('') + '</tr>';
+    // grouped two-row header: Net income (per person) + Bills by person (per person)
+    const memNames = d.cols.map(n => '<th>' + esc(n) + '</th>').join('');
+    document.getElementById('thead').innerHTML =
+      '<tr>' +
+        '<th class="mon" rowspan="2">Month</th>' +
+        '<th class="grp" colspan="' + nMem + '">Net income</th>' +
+        '<th class="grp" colspan="' + nMem + '">Bills by person</th>' +
+        '<th rowspan="2">Dining</th><th rowspan="2">Holidays</th><th rowspan="2">Card</th>' +
+        '<th rowspan="2">PayPal</th><th rowspan="2">Total</th><th rowspan="2">Available</th>' +
+      '</tr><tr>' + memNames + memNames + '</tr>';
 
-    const ncols = heads.length;
+    const ncols = 2 * nMem + 7;   // Month + income(nMem) + bills(nMem) + dining/hol/card/paypal/total/avail
     let body = '';
-    const yearSums = { cols: d.cols.map(() => 0), dining: 0, holiday: 0, card: 0, paypal: 0, total: 0, avail: 0 };
+    const yearSums = { inc: d.cols.map(() => 0), cols: d.cols.map(() => 0), dining: 0, holiday: 0, card: 0, paypal: 0, total: 0, avail: 0 };
 
     for (let m = 0; m < 12; m++) {
       const v = monthValues(m);
+      v.incCols.forEach((val, i) => yearSums.inc[i] += val);
       v.cols.forEach((val, i) => yearSums.cols[i] += val);
       yearSums.dining += v.dining; yearSums.holiday += v.holiday; yearSums.card += v.card;
       yearSums.paypal += v.paypal; yearSums.total += v.total; yearSums.avail += v.available;
 
       const open = openMonths.has(m);
       const cells = ['<td class="mon"><span class="chev">&#9656;</span> ' + MABBR[m] + ' ' + selYear + '</td>']
+        .concat(v.incCols.map(val => '<td class="inc">' + fmt(val) + '</td>'))
         .concat(v.cols.map(val => '<td>' + fmt(val) + '</td>'))
         .concat([
           '<td>' + fmt(v.dining) + '</td>',
@@ -345,6 +367,7 @@
 
     // year totals row
     const totalCells = ['<td class="mon">' + selYear + ' total</td>']
+      .concat(yearSums.inc.map(val => '<td class="inc">' + fmt(val) + '</td>'))
       .concat(yearSums.cols.map(val => '<td>' + fmt(val) + '</td>'))
       .concat([
         '<td>' + fmt(yearSums.dining) + '</td>',
