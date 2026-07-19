@@ -55,14 +55,15 @@
 
   tr.detail { display:none; }
   tr.detail.show { display:table-row; }
-  tr.detail > td { background:#fbfdff; padding:0; border-bottom:1px solid #e2e8f0; }
+  tr.detail > td { background:#fbfdff; padding:0; border-bottom:1px solid #e2e8f0; white-space:normal; }
   .dwrap { padding:12px 16px; display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; }
   .dcard { border:1px solid #e6edf3; border-radius:8px; overflow:hidden; }
   .dcard .dhead { background:#eef2f7; color:#2c3e50; font-weight:700; font-size:13px; padding:7px 10px; display:flex; justify-content:space-between; gap:8px; }
-  .dcard .drow { display:flex; justify-content:space-between; gap:10px; padding:5px 10px; font-size:13px; border-top:1px dashed #eef2f6; }
+  .dcard .drow { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; padding:5px 10px; font-size:13px; border-top:1px dashed #eef2f6; }
   .dcard .drow:first-of-type { border-top:none; }
-  .dcard .drow .nm { color:#475569; }
-  .dcard .drow .vl { color:#2c3e50; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .dcard .drow .nm { color:#475569; flex:1 1 auto; min-width:0; overflow-wrap:anywhere; word-break:break-word; }
+  .dcard .drow .vl { color:#2c3e50; font-variant-numeric:tabular-nums; white-space:nowrap; flex:0 0 auto; text-align:right; }
+  .dcard .dhead span:first-child { overflow-wrap:anywhere; word-break:break-word; }
   .dcard .acct-sub { background:#f4f8fb; font-weight:700; }
   .dcard .empty { color:#94a3b8; font-style:italic; padding:6px 10px; font-size:13px; }
   .dnote { font-size:11px; color:#94a3b8; }
@@ -99,7 +100,7 @@
 </head>
 <body>
   <h1>What I Could Save</h1>
-  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. The last column is what's left to save. Costs are inflated to the chosen year at 2.5%; income is held at today's level. Tap any month to see the account-level breakdown. <span style="color:#94a3b8;">(save-forecast build: sf2)</span></p>
+  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save. Costs are inflated to the chosen year at 2.5%; income is held at today's level. Tap any month to see the account-level breakdown. <span style="color:#94a3b8;">(save-forecast build: sf3)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="controls" class="controls" style="display:none;">
@@ -158,6 +159,12 @@
     if (!activeMonthsB(b)[month - 1]) return 0;
     return p;   // Annual = full amount in its month; Monthly = the monthly premium
   }
+  function annualToMonthly(premium, frequency) {   // smoothed monthly set-aside (savings pots)
+    const p = Number(premium) || 0;
+    if (frequency === 'Weekly') return p * 52 / 12;
+    if (frequency === 'Annual') return p / 12;
+    return p;   // Monthly
+  }
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function inflFactor(year) { return Math.pow(1 + INFL, year - CUR_Y); }
@@ -183,9 +190,14 @@
       if (!names.length) { status.textContent = 'No members found. Add members first.'; return; }
       const cols = names.slice(0, 2);   // two-person model: one column each
 
-      // account_id -> holder / bank name
-      const acctHolder = {}, acctBank = {};
-      (bankAccts || []).forEach(a => { if (a.account_id) { acctHolder[a.account_id] = a.account_holder || ''; acctBank[a.account_id] = a.bank_name || ''; } });
+      // account_id -> holder / bank name; pots are accounts with funded_from set
+      const acctHolder = {}, acctBank = {}, isPot = {};
+      (bankAccts || []).forEach(a => {
+        if (!a.account_id) return;
+        acctHolder[a.account_id] = a.account_holder || '';
+        acctBank[a.account_id] = a.bank_name || '';
+        if (a.funded_from != null && String(a.funded_from).trim() !== '') isPot[a.account_id] = true;
+      });
 
       // ---- dining: weekly rota summed into each calendar month ----
       const mealCostMap = {};
@@ -223,13 +235,18 @@
       }
 
       (bills || []).forEach(b => {
-        const charge = []; for (let m = 1; m <= 12; m++) charge[m - 1] = monthCharge(b, m);
         const pb = (b.paid_by || '').trim();
         const nm = b.bill_name || '\u2014';
+        const acctId = (b.paid_account || '').trim();
+        const pot = acctId && isPot[acctId] && pb !== 'Credit card' && pb !== 'PayPal';
+        // pot-funded bills (e.g. insurance) are saved monthly -> spread evenly across every month
+        const charge = [];
+        if (pot) { const mo = annualToMonthly(b.premium, b.frequency); for (let m = 0; m < 12; m++) charge[m] = mo; }
+        else { for (let m = 1; m <= 12; m++) charge[m - 1] = monthCharge(b, m); }
         if (pb === 'Credit card') { for (let m = 0; m < 12; m++) cardMonth[m] += charge[m]; addBill(cardBills, nm, charge); return; }
         if (pb === 'PayPal')      { for (let m = 0; m < 12; m++) paypalMonth[m] += charge[m]; addBill(paypalBills, nm, charge); return; }
         const owner = ownerOf(b);
-        const acct = (b.paid_account || '').trim() || '(no account)';
+        const acct = acctId || '(no account)';
         for (let m = 0; m < 12; m++) memberMonth[owner][m] += charge[m];
         if (!memberAcct[owner][acct]) memberAcct[owner][acct] = { m: new Array(12).fill(0), bills: {} };
         for (let m = 0; m < 12; m++) memberAcct[owner][acct].m[m] += charge[m];
