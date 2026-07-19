@@ -6,7 +6,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=hol1"></script>
 <style>
-  :root { --accent:#1d3a63; --accent-dark:#14294a; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; --good:#15803d; --bad:#c0392b; }
+  :root { --accent:#1d3a63; --accent-dark:#14294a; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; --good:#15803d; --bad:#c0392b; --cost:#dc2626; --save:#16a34a; --grid:#e2e8f0; --axis:#94a3b8; }
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1100px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin-bottom:2px; }
   .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
@@ -71,6 +71,16 @@
   .diffline .vl { flex:0 0 auto; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; color:#2c3e50; }
   .diffline .vl .d.pos { color:var(--good); } .diffline .vl .d.neg { color:var(--bad); }
   .diffnote { color:#94a3b8; font-style:italic; font-size:13px; }
+
+  .chartpanel { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:14px 16px; margin-bottom:16px; }
+  .chart-top { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
+  .legend { display:flex; gap:16px; font-size:13px; color:#475569; }
+  .legend .lg { display:inline-flex; align-items:center; gap:6px; }
+  .legend .lg::before { content:''; width:14px; height:3px; border-radius:2px; background:#94a3b8; }
+  .legend .lg.cost::before { background:var(--cost); }
+  .legend .lg.save::before { background:var(--save); }
+  .readout { font-size:13px; color:#64748b; font-variant-numeric:tabular-nums; }
+  .chart-svg svg { width:100%; height:auto; display:block; touch-action:pan-y; }
   tr.detail.show { display:table-row; }
   tr.detail > td { background:#fbfdff; padding:0; border-bottom:1px solid #e2e8f0; white-space:normal; }
   .dwrap { padding:12px 16px; display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; }
@@ -86,7 +96,7 @@
   .dnote { font-size:11px; color:#94a3b8; }
 
   @media (prefers-color-scheme: dark) {
-    :root { --good:#4ade80; --bad:#f87171; }
+    :root { --good:#4ade80; --bad:#f87171; --cost:#f87171; --save:#4ade80; --grid:#334155; --axis:#64748b; }
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
     h1 { color:#f1f5f9 !important; } .note { color:#94a3b8 !important; }
     #status { background:#1e293b !important; color:#93c5fd !important; }
@@ -120,12 +130,15 @@
     .diffline { border-color:#334155 !important; }
     .diffline .nm { color:#cbd5e1 !important; } .diffline .vl { color:#e2e8f0 !important; }
     .diffnote { color:#94a3b8 !important; }
+    .chartpanel { background:#1e293b !important; border-color:#334155 !important; }
+    .legend { color:#cbd5e1 !important; }
+    .readout { color:#94a3b8 !important; }
   }
 </style>
 </head>
 <body>
   <h1>What I Could Save</h1>
-  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save. Both costs and take-home rise with inflation at 2.5% to the chosen year. Tap any month to see the account-level breakdown, or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf5)</span></p>
+  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save. Both costs and take-home rise with inflation at 2.5% to the chosen year. The chart plots cost out (red) against what's left to save (green) by month; move across it for each month's figures. Tap any month row for the account-level breakdown, or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf6)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="controls" class="controls" style="display:none;">
@@ -148,6 +161,13 @@
   </div>
 
   <div id="headline" class="headline" style="display:none;"></div>
+  <div id="chartPanel" class="chartpanel" style="display:none;">
+    <div class="chart-top">
+      <div class="legend"><span class="lg cost">Cost out</span><span class="lg save">Could save</span></div>
+      <div class="readout" id="chartReadout"></div>
+    </div>
+    <div class="chart-svg" id="chartSvg"></div>
+  </div>
   <div id="tablewrap" class="tablewrap" style="display:none;"><table id="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
 
 <script>
@@ -353,6 +373,69 @@
     return { incCols, cols, dining, holiday, card, paypal, total, income, available: income - total };
   }
 
+  // ---- month line chart: red = cost out, green = could save ----
+  let CHART = null;
+  function niceCeil(v) { if (v <= 0) return 0; const p = Math.pow(10, Math.floor(Math.log10(v))); const n = v / p; const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10; return step * p; }
+
+  function drawChart(totals, avails) {
+    const W = 720, H = 260, L = 58, R = 14, T = 12, B = 26;
+    const plotW = W - L - R, plotH = H - T - B;
+    let maxV = 0, minV = 0;
+    for (let m = 0; m < 12; m++) { maxV = Math.max(maxV, totals[m], avails[m]); minV = Math.min(minV, totals[m], avails[m]); }
+    let yMax = niceCeil(maxV); if (yMax <= 0) yMax = 100;
+    let yMin = minV < 0 ? -niceCeil(-minV) : 0;
+    if (yMax === yMin) yMax = yMin + 100;
+    const xFor = i => L + plotW * i / 11;
+    const yFor = v => T + plotH * (1 - (v - yMin) / (yMax - yMin));
+    const xs = []; for (let i = 0; i < 12; i++) xs.push(xFor(i));
+    CHART = { xs: xs, totals: totals.slice(), avails: avails.slice() };
+
+    let grid = '';
+    for (let t = 0; t <= 4; t++) {
+      const val = yMin + (yMax - yMin) * t / 4, y = yFor(val);
+      grid += '<line x1="' + L + '" y1="' + y + '" x2="' + (W - R) + '" y2="' + y + '" style="stroke:var(--grid)" stroke-width="1"/>';
+      grid += '<text x="' + (L - 8) + '" y="' + (y + 4) + '" text-anchor="end" font-size="11" style="fill:var(--axis)">' + fmt(val) + '</text>';
+    }
+    let zero = '';
+    if (yMin < 0) { const y0 = yFor(0); zero = '<line x1="' + L + '" y1="' + y0 + '" x2="' + (W - R) + '" y2="' + y0 + '" style="stroke:var(--axis)" stroke-width="1.5"/>'; }
+    let xlab = '';
+    for (let i = 0; i < 12; i++) xlab += '<text x="' + xFor(i) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="11" style="fill:var(--axis)">' + MABBR[i] + '</text>';
+
+    const costPts = totals.map((v, i) => xFor(i) + ',' + yFor(v)).join(' ');
+    const savePts = avails.map((v, i) => xFor(i) + ',' + yFor(v)).join(' ');
+    const costLine = '<polyline points="' + costPts + '" fill="none" style="stroke:var(--cost)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+    const saveLine = '<polyline points="' + savePts + '" fill="none" style="stroke:var(--save)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+    let dots = '';
+    for (let i = 0; i < 12; i++) {
+      dots += '<circle cx="' + xFor(i) + '" cy="' + yFor(totals[i]) + '" r="3" style="fill:var(--cost)"/>';
+      dots += '<circle cx="' + xFor(i) + '" cy="' + yFor(avails[i]) + '" r="3" style="fill:var(--save)"/>';
+    }
+    const guide = '<line id="chartGuide" x1="0" y1="' + T + '" x2="0" y2="' + (T + plotH) + '" style="stroke:var(--axis);display:none" stroke-width="1" stroke-dasharray="3 3"/>';
+    let hits = '';
+    const band = plotW / 11;
+    for (let i = 0; i < 12; i++) {
+      let x = xFor(i) - band / 2, w = band;
+      if (x < L) { w -= (L - x); x = L; }
+      if (x + w > W - R) w = (W - R) - x;
+      hits += '<rect x="' + x + '" y="' + T + '" width="' + w + '" height="' + plotH + '" fill="transparent" onmouseenter="showPoint(' + i + ')" ontouchstart="showPoint(' + i + ')"/>';
+    }
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" onmouseleave="clearPoint()">' +
+      grid + zero + costLine + saveLine + dots + guide + xlab + hits + '</svg>';
+  }
+
+  function setReadoutDefault() {
+    const c = CHART; if (!c) return;
+    let ct = 0, sv = 0; for (let m = 0; m < 12; m++) { ct += c.totals[m]; sv += c.avails[m]; }
+    document.getElementById('chartReadout').innerHTML = 'Avg/mo &middot; <span style="color:var(--cost)">cost ' + fmt(ct / 12) + '</span> &middot; <span style="color:var(--save)">save ' + fmt(sv / 12) + '</span>';
+  }
+  function showPoint(m) {
+    const c = CHART; if (!c) return;
+    const g = document.getElementById('chartGuide');
+    if (g) { g.setAttribute('x1', c.xs[m]); g.setAttribute('x2', c.xs[m]); g.style.display = 'block'; }
+    document.getElementById('chartReadout').innerHTML = '<b>' + MABBR[m] + ' ' + selYear + '</b> &middot; <span style="color:var(--cost)">cost ' + fmt(c.totals[m]) + '</span> &middot; <span style="color:var(--save)">save ' + fmt(c.avails[m]) + '</span>';
+  }
+  function clearPoint() { const g = document.getElementById('chartGuide'); if (g) g.style.display = 'none'; setReadoutDefault(); }
+
   function render() {
     const d = DATA; if (!d) return;
     const income = incomeTotal(selDays) * inflFactor(selYear);
@@ -384,9 +467,11 @@
     const ncols = 2 * nMem + 7;   // Month + income(nMem) + bills(nMem) + dining/hol/card/paypal/total/avail
     let body = '';
     const yearSums = { inc: d.cols.map(() => 0), cols: d.cols.map(() => 0), dining: 0, holiday: 0, card: 0, paypal: 0, total: 0, avail: 0 };
+    const chTot = [], chAvail = [];
 
     for (let m = 0; m < 12; m++) {
       const v = monthValues(m);
+      chTot.push(v.total); chAvail.push(v.available);
       v.incCols.forEach((val, i) => yearSums.inc[i] += val);
       v.cols.forEach((val, i) => yearSums.cols[i] += val);
       yearSums.dining += v.dining; yearSums.holiday += v.holiday; yearSums.card += v.card;
@@ -427,6 +512,9 @@
 
     document.getElementById('tbody').innerHTML = body;
     document.getElementById('tablewrap').style.display = 'block';
+    document.getElementById('chartSvg').innerHTML = drawChart(chTot, chAvail);
+    setReadoutDefault();
+    document.getElementById('chartPanel').style.display = 'block';
   }
 
   function detailHtml(m) {
