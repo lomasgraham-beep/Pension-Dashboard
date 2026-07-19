@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What I Could Save</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=hol1"></script>
+<style>
+  :root { --accent:#1d3a63; --accent-dark:#14294a; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; --good:#15803d; --bad:#c0392b; }
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1100px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+
+  .controls { display:flex; gap:18px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px; }
+  .ctl { display:flex; flex-direction:column; gap:6px; }
+  .ctl .lbl { font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#64748b; }
+
+  .seg { display:inline-flex; border:1px solid #cbd5e1; border-radius:10px; overflow:hidden; }
+  .seg-btn { border:none; background:#fff; color:#475569; font-size:15px; font-weight:600; padding:11px 20px; min-height:46px; cursor:pointer; border-right:1px solid #e2e8f0; }
+  .seg-btn:last-child { border-right:none; }
+  .seg-btn.active { background:var(--accent); color:#fff; }
+
+  .yearpick { display:flex; align-items:center; gap:10px; }
+  .stepbtn { border:1px solid #cbd5e1; background:#fff; color:var(--accent); font-size:22px; font-weight:800; line-height:1; width:46px; height:46px; border-radius:10px; cursor:pointer; }
+  .stepbtn:disabled { opacity:.35; cursor:default; }
+  .yearval { font-size:26px; font-weight:800; color:#2c3e50; min-width:78px; text-align:center; font-variant-numeric:tabular-nums; }
+  input[type=range] { width:260px; max-width:60vw; height:30px; cursor:pointer; }
+
+  .headline { background:#f8fafc; border:1px solid #e2e8f0; border-left:5px solid var(--accent-dark); border-radius:10px; padding:14px 16px; margin-bottom:16px; }
+  .headline .big { font-size:30px; font-weight:800; color:var(--accent-dark); line-height:1.05; }
+  .headline .big.neg { color:var(--bad); }
+  .headline .meta { font-size:13px; color:#64748b; margin-top:4px; }
+  .warn { color:#b45309; background:#fef3c7; border:1px solid #fcd34d; border-radius:6px; padding:8px 12px; font-size:13px; margin-top:10px; }
+
+  .tablewrap { overflow-x:auto; border:1px solid #e2e8f0; border-radius:10px; background:#fff; }
+  table { border-collapse:collapse; width:100%; min-width:820px; }
+  th, td { padding:9px 10px; font-size:14px; text-align:right; white-space:nowrap; border-bottom:1px solid #eef2f7; font-variant-numeric:tabular-nums; }
+  th { background:var(--surface-2); color:var(--ink); font-size:12px; text-transform:uppercase; letter-spacing:.03em; position:sticky; top:0; }
+  th.mon, td.mon { text-align:left; }
+  td.avail { font-weight:800; }
+  td.avail.pos { color:var(--good); }
+  td.avail.neg { color:var(--bad); }
+  tr.mrow { cursor:pointer; }
+  tr.mrow:hover td { background:#f8fbfc; }
+  tr.mrow td.mon .chev { display:inline-block; width:14px; color:#94a3b8; transition:transform .15s; }
+  tr.mrow.open td.mon .chev { transform:rotate(90deg); }
+  tr.total td { font-weight:800; border-top:2px solid #cbd5e1; background:#f8fafc; }
+  tr.total td.avail.pos { color:var(--good); }
+  tr.total td.avail.neg { color:var(--bad); }
+
+  tr.detail { display:none; }
+  tr.detail.show { display:table-row; }
+  tr.detail > td { background:#fbfdff; padding:0; border-bottom:1px solid #e2e8f0; }
+  .dwrap { padding:12px 16px; display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; }
+  .dcard { border:1px solid #e6edf3; border-radius:8px; overflow:hidden; }
+  .dcard .dhead { background:#eef2f7; color:#2c3e50; font-weight:700; font-size:13px; padding:7px 10px; display:flex; justify-content:space-between; gap:8px; }
+  .dcard .drow { display:flex; justify-content:space-between; gap:10px; padding:5px 10px; font-size:13px; border-top:1px dashed #eef2f6; }
+  .dcard .drow:first-of-type { border-top:none; }
+  .dcard .drow .nm { color:#475569; }
+  .dcard .drow .vl { color:#2c3e50; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .dcard .acct-sub { background:#f4f8fb; font-weight:700; }
+  .dcard .empty { color:#94a3b8; font-style:italic; padding:6px 10px; font-size:13px; }
+  .dnote { font-size:11px; color:#94a3b8; }
+
+  @media (prefers-color-scheme: dark) {
+    :root { --good:#4ade80; --bad:#f87171; }
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1 { color:#f1f5f9 !important; } .note { color:#94a3b8 !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+    .seg { border-color:#334155 !important; }
+    .seg-btn { background:#1e293b; color:#cbd5e1; border-right-color:#334155; }
+    .seg-btn.active { background:#38d6e6; color:#0f172a; }
+    .stepbtn { background:#0f172a !important; color:#38d6e6 !important; border-color:#475569 !important; }
+    .yearval { color:#f1f5f9 !important; }
+    .ctl .lbl { color:#94a3b8 !important; }
+    .headline { background:#1e293b !important; border-color:#334155 !important; border-left-color:#38d6e6 !important; }
+    .headline .big { color:#38d6e6 !important; } .headline .big.neg { color:#f87171 !important; } .headline .meta { color:#94a3b8 !important; }
+    .tablewrap { background:#1e293b !important; border-color:#334155 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    tr.mrow:hover td { background:#243244 !important; }
+    tr.total td { background:#162132 !important; color:#f1f5f9 !important; border-color:#475569 !important; }
+    tr.detail > td { background:#162132 !important; border-color:#334155 !important; }
+    .dcard { border-color:#334155 !important; }
+    .dcard .dhead { background:#0f172a !important; color:#e2e8f0 !important; }
+    .dcard .drow { border-color:#334155 !important; }
+    .dcard .drow .nm { color:#cbd5e1 !important; } .dcard .drow .vl { color:#f1f5f9 !important; }
+    .dcard .acct-sub { background:#0f172a !important; }
+    .warn { background:#78350f !important; color:#fde68a !important; border-color:#b45309 !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>What I Could Save</h1>
+  <p class="note">Month-by-month for the year you pick: what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. The last column is what's left to save. Costs are inflated to the chosen year at 2.5%; income is held at today's level. Tap any month to see the account-level breakdown. <span style="color:#94a3b8;">(save-forecast build: sf1)</span></p>
+  <div id="status">Loading&hellip;</div>
+
+  <div id="controls" class="controls" style="display:none;">
+    <div class="ctl">
+      <span class="lbl">Working week</span>
+      <div class="seg" id="daysSeg">
+        <button class="seg-btn active" data-d="5" onclick="setDays(5)">5-day week</button>
+        <button class="seg-btn" data-d="3" onclick="setDays(3)">3-day week</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <span class="lbl">Year</span>
+      <div class="yearpick">
+        <button class="stepbtn" id="yminus" onclick="stepYear(-1)">&minus;</button>
+        <input type="range" id="yslider" min="0" max="0" step="1" value="0" oninput="onSlider(this.value)">
+        <button class="stepbtn" id="yplus" onclick="stepYear(1)">+</button>
+        <span class="yearval" id="yearVal">&mdash;</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="headline" class="headline" style="display:none;"></div>
+  <div id="tablewrap" class="tablewrap" style="display:none;"><table id="tbl"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+
+<script>
+  const fmt = App.fmt;
+  const INFL = 0.025;                       // matches engine.js (inflation on outgoings)
+  const DAY_COLS = ['mon','tue','wed','thu','fri','sat','sun'];
+  const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const MABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const CUR_Y = new Date().getFullYear();
+  const WEEKS = 52;
+  // week -> calendar-month index (0-11): week 1 starts 1 Jan, +7 days each week. Same rule as the Dining page.
+  function monthIndexForWeek(w) { return new Date(CUR_Y, 0, 1 + (w - 1) * 7).getMonth(); }
+
+  let DATA = null;
+  let selDays = 5;
+  let selYear = CUR_Y;
+  let minYear = CUR_Y, maxYear = CUR_Y;
+  const openMonths = new Set();
+
+  // ---- month-accurate bill charge (mirrors budget.html / bills.html) ----
+  function activeMonthsB(b) {
+    if (b.frequency === 'Annual') {
+      let m = Number(b.bill_month);
+      if ((!m || m < 1 || m > 12) && b.pay_months) { const i = b.pay_months.indexOf('1'); if (i >= 0) m = i + 1; }
+      const a = new Array(12).fill(false); if (m >= 1 && m <= 12) a[m - 1] = true; return a;
+    }
+    if (b.frequency === 'Weekly') return new Array(12).fill(true);
+    if (!b.pay_months || !/^[01]{12}$/.test(b.pay_months)) return new Array(12).fill(true);
+    return b.pay_months.split('').map(c => c === '1');
+  }
+  function monthCharge(b, month) {   // cash a bill takes in calendar month 1-12
+    const p = Number(b.premium) || 0;
+    if (b.frequency === 'Weekly') return p * 52 / 12;
+    if (!activeMonthsB(b)[month - 1]) return 0;
+    return p;   // Annual = full amount in its month; Monthly = the monthly premium
+  }
+
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function inflFactor(year) { return Math.pow(1 + INFL, year - CUR_Y); }
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      const [members, bills, incAmts, otherInc, bankAccts, mealCost, diningRota, holidayPlan, holidayCost, holidaySettings, params] = await Promise.all([
+        App.rest('bd_members?order=name.asc'),
+        App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
+        App.rest('bd_income_amounts?order=member_name.asc'),
+        App.rest('bd_other_income?order=member_name.asc'),
+        App.rest('bd_bank_account?order=account_id.asc'),
+        App.rest('bd_meal_cost'),
+        App.rest('bd_dining_rota?order=week_no.asc,meal_type.asc'),
+        App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
+        App.rest('bd_holiday_cost'),
+        App.rest('bd_holiday_settings?id=eq.1'),
+        App.rest('op_modelling_parameters?select=member_name,retirement_date')
+      ]);
+
+      const names = (members || []).map(m => m.name).filter(Boolean);
+      if (!names.length) { status.textContent = 'No members found. Add members first.'; return; }
+      const cols = names.slice(0, 2);   // two-person model: one column each
+
+      // account_id -> holder / bank name
+      const acctHolder = {}, acctBank = {};
+      (bankAccts || []).forEach(a => { if (a.account_id) { acctHolder[a.account_id] = a.account_holder || ''; acctBank[a.account_id] = a.bank_name || ''; } });
+
+      // ---- dining: weekly rota summed into each calendar month ----
+      const mealCostMap = {};
+      (mealCost || []).forEach(c => { mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
+      const weekTotal = new Array(WEEKS + 1).fill(0);
+      (diningRota || []).forEach(r => {
+        const w = Number(r.week_no);
+        if (w >= 1 && w <= WEEKS) weekTotal[w] += DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0);
+      });
+      const diningMonth = new Array(12).fill(0);
+      for (let w = 1; w <= WEEKS; w++) diningMonth[monthIndexForWeek(w)] += weekTotal[w];
+
+      // ---- holidays: today-based annual figure, spread evenly ----
+      const holSettings = (holidaySettings && holidaySettings[0]) || {};
+      const holidayAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], holSettings), 'retired');
+      const holidayMonth = new Array(12).fill(holidayAnnual / 12);
+
+      // ---- bills -> member / card / paypal buckets, month by month ----
+      const memberMonth = {};     // owner -> [12]
+      const memberAcct = {};      // owner -> { acct -> { m:[12], bills:{ name -> [12] } } }
+      cols.forEach(n => { memberMonth[n] = new Array(12).fill(0); memberAcct[n] = {}; });
+      const cardMonth = new Array(12).fill(0), paypalMonth = new Array(12).fill(0);
+      const cardBills = {}, paypalBills = {};   // name -> [12]
+
+      function ownerOf(b) {
+        const pb = (b.paid_by || '').trim();
+        if (cols.indexOf(pb) >= 0) return pb;
+        const h = acctHolder[(b.paid_account || '').trim()];
+        if (h && cols.indexOf(h) >= 0) return h;
+        return cols[0];   // fallback: first member (keeps the total honest)
+      }
+      function addBill(store, name, arr) {
+        if (!store[name]) store[name] = new Array(12).fill(0);
+        for (let m = 0; m < 12; m++) store[name][m] += arr[m];
+      }
+
+      (bills || []).forEach(b => {
+        const charge = []; for (let m = 1; m <= 12; m++) charge[m - 1] = monthCharge(b, m);
+        const pb = (b.paid_by || '').trim();
+        const nm = b.bill_name || '\u2014';
+        if (pb === 'Credit card') { for (let m = 0; m < 12; m++) cardMonth[m] += charge[m]; addBill(cardBills, nm, charge); return; }
+        if (pb === 'PayPal')      { for (let m = 0; m < 12; m++) paypalMonth[m] += charge[m]; addBill(paypalBills, nm, charge); return; }
+        const owner = ownerOf(b);
+        const acct = (b.paid_account || '').trim() || '(no account)';
+        for (let m = 0; m < 12; m++) memberMonth[owner][m] += charge[m];
+        if (!memberAcct[owner][acct]) memberAcct[owner][acct] = { m: new Array(12).fill(0), bills: {} };
+        for (let m = 0; m < 12; m++) memberAcct[owner][acct].m[m] += charge[m];
+        addBill(memberAcct[owner][acct].bills, nm, charge);
+      });
+
+      // ---- income by working-days pattern (flat monthly) ----
+      const salaryByDays = {};   // days -> monthly total across members
+      (incAmts || []).forEach(a => { const d = Number(a.working_days); salaryByDays[d] = (salaryByDays[d] || 0) + (Number(a.net_monthly) || 0); });
+      const otherIncome = (otherInc || []).reduce((s, o) => s + (Number(o.net_monthly) || 0), 0);
+      const daysWithSalary = new Set(Object.keys(salaryByDays).map(Number));
+
+      // ---- joint retirement year = later of the two retirement dates ----
+      let jointRetYear = null;
+      (params || []).forEach(p => {
+        if (!p.retirement_date) return;
+        const y = new Date(p.retirement_date).getFullYear();
+        if (isFinite(y) && (jointRetYear == null || y > jointRetYear)) jointRetYear = y;
+      });
+      minYear = CUR_Y;
+      maxYear = (jointRetYear && jointRetYear >= CUR_Y) ? jointRetYear : CUR_Y;
+
+      DATA = { cols, acctHolder, acctBank, memberMonth, memberAcct, cardMonth, cardBills,
+               paypalMonth, paypalBills, diningMonth, holidayMonth, salaryByDays, otherIncome,
+               daysWithSalary, jointRetYear };
+
+      selYear = CUR_Y;
+      initSlider();
+      status.style.display = 'none';
+      document.getElementById('controls').style.display = 'flex';
+      render();
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  function initSlider() {
+    const s = document.getElementById('yslider');
+    s.min = String(minYear); s.max = String(maxYear); s.value = String(selYear);
+    const single = maxYear <= minYear;
+    s.disabled = single;
+    document.getElementById('yminus').disabled = single;
+    document.getElementById('yplus').disabled = single;
+    syncYearUI();
+  }
+  function syncYearUI() {
+    document.getElementById('yearVal').textContent = selYear;
+    document.getElementById('yslider').value = String(selYear);
+    document.getElementById('yminus').disabled = (selYear <= minYear);
+    document.getElementById('yplus').disabled = (selYear >= maxYear);
+  }
+  function onSlider(v) { selYear = Math.max(minYear, Math.min(maxYear, Number(v))); syncYearUI(); render(); }
+  function stepYear(delta) { selYear = Math.max(minYear, Math.min(maxYear, selYear + delta)); syncYearUI(); render(); }
+  function setDays(d) {
+    selDays = d;
+    document.querySelectorAll('#daysSeg .seg-btn').forEach(b => b.classList.toggle('active', Number(b.dataset.d) === d));
+    render();
+  }
+
+  function incomeFor(days) { return (DATA.salaryByDays[days] || 0) + DATA.otherIncome; }
+
+  function monthValues(m) {
+    const d = DATA, f = inflFactor(selYear);
+    const cols = d.cols.map(n => d.memberMonth[n][m] * f);
+    const dining = d.diningMonth[m] * f;
+    const holiday = d.holidayMonth[m] * f;
+    const card = d.cardMonth[m] * f;
+    const paypal = d.paypalMonth[m] * f;
+    const total = cols.reduce((s, v) => s + v, 0) + dining + holiday + card + paypal;
+    const income = incomeFor(selDays);
+    return { cols, dining, holiday, card, paypal, total, income, available: income - total };
+  }
+
+  function render() {
+    const d = DATA; if (!d) return;
+    const income = incomeFor(selDays);
+
+    // headline: annual available for the chosen pattern/year
+    let annualTotal = 0; for (let m = 0; m < 12; m++) annualTotal += monthValues(m).total;
+    const annualAvail = income * 12 - annualTotal;
+    const hn = document.getElementById('headline');
+    let warn = '';
+    if (!d.daysWithSalary.has(selDays)) warn = '<div class="warn">No ' + selDays + '-day salary is set, so income shows as £0 for this pattern. Add it on the Workplace Income page.</div>';
+    hn.innerHTML =
+      '<div class="big' + (annualAvail < 0 ? ' neg' : '') + '">' + fmt(annualAvail) + '</div>' +
+      '<div class="meta">could be saved across ' + selYear + ' on a ' + selDays + '-day week &middot; take-home ' + fmt(income) + '/mo &middot; costs ' + fmt(annualTotal) + '/yr' +
+      (selYear > CUR_Y ? ' (inflated &times;' + inflFactor(selYear).toFixed(3) + ')' : '') + '</div>' + warn;
+    hn.style.display = 'block';
+
+    // header row
+    const heads = ['<th class="mon">Month</th>']
+      .concat(d.cols.map(n => '<th>' + esc(n) + '</th>'))
+      .concat(['<th>Dining</th>','<th>Holidays</th>','<th>Card</th>','<th>PayPal</th>','<th>Total</th>','<th>Available</th>']);
+    document.getElementById('thead').innerHTML = '<tr>' + heads.join('') + '</tr>';
+
+    const ncols = heads.length;
+    let body = '';
+    const yearSums = { cols: d.cols.map(() => 0), dining: 0, holiday: 0, card: 0, paypal: 0, total: 0, avail: 0 };
+
+    for (let m = 0; m < 12; m++) {
+      const v = monthValues(m);
+      v.cols.forEach((val, i) => yearSums.cols[i] += val);
+      yearSums.dining += v.dining; yearSums.holiday += v.holiday; yearSums.card += v.card;
+      yearSums.paypal += v.paypal; yearSums.total += v.total; yearSums.avail += v.available;
+
+      const open = openMonths.has(m);
+      const cells = ['<td class="mon"><span class="chev">&#9656;</span> ' + MABBR[m] + ' ' + selYear + '</td>']
+        .concat(v.cols.map(val => '<td>' + fmt(val) + '</td>'))
+        .concat([
+          '<td>' + fmt(v.dining) + '</td>',
+          '<td>' + fmt(v.holiday) + '</td>',
+          '<td>' + fmt(v.card) + '</td>',
+          '<td>' + fmt(v.paypal) + '</td>',
+          '<td>' + fmt(v.total) + '</td>',
+          '<td class="avail ' + (v.available < 0 ? 'neg' : 'pos') + '">' + fmt(v.available) + '</td>'
+        ]);
+      body += '<tr class="mrow' + (open ? ' open' : '') + '" onclick="toggleMonth(' + m + ')">' + cells.join('') + '</tr>';
+      body += '<tr class="detail' + (open ? ' show' : '') + '" id="det_' + m + '"><td colspan="' + ncols + '">' + (open ? detailHtml(m) : '') + '</td></tr>';
+    }
+
+    // year totals row
+    const totalCells = ['<td class="mon">' + selYear + ' total</td>']
+      .concat(yearSums.cols.map(val => '<td>' + fmt(val) + '</td>'))
+      .concat([
+        '<td>' + fmt(yearSums.dining) + '</td>',
+        '<td>' + fmt(yearSums.holiday) + '</td>',
+        '<td>' + fmt(yearSums.card) + '</td>',
+        '<td>' + fmt(yearSums.paypal) + '</td>',
+        '<td>' + fmt(yearSums.total) + '</td>',
+        '<td class="avail ' + (yearSums.avail < 0 ? 'neg' : 'pos') + '">' + fmt(yearSums.avail) + '</td>'
+      ]);
+    body += '<tr class="total">' + totalCells.join('') + '</tr>';
+
+    document.getElementById('tbody').innerHTML = body;
+    document.getElementById('tablewrap').style.display = 'block';
+  }
+
+  function detailHtml(m) {
+    const d = DATA, f = inflFactor(selYear);
+    let cards = '';
+
+    // one card per member: accounts, each with its bills
+    d.cols.forEach(name => {
+      const accts = d.memberAcct[name] || {};
+      const acctIds = Object.keys(accts).sort();
+      let inner = '', total = 0;
+      if (!acctIds.length) inner = '<div class="empty">No bills paid by ' + esc(name) + '</div>';
+      acctIds.forEach(aid => {
+        const a = accts[aid];
+        const sub = a.m[m] * f; total += sub;
+        const bank = d.acctBank[aid] ? (d.acctBank[aid] + ' \u00b7 ') : '';
+        inner += '<div class="drow acct-sub"><span class="nm">' + esc(bank + aid) + '</span><span class="vl">' + fmt(sub) + '</span></div>';
+        Object.keys(a.bills).sort().forEach(bn => {
+          const val = a.bills[bn][m] * f;
+          if (val <= 0) return;
+          inner += '<div class="drow"><span class="nm">' + esc(bn) + '</span><span class="vl">' + fmt(val) + '</span></div>';
+        });
+      });
+      cards += '<div class="dcard"><div class="dhead"><span>' + esc(name) + '</span><span>' + fmt(total) + '</span></div>' + inner + '</div>';
+    });
+
+    // card + paypal cards (bill-level)
+    cards += costCard('Credit card', d.cardBills, d.cardMonth[m] * f, m, f);
+    cards += costCard('PayPal', d.paypalBills, d.paypalMonth[m] * f, m, f);
+
+    // dining + holidays notes
+    cards += '<div class="dcard"><div class="dhead"><span>Dining</span><span>' + fmt(d.diningMonth[m] * f) + '</span></div>' +
+             '<div class="drow"><span class="nm">From weekly rota <span class="dnote">(weeks in ' + MABBR[m] + ')</span></span><span class="vl">' + fmt(d.diningMonth[m] * f) + '</span></div></div>';
+    cards += '<div class="dcard"><div class="dhead"><span>Holidays</span><span>' + fmt(d.holidayMonth[m] * f) + '</span></div>' +
+             '<div class="drow"><span class="nm">Monthly set-aside <span class="dnote">(today-based)</span></span><span class="vl">' + fmt(d.holidayMonth[m] * f) + '</span></div></div>';
+
+    return '<div class="dwrap">' + cards + '</div>';
+  }
+
+  function costCard(title, billsMap, total, m, f) {
+    const names = Object.keys(billsMap).sort();
+    let inner = '';
+    names.forEach(bn => { const val = billsMap[bn][m] * f; if (val <= 0) return; inner += '<div class="drow"><span class="nm">' + esc(bn) + '</span><span class="vl">' + fmt(val) + '</span></div>'; });
+    if (!inner) inner = '<div class="empty">Nothing in ' + MABBR[m] + '</div>';
+    return '<div class="dcard"><div class="dhead"><span>' + esc(title) + '</span><span>' + fmt(total) + '</span></div>' + inner + '</div>';
+  }
+
+  function toggleMonth(m) {
+    if (openMonths.has(m)) openMonths.delete(m); else openMonths.add(m);
+    const row = document.getElementById('det_' + m);
+    const mrow = row ? row.previousElementSibling : null;
+    const open = openMonths.has(m);
+    if (row) { row.classList.toggle('show', open); row.firstElementChild.innerHTML = open ? detailHtml(m) : ''; }
+    if (mrow) mrow.classList.toggle('open', open);
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  if (typeof App === 'undefined' || !App.requireLogin) {
+    document.getElementById('status').textContent = 'Error: common.js did not load (App is undefined).';
+  } else {
+    try { App.requireLogin(load, { title: 'What I Could Save' }); }
+    catch (err) { document.getElementById('status').textContent = 'Error during startup: ' + (err && err.message ? err.message : err); }
+  }
+</script>
+</body>
+</html>
