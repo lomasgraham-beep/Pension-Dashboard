@@ -54,6 +54,23 @@
   tr.total td.avail.neg { color:var(--bad); }
 
   tr.detail { display:none; }
+  .ibtn { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; margin-left:7px; border:1px solid var(--line-strong); background:#fff; color:var(--ink-soft); border-radius:50%; font-size:12px; font-weight:700; font-style:italic; font-family:Georgia,'Times New Roman',serif; cursor:pointer; vertical-align:middle; line-height:1; }
+  .ibtn:hover { background:#eef2f7; color:var(--accent); }
+  tr.diff { display:none; }
+  tr.diff.show { display:table-row; }
+  tr.diff > td { background:#f5f9ff; padding:0; border-bottom:1px solid #e2e8f0; white-space:normal; }
+  .diffwrap { padding:12px 16px; }
+  .diffhead { font-weight:700; color:#2c3e50; font-size:14px; margin-bottom:8px; }
+  .diffsum { display:flex; gap:20px; flex-wrap:wrap; margin-bottom:10px; font-size:14px; }
+  .diffsum .k { color:#64748b; } .diffsum .v { font-weight:800; }
+  .diffsum .v.pos { color:var(--good); } .diffsum .v.neg { color:var(--bad); }
+  .diffline { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:5px 0; border-top:1px dashed #eef2f6; font-size:13px; }
+  .diffline:first-of-type { border-top:none; }
+  .diffline .nm { color:#475569; flex:1 1 auto; min-width:0; overflow-wrap:anywhere; word-break:break-word; }
+  .diffline .tag { color:#94a3b8; font-size:11px; }
+  .diffline .vl { flex:0 0 auto; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; color:#2c3e50; }
+  .diffline .vl .d.pos { color:var(--good); } .diffline .vl .d.neg { color:var(--bad); }
+  .diffnote { color:#94a3b8; font-style:italic; font-size:13px; }
   tr.detail.show { display:table-row; }
   tr.detail > td { background:#fbfdff; padding:0; border-bottom:1px solid #e2e8f0; white-space:normal; }
   .dwrap { padding:12px 16px; display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; }
@@ -95,12 +112,20 @@
     .dcard .drow .nm { color:#cbd5e1 !important; } .dcard .drow .vl { color:#f1f5f9 !important; }
     .dcard .acct-sub { background:#0f172a !important; }
     .warn { background:#78350f !important; color:#fde68a !important; border-color:#b45309 !important; }
+    .ibtn { background:#0f172a !important; color:#94a3b8 !important; border-color:#475569 !important; }
+    .ibtn:hover { background:#243244 !important; color:#38d6e6 !important; }
+    tr.diff > td { background:#14212f !important; border-color:#334155 !important; }
+    .diffhead { color:#f1f5f9 !important; }
+    .diffsum .k { color:#94a3b8 !important; }
+    .diffline { border-color:#334155 !important; }
+    .diffline .nm { color:#cbd5e1 !important; } .diffline .vl { color:#e2e8f0 !important; }
+    .diffnote { color:#94a3b8 !important; }
   }
 </style>
 </head>
 <body>
   <h1>What I Could Save</h1>
-  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save. Both costs and take-home rise with inflation at 2.5% to the chosen year. Tap any month to see the account-level breakdown. <span style="color:#94a3b8;">(save-forecast build: sf4)</span></p>
+  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save. Both costs and take-home rise with inflation at 2.5% to the chosen year. Tap any month to see the account-level breakdown, or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf5)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="controls" class="controls" style="display:none;">
@@ -141,6 +166,7 @@
   let selYear = CUR_Y;
   let minYear = CUR_Y, maxYear = CUR_Y;
   const openMonths = new Set();
+  const openDiffs = new Set();
 
   // ---- month-accurate bill charge (mirrors budget.html / bills.html) ----
   function activeMonthsB(b) {
@@ -367,7 +393,9 @@
       yearSums.paypal += v.paypal; yearSums.total += v.total; yearSums.avail += v.available;
 
       const open = openMonths.has(m);
-      const cells = ['<td class="mon"><span class="chev">&#9656;</span> ' + MABBR[m] + ' ' + selYear + '</td>']
+      const odiff = openDiffs.has(m);
+      const cells = ['<td class="mon"><span class="chev">&#9656;</span> ' + MABBR[m] + ' ' + selYear +
+          '<button type="button" class="ibtn" onclick="event.stopPropagation();toggleDiff(' + m + ')" title="What changed vs the previous month">i</button></td>']
         .concat(v.incCols.map(val => '<td class="inc">' + fmt(val) + '</td>'))
         .concat(v.cols.map(val => '<td>' + fmt(val) + '</td>'))
         .concat([
@@ -379,6 +407,7 @@
           '<td class="avail ' + (v.available < 0 ? 'neg' : 'pos') + '">' + fmt(v.available) + '</td>'
         ]);
       body += '<tr class="mrow' + (open ? ' open' : '') + '" onclick="toggleMonth(' + m + ')">' + cells.join('') + '</tr>';
+      body += '<tr class="diff' + (odiff ? ' show' : '') + '" id="diff_' + m + '"><td colspan="' + ncols + '">' + (odiff ? diffHtml(m) : '') + '</td></tr>';
       body += '<tr class="detail' + (open ? ' show' : '') + '" id="det_' + m + '"><td colspan="' + ncols + '">' + (open ? detailHtml(m) : '') + '</td></tr>';
     }
 
@@ -443,6 +472,68 @@
     names.forEach(bn => { const val = billsMap[bn][m] * f; if (val <= 0) return; inner += '<div class="drow"><span class="nm">' + esc(bn) + '</span><span class="vl">' + fmt(val) + '</span></div>'; });
     if (!inner) inner = '<div class="empty">Nothing in ' + MABBR[m] + '</div>';
     return '<div class="dcard"><div class="dhead"><span>' + esc(title) + '</span><span>' + fmt(total) + '</span></div>' + inner + '</div>';
+  }
+
+  // every cost line for a month (bills by owner/account, card, paypal, dining, holidays), inflation-adjusted
+  function lineValuesForMonth(m, f) {
+    const d = DATA, out = [];
+    d.cols.forEach(name => {
+      const accts = d.memberAcct[name] || {};
+      Object.keys(accts).forEach(aid => {
+        const bills = accts[aid].bills;
+        Object.keys(bills).forEach(bn => out.push({ key: 'm|' + name + '|' + aid + '|' + bn, label: bn, grp: name, val: bills[bn][m] * f }));
+      });
+    });
+    Object.keys(d.cardBills).forEach(bn => out.push({ key: 'c|' + bn, label: bn, grp: 'Card', val: d.cardBills[bn][m] * f }));
+    Object.keys(d.paypalBills).forEach(bn => out.push({ key: 'p|' + bn, label: bn, grp: 'PayPal', val: d.paypalBills[bn][m] * f }));
+    out.push({ key: 'dining', label: 'Dining', grp: 'Dining', val: d.diningMonth[m] * f });
+    out.push({ key: 'holiday', label: 'Holidays', grp: 'Holidays', val: d.holidayMonth[m] * f });
+    return out;
+  }
+
+  function signed(v) { return (v >= 0 ? '+' : '\u2212') + fmt(Math.abs(v)); }
+
+  function diffHtml(m) {
+    const f = inflFactor(selYear);
+    if (m === 0) return '<div class="diffwrap"><div class="diffnote">' + MABBR[0] + ' ' + selYear + ' is the first month shown \u2014 no earlier month here to compare against.</div></div>';
+    const prev = m - 1;
+    const cur = {}, pre = {};
+    lineValuesForMonth(m, f).forEach(x => cur[x.key] = x);
+    lineValuesForMonth(prev, f).forEach(x => pre[x.key] = x);
+    const keys = {}; Object.keys(cur).forEach(k => keys[k] = 1); Object.keys(pre).forEach(k => keys[k] = 1);
+    const rows = [];
+    Object.keys(keys).forEach(k => {
+      const a = pre[k] ? pre[k].val : 0, b = cur[k] ? cur[k].val : 0, delta = b - a;
+      if (Math.abs(delta) < 0.5) return;
+      const src = cur[k] || pre[k];
+      rows.push({ label: src.label, grp: src.grp, a: a, b: b, delta: delta });
+    });
+    rows.sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta));
+    const totalDelta = rows.reduce((s, r) => s + r.delta, 0);
+    const availDelta = -totalDelta;
+
+    let head = '<div class="diffhead">' + MABBR[m] + ' ' + selYear + ' vs ' + MABBR[prev] + ' ' + selYear + '</div>';
+    let sum = '<div class="diffsum">' +
+      '<span><span class="k">Available to save </span><span class="v ' + (availDelta < 0 ? 'neg' : 'pos') + '">' + signed(availDelta) + '</span></span>' +
+      '<span><span class="k">Total out </span><span class="v ' + (totalDelta > 0 ? 'neg' : 'pos') + '">' + signed(totalDelta) + '</span></span>' +
+      '</div>';
+    let list;
+    if (!rows.length) {
+      list = '<div class="diffnote">Nothing changed \u2014 the same costs land in both months.</div>';
+    } else {
+      list = rows.map(r =>
+        '<div class="diffline"><span class="nm">' + esc(r.label) + ' <span class="tag">' + esc(r.grp) + '</span></span>' +
+        '<span class="vl">' + fmt(r.a) + ' \u2192 ' + fmt(r.b) + ' <span class="d ' + (r.delta < 0 ? 'neg' : 'pos') + '">(' + signed(r.delta) + ')</span></span></div>'
+      ).join('');
+    }
+    return '<div class="diffwrap">' + head + sum + list + '</div>';
+  }
+
+  function toggleDiff(m) {
+    if (openDiffs.has(m)) openDiffs.delete(m); else openDiffs.add(m);
+    const row = document.getElementById('diff_' + m);
+    const open = openDiffs.has(m);
+    if (row) { row.classList.toggle('show', open); row.firstElementChild.innerHTML = open ? diffHtml(m) : ''; }
   }
 
   function toggleMonth(m) {
