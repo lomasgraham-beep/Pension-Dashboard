@@ -100,7 +100,7 @@
 </head>
 <body>
   <h1>What I Could Save</h1>
-  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save. Costs are inflated to the chosen year at 2.5%; income is held at today's level. Tap any month to see the account-level breakdown. <span style="color:#94a3b8;">(save-forecast build: sf3)</span></p>
+  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save. Both costs and take-home rise with inflation at 2.5% to the chosen year. Tap any month to see the account-level breakdown. <span style="color:#94a3b8;">(save-forecast build: sf4)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="controls" class="controls" style="display:none;">
@@ -316,7 +316,7 @@
 
   function monthValues(m) {
     const d = DATA, f = inflFactor(selYear);
-    const incCols = d.cols.map(n => incomeForMember(n, selDays));   // flat: not inflated, same every month
+    const incCols = d.cols.map(n => incomeForMember(n, selDays) * f);   // rises with inflation, level within the year
     const cols = d.cols.map(n => d.memberMonth[n][m] * f);
     const dining = d.diningMonth[m] * f;
     const holiday = d.holidayMonth[m] * f;
@@ -329,7 +329,7 @@
 
   function render() {
     const d = DATA; if (!d) return;
-    const income = incomeTotal(selDays);
+    const income = incomeTotal(selDays) * inflFactor(selYear);
     const nMem = d.cols.length;
 
     // headline: annual available for the chosen pattern/year
