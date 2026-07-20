@@ -213,7 +213,7 @@
     .frozen-header table { margin:0; }
     .frozen-header th { background:var(--surface); }
 
-    .subtab-buttons { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:15px; border-bottom:2px solid var(--line); padding-bottom:10px; }
+    .subtab-buttons { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:15px; border-bottom:2px solid var(--line); padding-bottom:10px; position:sticky; top:var(--topnav-h, 52px); z-index:55; background:var(--surface); padding-top:8px; box-shadow:0 4px 5px -4px rgba(0,0,0,0.12); }
     .subtab-group-label { flex-basis:100%; width:100%; margin:6px 0 0; font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-soft); }
     .subtab-group-label:first-child { margin-top:0; }
     .subtab-link { background:var(--surface-2); border:1px solid var(--line-strong); color:var(--ink-soft); padding:9px 16px; border-radius:8px; font-weight:600; cursor:pointer; font-size:14px; transition:background .12s,color .12s; }
@@ -553,7 +553,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-364</span>
+      <span class="build-stamp">LC-365</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1570,6 +1570,22 @@
       }).join('');
     }
 
+    // ---- Keep the sticky second-level subtab bar flush under the top nav ----
+    (function initTopNavHeight() {
+      function sync() {
+        const nav = document.querySelector('.tab-buttons');
+        const h = (nav && nav.offsetHeight) ? nav.offsetHeight : 52;
+        document.documentElement.style.setProperty('--topnav-h', h + 'px');
+      }
+      window.addEventListener('load', sync);
+      window.addEventListener('resize', sync);
+      if (window.ResizeObserver) {
+        const nav = document.querySelector('.tab-buttons');
+        if (nav) new ResizeObserver(sync).observe(nav);
+      }
+      sync();
+    })();
+
     // ---- Frozen table header (Safari-proof: no position:sticky needed) ----
     // Clones the thead into a fixed-position div when the real header scrolls above the viewport.
     (function initFrozenHeader() {
@@ -1612,7 +1628,10 @@
           // don't overlap. On phones the strip is hidden (height 0) so this resolves to 0.
           const nav = document.querySelector('.tab-buttons');
           const nr = nav ? nav.getBoundingClientRect() : null;
-          const navOffset = (nr && nr.height > 0 && nr.top <= 1) ? Math.max(0, nr.bottom) : 0;
+          let navOffset = (nr && nr.height > 0 && nr.top <= 1) ? Math.max(0, nr.bottom) : 0;
+          // also clear the pinned second-level subtab bar so the frozen header sits below it
+          const sub = document.querySelector('#Retirement .subtab-buttons');
+          if (sub) { const sr = sub.getBoundingClientRect(); if (sr.height > 0 && sr.top <= navOffset + 2) navOffset = Math.max(navOffset, sr.bottom); }
           ghost.style.top = navOffset + 'px';
           ghost.querySelector('table').style.marginLeft = (-wrap.scrollLeft) + 'px';
           syncWidths();
@@ -1662,7 +1681,7 @@
       const box = document.getElementById(id);
       if (!box) return;
       const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
-      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-364 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-365 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
     }
     function safeOptionalChart(drawFn, chartId, headId) {
       try { drawFn(); }
