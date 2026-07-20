@@ -154,7 +154,7 @@
 </head>
 <body>
   <h1>What I Could Save</h1>
-  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save. Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings) and general costs each April — not at the calendar-year line. The chart plots cost out (red) against what's left to save (green) by month; move across it for each month's figures. Tap any month row for a by-category summary (with an option to open the full account breakdown), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf9)</span></p>
+  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save. Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings) and general costs each April — not at the calendar-year line. The chart plots cost out (red) against what's left to save (green) by month; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf10)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="controls" class="controls" style="display:none;">
@@ -301,6 +301,7 @@
       const catLabel = {};
       (catRows || []).forEach(c => { if (c.code != null) catLabel[c.code] = c.description || c.code; });
       const cardBills = {}, paypalBills = {};   // name -> [12]
+      const cardCat = {}, paypalCat = {};       // category_code -> [12]
 
       function ownerOf(b) {
         const pb = (b.paid_by || '').trim();
@@ -326,14 +327,15 @@
         const code = (b.category_code || '').trim() || '(uncategorised)';
         if (!catMonth[code]) catMonth[code] = new Array(12).fill(0);
         for (let m = 0; m < 12; m++) catMonth[code][m] += charge[m];
-        if (pb === 'Credit card') { for (let m = 0; m < 12; m++) cardMonth[m] += charge[m]; addBill(cardBills, nm, charge); return; }
-        if (pb === 'PayPal')      { for (let m = 0; m < 12; m++) paypalMonth[m] += charge[m]; addBill(paypalBills, nm, charge); return; }
+        if (pb === 'Credit card') { for (let m = 0; m < 12; m++) cardMonth[m] += charge[m]; addBill(cardBills, nm, charge); addBill(cardCat, code, charge); return; }
+        if (pb === 'PayPal')      { for (let m = 0; m < 12; m++) paypalMonth[m] += charge[m]; addBill(paypalBills, nm, charge); addBill(paypalCat, code, charge); return; }
         const owner = ownerOf(b);
         const acct = acctId || '(no account)';
         for (let m = 0; m < 12; m++) memberMonth[owner][m] += charge[m];
-        if (!memberAcct[owner][acct]) memberAcct[owner][acct] = { m: new Array(12).fill(0), bills: {} };
+        if (!memberAcct[owner][acct]) memberAcct[owner][acct] = { m: new Array(12).fill(0), bills: {}, cat: {} };
         for (let m = 0; m < 12; m++) memberAcct[owner][acct].m[m] += charge[m];
         addBill(memberAcct[owner][acct].bills, nm, charge);
+        addBill(memberAcct[owner][acct].cat, code, charge);
       });
 
       // ---- income by member + working-days pattern (flat monthly) ----
@@ -372,7 +374,7 @@
 
       DATA = { cols, acctHolder, acctBank, memberMonth, memberAcct, cardMonth, cardBills,
                paypalMonth, paypalBills, diningMonth, holidayMonth, salaryByMemberDays, otherByMember,
-               daysWithSalary, jointRetYear, salaryMonth, catMonth, catLabel };
+               daysWithSalary, jointRetYear, salaryMonth, catMonth, catLabel, cardCat, paypalCat };
 
       selYear = CUR_Y;
       initSlider();
@@ -573,25 +575,17 @@
     document.getElementById('chartPanel').style.display = 'block';
   }
 
-  function detailHtml(m) {
-    const d = DATA, f = costFactor(selYear, m);
+  function catLbl(code) { return code === '(uncategorised)' ? 'Uncategorised' : (DATA.catLabel[code] || code); }
 
-    // ---- glanceable summary: costs grouped by category ----
-    const catRows = [];
-    Object.keys(d.catMonth).forEach(code => {
-      const v = d.catMonth[code][m] * f;
-      if (Math.abs(v) < 0.005) return;
-      catRows.push({ label: (code === '(uncategorised)' ? 'Uncategorised' : (d.catLabel[code] || code)), val: v });
-    });
-    const dv = d.diningMonth[m] * f; if (dv > 0.005) catRows.push({ label: 'Dining', val: dv });
-    const hv = d.holidayMonth[m] * f; if (hv > 0.005) catRows.push({ label: 'Holidays', val: hv });
-    catRows.sort((a, b) => b.val - a.val);
-    const catTotal = catRows.reduce((s, r) => s + r.val, 0);
-    let catList = catRows.map(r => '<div class="catrow"><span class="nm">' + esc(r.label) + '</span><span class="vl">' + fmt(r.val) + '</span></div>').join('');
-    catList += '<div class="catrow cattot"><span class="nm">Total</span><span class="vl">' + fmt(catTotal) + '</span></div>';
+  // rows inside an account/card: grouped by category, or by individual bill
+  function innerRows(map, m, f, byCat) {
+    const rows = Object.keys(map).map(k => ({ label: byCat ? catLbl(k) : k, val: map[k][m] * f })).filter(r => r.val > 0.005);
+    rows.sort((a, b) => b.val - a.val);
+    return rows.map(r => '<div class="drow"><span class="nm">' + esc(r.label) + '</span><span class="vl">' + fmt(r.val) + '</span></div>').join('');
+  }
 
-    // ---- detailed cards (hidden until requested) ----
-    let cards = '';
+  function acctCards(m, f, byCat) {
+    const d = DATA; let cards = '';
     d.cols.forEach(name => {
       const accts = d.memberAcct[name] || {};
       const acctIds = Object.keys(accts).sort();
@@ -602,40 +596,39 @@
         const sub = a.m[m] * f; total += sub;
         const bank = d.acctBank[aid] ? (d.acctBank[aid] + ' \u00b7 ') : '';
         inner += '<div class="drow acct-sub"><span class="nm">' + esc(bank + aid) + '</span><span class="vl">' + fmt(sub) + '</span></div>';
-        Object.keys(a.bills).sort().forEach(bn => {
-          const val = a.bills[bn][m] * f;
-          if (val <= 0) return;
-          inner += '<div class="drow"><span class="nm">' + esc(bn) + '</span><span class="vl">' + fmt(val) + '</span></div>';
-        });
+        inner += innerRows(byCat ? a.cat : a.bills, m, f, byCat) || '<div class="empty">\u2014</div>';
       });
       cards += '<div class="dcard"><div class="dhead"><span>' + esc(name) + '</span><span>' + fmt(total) + '</span></div>' + inner + '</div>';
     });
-    cards += costCard('Credit card', d.cardBills, d.cardMonth[m] * f, m, f);
-    cards += costCard('PayPal', d.paypalBills, d.paypalMonth[m] * f, m, f);
+    cards += costCard('Credit card', byCat ? d.cardCat : d.cardBills, d.cardMonth[m] * f, m, f, byCat);
+    cards += costCard('PayPal', byCat ? d.paypalCat : d.paypalBills, d.paypalMonth[m] * f, m, f, byCat);
     cards += '<div class="dcard"><div class="dhead"><span>Dining</span><span>' + fmt(d.diningMonth[m] * f) + '</span></div>' +
              '<div class="drow"><span class="nm">From weekly rota <span class="dnote">(weeks in ' + MABBR[m] + ')</span></span><span class="vl">' + fmt(d.diningMonth[m] * f) + '</span></div></div>';
     cards += '<div class="dcard"><div class="dhead"><span>Holidays</span><span>' + fmt(d.holidayMonth[m] * f) + '</span></div>' +
              '<div class="drow"><span class="nm">Monthly set-aside <span class="dnote">(today-based)</span></span><span class="vl">' + fmt(d.holidayMonth[m] * f) + '</span></div></div>';
+    return cards;
+  }
 
+  function detailHtml(m) {
+    const f = costFactor(selYear, m);
     return '<div class="dwrap-cat">' +
-      '<div class="catlist">' + catList + '</div>' +
-      '<button type="button" class="showdet" id="detbtn_' + m + '" onclick="toggleFull(' + m + ')">Show account details</button>' +
-      '<div class="detfull" id="detfull_' + m + '" style="display:none;"><div class="dwrap">' + cards + '</div></div>' +
+      '<div class="dwrap" id="detcat_' + m + '">' + acctCards(m, f, true) + '</div>' +
+      '<div class="dwrap" id="detbill_' + m + '" style="display:none;">' + acctCards(m, f, false) + '</div>' +
+      '<button type="button" class="showdet" id="detbtn_' + m + '" onclick="toggleFull(' + m + ')">Show individual bills</button>' +
       '</div>';
   }
 
   function toggleFull(m) {
-    const el = document.getElementById('detfull_' + m), btn = document.getElementById('detbtn_' + m);
-    if (!el) return;
-    const show = el.style.display === 'none';
-    el.style.display = show ? 'block' : 'none';
-    if (btn) btn.textContent = show ? 'Hide account details' : 'Show account details';
+    const catEl = document.getElementById('detcat_' + m), billEl = document.getElementById('detbill_' + m), btn = document.getElementById('detbtn_' + m);
+    if (!catEl || !billEl) return;
+    const showBills = billEl.style.display === 'none';
+    billEl.style.display = showBills ? 'grid' : 'none';
+    catEl.style.display = showBills ? 'none' : 'grid';
+    if (btn) btn.textContent = showBills ? 'Show by category' : 'Show individual bills';
   }
 
-  function costCard(title, billsMap, total, m, f) {
-    const names = Object.keys(billsMap).sort();
-    let inner = '';
-    names.forEach(bn => { const val = billsMap[bn][m] * f; if (val <= 0) return; inner += '<div class="drow"><span class="nm">' + esc(bn) + '</span><span class="vl">' + fmt(val) + '</span></div>'; });
+  function costCard(title, map, total, m, f, byCat) {
+    let inner = innerRows(map, m, f, byCat);
     if (!inner) inner = '<div class="empty">Nothing in ' + MABBR[m] + '</div>';
     return '<div class="dcard"><div class="dhead"><span>' + esc(title) + '</span><span>' + fmt(total) + '</span></div>' + inner + '</div>';
   }
