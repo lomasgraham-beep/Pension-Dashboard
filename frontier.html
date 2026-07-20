@@ -90,7 +90,7 @@
 
   <div class="head">
     <div class="hrow">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front11)</span></span>
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front12)</span></span>
       <div class="seg" id="seg">
         <button type="button" class="seg-btn active" data-mode="joint">Joint</button>
         <button type="button" class="seg-btn" data-mode="p1" id="segP1">Graham</button>
@@ -384,8 +384,15 @@
 
     const cross = crossingFor(spend);
     if (cross.status === 'now') {
-      out.textContent = 'any date'; dot.style.display = 'none';
-      document.getElementById('crossTag').textContent = '';
+      // Safe even at the earliest possible retirement date (the start of the chart).
+      // Pin the dot to the left edge on the test-spend line instead of hiding it, so it
+      // doesn't appear to fall off the chart when the spend drops below the earliest-safe level.
+      out.textContent = 'any date';
+      const cx0 = cli.getXLocation(frontier[0].year);
+      if (area && isFinite(cx0) && isFinite(ly)) {
+        dot.style.left = (baseX + cx0) + 'px'; dot.style.top = (baseY + ly) + 'px'; dot.style.display = 'block';
+        document.getElementById('crossTag').textContent = 'now';
+      } else dot.style.display = 'none';
     } else if (cross.status === 'never') {
       out.textContent = 'not within ' + HORIZON_YEARS + ' yrs'; dot.style.display = 'none';
     } else {
