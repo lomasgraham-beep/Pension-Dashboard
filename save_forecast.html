@@ -78,7 +78,7 @@
   .legend .lg { display:inline-flex; align-items:center; gap:6px; }
   .legend .lg::before { content:''; width:14px; height:3px; border-radius:2px; background:#94a3b8; }
   .legend .lg.cost::before { background:var(--cost); }
-  .legend .lg.save::before { background:var(--save); }
+  .legend .lg.save::before { width:12px; height:12px; border-radius:2px; background:var(--save); }
   .readout { font-size:13px; color:#64748b; font-variant-numeric:tabular-nums; }
   .chart-svg svg { width:100%; height:auto; display:block; touch-action:pan-y; }
   tr.detail.show { display:table-row; }
@@ -154,7 +154,7 @@
 </head>
 <body>
   <h1>What I Could Save</h1>
-  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save. Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings) and general costs each April — not at the calendar-year line. The chart plots cost out (red) against what's left to save (green) by month; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf10)</span></p>
+  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save. Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings) and general costs each April — not at the calendar-year line. The chart shows what's left to save each month as green bars (red if a month runs short) against the red cost line; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf11)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="controls" class="controls" style="display:none;">
@@ -432,52 +432,61 @@
 
   // ---- month line chart: red = cost out, green = could save ----
   let CHART = null;
-  function niceCeil(v) { if (v <= 0) return 0; const p = Math.pow(10, Math.floor(Math.log10(v))); const n = v / p; const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10; return step * p; }
+  // round-number axis: ~5 divisions sized from the positive peak, floor rounded down to a step (0 stays a tick)
+  function axisScale(dataMin, dataMax) {
+    const posMax = Math.max(dataMax, 0);
+    const raw = (posMax > 0 ? posMax : 100) / 5;
+    const p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const n = raw / p;
+    const step = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
+    const max = (Math.ceil(posMax / step) * step) || step;
+    const min = Math.min(0, Math.floor(dataMin / step) * step);
+    const ticks = [];
+    for (let v = min; v <= max + step * 0.001; v += step) ticks.push(Math.round(v));
+    return { min: min, max: max, ticks: ticks };
+  }
 
   function drawChart(totals, avails) {
     const W = 720, H = 260, L = 58, R = 14, T = 12, B = 26;
     const plotW = W - L - R, plotH = H - T - B;
-    let maxV = 0, minV = 0;
-    for (let m = 0; m < 12; m++) { maxV = Math.max(maxV, totals[m], avails[m]); minV = Math.min(minV, totals[m], avails[m]); }
-    let yMax = niceCeil(maxV); if (yMax <= 0) yMax = 100;
-    let yMin = minV < 0 ? -niceCeil(-minV) : 0;
-    if (yMax === yMin) yMax = yMin + 100;
-    const xFor = i => L + plotW * i / 11;
+    let dataMax = 0, dataMin = 0;
+    for (let m = 0; m < 12; m++) { dataMax = Math.max(dataMax, totals[m], avails[m]); dataMin = Math.min(dataMin, totals[m], avails[m]); }
+    const sc = axisScale(dataMin, dataMax), yMin = sc.min, yMax = sc.max;
+    const xFor = i => L + plotW * (i + 0.5) / 12;   // centre of each of 12 bands
     const yFor = v => T + plotH * (1 - (v - yMin) / (yMax - yMin));
     const xs = []; for (let i = 0; i < 12; i++) xs.push(xFor(i));
     CHART = { xs: xs, totals: totals.slice(), avails: avails.slice() };
+    const y0 = yFor(0);
 
     let grid = '';
-    for (let t = 0; t <= 4; t++) {
-      const val = yMin + (yMax - yMin) * t / 4, y = yFor(val);
+    sc.ticks.forEach(val => {
+      const y = yFor(val);
       grid += '<line x1="' + L + '" y1="' + y + '" x2="' + (W - R) + '" y2="' + y + '" style="stroke:var(--grid)" stroke-width="1"/>';
       grid += '<text x="' + (L - 8) + '" y="' + (y + 4) + '" text-anchor="end" font-size="11" style="fill:var(--axis)">' + fmt(val) + '</text>';
+    });
+    const zero = '<line x1="' + L + '" y1="' + y0 + '" x2="' + (W - R) + '" y2="' + y0 + '" style="stroke:var(--axis)" stroke-width="1.5"/>';
+
+    // green save bars from zero (red when negative = shortfall)
+    let bars = '';
+    const bw = (plotW / 12) * 0.5;
+    for (let i = 0; i < 12; i++) {
+      const v = avails[i], yv = yFor(v), x = xFor(i) - bw / 2;
+      const yTop = Math.min(y0, yv), h = Math.max(0.5, Math.abs(yv - y0));
+      bars += '<rect x="' + x + '" y="' + yTop + '" width="' + bw + '" height="' + h + '" rx="1.5" style="fill:' + (v < 0 ? 'var(--bad)' : 'var(--save)') + ';opacity:0.9"/>';
     }
-    let zero = '';
-    if (yMin < 0) { const y0 = yFor(0); zero = '<line x1="' + L + '" y1="' + y0 + '" x2="' + (W - R) + '" y2="' + y0 + '" style="stroke:var(--axis)" stroke-width="1.5"/>'; }
+    // red cost line + dots on top
+    const costPts = totals.map((v, i) => xFor(i) + ',' + yFor(v)).join(' ');
+    const costLine = '<polyline points="' + costPts + '" fill="none" style="stroke:var(--cost)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+    let dots = ''; for (let i = 0; i < 12; i++) dots += '<circle cx="' + xFor(i) + '" cy="' + yFor(totals[i]) + '" r="3" style="fill:var(--cost)"/>';
+
     let xlab = '';
     for (let i = 0; i < 12; i++) xlab += '<text x="' + xFor(i) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="11" style="fill:var(--axis)">' + MABBR[i] + '</text>';
-
-    const costPts = totals.map((v, i) => xFor(i) + ',' + yFor(v)).join(' ');
-    const savePts = avails.map((v, i) => xFor(i) + ',' + yFor(v)).join(' ');
-    const costLine = '<polyline points="' + costPts + '" fill="none" style="stroke:var(--cost)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
-    const saveLine = '<polyline points="' + savePts + '" fill="none" style="stroke:var(--save)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
-    let dots = '';
-    for (let i = 0; i < 12; i++) {
-      dots += '<circle cx="' + xFor(i) + '" cy="' + yFor(totals[i]) + '" r="3" style="fill:var(--cost)"/>';
-      dots += '<circle cx="' + xFor(i) + '" cy="' + yFor(avails[i]) + '" r="3" style="fill:var(--save)"/>';
-    }
     const guide = '<line id="chartGuide" x1="0" y1="' + T + '" x2="0" y2="' + (T + plotH) + '" style="stroke:var(--axis);display:none" stroke-width="1" stroke-dasharray="3 3"/>';
     let hits = '';
-    const band = plotW / 11;
-    for (let i = 0; i < 12; i++) {
-      let x = xFor(i) - band / 2, w = band;
-      if (x < L) { w -= (L - x); x = L; }
-      if (x + w > W - R) w = (W - R) - x;
-      hits += '<rect x="' + x + '" y="' + T + '" width="' + w + '" height="' + plotH + '" fill="transparent" onmouseenter="showPoint(' + i + ')" ontouchstart="showPoint(' + i + ')"/>';
-    }
+    const band = plotW / 12;
+    for (let i = 0; i < 12; i++) hits += '<rect x="' + (L + band * i) + '" y="' + T + '" width="' + band + '" height="' + plotH + '" fill="transparent" onmouseenter="showPoint(' + i + ')" ontouchstart="showPoint(' + i + ')"/>';
     return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" onmouseleave="clearPoint()">' +
-      grid + zero + costLine + saveLine + dots + guide + xlab + hits + '</svg>';
+      grid + zero + bars + costLine + dots + guide + xlab + hits + '</svg>';
   }
 
   function setReadoutDefault() {
