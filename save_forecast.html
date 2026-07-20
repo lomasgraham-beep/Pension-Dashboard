@@ -154,7 +154,7 @@
 </head>
 <body>
   <h1>What I Could Save</h1>
-  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save. Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings) and general costs each April — not at the calendar-year line. The chart shows what's left to save each month as green bars (red if a month runs short) against the red cost line; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf11)</span></p>
+  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save after everything, including pension contributions (shown as their net cost, matching the budget). Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings), general costs each April, and each pension by its own annual increase — not at the calendar-year line. The chart shows what's left to save each month as green bars (red if a month runs short) against the red cost line; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf12)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="controls" class="controls" style="display:none;">
@@ -259,7 +259,7 @@
         App.rest('bd_holiday_cost'),
         App.rest('bd_holiday_settings?id=eq.1'),
         App.rest('op_modelling_parameters?select=member_name,retirement_date'),
-        App.rest('bd_pension_contributions?select=member_name,increase_month'),
+        App.rest('bd_pension_contributions?select=member_name,pension_name,monthly_contribution,working_days,august_increase_pct,increase_month,paid_account'),
         App.rest('bd_bill_category?select=code,description')
       ]);
 
@@ -372,9 +372,28 @@
         salaryMonth[n] = best || COST_MONTH;
       });
 
+      // pension contributions: net cost (private / 1.25, workplace 'aegon' at gross), only if paid from a held account.
+      // Kept as rows so each grows by its own annual increase in its own month.
+      const pensRows = [];
+      const pensTierDays = {};
+      cols.forEach(n => { pensTierDays[n] = {}; });
+      (contribs || []).forEach(p => {
+        const acct = (p.paid_account || '').trim();
+        if (!acct || acctHolder[acct] === undefined) return;      // only pensions paid from a known account
+        const member = p.member_name; if (cols.indexOf(member) < 0) return;
+        const gross = Number(p.monthly_contribution) || 0;
+        if (gross === 0) return;
+        const isWorkplace = /aegon/i.test(p.pension_name || '');
+        const netToday = isWorkplace ? gross : gross / 1.25;
+        const days = (p.working_days == null) ? null : Number(p.working_days);
+        pensRows.push({ member: member, name: p.pension_name || 'Pension', netToday: netToday, days: days,
+          incPct: Number(p.august_increase_pct) || 0, incMonth: Number(p.increase_month) || 8 });
+        if (days != null) pensTierDays[member][days] = 1;
+      });
+
       DATA = { cols, acctHolder, acctBank, memberMonth, memberAcct, cardMonth, cardBills,
                paypalMonth, paypalBills, diningMonth, holidayMonth, salaryByMemberDays, otherByMember,
-               daysWithSalary, jointRetYear, salaryMonth, catMonth, catLabel, cardCat, paypalCat };
+               daysWithSalary, jointRetYear, salaryMonth, catMonth, catLabel, cardCat, paypalCat, pensRows, pensTierDays };
 
       selYear = CUR_Y;
       initSlider();
@@ -415,6 +434,22 @@
     return map[Math.max.apply(null, keys)];              // no row for this pattern -> use their usual (fullest) one
   }
   function incomeForMember(name, days) { return memberSalary(name, days) + DATA.otherByMember[name]; }
+
+  // pension: pick the tier matching the selected pattern, else the member's fullest pension tier
+  function effectivePensDays(name) {
+    const tiers = DATA.pensTierDays[name] || {};
+    if (tiers[selDays]) return selDays;
+    const keys = Object.keys(tiers).map(Number);
+    return keys.length ? Math.max.apply(null, keys) : null;
+  }
+  function pensRowCost(r, m) {
+    const grow = Math.pow(1 + r.incPct, upliftsAt(r.incMonth, selYear, m));   // grows by its own annual increase in its own month
+    return r.netToday * grow;
+  }
+  function activePensRows() {
+    return DATA.pensRows.filter(r => { const ed = effectivePensDays(r.member); return r.days == null || r.days === ed; });
+  }
+  function pensionMonth(m) { return activePensRows().reduce((s, r) => s + pensRowCost(r, m), 0); }
   function incomeTotal(days) { return DATA.cols.reduce((s, n) => s + incomeForMember(n, days), 0); }
 
   function monthValues(m) {
@@ -425,9 +460,10 @@
     const holiday = d.holidayMonth[m] * cf;
     const card = d.cardMonth[m] * cf;
     const paypal = d.paypalMonth[m] * cf;
-    const total = cols.reduce((s, v) => s + v, 0) + dining + holiday + card + paypal;
+    const pension = pensionMonth(m);   // grown by each contribution's own increase; not inflation-scaled
+    const total = cols.reduce((s, v) => s + v, 0) + dining + holiday + card + paypal + pension;
     const income = incCols.reduce((s, v) => s + v, 0);
-    return { incCols, cols, dining, holiday, card, paypal, total, income, available: income - total };
+    return { incCols, cols, dining, holiday, card, paypal, pension, total, income, available: income - total };
   }
 
   // ---- month line chart: red = cost out, green = could save ----
@@ -528,12 +564,12 @@
         '<th class="grp" colspan="' + nMem + '">Net income</th>' +
         '<th class="grp" colspan="' + nMem + '">Bills by person</th>' +
         '<th rowspan="2">Dining</th><th rowspan="2">Holidays</th><th rowspan="2">Card</th>' +
-        '<th rowspan="2">PayPal</th><th rowspan="2">Total</th><th rowspan="2">Available</th>' +
+        '<th rowspan="2">PayPal</th><th rowspan="2">Pension</th><th rowspan="2">Total</th><th rowspan="2">Available</th>' +
       '</tr><tr>' + memNames + memNames + '</tr>';
 
-    const ncols = 2 * nMem + 7;   // Month + income(nMem) + bills(nMem) + dining/hol/card/paypal/total/avail
+    const ncols = 2 * nMem + 8;   // Month + income(nMem) + bills(nMem) + dining/hol/card/paypal/pension/total/avail
     let body = '';
-    const yearSums = { inc: d.cols.map(() => 0), cols: d.cols.map(() => 0), dining: 0, holiday: 0, card: 0, paypal: 0, total: 0, avail: 0 };
+    const yearSums = { inc: d.cols.map(() => 0), cols: d.cols.map(() => 0), dining: 0, holiday: 0, card: 0, paypal: 0, pension: 0, total: 0, avail: 0 };
     const chTot = [], chAvail = [];
 
     for (let m = 0; m < 12; m++) {
@@ -542,7 +578,7 @@
       v.incCols.forEach((val, i) => yearSums.inc[i] += val);
       v.cols.forEach((val, i) => yearSums.cols[i] += val);
       yearSums.dining += v.dining; yearSums.holiday += v.holiday; yearSums.card += v.card;
-      yearSums.paypal += v.paypal; yearSums.total += v.total; yearSums.avail += v.available;
+      yearSums.paypal += v.paypal; yearSums.pension += v.pension; yearSums.total += v.total; yearSums.avail += v.available;
 
       const open = openMonths.has(m);
       const odiff = openDiffs.has(m);
@@ -555,6 +591,7 @@
           '<td>' + fmt(v.holiday) + '</td>',
           '<td>' + fmt(v.card) + '</td>',
           '<td>' + fmt(v.paypal) + '</td>',
+          '<td>' + fmt(v.pension) + '</td>',
           '<td>' + fmt(v.total) + '</td>',
           '<td class="avail ' + (v.available < 0 ? 'neg' : 'pos') + '">' + fmt(v.available) + '</td>'
         ]);
@@ -572,6 +609,7 @@
         '<td>' + fmt(yearSums.holiday) + '</td>',
         '<td>' + fmt(yearSums.card) + '</td>',
         '<td>' + fmt(yearSums.paypal) + '</td>',
+        '<td>' + fmt(yearSums.pension) + '</td>',
         '<td>' + fmt(yearSums.total) + '</td>',
         '<td class="avail ' + (yearSums.avail < 0 ? 'neg' : 'pos') + '">' + fmt(yearSums.avail) + '</td>'
       ]);
@@ -615,7 +653,17 @@
              '<div class="drow"><span class="nm">From weekly rota <span class="dnote">(weeks in ' + MABBR[m] + ')</span></span><span class="vl">' + fmt(d.diningMonth[m] * f) + '</span></div></div>';
     cards += '<div class="dcard"><div class="dhead"><span>Holidays</span><span>' + fmt(d.holidayMonth[m] * f) + '</span></div>' +
              '<div class="drow"><span class="nm">Monthly set-aside <span class="dnote">(today-based)</span></span><span class="vl">' + fmt(d.holidayMonth[m] * f) + '</span></div></div>';
+    cards += pensionCard(m);
     return cards;
+  }
+
+  function pensionCard(m) {
+    const rows = activePensRows().map(r => ({ label: r.member + ' ' + r.name, val: pensRowCost(r, m) })).filter(x => x.val > 0.005);
+    if (!rows.length) return '';
+    rows.sort((a, b) => b.val - a.val);
+    const total = rows.reduce((s, x) => s + x.val, 0);
+    const inner = rows.map(x => '<div class="drow"><span class="nm">' + esc(x.label) + ' <span class="dnote">(net cost)</span></span><span class="vl">' + fmt(x.val) + '</span></div>').join('');
+    return '<div class="dcard"><div class="dhead"><span>Pensions</span><span>' + fmt(total) + '</span></div>' + inner + '</div>';
   }
 
   function detailHtml(m) {
@@ -656,6 +704,7 @@
     Object.keys(d.paypalBills).forEach(bn => out.push({ key: 'p|' + bn, label: bn, grp: 'PayPal', val: d.paypalBills[bn][m] * f }));
     out.push({ key: 'dining', label: 'Dining', grp: 'Dining', val: d.diningMonth[m] * f });
     out.push({ key: 'holiday', label: 'Holidays', grp: 'Holidays', val: d.holidayMonth[m] * f });
+    activePensRows().forEach((r, i) => out.push({ key: 'pens|' + r.member + '|' + r.name + '|' + i, label: r.member + ' ' + r.name, grp: 'Pension', val: pensRowCost(r, m) }));
     return out;
   }
 
