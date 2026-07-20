@@ -72,6 +72,19 @@
   #crossDot .ctag { position:absolute; left:50%; top:14px; transform:translateX(-50%); white-space:nowrap;
                     font-size:11px; font-weight:700; color:var(--accent); background:var(--panel);
                     border:1px solid var(--panelborder); border-radius:6px; padding:2px 6px; box-shadow:var(--shadow); }
+  /* vertical "retire date" reference line (shown only when the date is decoupled) */
+  #dateLine { position:absolute; z-index:4; width:0; border-left:2px dashed var(--accent); pointer-events:none; opacity:.7; }
+  /* true/false switch to decouple the retire date from the spend */
+  .switch { position:relative; display:inline-block; width:44px; height:26px; flex:none; }
+  .switch input { opacity:0; width:0; height:0; }
+  .switch .sl { position:absolute; inset:0; background:var(--panelborder); border-radius:26px; transition:.15s; cursor:pointer; }
+  .switch .sl:before { content:''; position:absolute; height:20px; width:20px; left:3px; top:3px; background:#fff;
+                       border-radius:50%; transition:.15s; box-shadow:0 1px 3px rgba(0,0,0,.35); }
+  .switch input:checked + .sl { background:var(--accent); }
+  .switch input:checked + .sl:before { transform:translateX(18px); }
+  #dateCtl.locked { opacity:.42; }
+  #dateCtl.locked .step { cursor:default; }
+  .dateVal { min-width:74px; text-align:right; font-size:15px; }
 
   @media (prefers-color-scheme: dark) {
     :root {
@@ -90,7 +103,7 @@
 
   <div class="head">
     <div class="hrow">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front12)</span></span>
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front13)</span></span>
       <div class="seg" id="seg">
         <button type="button" class="seg-btn active" data-mode="joint">Joint</button>
         <button type="button" class="seg-btn" data-mode="p1" id="segP1">Graham</button>
@@ -109,7 +122,19 @@
         <button type="button" class="step" id="spDn" aria-label="Lower spend">&minus;</button>
         <input id="spendTest" type="range" min="20" max="200" step="1" value="70">
         <button type="button" class="step" id="spUp" aria-label="Raise spend">+</button>
-        <b id="spendTestVal" class="spendVal">70%</b> &rarr; earliest safe <span class="out" id="crossOut">—</span>
+        <b id="spendTestVal" class="spendVal">70%</b>
+        <span id="crossLead">&rarr; earliest safe</span> <span class="out" id="crossOut">—</span>
+      </span>
+    </div>
+    <div class="hrow">
+      <label class="ctl" style="cursor:pointer;">Adjust retire date
+        <span class="switch"><input type="checkbox" id="decouple"><span class="sl"></span></span>
+      </label>
+      <span class="ctl locked" id="dateCtl">Retire date
+        <button type="button" class="step" id="dtDn" aria-label="Earlier date">&minus;</button>
+        <input id="dateTest" type="range" min="0" max="72" step="1" value="0" disabled>
+        <button type="button" class="step" id="dtUp" aria-label="Later date">+</button>
+        <b id="dateTestVal" class="dateVal">—</b>
       </span>
     </div>
   </div>
@@ -117,6 +142,7 @@
   <div class="wrap">
     <div id="fchart"></div>
     <div id="spendLine" style="display:none;"></div>
+    <div id="dateLine" style="display:none;"></div>
     <div id="crossDot" style="display:none;"><div class="ctag" id="crossTag"></div></div>
     <div id="marker" style="display:none;"><div class="pin"></div><div class="tag" id="markerTag">Your plan</div></div>
   </div>
@@ -133,6 +159,8 @@
   let frontier = [];           // [{ year:decimal, pct }]
   let plan = null;             // { year:decimal, date, pct }
   let endYear = null, yMax = 100;
+  let decoupled = false;       // false = date tracks the spend (earliest-safe); true = date is a free what-if
+  let sweepBase = null;        // first-of-current-month; anchors the retire-date slider to the frontier sweep
   let mode = 'joint';          // 'joint' | 'p1' (Graham) | 'p2' (Julie)
   const modeName = () => mode === 'p1' ? p1Name : (mode === 'p2' ? p2Name : 'Joint');
   const isIndiv = () => mode === 'p1' || mode === 'p2';
@@ -213,6 +241,7 @@
     frontier = []; endYear = null;
     const now = new Date();
     const base0 = new Date(now.getFullYear(), now.getMonth(), 1);
+    sweepBase = base0;
     for (let m = 0; m <= HORIZON_YEARS * 12; m += STEP_MONTHS) {
       const d = new Date(base0.getFullYear(), base0.getMonth() + m, 1);
       const res = maxSafeSpend(baseFor(d), mode);
@@ -272,6 +301,40 @@
       }
     }
     return { year: top.year, status: 'cross' };
+  }
+
+  // max safe spend % at a given (decimal) retirement year, read off the computed frontier.
+  function frontierPctAt(decY) {
+    if (!frontier.length) return 0;
+    if (decY <= frontier[0].year) return frontier[0].pct;
+    const last = frontier[frontier.length - 1];
+    if (decY >= last.year) return last.pct;
+    for (let i = 1; i < frontier.length; i++) {
+      if (frontier[i].year >= decY) {
+        const a = frontier[i - 1], b = frontier[i];
+        const tt = (b.year === a.year) ? 0 : (decY - a.year) / (b.year - a.year);
+        return a.pct + tt * (b.pct - a.pct);
+      }
+    }
+    return last.pct;
+  }
+  // verdict for a free (date, spend) point, using the same +/- MARGIN bands the chart draws.
+  function verdictAt(decY, spend) {
+    const pct = frontierPctAt(decY);
+    let kind;
+    if (spend <= pct - MARGIN) kind = 'safe';
+    else if (spend <= pct + MARGIN) kind = 'marg';
+    else kind = 'risk';
+    return { kind: kind, pct: pct };
+  }
+  // retire-date slider (whole-month offsets from the sweep start) <-> decimal year / label
+  const MAX_MONTHS = () => HORIZON_YEARS * 12;
+  function dateFromMonths(mo) { return new Date(sweepBase.getFullYear(), sweepBase.getMonth() + mo, 1); }
+  const monthsToYear = (mo) => decYear(dateFromMonths(mo));
+  const monthsLabel = (mo) => { const d = dateFromMonths(mo); return MONTHS[d.getMonth()] + ' ' + d.getFullYear(); };
+  function yearToMonths(decY) {
+    const mo = Math.round((decY - decYear(sweepBase)) * 12);
+    return Math.max(0, Math.min(MAX_MONTHS(), mo));
   }
 
   function draw() {
@@ -372,8 +435,11 @@
     const spend = Number(document.getElementById('spendTest').value);
     document.getElementById('spendTestVal').textContent = spend + '%';
     const line = document.getElementById('spendLine');
+    const dLine = document.getElementById('dateLine');
     const dot = document.getElementById('crossDot');
     const out = document.getElementById('crossOut');
+    const lead = document.getElementById('crossLead');
+    const tag = document.getElementById('crossTag');
     const ly = cli.getYLocation(spend);
     if (area && isFinite(ly)) {
       line.style.left = (baseX + area.left) + 'px';
@@ -382,7 +448,43 @@
       line.style.display = 'block';
     } else line.style.display = 'none';
 
+    if (decoupled) {
+      // ---- date decoupled: the dot is a free what-if point at (chosen date, chosen spend) ----
+      const mo = Number(document.getElementById('dateTest').value);
+      const dy = monthsToYear(mo);
+      document.getElementById('dateTestVal').textContent = monthsLabel(mo);
+      const cx = cli.getXLocation(dy);
+      // vertical date guide across the plot
+      if (area && isFinite(cx)) {
+        dLine.style.left = (baseX + cx) + 'px';
+        dLine.style.top = (baseY + area.top) + 'px';
+        dLine.style.height = area.height + 'px';
+        dLine.style.display = 'block';
+      } else dLine.style.display = 'none';
+      // the free point at the crossing of the two guides
+      if (area && isFinite(cx) && isFinite(ly)) {
+        dot.style.left = (baseX + cx) + 'px'; dot.style.top = (baseY + ly) + 'px'; dot.style.display = 'block';
+        tag.textContent = monthsLabel(mo);
+      } else dot.style.display = 'none';
+      // verdict readout, coloured to match the chart's bands
+      const dark = isDark();
+      const colFor = { safe: dark ? '#22c55e' : '#16a34a', marg: dark ? '#fbbf24' : '#f59e0b', risk: dark ? '#f87171' : '#dc2626' };
+      const v = verdictAt(dy, spend);
+      const word = isIndiv()
+        ? (v.kind === 'safe' ? 'Grows' : (v.kind === 'marg' ? 'Maintained' : 'Shrinks'))
+        : (v.kind === 'safe' ? 'Safe' : (v.kind === 'marg' ? 'Marginal' : 'Runs dry'));
+      const ceil = Math.max(0, Math.round(v.pct - MARGIN));
+      lead.innerHTML = '&rarr;';
+      out.innerHTML = '<span style="color:' + colFor[v.kind] + ';font-weight:700;">' + word
+        + '</span> &middot; <span style="color:var(--sub);font-weight:400;">safe up to</span> <b style="color:var(--ink);">' + ceil + '%</b>';
+      return;
+    }
+
+    // ---- coupled (default): the dot rides the frontier at the earliest-safe date ----
+    dLine.style.display = 'none';
+    lead.innerHTML = '&rarr; earliest safe';
     const cross = crossingFor(spend);
+    let parkMonths;
     if (cross.status === 'now') {
       // Safe even at the earliest possible retirement date (the start of the chart).
       // Pin the dot to the left edge on the test-spend line instead of hiding it, so it
@@ -391,18 +493,36 @@
       const cx0 = cli.getXLocation(frontier[0].year);
       if (area && isFinite(cx0) && isFinite(ly)) {
         dot.style.left = (baseX + cx0) + 'px'; dot.style.top = (baseY + ly) + 'px'; dot.style.display = 'block';
-        document.getElementById('crossTag').textContent = 'now';
+        tag.textContent = 'now';
       } else dot.style.display = 'none';
+      parkMonths = 0;
     } else if (cross.status === 'never') {
       out.textContent = 'not within ' + HORIZON_YEARS + ' yrs'; dot.style.display = 'none';
+      parkMonths = MAX_MONTHS();
     } else {
       out.textContent = ymLabel(cross.year);
       const cx = cli.getXLocation(cross.year);
       if (area && isFinite(cx) && isFinite(ly)) {
         dot.style.left = (baseX + cx) + 'px'; dot.style.top = (baseY + ly) + 'px'; dot.style.display = 'block';
-        document.getElementById('crossTag').textContent = ymLabel(cross.year);
+        tag.textContent = ymLabel(cross.year);
       } else dot.style.display = 'none';
+      parkMonths = yearToMonths(cross.year);
     }
+    // park the (disabled) date slider on the derived earliest-safe date, so it's a
+    // sensible starting point the instant the toggle is switched on.
+    const ds = document.getElementById('dateTest');
+    ds.value = parkMonths;
+    document.getElementById('dateTestVal').textContent = monthsLabel(parkMonths);
+  }
+
+  // enable/disable + grey the retire-date control to match the decouple state
+  function applyDecoupleUI() {
+    const ctl = document.getElementById('dateCtl');
+    const ds = document.getElementById('dateTest');
+    ctl.classList.toggle('locked', !decoupled);
+    ds.disabled = !decoupled;
+    document.getElementById('dtDn').disabled = !decoupled;
+    document.getElementById('dtUp').disabled = !decoupled;
   }
 
   async function load() {
@@ -489,6 +609,10 @@
         st.value = Math.max(20, Math.min(200, plan.pct));
         document.getElementById('spendTestVal').textContent = st.value + '%';
       }
+      const ds = document.getElementById('dateTest');
+      ds.max = MAX_MONTHS();
+      document.getElementById('dateTestVal').textContent = monthsLabel(Number(ds.value));
+      applyDecoupleUI();
       buildSubline();
       draw();
       status.style.display = 'none';
@@ -506,6 +630,22 @@
   }
   document.getElementById('spDn').addEventListener('click', () => nudgeSpend(-1));
   document.getElementById('spUp').addEventListener('click', () => nudgeSpend(1));
+
+  // retire-date slider (only active when decoupled) + month bumps
+  document.getElementById('dateTest').addEventListener('input', () => { if (decoupled) placeOverlays(); });
+  function nudgeDate(d) {
+    if (!decoupled) return;
+    const dt = document.getElementById('dateTest');
+    dt.value = Math.max(0, Math.min(MAX_MONTHS(), Number(dt.value) + d));
+    placeOverlays();
+  }
+  document.getElementById('dtDn').addEventListener('click', () => nudgeDate(-1));
+  document.getElementById('dtUp').addEventListener('click', () => nudgeDate(1));
+  document.getElementById('decouple').addEventListener('change', (e) => {
+    decoupled = !!e.target.checked;
+    applyDecoupleUI();
+    placeOverlays();
+  });
   document.getElementById('seg').addEventListener('click', (e) => {
     const b = e.target.closest('.seg-btn'); if (!b || b.dataset.mode === mode) return;
     mode = b.dataset.mode;
