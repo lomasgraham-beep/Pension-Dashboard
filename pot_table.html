@@ -53,19 +53,22 @@
   .lowyr { color:var(--sub); }
   .off { color:var(--sub); }
   .off.on { color:var(--accent); font-weight:600; }
+  .pct.capped { color:var(--sub); }
+  .pct .lk { display:inline-block; margin-left:5px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.3px;
+             color:var(--accent); border:1px solid var(--accent); border-radius:4px; padding:0 3px; vertical-align:middle; }
   .ctlrow { display:flex; align-items:center; gap:9px; margin-top:9px; font-size:12px; color:var(--sub); flex-wrap:wrap; }
-  .ctl-label { font-weight:700; color:var(--ink); }
+  .ctl-label { font-weight:700; color:var(--ink); min-width:88px; }
   .step { width:32px; height:32px; font-size:20px; font-weight:700; line-height:1; padding:0; border:1px solid var(--panelborder);
           background:var(--panel); color:var(--ink); border-radius:8px; cursor:pointer; -webkit-tap-highlight-color:transparent;
           display:inline-flex; align-items:center; justify-content:center; }
   .step:active { background:var(--accent); color:#fff; border-color:var(--accent); }
-  #offset { -webkit-appearance:none; appearance:none; width:180px; height:30px; background:transparent; margin:0; cursor:pointer; }
-  #offset::-webkit-slider-runnable-track { height:8px; border-radius:5px; background:var(--panelborder); }
-  #offset::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:26px; height:26px; border-radius:50%;
+  #offset, #lock { -webkit-appearance:none; appearance:none; width:180px; height:30px; background:transparent; margin:0; cursor:pointer; }
+  #offset::-webkit-slider-runnable-track, #lock::-webkit-slider-runnable-track { height:8px; border-radius:5px; background:var(--panelborder); }
+  #offset::-webkit-slider-thumb, #lock::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:26px; height:26px; border-radius:50%;
                                   background:#fff; border:4px solid var(--accent); margin-top:-9px; box-shadow:0 1px 4px rgba(0,0,0,.35); }
-  #offset::-moz-range-track { height:8px; border-radius:5px; background:var(--panelborder); }
-  #offset::-moz-range-thumb { width:26px; height:26px; border-radius:50%; background:#fff; border:4px solid var(--accent); }
-  #offVal { color:var(--accent); font-size:15px; min-width:14px; text-align:center; }
+  #offset::-moz-range-track, #lock::-moz-range-track { height:8px; border-radius:5px; background:var(--panelborder); }
+  #offset::-moz-range-thumb, #lock::-moz-range-thumb { width:26px; height:26px; border-radius:50%; background:#fff; border:4px solid var(--accent); }
+  #offVal, #lockVal { color:var(--accent); font-size:15px; min-width:14px; text-align:center; }
   tr.planrow td { background:rgba(56,214,230,.14) !important; }
   .plantag { display:inline-block; margin-left:8px; font-size:10px; font-weight:700; color:var(--accent);
              border:1px solid var(--accent); border-radius:5px; padding:0 5px; vertical-align:middle; }
@@ -73,8 +76,8 @@
 </head>
 <body>
   <div class="head">
-    <div class="h-title">Pot at Retirement <span class="build">(build: pt3)</span></div>
-    <div class="h-sub" id="hsub">Pot value for each possible retirement month, from this month onwards. <b>Safe spend %</b> is the most you could spend at that date and still have both pots last. <b>Lowest pot</b> is the lowest the combined pot falls to during drawdown at that safe spend, and the year it happens (red if it empties).</div>
+    <div class="h-title">Pot at Retirement <span class="build">(build: pt4)</span></div>
+    <div class="h-sub" id="hsub">Pot value for each possible retirement month, from this month onwards. <b>Safe spend %</b> is the most you could spend at that date and still have both pots last (capped by the spend lock). <b>Lowest pot</b> is the lowest the combined pot falls to during drawdown at that spend, and the year it happens (red if it empties).</div>
     <div class="ctlrow">
       <span class="ctl-label">Offset months</span>
       <button type="button" class="step" id="offDn" aria-label="Fewer months">&minus;</button>
@@ -82,6 +85,14 @@
       <button type="button" class="step" id="offUp" aria-label="More months">+</button>
       <b id="offVal">0</b>
       <span class="ctl-hint">retire this many months later &mdash; spend stays at each row&rsquo;s safe %</span>
+    </div>
+    <div class="ctlrow">
+      <span class="ctl-label">Spend lock</span>
+      <button type="button" class="step" id="lockDn" aria-label="Lower cap">&minus;</button>
+      <input id="lock" type="range" min="20" max="200" step="5" value="200">
+      <button type="button" class="step" id="lockUp" aria-label="Raise cap">+</button>
+      <b id="lockVal">200%</b>
+      <span class="ctl-hint">cap the spend used &mdash; lower it to model spending under the safe maximum</span>
     </div>
   </div>
   <span id="status" class="s-load">Loading…</span>
@@ -98,7 +109,7 @@
   const SPEND_LO = 0, SPEND_HI = 200;
 
   let data = null, p1Name = 'Graham', p2Name = null, savedBase = null;
-  let offset = 0, rowsCache = [], planRetire = null, offTimer = null;   // offset-months explorer
+  let offset = 0, spendLock = 200, rowsCache = [], planRetire = null;   // offset-months + spend-lock explorer
 
   const addMonths = (d, k) => new Date(d.getFullYear(), d.getMonth() + k, 1);
 
@@ -172,18 +183,29 @@
     return lo;
   }
 
-  function rowHtml(d, d2, pct, g, j, trough, isPlan) {
+  function rowHtml(d, d2, pct, capped, g, j, trough, isPlan) {
     const t = g + (p2Name ? j : 0);
     const dry = trough.val < 1;
     return '<tr' + (isPlan ? ' class="planrow"' : '') + '>'
       + '<td class="ym">' + ymLabelD(d) + (isPlan ? '<span class="plantag">your plan</span>' : '') + '</td>'
       + '<td class="off' + (d2 ? ' on' : '') + '">' + (d2 ? ymLabelD(d2) : '\u2014') + '</td>'
-      + '<td class="pct">' + Math.round(pct) + '%</td>'
+      + '<td class="pct' + (capped ? ' capped' : '') + '">' + Math.round(pct) + '%' + (capped ? '<span class="lk">lock</span>' : '') + '</td>'
       + '<td>' + gbp(g) + '</td>'
       + (p2Name ? '<td>' + gbp(j) + '</td>' : '')
       + '<td class="tot">' + gbp(t) + '</td>'
       + '<td class="low' + (dry ? ' dry' : '') + '">' + gbp(trough.val) + '</td>'
       + '<td class="lowyr">' + trough.year + '</td></tr>';
+  }
+
+  // build one row's HTML for a given month offset and spend lock (cap)
+  function buildRow(r, off, lock) {
+    const effPct = Math.min(r.pct, lock);          // spend used = row's safe %, capped by the lock
+    const capped = effPct < r.pct - 0.01;
+    let base = r.base, d2 = null;
+    if (off > 0) { d2 = addMonths(r.d, off); base = baseFor(d2); }
+    const g = base.pots.graham, j = base.pots.julie;
+    const trough = troughAt(base, effPct);
+    return rowHtml(r.d, d2, effPct, capped, g, j, trough, r.isPlan);
   }
 
   function computeTable() {
@@ -207,50 +229,43 @@
       for (; m <= stop; m++) {
         const d = new Date(base0.getFullYear(), base0.getMonth() + m, 1);
         const base = baseFor(d);
-        const pct = maxSafeSpend(base);
-        const trough = troughAt(base, pct);
+        const pct = maxSafeSpend(base);            // true safe max for the standard month (cached, cap applied at render)
         const isPlan = !!(planRetire && planRetire.getFullYear() === d.getFullYear() && planRetire.getMonth() === d.getMonth());
-        rowsCache.push({ d: d, pct: pct, g0: base.pots.graham, j0: base.pots.julie, trough0: trough, isPlan: isPlan });
-        const d2 = offset > 0 ? addMonths(d, offset) : null;   // usually 0 on first build
-        html += rowHtml(d, d2, pct, base.pots.graham, base.pots.julie, trough, isPlan);
+        const r = { d: d, pct: pct, base: base, isPlan: isPlan };
+        rowsCache.push(r);
+        html += buildRow(r, offset, spendLock);
       }
       tbody.insertAdjacentHTML('beforeend', html);
       if (m <= total) { status.textContent = 'Computing\u2026 ' + Math.floor(m / (total + 1) * 100) + '%'; setTimeout(chunk, 0); }
-      else { status.style.display = 'none'; if (offset > 0) renderRows(offset); }
+      else { status.style.display = 'none'; }
     }
     chunk();
   }
 
-  // re-render the table for a given month offset, keeping each row's safe spend fixed
-  function renderRows(off) {
+  // re-render every row for the current offset + spend lock (safe % per row stays fixed)
+  function renderRows(off, lock) {
     if (!rowsCache.length) return;
     let html = '';
-    for (const r of rowsCache) {
-      let d2 = null, g = r.g0, j = r.j0, trough = r.trough0;
-      if (off > 0) {
-        d2 = addMonths(r.d, off);
-        const base2 = baseFor(d2);
-        g = base2.pots.graham; j = base2.pots.julie; trough = troughAt(base2, r.pct);
-      }
-      html += rowHtml(r.d, d2, r.pct, g, j, trough, r.isPlan);
-    }
+    for (const r of rowsCache) html += buildRow(r, off, lock);
     document.getElementById('tbody').innerHTML = html;
   }
 
-  function applyOffset() {
+  let renderTimer = null;
+  function scheduleRender() {
     offset = Number(document.getElementById('offset').value);
+    spendLock = Number(document.getElementById('lock').value);
     document.getElementById('offVal').textContent = offset;
+    document.getElementById('lockVal').textContent = spendLock + '%';
     if (!rowsCache.length) return;
-    if (offset === 0) { renderRows(0); return; }
     const status = document.getElementById('status');
     status.style.display = 'inline-block'; status.className = 's-load'; status.textContent = 'Recomputing\u2026';
-    clearTimeout(offTimer);
-    offTimer = setTimeout(() => { renderRows(offset); status.style.display = 'none'; }, 30);
+    clearTimeout(renderTimer);
+    renderTimer = setTimeout(() => { renderRows(offset, spendLock); status.style.display = 'none'; }, 30);
   }
-  function nudgeOff(dir) {
-    const el = document.getElementById('offset');
-    el.value = Math.max(0, Math.min(5, Number(el.value) + dir));
-    applyOffset();
+  function nudge(id, dir, lo, hi, step) {
+    const el = document.getElementById(id);
+    el.value = Math.max(lo, Math.min(hi, Number(el.value) + dir * step));
+    scheduleRender();
   }
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -334,9 +349,12 @@
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
 
-  document.getElementById('offset').addEventListener('input', applyOffset);
-  document.getElementById('offDn').addEventListener('click', () => nudgeOff(-1));
-  document.getElementById('offUp').addEventListener('click', () => nudgeOff(1));
+  document.getElementById('offset').addEventListener('input', scheduleRender);
+  document.getElementById('offDn').addEventListener('click', () => nudge('offset', -1, 0, 5, 1));
+  document.getElementById('offUp').addEventListener('click', () => nudge('offset', 1, 0, 5, 1));
+  document.getElementById('lock').addEventListener('input', scheduleRender);
+  document.getElementById('lockDn').addEventListener('click', () => nudge('lock', -1, 20, 200, 5));
+  document.getElementById('lockUp').addEventListener('click', () => nudge('lock', 1, 20, 200, 5));
   window.addEventListener('message', (ev) => { if (ev && ev.data === 'refresh-data') load(); });
   App.requireLogin(load, { title: 'Pot at Retirement' });
 </script>
