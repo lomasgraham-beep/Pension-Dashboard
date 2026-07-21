@@ -76,12 +76,34 @@
   /* interactive "test spend" reference line + where it crosses the frontier */
   #spendLine { position:absolute; z-index:4; height:0; border-top:2px dashed var(--accent); pointer-events:none; opacity:.85; }
   #crossDot { position:absolute; z-index:5; width:12px; height:12px; border-radius:50%; background:var(--headbg);
-              border:3px solid var(--accent); transform:translate(-50%,-50%); pointer-events:none; }
+              border:3px solid var(--accent); transform:translate(-50%,-50%); pointer-events:auto; cursor:pointer; }
+  #crossDot::before { content:''; position:absolute; left:50%; top:50%; width:42px; height:42px;
+                      transform:translate(-50%,-50%); border-radius:50%; }
   #crossDot .ctag { position:absolute; left:50%; top:14px; transform:translateX(-50%); white-space:nowrap;
                     font-size:11px; font-weight:700; color:var(--accent); background:var(--panel);
                     border:1px solid var(--panelborder); border-radius:6px; padding:2px 6px; box-shadow:var(--shadow); }
   /* vertical "retire date" reference line (shown only when the date is decoupled) */
   #dateLine { position:absolute; z-index:4; width:0; border-left:2px dashed var(--accent); pointer-events:none; opacity:.7; }
+  /* tap-for-breakdown hint + the £ breakdown popover */
+  .bd-hint { color:var(--sub); font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent; padding:0 3px; user-select:none; }
+  .bd-hint:hover { color:var(--accent); }
+  #breakdown { position:absolute; z-index:8; width:298px; max-width:80vw; background:var(--panel);
+               border:1px solid var(--panelborder); border-radius:10px; box-shadow:var(--shadow);
+               padding:9px 11px 10px; font-size:12px; color:var(--ink); }
+  .bd-head { font-weight:700; font-size:12.5px; margin:0 22px 6px 0; }
+  .bd-close { position:absolute; top:5px; right:7px; width:24px; height:24px; border:0; background:transparent;
+              color:var(--sub); font-size:17px; line-height:1; cursor:pointer; border-radius:6px; }
+  .bd-close:active { background:var(--panelborder); }
+  .bd-tbl { width:100%; border-collapse:collapse; }
+  .bd-tbl th { text-align:right; font-weight:600; color:var(--sub); font-size:10.5px; padding:2px 0 3px; border-bottom:1px solid var(--panelborder); }
+  .bd-tbl th:first-child { text-align:left; }
+  .bd-tbl td { padding:2px 0; text-align:right; white-space:nowrap; }
+  .bd-tbl td:first-child { text-align:left; padding-right:8px; white-space:normal; }
+  .bd-cut { color:var(--risk); font-weight:700; }
+  .bd-fixed { color:var(--sub); font-weight:400; }
+  .bd-tot td { border-top:1px solid var(--panelborder); padding-top:4px; font-weight:700; }
+  .bd-save { color:var(--accent); }
+  .bd-note { color:var(--sub); font-size:10.5px; margin-top:6px; line-height:1.35; }
   /* true/false switch to decouple the retire date from the spend */
   .switch { position:relative; display:inline-block; width:44px; height:26px; flex:none; }
   .switch input { opacity:0; width:0; height:0; }
@@ -109,7 +131,7 @@
 
   <div class="head">
     <div class="hrow">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front14)</span></span>
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front15)</span></span>
       <div class="seg" id="seg">
         <button type="button" class="seg-btn active" data-mode="joint">Joint</button>
         <button type="button" class="seg-btn" data-mode="p1" id="segP1">Graham</button>
@@ -130,7 +152,7 @@
         <input id="spendTest" type="range" min="20" max="200" step="1" value="70">
         <button type="button" class="step" id="spUp" aria-label="Raise spend">+</button>
         <b id="spendTestVal" class="spendVal">70%</b>
-        <span class="cread"><span id="crossLead">&rarr; earliest safe</span> <span class="out" id="crossOut">—</span></span>
+        <span class="cread"><span id="crossLead">&rarr; earliest safe</span> <span class="out" id="crossOut">—</span> <span id="bdHint" class="bd-hint" title="What reduces — tap for a &pound; breakdown">&#9432;</span></span>
 
         <span class="clabel dlabel"><span class="switch"><input type="checkbox" id="decouple"><span class="sl"></span></span><span class="dgrey">Retire date</span></span>
         <button type="button" class="step dgrey" id="dtDn" aria-label="Earlier date" disabled>&minus;</button>
@@ -147,6 +169,11 @@
     <div id="spendLine" style="display:none;"></div>
     <div id="dateLine" style="display:none;"></div>
     <div id="crossDot" style="display:none;"><div class="ctag" id="crossTag"></div></div>
+    <div id="breakdown" style="display:none;">
+      <button type="button" class="bd-close" id="bdClose" aria-label="Close">&times;</button>
+      <div class="bd-head" id="bdHead"></div>
+      <div id="bdBody"></div>
+    </div>
     <div id="marker" style="display:none;"><div class="pin"></div><div class="tag" id="markerTag">Your plan</div></div>
   </div>
 
@@ -164,6 +191,8 @@
   let endYear = null, yMax = 100;
   let decoupled = false;       // false = date tracks the spend (earliest-safe); true = date is a free what-if
   let sweepBase = null;        // first-of-current-month; anchors the retire-date slider to the frontier sweep
+  let bdOpen = false;          // £ breakdown popover open?
+  let catLabel = {};           // bill category_code -> friendly name
   let mode = 'joint';          // 'joint' | 'p1' (Graham) | 'p2' (Julie)
   const modeName = () => mode === 'p1' ? p1Name : (mode === 'p2' ? p2Name : 'Joint');
   const isIndiv = () => mode === 'p1' || mode === 'p2';
@@ -340,6 +369,85 @@
     return Math.max(0, Math.min(MAX_MONTHS(), mo));
   }
 
+  // ---- £ spending-plan breakdown (tap the dot) ----
+  // Computed page-side from the same figures the engine uses, so no engine change: bills scale by
+  // the spend slider only when flagged spend_reduction; dining and holidays always scale; everything
+  // else is fixed. Figures are per-year, in today's money (pre-inflation, pre age-taper).
+  const gbp = (n) => '\u00A3' + Math.round(n).toLocaleString('en-GB');
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function billEffAnnual(b) {
+    const full = Number(b.total_annual) || 0;
+    if (b.frequency !== 'Monthly') return full;
+    const pm = b.pay_months;
+    if (!pm || !/^[01]{12}$/.test(pm)) return full;
+    const n = (pm.match(/1/g) || []).length;
+    return n >= 12 ? full : (Number(b.premium) || 0) * n;
+  }
+  function spendBreakdown(spendPct) {
+    const sr = spendPct / 100, cats = {};
+    const add = (key, label, full, reducible) => {
+      if (!cats[key]) cats[key] = { label: label, full: 0, reduced: 0 };
+      cats[key].full += full;
+      cats[key].reduced += reducible ? full * sr : full;
+    };
+    ((data && data.bills) || []).forEach((b) => {
+      const eff = billEffAnnual(b);
+      if (eff <= 0) return;
+      const code = b.category_code || '\u2014';
+      add('b:' + code, catLabel[code] || code, eff, !!b.spend_reduction);
+    });
+    if (Number(data && data.diningAnnual) > 0) add('dining', 'Dining out', Number(data.diningAnnual), true);
+    if (Number(data && data.holidayAnnual) > 0) add('holiday', 'Holidays', Number(data.holidayAnnual), true);
+    const rows = Object.keys(cats).map((k) => {
+      const c = cats[k];
+      return { label: c.label, full: c.full, reduced: c.reduced, cut: c.full - c.reduced };
+    }).sort((a, b) => b.full - a.full);
+    const total = rows.reduce((t, r) => ({ full: t.full + r.full, reduced: t.reduced + r.reduced, cut: t.cut + r.cut }),
+                              { full: 0, reduced: 0, cut: 0 });
+    return { rows: rows, total: total };
+  }
+  function renderBreakdown(spendPct) {
+    const bd = spendBreakdown(spendPct);
+    document.getElementById('bdHead').innerHTML = 'Spending plan at <b>' + spendPct + '%</b>';
+    let html = '<table class="bd-tbl"><thead><tr><th>Category</th><th>Plan</th><th>At ' + spendPct + '%</th><th>Change</th></tr></thead><tbody>';
+    bd.rows.forEach((r) => {
+      const change = (r.cut > 0.5)
+        ? '<span class="bd-cut">&minus;' + gbp(r.cut) + '</span>'
+        : '<span class="bd-fixed">fixed</span>';
+      html += '<tr><td>' + esc(r.label) + '</td><td>' + gbp(r.full) + '</td><td>' + gbp(r.reduced) + '</td><td>' + change + '</td></tr>';
+    });
+    html += '</tbody><tfoot><tr class="bd-tot"><td>Total</td><td>' + gbp(bd.total.full) + '</td><td>' + gbp(bd.total.reduced)
+          + '</td><td class="bd-save">&minus;' + gbp(bd.total.cut) + '</td></tr></tfoot></table>'
+          + '<div class="bd-note">Per year, in today\u2019s money. Fixed essentials don\u2019t move with the slider.</div>';
+    document.getElementById('bdBody').innerHTML = html;
+  }
+  function positionBreakdown(ax, ay) {
+    const pop = document.getElementById('breakdown');
+    const wrap = document.querySelector('.wrap');
+    if (!wrap) return;
+    const W = wrap.clientWidth, H = wrap.clientHeight;
+    const pw = pop.offsetWidth, ph = pop.offsetHeight;
+    let left = Math.max(6, Math.min(W - pw - 6, ax - pw / 2));
+    let top = ay - ph - 16;               // prefer above the dot
+    if (top < 6) top = ay + 18;           // otherwise below
+    top = Math.max(6, Math.min(H - ph - 6, top));
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+  }
+  // keep the popover live with the slider and pinned to the dot (or chart centre if the dot is hidden)
+  function followBreakdown(dot, area, baseX, baseY) {
+    if (!bdOpen) return;
+    renderBreakdown(Number(document.getElementById('spendTest').value));
+    let ax, ay;
+    if (dot.style.display === 'block') { ax = parseFloat(dot.style.left) || 0; ay = parseFloat(dot.style.top) || 0; }
+    else if (area) { ax = baseX + area.left + area.width / 2; ay = baseY + area.top + 20; }
+    else { ax = 60; ay = 60; }
+    positionBreakdown(ax, ay);
+  }
+  function openBreakdown() { bdOpen = true; document.getElementById('breakdown').style.display = 'block'; placeOverlays(); }
+  function closeBreakdown() { bdOpen = false; document.getElementById('breakdown').style.display = 'none'; }
+  function toggleBreakdown(e) { if (e) e.stopPropagation(); if (bdOpen) closeBreakdown(); else openBreakdown(); }
+
   function draw() {
     if (!chartsReady || !frontier.length) return;
     const host = document.getElementById('fchart');
@@ -480,6 +588,7 @@
       lead.innerHTML = '&rarr;';
       out.innerHTML = '<span style="color:' + colFor[v.kind] + ';font-weight:700;">' + word
         + '</span> &middot; <span style="color:var(--sub);font-weight:400;">safe up to</span> <b style="color:var(--ink);">' + ceil + '%</b>';
+      followBreakdown(dot, area, baseX, baseY);
       return;
     }
 
@@ -516,6 +625,7 @@
     const ds = document.getElementById('dateTest');
     ds.value = parkMonths;
     document.getElementById('dateTestVal').textContent = monthsLabel(parkMonths);
+    followBreakdown(dot, area, baseX, baseY);
   }
 
   // enable/disable + grey the retire-date row to match the decouple state
@@ -532,7 +642,7 @@
     try {
       const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases,
              crashes, savingsAccounts, contributionExceptions, workingTiers,
-             incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings, diningSettings] = await Promise.all([
+             incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings, diningSettings, billCategories] = await Promise.all([
         App.rest('bd_members'), App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
         App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
         App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
@@ -548,8 +658,12 @@
         App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
         App.rest('bd_holiday_cost'),
         App.rest('bd_holiday_settings?id=eq.1'),
-        App.rest('bd_dining_settings?id=eq.1')
+        App.rest('bd_dining_settings?id=eq.1'),
+        App.rest('bd_bill_category?order=code.asc')
       ]);
+
+      catLabel = {};
+      (billCategories || []).forEach(c => { if (c.code) catLabel[c.code] = c.description || c.code; });
 
       const mealCostMap = {};
       (mealCost || []).forEach(c => { mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
@@ -643,6 +757,19 @@
   }
   document.getElementById('dtDn').addEventListener('click', () => nudgeDate(-1));
   document.getElementById('dtUp').addEventListener('click', () => nudgeDate(1));
+
+  // £ breakdown: tap the dot (or the info glyph) to open; tap outside or the x to close
+  document.getElementById('crossDot').addEventListener('click', toggleBreakdown);
+  document.getElementById('bdHint').addEventListener('click', toggleBreakdown);
+  document.getElementById('bdClose').addEventListener('click', (e) => { e.stopPropagation(); closeBreakdown(); });
+  document.addEventListener('click', (e) => {
+    if (!bdOpen) return;
+    const pop = document.getElementById('breakdown');
+    const dot = document.getElementById('crossDot');
+    const hint = document.getElementById('bdHint');
+    if (pop.contains(e.target) || dot.contains(e.target) || hint.contains(e.target)) return;
+    closeBreakdown();
+  });
   document.getElementById('decouple').addEventListener('change', (e) => {
     decoupled = !!e.target.checked;
     applyDecoupleUI();
