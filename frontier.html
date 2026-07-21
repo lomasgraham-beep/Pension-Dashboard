@@ -87,9 +87,11 @@
   /* tap-for-breakdown hint + the £ breakdown popover */
   .bd-hint { color:var(--sub); font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent; padding:0 3px; user-select:none; }
   .bd-hint:hover { color:var(--accent); }
-  #breakdown { position:absolute; z-index:8; width:298px; max-width:80vw; background:var(--panel);
+  #breakdown { position:absolute; z-index:8; width:566px; max-width:88vw; background:var(--panel);
                border:1px solid var(--panelborder); border-radius:10px; box-shadow:var(--shadow);
                padding:9px 11px 10px; font-size:12px; color:var(--ink); }
+  .bd-cols { display:flex; gap:14px; align-items:flex-start; }
+  .bd-left { flex:1 1 auto; min-width:0; max-height:58vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .bd-head { font-weight:700; font-size:12.5px; margin:0 22px 6px 0; }
   .bd-close { position:absolute; top:5px; right:7px; width:24px; height:24px; border:0; background:transparent;
               color:var(--sub); font-size:17px; line-height:1; cursor:pointer; border-radius:6px; }
@@ -104,10 +106,10 @@
   .bd-tot td { border-top:1px solid var(--panelborder); padding-top:4px; font-weight:700; }
   .bd-save { color:var(--accent); }
   .bd-note { color:var(--sub); font-size:10.5px; margin-top:6px; line-height:1.35; }
-  /* pot-value mini chart inside the breakdown card */
-  .pot-wrap { margin-top:9px; padding-top:8px; border-top:1px solid var(--panelborder); }
+  /* pot-value mini chart — right-hand column of the breakdown card */
+  .pot-wrap { flex:0 0 232px; border-left:1px solid var(--panelborder); padding-left:13px; }
   .pot-title { font-size:10.5px; color:var(--sub); font-weight:600; margin-bottom:3px; }
-  #potSvg { height:112px; }
+  #potSvg { height:132px; }
   #potSvg svg { width:100%; height:100%; display:block; }
   .pot-leg { display:flex; gap:11px; margin-top:4px; font-size:10px; color:var(--sub); }
   .pot-leg span { display:inline-flex; align-items:center; gap:4px; }
@@ -140,7 +142,7 @@
 
   <div class="head">
     <div class="hrow">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front17)</span></span>
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front18)</span></span>
       <div class="seg" id="seg">
         <button type="button" class="seg-btn active" data-mode="joint">Joint</button>
         <button type="button" class="seg-btn" data-mode="p1" id="segP1">Graham</button>
@@ -181,11 +183,13 @@
     <div id="breakdown" style="display:none;">
       <button type="button" class="bd-close" id="bdClose" aria-label="Close">&times;</button>
       <div class="bd-head" id="bdHead"></div>
-      <div id="bdBody"></div>
-      <div class="pot-wrap" id="potWrap">
-        <div class="pot-title">Pot value over time</div>
-        <div id="potSvg"></div>
-        <div class="pot-leg" id="potLeg"></div>
+      <div class="bd-cols">
+        <div class="bd-left" id="bdBody"></div>
+        <div class="pot-wrap" id="potWrap">
+          <div class="pot-title">Pot value over time</div>
+          <div id="potSvg"></div>
+          <div class="pot-leg" id="potLeg"></div>
+        </div>
       </div>
     </div>
     <div id="marker" style="display:none;"><div class="pin"></div><div class="tag" id="markerTag">Your plan</div></div>
