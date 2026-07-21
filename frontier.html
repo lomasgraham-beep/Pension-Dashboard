@@ -104,6 +104,15 @@
   .bd-tot td { border-top:1px solid var(--panelborder); padding-top:4px; font-weight:700; }
   .bd-save { color:var(--accent); }
   .bd-note { color:var(--sub); font-size:10.5px; margin-top:6px; line-height:1.35; }
+  /* pot-value mini chart inside the breakdown card */
+  .pot-wrap { margin-top:9px; padding-top:8px; border-top:1px solid var(--panelborder); }
+  .pot-title { font-size:10.5px; color:var(--sub); font-weight:600; margin-bottom:3px; }
+  #potSvg { height:112px; }
+  #potSvg svg { width:100%; height:100%; display:block; }
+  .pot-leg { display:flex; gap:11px; margin-top:4px; font-size:10px; color:var(--sub); }
+  .pot-leg span { display:inline-flex; align-items:center; gap:4px; }
+  .pot-leg i { width:10px; height:3px; border-radius:2px; display:inline-block; }
+  .pot-msg { font-size:10.5px; color:var(--sub); padding:44px 0; text-align:center; }
   /* true/false switch to decouple the retire date from the spend */
   .switch { position:relative; display:inline-block; width:44px; height:26px; flex:none; }
   .switch input { opacity:0; width:0; height:0; }
@@ -131,7 +140,7 @@
 
   <div class="head">
     <div class="hrow">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front16)</span></span>
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front17)</span></span>
       <div class="seg" id="seg">
         <button type="button" class="seg-btn active" data-mode="joint">Joint</button>
         <button type="button" class="seg-btn" data-mode="p1" id="segP1">Graham</button>
@@ -173,6 +182,11 @@
       <button type="button" class="bd-close" id="bdClose" aria-label="Close">&times;</button>
       <div class="bd-head" id="bdHead"></div>
       <div id="bdBody"></div>
+      <div class="pot-wrap" id="potWrap">
+        <div class="pot-title">Pot value over time</div>
+        <div id="potSvg"></div>
+        <div class="pot-leg" id="potLeg"></div>
+      </div>
     </div>
     <div id="marker" style="display:none;"><div class="pin"></div><div class="tag" id="markerTag">Your plan</div></div>
   </div>
@@ -193,6 +207,7 @@
   let sweepBase = null;        // first-of-current-month; anchors the retire-date slider to the frontier sweep
   let bdOpen = false;          // £ breakdown popover open?
   let catLabel = {};           // bill category_code -> friendly name
+  let potTimer = null, potRenderedKey = null;   // debounce for the pot-value mini chart
   let mode = 'joint';          // 'joint' | 'p1' (Graham) | 'p2' (Julie)
   const modeName = () => mode === 'p1' ? p1Name : (mode === 'p2' ? p2Name : 'Joint');
   const isIndiv = () => mode === 'p1' || mode === 'p2';
@@ -443,10 +458,72 @@
     else if (area) { ax = baseX + area.left + area.width / 2; ay = baseY + area.top + 20; }
     else { ax = 60; ay = 60; }
     positionBreakdown(ax, ay);
+    schedulePotChart(Number(document.getElementById('dateTest').value), Number(document.getElementById('spendTest').value));
   }
-  function openBreakdown() { bdOpen = true; document.getElementById('breakdown').style.display = 'block'; placeOverlays(); }
+  function openBreakdown() { bdOpen = true; document.getElementById('breakdown').style.display = 'block';
+    potRenderedKey = null;
+    const mo = Number(document.getElementById('dateTest').value), sp = Number(document.getElementById('spendTest').value);
+    renderPotChart(mo, sp); potRenderedKey = mo + '|' + sp;
+    placeOverlays(); }
   function closeBreakdown() { bdOpen = false; document.getElementById('breakdown').style.display = 'none'; }
   function toggleBreakdown(e) { if (e) e.stopPropagation(); if (bdOpen) closeBreakdown(); else openBreakdown(); }
+
+  // ---- pot-value mini chart (runs one engine drawdown for the current date + spend) ----
+  const POT_COMB = 'var(--accent)', POT_G = '#6ea8fe', POT_J = '#c58bf2';
+  function potTrajectory(monthOffset, spendPct) {
+    if (!data || !savedBase) return null;
+    try {
+      const base = baseFor(dateFromMonths(monthOffset));
+      const cfg = {
+        pots: base.pots, potsAtOwnRetire: base.own, gRatio: savedBase.gRatio,
+        spendRed: spendPct / 100, startYear: base.startYr, retirementDate: base.pl.retirementDate,
+        retireByMember: base.pl.retireByMember, savingsFundBills: savedBase.savingsFundBills,
+        withdrawalMethod: savedBase.withdrawalMethod, crystallisationDate: savedBase.crystallisationDate,
+        ufplsDivertTf: savedBase.ufplsDivertTf, sp: base.sp
+      };
+      const rows = PensionEngine.drawdown(data, cfg) || [];
+      if (!rows.length) return null;
+      return rows.map(r => ({ year: r.year, g: Math.max(0, r.g_closing || 0), j: Math.max(0, r.j_closing || 0), c: Math.max(0, r.combinedClosing || 0) }));
+    } catch (e) { return null; }
+  }
+  function potChartSVG(series) {
+    const W = 276, H = 110, padL = 6, padR = 8, padT = 10, padB = 16;
+    const x0 = padL, x1 = W - padR, yb = H - padB, yt = padT;
+    const minYr = series[0].year, maxYr = series[series.length - 1].year;
+    const maxV = Math.max(1, ...series.map(s => s.c));
+    const sx = (yr) => x0 + (maxYr === minYr ? 0 : (yr - minYr) / (maxYr - minYr)) * (x1 - x0);
+    const sy = (v) => yb - (v / maxV) * (yb - yt);
+    const line = (key, col, w) => {
+      const d = series.map((s, i) => (i ? 'L' : 'M') + sx(s.year).toFixed(1) + ' ' + sy(s[key]).toFixed(1)).join(' ');
+      return '<path d="' + d + '" style="fill:none;stroke:' + col + ';stroke-width:' + w + '" stroke-linejoin="round" stroke-linecap="round"/>';
+    };
+    let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">';
+    svg += '<line x1="' + x0 + '" y1="' + yb + '" x2="' + x1 + '" y2="' + yb + '" style="stroke:var(--panelborder);stroke-width:1"/>';
+    if (p2Name) svg += line('j', POT_J, 1.6);
+    svg += line('g', POT_G, 1.6) + line('c', POT_COMB, 2.4);
+    svg += '<text x="' + x0 + '" y="' + (yt + 1) + '" font-size="8.5" style="fill:var(--sub)">' + gbp(maxV) + '</text>';
+    svg += '<text x="' + x0 + '" y="' + (H - 4) + '" font-size="8.5" style="fill:var(--sub)">' + minYr + '</text>';
+    svg += '<text x="' + x1 + '" y="' + (H - 4) + '" font-size="8.5" text-anchor="end" style="fill:var(--sub)">' + maxYr + '</text>';
+    return svg + '</svg>';
+  }
+  function renderPotChart(monthOffset, spendPct) {
+    const svgBox = document.getElementById('potSvg'), leg = document.getElementById('potLeg');
+    const series = potTrajectory(monthOffset, spendPct);
+    if (!series || series.length < 2) { svgBox.innerHTML = '<div class="pot-msg">Pot projection unavailable</div>'; leg.innerHTML = ''; return; }
+    svgBox.innerHTML = potChartSVG(series);
+    leg.innerHTML = '<span><i style="background:' + POT_COMB + '"></i>Combined</span>'
+      + '<span><i style="background:' + POT_G + '"></i>' + esc(p1Name || 'Graham') + '</span>'
+      + (p2Name ? '<span><i style="background:' + POT_J + '"></i>' + esc(p2Name) + '</span>' : '');
+  }
+  function schedulePotChart(monthOffset, spendPct) {
+    if (potTimer) clearTimeout(potTimer);
+    potTimer = setTimeout(() => {
+      const key = monthOffset + '|' + spendPct;
+      if (key === potRenderedKey) return;
+      potRenderedKey = key;
+      renderPotChart(monthOffset, spendPct);
+    }, 170);
+  }
 
   function draw() {
     if (!chartsReady || !frontier.length) return;
