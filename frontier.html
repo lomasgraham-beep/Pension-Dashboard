@@ -87,33 +87,49 @@
   /* tap-for-breakdown hint + the £ breakdown popover */
   .bd-hint { color:var(--sub); font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent; padding:0 3px; user-select:none; }
   .bd-hint:hover { color:var(--accent); }
-  #breakdown { position:absolute; z-index:8; width:566px; max-width:88vw; background:var(--panel);
-               border:1px solid var(--panelborder); border-radius:10px; box-shadow:var(--shadow);
-               padding:9px 11px 10px; font-size:12px; color:var(--ink); }
-  .bd-cols { display:flex; gap:14px; align-items:flex-start; }
-  .bd-left { flex:1 1 auto; min-width:0; max-height:58vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
-  .bd-head { font-weight:700; font-size:12.5px; margin:0 22px 6px 0; }
-  .bd-close { position:absolute; top:5px; right:7px; width:24px; height:24px; border:0; background:transparent;
-              color:var(--sub); font-size:17px; line-height:1; cursor:pointer; border-radius:6px; }
+  #breakdown { position:absolute; z-index:8; width:640px; max-width:92vw; background:var(--panel);
+               border:1px solid var(--panelborder); border-radius:12px;
+               box-shadow:0 10px 30px rgba(0,0,0,.28), 0 2px 8px rgba(0,0,0,.18);
+               padding:0; font-size:12px; color:var(--ink); overflow:hidden; }
+  .bd-topbar { display:flex; align-items:center; gap:8px; padding:9px 12px 8px;
+               border-bottom:2px solid var(--accent); }
+  .bd-head { font-weight:700; font-size:13px; }
+  .bd-pill { font-size:11px; font-weight:700; color:#fff; background:var(--accent);
+             border-radius:999px; padding:1px 9px; letter-spacing:.2px; }
+  .bd-summary { padding:7px 12px; font-size:11.5px; color:var(--sub);
+                background:rgba(127,170,180,.10); border-bottom:1px solid var(--panelborder); }
+  .bd-summary b { color:var(--accent); font-weight:700; }
+  .bd-summary .pl { color:var(--ink); font-weight:600; }
+  .bd-body { padding:8px 12px 11px; }
+  .bd-cols { display:flex; gap:15px; align-items:flex-start; }
+  .bd-left { flex:1 1 auto; min-width:0; max-height:56vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .bd-close { position:absolute; top:6px; right:9px; width:26px; height:26px; border:0; background:transparent;
+              color:var(--sub); font-size:18px; line-height:1; cursor:pointer; border-radius:7px; z-index:2; }
   .bd-close:active { background:var(--panelborder); }
-  .bd-tbl { width:100%; border-collapse:collapse; }
-  .bd-tbl th { text-align:right; font-weight:600; color:var(--sub); font-size:10.5px; padding:2px 0 3px; border-bottom:1px solid var(--panelborder); }
+  .bd-tbl { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+  .bd-tbl th { text-align:right; font-weight:600; color:var(--sub); font-size:10px; text-transform:uppercase;
+               letter-spacing:.4px; padding:2px 0 4px; border-bottom:1px solid var(--panelborder); }
   .bd-tbl th:first-child { text-align:left; }
-  .bd-tbl td { padding:2px 0; text-align:right; white-space:nowrap; }
-  .bd-tbl td:first-child { text-align:left; padding-right:8px; white-space:normal; }
-  .bd-cut { color:var(--risk); font-weight:700; }
+  .bd-tbl td { padding:3px 0; text-align:right; white-space:nowrap; }
+  .bd-tbl td:first-child { text-align:left; padding-right:8px; white-space:normal; line-height:1.15; }
+  .bd-tbl tbody tr:nth-child(odd) td { background:rgba(127,127,127,.055); }
+  .bd-chg { padding-left:10px; }
+  .bd-chg .bd-cut { color:var(--risk); font-weight:700; display:block; }
+  .bd-bartrack { width:46px; height:3px; border-radius:2px; background:rgba(127,127,127,.16);
+                 display:inline-block; margin-top:2px; vertical-align:middle; overflow:hidden; }
+  .bd-bar { height:100%; background:var(--risk); border-radius:2px; }
   .bd-fixed { color:var(--sub); font-weight:400; }
-  .bd-tot td { border-top:1px solid var(--panelborder); padding-top:4px; font-weight:700; }
+  .bd-tot td { border-top:2px solid var(--panelborder); padding-top:5px; font-weight:700; background:rgba(127,170,180,.12); }
   .bd-save { color:var(--accent); }
-  .bd-note { color:var(--sub); font-size:10.5px; margin-top:6px; line-height:1.35; }
+  .bd-note { color:var(--sub); font-size:10px; margin-top:7px; line-height:1.35; }
   /* pot-value mini chart — right-hand column of the breakdown card */
-  .pot-wrap { flex:0 0 232px; border-left:1px solid var(--panelborder); padding-left:13px; }
-  .pot-title { font-size:10.5px; color:var(--sub); font-weight:600; margin-bottom:3px; }
-  #potSvg { height:132px; }
+  .pot-wrap { flex:0 0 300px; border-left:1px solid var(--panelborder); padding-left:14px; align-self:stretch; }
+  .pot-title { font-size:10.5px; color:var(--sub); font-weight:600; margin-bottom:4px; }
+  #potSvg { height:172px; }
   #potSvg svg { width:100%; height:100%; display:block; }
-  .pot-leg { display:flex; gap:11px; margin-top:4px; font-size:10px; color:var(--sub); }
+  .pot-leg { display:flex; gap:12px; margin-top:5px; font-size:10px; color:var(--sub); }
   .pot-leg span { display:inline-flex; align-items:center; gap:4px; }
-  .pot-leg i { width:10px; height:3px; border-radius:2px; display:inline-block; }
+  .pot-leg i { width:11px; height:3px; border-radius:2px; display:inline-block; }
   .pot-msg { font-size:10.5px; color:var(--sub); padding:44px 0; text-align:center; }
   /* true/false switch to decouple the retire date from the spend */
   .switch { position:relative; display:inline-block; width:44px; height:26px; flex:none; }
@@ -142,7 +158,7 @@
 
   <div class="head">
     <div class="hrow">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front18)</span></span>
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front19)</span></span>
       <div class="seg" id="seg">
         <button type="button" class="seg-btn active" data-mode="joint">Joint</button>
         <button type="button" class="seg-btn" data-mode="p1" id="segP1">Graham</button>
@@ -182,13 +198,16 @@
     <div id="crossDot" style="display:none;"><div class="ctag" id="crossTag"></div></div>
     <div id="breakdown" style="display:none;">
       <button type="button" class="bd-close" id="bdClose" aria-label="Close">&times;</button>
-      <div class="bd-head" id="bdHead"></div>
-      <div class="bd-cols">
-        <div class="bd-left" id="bdBody"></div>
-        <div class="pot-wrap" id="potWrap">
-          <div class="pot-title">Pot value over time</div>
-          <div id="potSvg"></div>
-          <div class="pot-leg" id="potLeg"></div>
+      <div class="bd-topbar"><span class="bd-head" id="bdHead">Spending plan</span><span class="bd-pill" id="bdPill"></span></div>
+      <div class="bd-summary" id="bdSummary"></div>
+      <div class="bd-body">
+        <div class="bd-cols">
+          <div class="bd-left" id="bdBody"></div>
+          <div class="pot-wrap" id="potWrap">
+            <div class="pot-title">Pot value over time</div>
+            <div id="potSvg"></div>
+            <div class="pot-leg" id="potLeg"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -393,6 +412,18 @@
   // the spend slider only when flagged spend_reduction; dining and holidays always scale; everything
   // else is fixed. Figures are per-year, in today's money (pre-inflation, pre age-taper).
   const gbp = (n) => '\u00A3' + Math.round(n).toLocaleString('en-GB');
+  const kGBP = (n) => {                       // compact axis money: £0, £120k, £1.2M
+    const a = Math.abs(n);
+    if (a >= 1e6) return '\u00A3' + (n / 1e6).toFixed(a >= 1e7 ? 0 : 1).replace(/\.0$/, '') + 'M';
+    if (a >= 1e3) return '\u00A3' + Math.round(n / 1e3) + 'k';
+    return '\u00A3' + Math.round(n);
+  };
+  function niceMax(v) {                        // round a max up to a clean axis value
+    if (v <= 0) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(v))), n = v / p;
+    const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10;
+    return step * p;
+  }
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function billEffAnnual(b) {
     const full = Number(b.total_annual) || 0;
@@ -427,16 +458,27 @@
   }
   function renderBreakdown(spendPct) {
     const bd = spendBreakdown(spendPct);
-    document.getElementById('bdHead').innerHTML = 'Spending plan at <b>' + spendPct + '%</b>';
+    document.getElementById('bdPill').textContent = spendPct + '%';
+    const savePct = bd.total.full > 0 ? Math.round(bd.total.cut / bd.total.full * 100) : 0;
+    document.getElementById('bdSummary').innerHTML =
+      'Save <b>' + gbp(bd.total.cut) + '</b> \u00B7 ' + savePct + '% of plan \u00B7 '
+      + '<span class="pl">' + gbp(bd.total.full) + '</span> \u2192 <span class="pl">' + gbp(bd.total.reduced) + '</span>/yr';
+    const maxCut = Math.max(1, ...bd.rows.map(r => r.cut));
     let html = '<table class="bd-tbl"><thead><tr><th>Category</th><th>Plan</th><th>At ' + spendPct + '%</th><th>Change</th></tr></thead><tbody>';
     bd.rows.forEach((r) => {
-      const change = (r.cut > 0.5)
-        ? '<span class="bd-cut">&minus;' + gbp(r.cut) + '</span>'
-        : '<span class="bd-fixed">fixed</span>';
-      html += '<tr><td>' + esc(r.label) + '</td><td>' + gbp(r.full) + '</td><td>' + gbp(r.reduced) + '</td><td>' + change + '</td></tr>';
+      let change;
+      if (r.cut > 0.5) {
+        const w = Math.max(6, Math.round(r.cut / maxCut * 100));
+        change = '<span class="bd-cut">&minus;' + gbp(r.cut) + '</span>'
+               + '<span class="bd-bartrack"><span class="bd-bar" style="width:' + w + '%"></span></span>';
+      } else {
+        change = '<span class="bd-fixed">fixed</span>';
+      }
+      html += '<tr><td>' + esc(r.label) + '</td><td>' + gbp(r.full) + '</td><td>' + gbp(r.reduced)
+            + '</td><td class="bd-chg">' + change + '</td></tr>';
     });
     html += '</tbody><tfoot><tr class="bd-tot"><td>Total</td><td>' + gbp(bd.total.full) + '</td><td>' + gbp(bd.total.reduced)
-          + '</td><td class="bd-save">&minus;' + gbp(bd.total.cut) + '</td></tr></tfoot></table>'
+          + '</td><td class="bd-chg bd-save">&minus;' + gbp(bd.total.cut) + '</td></tr></tfoot></table>'
           + '<div class="bd-note">Per year, in today\u2019s money. Fixed essentials don\u2019t move with the slider.</div>';
     document.getElementById('bdBody').innerHTML = html;
   }
@@ -491,23 +533,51 @@
     } catch (e) { return null; }
   }
   function potChartSVG(series) {
-    const W = 276, H = 110, padL = 6, padR = 8, padT = 10, padB = 16;
+    const W = 300, H = 172, padL = 40, padR = 10, padT = 10, padB = 18;
     const x0 = padL, x1 = W - padR, yb = H - padB, yt = padT;
     const minYr = series[0].year, maxYr = series[series.length - 1].year;
-    const maxV = Math.max(1, ...series.map(s => s.c));
+    const maxV = niceMax(Math.max(1, ...series.map(s => s.c)));
     const sx = (yr) => x0 + (maxYr === minYr ? 0 : (yr - minYr) / (maxYr - minYr)) * (x1 - x0);
-    const sy = (v) => yb - (v / maxV) * (yb - yt);
-    const line = (key, col, w) => {
-      const d = series.map((s, i) => (i ? 'L' : 'M') + sx(s.year).toFixed(1) + ' ' + sy(s[key]).toFixed(1)).join(' ');
-      return '<path d="' + d + '" style="fill:none;stroke:' + col + ';stroke-width:' + w + '" stroke-linejoin="round" stroke-linecap="round"/>';
-    };
+    const sy = (v) => yb - (Math.min(v, maxV) / maxV) * (yb - yt);
+    const pts = (key) => series.map((s, i) => (i ? 'L' : 'M') + sx(s.year).toFixed(1) + ' ' + sy(s[key]).toFixed(1)).join(' ');
+    const line = (key, col, w) => '<path d="' + pts(key) + '" style="fill:none;stroke:' + col + ';stroke-width:' + w + '" stroke-linejoin="round" stroke-linecap="round"/>';
+
     let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">';
-    svg += '<line x1="' + x0 + '" y1="' + yb + '" x2="' + x1 + '" y2="' + yb + '" style="stroke:var(--panelborder);stroke-width:1"/>';
-    if (p2Name) svg += line('j', POT_J, 1.6);
-    svg += line('g', POT_G, 1.6) + line('c', POT_COMB, 2.4);
-    svg += '<text x="' + x0 + '" y="' + (yt + 1) + '" font-size="8.5" style="fill:var(--sub)">' + gbp(maxV) + '</text>';
-    svg += '<text x="' + x0 + '" y="' + (H - 4) + '" font-size="8.5" style="fill:var(--sub)">' + minYr + '</text>';
-    svg += '<text x="' + x1 + '" y="' + (H - 4) + '" font-size="8.5" text-anchor="end" style="fill:var(--sub)">' + maxYr + '</text>';
+    // y gridlines + compact £ labels
+    for (let t = 0; t <= 4; t++) {
+      const v = maxV * t / 4, y = sy(v);
+      svg += '<line x1="' + x0 + '" y1="' + y.toFixed(1) + '" x2="' + x1 + '" y2="' + y.toFixed(1) + '" style="stroke:var(--panelborder);stroke-width:1;opacity:' + (t === 0 ? '1' : '.45') + '"/>';
+      svg += '<text x="' + (x0 - 4) + '" y="' + (y + 3).toFixed(1) + '" font-size="8.5" text-anchor="end" style="fill:var(--sub)">' + kGBP(v) + '</text>';
+    }
+    // x ticks (years) with faint gridlines
+    const span = maxYr - minYr, nice = [1, 2, 5, 10, 20, 25, 50];
+    let step = Math.max(1, Math.round(span / 4));
+    step = nice.find(s => s >= step) || step;
+    const xs = [];
+    for (let y = minYr; y <= maxYr + 0.001; y += step) xs.push(Math.round(y));
+    while (xs.length && Math.abs(xs[xs.length - 1] - maxYr) < step * 0.5) xs.pop();
+    xs.push(maxYr);
+    xs.forEach((yr) => {
+      const xx = sx(yr);
+      svg += '<line x1="' + xx.toFixed(1) + '" y1="' + yt + '" x2="' + xx.toFixed(1) + '" y2="' + yb + '" style="stroke:var(--panelborder);stroke-width:1;opacity:.25"/>';
+      svg += '<text x="' + xx.toFixed(1) + '" y="' + (H - 5) + '" font-size="8.5" text-anchor="middle" style="fill:var(--sub)">' + yr + '</text>';
+    });
+    // soft fill under the combined line
+    svg += '<path d="' + pts('c') + ' L' + sx(maxYr).toFixed(1) + ' ' + yb.toFixed(1) + ' L' + sx(minYr).toFixed(1) + ' ' + yb.toFixed(1) + ' Z" style="fill:var(--accent);opacity:.10;stroke:none"/>';
+    // lines
+    if (p2Name) svg += line('j', POT_J, 1.5);
+    svg += line('g', POT_G, 1.5) + line('c', POT_COMB, 2.4);
+    // end marker + value
+    const last = series[series.length - 1], ex = sx(last.year), ey = sy(last.c);
+    svg += '<circle cx="' + ex.toFixed(1) + '" cy="' + ey.toFixed(1) + '" r="2.6" style="fill:var(--accent)"/>';
+    svg += '<text x="' + (ex - 4).toFixed(1) + '" y="' + (ey - 4).toFixed(1) + '" font-size="8.5" text-anchor="end" style="fill:var(--ink);font-weight:700">' + kGBP(last.c) + '</text>';
+    // runs-dry flag (combined pot hits zero before the horizon)
+    const dry = series.find(s => s.c <= 1);
+    if (dry && dry.year < maxYr) {
+      const dx = sx(dry.year);
+      svg += '<line x1="' + dx.toFixed(1) + '" y1="' + yt + '" x2="' + dx.toFixed(1) + '" y2="' + yb + '" style="stroke:var(--risk);stroke-width:1;stroke-dasharray:2 2;opacity:.85"/>';
+      svg += '<text x="' + (dx + 3).toFixed(1) + '" y="' + (yt + 8) + '" font-size="8" style="fill:var(--risk);font-weight:700">dry ' + dry.year + '</text>';
+    }
     return svg + '</svg>';
   }
   function renderPotChart(monthOffset, spendPct) {
