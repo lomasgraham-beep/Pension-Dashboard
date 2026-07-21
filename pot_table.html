@@ -48,6 +48,9 @@
   .ym { font-weight:600; }
   .pct { color:var(--accent); font-weight:700; }
   .tot { font-weight:700; }
+  .low { font-weight:600; }
+  .low.dry { color:var(--risk); }
+  .lowyr { color:var(--sub); }
   tr.planrow td { background:rgba(56,214,230,.14) !important; }
   .plantag { display:inline-block; margin-left:8px; font-size:10px; font-weight:700; color:var(--accent);
              border:1px solid var(--accent); border-radius:5px; padding:0 5px; vertical-align:middle; }
@@ -55,8 +58,8 @@
 </head>
 <body>
   <div class="head">
-    <div class="h-title">Pot at Retirement <span class="build">(build: pt1)</span></div>
-    <div class="h-sub" id="hsub">Pot value for each possible retirement month, from this month onwards. <b>Safe spend %</b> is the most you could spend at that date and still have both pots last.</div>
+    <div class="h-title">Pot at Retirement <span class="build">(build: pt2)</span></div>
+    <div class="h-sub" id="hsub">Pot value for each possible retirement month, from this month onwards. <b>Safe spend %</b> is the most you could spend at that date and still have both pots last. <b>Lowest pot</b> is the lowest the combined pot falls to during drawdown at that safe spend, and the year it happens (red if it empties).</div>
   </div>
   <span id="status" class="s-load">Loading…</span>
   <div class="wrap">
@@ -103,7 +106,7 @@
     return { pl: pl, pots: pots, own: own, startYr: retireDate.getFullYear(),
              sp: PensionEngine.baselineSP(stateNames) };
   }
-  function endPots(base, spendPct) {
+  function drawdownRows(base, spendPct) {
     const cfg = {
       pots: base.pots, potsAtOwnRetire: base.own, gRatio: savedBase.gRatio,
       spendRed: spendPct / 100, startYear: base.startYr, retirementDate: base.pl.retirementDate,
@@ -111,12 +114,22 @@
       withdrawalMethod: savedBase.withdrawalMethod, crystallisationDate: savedBase.crystallisationDate, ufplsDivertTf: savedBase.ufplsDivertTf,
       sp: base.sp
     };
-    const rows = PensionEngine.drawdown(data, cfg) || [];
+    return PensionEngine.drawdown(data, cfg) || [];
+  }
+  function endPots(base, spendPct) {
+    const rows = drawdownRows(base, spendPct);
     if (!rows.length) return null;
     const last = rows[rows.length - 1];
     return { end: last.year,
              g: (last.g_taxFree || 0) + (last.g_taxable || 0),
              j: (last.j_taxFree || 0) + (last.j_taxable || 0) };
+  }
+  // lowest the combined pot falls to during drawdown at the given spend, and the year it happens
+  function troughAt(base, spendPct) {
+    const rows = drawdownRows(base, spendPct);
+    let minV = base.pots.graham + (p2Name ? base.pots.julie : 0), minY = base.startYr;
+    rows.forEach(r => { const c = Math.max(0, r.combinedClosing || 0); if (c < minV) { minV = c; minY = r.year; } });
+    return { val: minV, year: minY };
   }
   function passes(base, spendPct) {                       // joint: household pots last
     const e = endPots(base, spendPct);
@@ -133,14 +146,17 @@
     return lo;
   }
 
-  function rowHtml(d, pct, g, j, isPlan) {
+  function rowHtml(d, pct, g, j, trough, isPlan) {
     const t = g + (p2Name ? j : 0);
+    const dry = trough.val < 1;
     return '<tr' + (isPlan ? ' class="planrow"' : '') + '>'
       + '<td class="ym">' + ymLabelD(d) + (isPlan ? '<span class="plantag">your plan</span>' : '') + '</td>'
       + '<td class="pct">' + Math.round(pct) + '%</td>'
       + '<td>' + gbp(g) + '</td>'
       + (p2Name ? '<td>' + gbp(j) + '</td>' : '')
-      + '<td class="tot">' + gbp(t) + '</td></tr>';
+      + '<td class="tot">' + gbp(t) + '</td>'
+      + '<td class="low' + (dry ? ' dry' : '') + '">' + gbp(trough.val) + '</td>'
+      + '<td class="lowyr">' + trough.year + '</td></tr>';
   }
 
   function computeTable() {
@@ -148,7 +164,7 @@
     const tbl = document.getElementById('ptbl'), tbody = document.getElementById('tbody');
     document.getElementById('phead').innerHTML =
       '<th>Retire</th><th>Safe spend %</th><th>' + esc(p1Name) + '</th>'
-      + (p2Name ? '<th>' + esc(p2Name) + '</th>' : '') + '<th>Total</th>';
+      + (p2Name ? '<th>' + esc(p2Name) + '</th>' : '') + '<th>Total</th><th>Lowest pot</th><th>Low year</th>';
     tbody.innerHTML = '';
     tbl.style.display = 'table';
 
@@ -164,8 +180,9 @@
         const d = new Date(base0.getFullYear(), base0.getMonth() + m, 1);
         const base = baseFor(d);
         const pct = maxSafeSpend(base);
+        const trough = troughAt(base, pct);
         const isPlan = !!(plan && plan.getFullYear() === d.getFullYear() && plan.getMonth() === d.getMonth());
-        html += rowHtml(d, pct, base.pots.graham, base.pots.julie, isPlan);
+        html += rowHtml(d, pct, base.pots.graham, base.pots.julie, trough, isPlan);
       }
       tbody.insertAdjacentHTML('beforeend', html);
       if (m <= total) { status.textContent = 'Computing\u2026 ' + Math.floor(m / (total + 1) * 100) + '%'; setTimeout(chunk, 0); }
