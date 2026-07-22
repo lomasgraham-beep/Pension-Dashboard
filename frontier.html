@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
   :root {
-    --accent:#1d3a63; --safe:#10b981; --risk:#ef4444;
+    --accent:#1d3a63; --safe:#10b981; --marg:#f59e0b; --risk:#ef4444;
     --ink:#2c3e50; --sub:#64748b; --line:#d3e3e3;
     --bg:#e8f0f0; --panel:#ffffff; --panelborder:#d4e4e4;
     --shadow:0 1px 3px rgba(15,52,52,0.10); --headbg:#ffffff;
@@ -118,6 +118,8 @@
   .bd-tbl tbody tr:nth-child(odd) td { background:rgba(127,127,127,.055); }
   .bd-chg { padding-left:10px; }
   .bd-chg .bd-cut { color:var(--risk); font-weight:700; display:block; }
+  .bd-chg .bd-up { color:var(--marg); font-weight:700; display:block; }
+  .bd-bar.up { background:var(--marg); }
   .bd-bartrack { width:46px; height:3px; border-radius:2px; background:rgba(127,127,127,.16);
                  display:inline-block; margin-top:2px; vertical-align:middle; overflow:hidden; }
   .bd-bar { height:100%; background:var(--risk); border-radius:2px; }
@@ -147,7 +149,7 @@
 
   @media (prefers-color-scheme: dark) {
     :root {
-      --accent:#38d6e6; --safe:#34d399; --risk:#f87171;
+      --accent:#38d6e6; --safe:#34d399; --marg:#fbbf24; --risk:#f87171;
       --ink:#e2e8f0; --sub:#94a3b8; --line:#334155;
       --bg:#0b1120; --panel:#1e293b; --panelborder:#334155;
       --shadow:0 1px 3px rgba(0,0,0,0.45); --headbg:#0f172a;
@@ -162,7 +164,7 @@
 
   <div class="head">
     <div class="hrow">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front21)</span></span>
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front22)</span></span>
       <div class="seg" id="seg">
         <button type="button" class="seg-btn active" data-mode="joint">Joint</button>
         <button type="button" class="seg-btn" data-mode="p1" id="segP1">Graham</button>
@@ -456,7 +458,7 @@
     const rows = Object.keys(cats).map((k) => {
       const c = cats[k];
       return { label: c.label, full: c.full, reduced: c.reduced, cut: c.full - c.reduced };
-    }).sort((a, b) => (b.cut - a.cut) || (b.full - a.full));
+    }).sort((a, b) => (Math.abs(b.cut) - Math.abs(a.cut)) || (b.full - a.full));
     const total = rows.reduce((t, r) => ({ full: t.full + r.full, reduced: t.reduced + r.reduced, cut: t.cut + r.cut }),
                               { full: 0, reduced: 0, cut: 0 });
     return { rows: rows, total: total };
@@ -464,26 +466,34 @@
   function renderBreakdown(spendPct) {
     const bd = spendBreakdown(spendPct);
     document.getElementById('bdPill').textContent = spendPct + '%';
-    const savePct = bd.total.full > 0 ? Math.round(bd.total.cut / bd.total.full * 100) : 0;
-    document.getElementById('bdSummary').innerHTML =
-      'Save <b>' + gbp(bd.total.cut) + '</b> \u00B7 ' + savePct + '% of plan \u00B7 '
+    const cutT = bd.total.cut;                       // +ve = saving vs plan, -ve = spending more
+    const chgPct = bd.total.full > 0 ? Math.round(Math.abs(cutT) / bd.total.full * 100) : 0;
+    document.getElementById('bdSummary').innerHTML = (cutT >= 0
+        ? 'Save <b>' + gbp(cutT) + '</b> \u00B7 ' + chgPct + '% of plan \u00B7 '
+        : 'Spend <b>' + gbp(-cutT) + ' more</b> \u00B7 +' + chgPct + '% of plan \u00B7 ')
       + '<span class="pl">' + gbp(bd.total.full) + '</span> \u2192 <span class="pl">' + gbp(bd.total.reduced) + '</span>/yr';
-    const maxCut = Math.max(1, ...bd.rows.map(r => r.cut));
+    const maxAbs = Math.max(1, ...bd.rows.map(r => Math.abs(r.cut)));
     let html = '<table class="bd-tbl"><thead><tr><th>Category</th><th>Plan</th><th>At ' + spendPct + '%</th><th>Change</th></tr></thead><tbody>';
     bd.rows.forEach((r) => {
       let change;
-      if (r.cut > 0.5) {
-        const w = Math.max(6, Math.round(r.cut / maxCut * 100));
+      if (r.cut > 0.5) {          // reduced vs plan
+        const w = Math.max(6, Math.round(r.cut / maxAbs * 100));
         change = '<span class="bd-cut">&minus;' + gbp(r.cut) + '</span>'
                + '<span class="bd-bartrack"><span class="bd-bar" style="width:' + w + '%"></span></span>';
+      } else if (r.cut < -0.5) {  // increased vs plan (spend above 100%)
+        const w = Math.max(6, Math.round(-r.cut / maxAbs * 100));
+        change = '<span class="bd-up">+' + gbp(-r.cut) + '</span>'
+               + '<span class="bd-bartrack"><span class="bd-bar up" style="width:' + w + '%"></span></span>';
       } else {
         change = '<span class="bd-fixed">fixed</span>';
       }
       html += '<tr><td>' + esc(r.label) + '</td><td>' + gbp(r.full) + '</td><td>' + gbp(r.reduced)
             + '</td><td class="bd-chg">' + change + '</td></tr>';
     });
+    const totChange = (Math.abs(cutT) <= 0.5) ? '\u2014'
+      : (cutT > 0 ? '&minus;' + gbp(cutT) : '<span class="bd-up">+' + gbp(-cutT) + '</span>');
     html += '</tbody><tfoot><tr class="bd-tot"><td>Total</td><td>' + gbp(bd.total.full) + '</td><td>' + gbp(bd.total.reduced)
-          + '</td><td class="bd-chg bd-save">&minus;' + gbp(bd.total.cut) + '</td></tr></tfoot></table>'
+          + '</td><td class="bd-chg bd-save">' + totChange + '</td></tr></tfoot></table>'
           + '<div class="bd-note">Per year, in today\u2019s money. Fixed essentials don\u2019t move with the slider.</div>';
     document.getElementById('bdBody').innerHTML = html;
   }
