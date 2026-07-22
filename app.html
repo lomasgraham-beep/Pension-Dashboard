@@ -22,14 +22,16 @@
       --ink-soft:#64748b;          /* secondary text */
       --line:#e2e8f0;              /* hairlines */
       --line-strong:#cbd5e1;
-      --shadow:0 1px 3px rgba(20,40,50,0.06), 0 4px 12px rgba(20,40,50,0.05);
-      --radius:10px;
+      --shadow:0 1px 2px rgba(20,40,50,0.05), 0 6px 16px rgba(20,40,50,0.07);
+      --shadow-hover:0 4px 10px rgba(20,40,50,0.08), 0 10px 26px rgba(20,40,50,0.10);
+      --radius:12px;
+      --radius-sm:8px;
       --pos:#2f8f5b; --neg:#c0392b; --warn:#e67e22; --bills:#c0392b;
     }
     * { box-sizing:border-box; }
     body { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding:20px; background:var(--page); color:var(--ink); }
-    .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
-    .topbar h1 { margin:0; font-size:22px; color:var(--ink); letter-spacing:-0.01em; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+    .topbar h1 { margin:0; font-size:23px; font-weight:700; color:var(--ink); letter-spacing:-0.015em; }
     .right { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
     .view-toggle { background:var(--surface); border-radius:8px; overflow:hidden; display:flex; border:1px solid var(--line-strong); box-shadow:var(--shadow); }
     .btn-toggle { background:transparent; border:none; padding:9px 16px; font-weight:600; cursor:pointer; color:var(--ink-soft); font-size:13px; transition:background .12s,color .12s; }
@@ -51,19 +53,21 @@
     /* responsive shell: horizontal top-bar nav at all widths above phone (sticky on scroll);
        phone (<=600px) swaps the strip for the dropdown selector further down. */
     .shell { display:block; }
-    .tab-buttons { display:flex; flex-wrap:wrap; gap:4px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius) var(--radius) 0 0; padding:6px 6px 0; box-shadow:var(--shadow); position:sticky; top:0; z-index:60; }
-    .tab-buttons button { background:transparent; border:none; cursor:pointer; padding:13px 16px; font-size:15px; font-weight:600; color:var(--ink-soft); border-radius:8px 8px 0 0; transition:background .12s,color .12s; }
-    .tab-buttons button:hover { background:var(--accent-soft); color:var(--accent-dark); }
-    .tab-buttons button.active-btn { background:var(--accent-soft); border-bottom:3px solid var(--accent); color:var(--accent-dark); }
+    .tab-buttons { display:flex; flex-wrap:wrap; gap:2px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius) var(--radius) 0 0; padding:8px 8px 0; box-shadow:var(--shadow); position:sticky; top:0; z-index:60; }
+    .tab-buttons button { background:transparent; border:none; cursor:pointer; padding:13px 18px; font-size:14.5px; font-weight:600; color:var(--ink-soft); border-radius:8px 8px 0 0; transition:background .15s,color .15s; position:relative; }
+    .tab-buttons button:hover { background:var(--surface-2); color:var(--ink); }
+    .tab-buttons button.active-btn { background:var(--accent-soft); color:var(--accent-dark); font-weight:700; }
+    .tab-buttons button.active-btn::after { content:''; position:absolute; left:10px; right:10px; bottom:-1px; height:3px; border-radius:3px 3px 0 0; background:var(--accent); }
     .tabcontent { display:none; padding:22px; background:var(--surface); border:1px solid var(--line); border-top:none; border-radius:0 0 var(--radius) var(--radius); box-shadow:var(--shadow); }
     .tabcontent.active { display:block; }
-    h2 { color:var(--ink); margin-top:0; padding-bottom:6px; border-bottom:2px solid var(--line); font-weight:700; }
+    h2 { color:var(--ink); margin-top:0; padding-bottom:8px; border-bottom:2px solid var(--line); font-weight:700; font-size:19px; letter-spacing:-0.005em; }
 
     .card-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:15px; margin-bottom:10px; }
-    .card { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:18px 15px; text-align:center; }
+    .card { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:18px 15px; text-align:center; transition:box-shadow .15s,border-color .15s; }
+    .card:hover { box-shadow:var(--shadow-hover); border-color:var(--line-strong); }
     .card.hl { background:var(--accent-soft); border-color:var(--accent-border); }
-    .card h3 { margin:0 0 8px; font-size:12px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; }
-    .card .value { font-size:24px; font-weight:700; color:var(--ink); }
+    .card h3 { margin:0 0 8px; font-size:11.5px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; font-weight:700; }
+    .card .value { font-size:25px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; }
     .card.hl .value { color:var(--accent-dark); }
     /* Overview pension-performance blocks (one card per measure, a row per pension) */
     .perf-member { margin:26px 0 4px; font-size:20px; color:var(--ink); font-weight:700; }
@@ -173,20 +177,22 @@
       .ov-path-top { grid-template-columns:1fr; }
     }
 
+    .chart-wrap { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:14px 6px 4px; }
+    .chart-wrap .chart-box { margin-bottom:6px; }
     .chart-box { width:100%; height:400px; margin-bottom:20px; }
     .chart-error { display:flex; align-items:flex-start; gap:10px; min-height:160px; padding:16px 18px; border:1px solid var(--line); border-left:4px solid var(--warn); border-radius:var(--radius); background:var(--surface-2); color:var(--ink); font-size:14px; line-height:1.45; }
     .chart-error strong { display:block; margin-bottom:4px; color:var(--ink); }
     .chart-error .chart-error-icon { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:var(--warn); color:#fff; font-weight:700; }
     .chart-error code { font-size:12px; color:var(--ink-soft); white-space:normal; word-break:break-word; }
     /* Custom two-row wrapping legend under charts (replaces google's paginating legend) */
-    .cx-legend { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:4px 12px; padding:6px 40px 10px; font-size:12px; color:var(--ink); max-height:calc(1.4em * 2 + 12px); overflow:hidden; margin:-14px 0 12px; }
+    .cx-legend { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:6px 14px; padding:6px 40px 10px; font-size:12px; color:var(--ink); font-weight:600; max-height:calc(1.4em * 2 + 12px); overflow:hidden; margin:-6px 0 4px; }
     .cx-legend .cx-item { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; line-height:1.35; }
     .cx-legend .cx-swatch { display:inline-block; width:12px; height:12px; border-radius:2px; flex:0 0 auto; }
     .cx-legend .cx-swatch.line { height:3px; border-radius:2px; }
-    .chart-wrap { position:relative; }
+    .chart-wrap { position:relative; margin-bottom:20px; }
     .chart-fs-btn { position:absolute; top:8px; right:8px; z-index:6; display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; padding:0; border:1px solid var(--line-strong); border-radius:8px; background:var(--surface); color:var(--ink-soft); cursor:pointer; opacity:0.8; box-shadow:var(--shadow); }
     .chart-fs-btn:hover { opacity:1; color:var(--accent); border-color:var(--accent-border); }
-    .chart-wrap.fs { position:fixed; inset:0; z-index:10000; margin:0; padding:12px 12px 16px; background:var(--surface); overflow:auto; }
+    .chart-wrap.fs { position:fixed; inset:0; z-index:10000; margin:0; padding:12px 12px 16px; background:var(--surface); border:none; border-radius:0; overflow:auto; }
     .chart-wrap.fs .chart-box { height:calc(var(--fs-h, 100vh) - 28px); margin:0; }
     .chart-wrap.fs .chart-fs-btn { position:fixed; top:14px; right:18px; width:44px; height:44px; opacity:1; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
@@ -223,8 +229,8 @@
     .subtab-buttons { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:15px; border-bottom:2px solid var(--line); padding-bottom:10px; position:sticky; top:var(--topnav-h, 52px); z-index:55; background:var(--surface); padding-top:8px; box-shadow:0 4px 5px -4px rgba(0,0,0,0.12); }
     .subtab-group-label { flex-basis:100%; width:100%; margin:6px 0 0; font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-soft); }
     .subtab-group-label:first-child { margin-top:0; }
-    .subtab-link { background:var(--surface-2); border:1px solid var(--line-strong); color:var(--ink-soft); padding:9px 16px; border-radius:8px; font-weight:600; cursor:pointer; font-size:14px; transition:background .12s,color .12s; }
-    .subtab-link:hover { background:var(--accent-soft); }
+    .subtab-link { background:var(--surface); border:1px solid var(--line-strong); color:var(--ink-soft); padding:9px 16px; border-radius:20px; font-weight:600; cursor:pointer; font-size:13.5px; transition:background .12s,color .12s,border-color .12s; }
+    .subtab-link:hover { background:var(--accent-soft); border-color:var(--accent-border); color:var(--accent-dark); }
     .subtab-link.active-sub { background:var(--accent); color:#fff; border-color:var(--accent); }
     .subtabcontent { display:none; }
     .subtabcontent[style*="block"] { display:block; }
@@ -242,8 +248,8 @@
        .tab-buttons rules above already give the strip; it is sticky so it stays
        reachable while scrolling long tables/charts on iPad and desktop. */
     .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
-    .params { background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:16px 18px; margin:0 0 14px; }
-    .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:18px 26px; }
+    .params { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius-sm); padding:18px 20px; margin:0 0 14px; }
+    .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:20px 26px; }
     @media (min-width: 1000px) { .params .grid { grid-template-columns:repeat(3, 1fr); } }
     /* Wide screens: Modelling controls become a fixed left rail, charts fill the right and rise to top */
     @media (min-width: 1300px) {
@@ -264,12 +270,12 @@
     /* below the rail breakpoint, the collapse controls are irrelevant (stacked layout) */
     @media (max-width: 1299px) { .rail-collapse, .rail-strip { display:none !important; } }
     .params .ctrl-wide { grid-column:1 / -1; }
-    .params label { display:block; font-weight:bold; font-size:14px; color:var(--ink); margin-bottom:8px; }
+    .params label { display:block; font-weight:700; font-size:13.5px; color:var(--ink); margin-bottom:9px; letter-spacing:0.005em; }
     .params .ctrl { display:flex; flex-direction:column; }
     .params .ctrl > label { min-height:2.6em; }   /* reserve 2 lines so sliders align even when a label wraps */
     .params .ctrl > label.switch { min-height:0; }
     .params .sv { color:var(--accent); font-weight:bold; font-size:15px; }
-    .params .hint { font-size:12px; color:#94a3b8; margin-top:4px; }
+    .params .hint { font-size:12px; color:var(--ink-soft); margin-top:5px; line-height:1.4; }
 
     /* ---- Rail containment ----
        .ctrl is a flex column and .grid is a grid; flex/grid children default to
@@ -359,7 +365,8 @@
     .sw-on { color:var(--pos); } .sw-off { color:var(--warn); }
 
     .params .actions { margin-top:18px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-    .params .pbtn { padding:13px 22px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:15px; color:#fff; }
+    .params .pbtn { padding:13px 22px; border:none; border-radius:var(--radius-sm); font-weight:700; cursor:pointer; font-size:15px; color:#fff; transition:filter .12s,transform .05s; }
+    .params .pbtn:active { transform:translateY(1px); }
     .pbtn-save { background:#27ae60; } .pbtn-save:hover { background:#219150; }
     .pbtn-reset { background:#64748b; } .pbtn-reset:hover { background:#475569; }
     .pbtn-mss { background:var(--accent); } .pbtn-mss:hover { filter:brightness(0.92); }
