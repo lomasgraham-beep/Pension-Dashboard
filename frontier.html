@@ -90,7 +90,7 @@
   /* tap-for-breakdown hint + the £ breakdown popover */
   .bd-hint { color:var(--sub); font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent; padding:0 3px; user-select:none; }
   .bd-hint:hover { color:var(--accent); }
-  #breakdown { position:absolute; z-index:8; width:640px; max-width:92vw; background:var(--panel);
+  #breakdown { position:absolute; z-index:8; width:672px; max-width:92vw; background:var(--panel);
                border:1px solid var(--panelborder); border-radius:12px;
                box-shadow:0 10px 30px rgba(0,0,0,.28), 0 2px 8px rgba(0,0,0,.18);
                padding:0; font-size:12px; color:var(--ink); overflow:hidden; }
@@ -109,22 +109,24 @@
   .bd-close { position:absolute; top:6px; right:9px; width:26px; height:26px; border:0; background:transparent;
               color:var(--sub); font-size:18px; line-height:1; cursor:pointer; border-radius:7px; z-index:2; }
   .bd-close:active { background:var(--panelborder); }
-  .bd-tbl { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+  .bd-tbl { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; table-layout:fixed; }
   .bd-tbl th { text-align:right; font-weight:600; color:var(--sub); font-size:10px; text-transform:uppercase;
-               letter-spacing:.4px; padding:2px 0 4px; border-bottom:1px solid var(--panelborder); }
-  .bd-tbl th:first-child { text-align:left; }
-  .bd-tbl td { padding:3px 0; text-align:right; white-space:nowrap; }
-  .bd-tbl td:first-child { text-align:left; padding-right:8px; white-space:normal; line-height:1.15; }
+               letter-spacing:.4px; padding:2px 0 5px 14px; border-bottom:1px solid var(--panelborder); }
+  .bd-tbl th:first-child { text-align:left; padding-left:0; }
+  .bd-tbl td { padding:4px 0 4px 14px; text-align:right; white-space:nowrap; }
+  .bd-tbl td:first-child { text-align:left; padding-left:0; padding-right:10px; white-space:normal; line-height:1.2;
+                           overflow-wrap:anywhere; }
+  /* fixed column widths stop the figures colliding when a name wraps */
+  .bd-tbl col.c-cat { width:44%; } .bd-tbl col.c-num { width:17%; } .bd-tbl col.c-chg { width:22%; }
   .bd-tbl tbody tr:nth-child(odd) td { background:rgba(127,127,127,.055); }
-  .bd-chg { padding-left:10px; }
   .bd-chg .bd-cut { color:var(--risk); font-weight:700; display:block; }
   .bd-chg .bd-up { color:var(--marg); font-weight:700; display:block; }
   .bd-bar.up { background:var(--marg); }
-  .bd-bartrack { width:46px; height:3px; border-radius:2px; background:rgba(127,127,127,.16);
-                 display:inline-block; margin-top:2px; vertical-align:middle; overflow:hidden; }
+  .bd-bartrack { width:100%; max-width:64px; height:3px; border-radius:2px; background:rgba(127,127,127,.16);
+                 display:inline-block; margin-top:3px; vertical-align:middle; overflow:hidden; }
   .bd-bar { height:100%; background:var(--risk); border-radius:2px; }
   .bd-fixed { color:var(--sub); font-weight:400; }
-  .bd-tot td { border-top:2px solid var(--panelborder); padding-top:5px; font-weight:700; background:rgba(127,170,180,.12); }
+  .bd-tot td { border-top:2px solid var(--panelborder); padding-top:6px; font-weight:700; background:rgba(127,170,180,.12); }
   .bd-save { color:var(--accent); }
   .bd-note { color:var(--sub); font-size:10px; margin-top:7px; line-height:1.35; }
   /* pot-value mini chart — right-hand column of the breakdown card */
@@ -164,7 +166,7 @@
 
   <div class="head">
     <div class="hrow">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front22)</span></span>
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front23)</span></span>
       <div class="seg" id="seg">
         <button type="button" class="seg-btn active" data-mode="joint">Joint</button>
         <button type="button" class="seg-btn" data-mode="p1" id="segP1">Graham</button>
@@ -473,7 +475,8 @@
         : 'Spend <b>' + gbp(-cutT) + ' more</b> \u00B7 +' + chgPct + '% of plan \u00B7 ')
       + '<span class="pl">' + gbp(bd.total.full) + '</span> \u2192 <span class="pl">' + gbp(bd.total.reduced) + '</span>/yr';
     const maxAbs = Math.max(1, ...bd.rows.map(r => Math.abs(r.cut)));
-    let html = '<table class="bd-tbl"><thead><tr><th>Category</th><th>Plan</th><th>At ' + spendPct + '%</th><th>Change</th></tr></thead><tbody>';
+    let html = '<table class="bd-tbl"><colgroup><col class="c-cat"><col class="c-num"><col class="c-num"><col class="c-chg"></colgroup>'
+             + '<thead><tr><th>Category</th><th>Plan</th><th>At ' + spendPct + '%</th><th>Change</th></tr></thead><tbody>';
     bd.rows.forEach((r) => {
       let change;
       if (r.cut > 0.5) {          // reduced vs plan
@@ -592,14 +595,16 @@
       const back = band.lo.slice().reverse().map(s => 'L' + sx(s.year).toFixed(1) + ' ' + sy(s.c).toFixed(1)).join(' ');
       svg += '<path d="' + bp(band.hi) + ' ' + back + ' Z" style="fill:var(--accent);opacity:.13;stroke:none"/>';
     }
-    // lean-years shading: the contiguous run of years around the trough where the pot sits near its floor
+    // lean-years shading: a genuine localised dip only — never the whole tail
     const troughIdx = series.reduce((mi, s, i) => (s.c < series[mi].c ? i : mi), 0);
     const trough = series[troughIdx];
     const nearFloor = Math.max(trough.c * 1.25, trough.c + maxV * 0.04);
     let li = troughIdx, ri = troughIdx;
     while (li > 0 && series[li - 1].c <= nearFloor) li--;
     while (ri < series.length - 1 && series[ri + 1].c <= nearFloor) ri++;
-    if (ri > li && trough.year > minYr && trough.year < maxYr) {
+    const runFrac = (ri - li) / Math.max(1, series.length - 1);
+    const reachesEnd = ri >= series.length - 1;
+    if (ri > li && runFrac <= 0.45 && !reachesEnd && trough.year > minYr) {
       svg += '<rect x="' + sx(series[li].year).toFixed(1) + '" y="' + yt + '" width="'
            + (sx(series[ri].year) - sx(series[li].year)).toFixed(1) + '" height="' + (yb - yt)
            + '" style="fill:var(--marg);opacity:.10"/>';
@@ -617,7 +622,10 @@
       svg += '<circle cx="' + tx.toFixed(1) + '" cy="' + ty.toFixed(1) + '" r="3.6" style="fill:' + tCol + '"/>';
       const anchor = (tx > (x0 + x1) / 2) ? 'end' : 'start';
       const lx = anchor === 'end' ? tx - 6 : tx + 6;
-      svg += '<text x="' + lx.toFixed(1) + '" y="' + Math.max(yt + FS, ty - 7).toFixed(1) + '" font-size="' + FS + '" text-anchor="' + anchor + '" style="fill:' + tCol + ';font-weight:700">low ' + kGBP(trough.c) + ' \u00B7 ' + trough.year + '</text>';
+      // if the trough sits near the right-hand end marker, drop the label a line so they don't overlap
+      const nearEnd = (x1 - tx) < 90;
+      const ly2 = nearEnd ? Math.min(yb - 4, ty + FS + 6) : Math.max(yt + FS, ty - 7);
+      svg += '<text x="' + lx.toFixed(1) + '" y="' + ly2.toFixed(1) + '" font-size="' + FS + '" text-anchor="' + anchor + '" style="fill:' + tCol + ';font-weight:700">low ' + kGBP(trough.c) + ' \u00B7 ' + trough.year + '</text>';
     }
     // end marker + value
     const last = series[series.length - 1], ex = sx(last.year), ey = sy(last.c);

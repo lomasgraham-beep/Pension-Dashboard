@@ -560,7 +560,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-380</span>
+      <span class="build-stamp">LC-381</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1723,7 +1723,7 @@
       const box = document.getElementById(id);
       if (!box) return;
       const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
-      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-380 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-381 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
     }
     function safeOptionalChart(drawFn, chartId, headId) {
       try { drawFn(); }
@@ -2670,23 +2670,30 @@
       lowEl.textContent = ovShortMoney(trough.val) + ' \u00B7 ' + trough.year;
       lowEl.className = 'kv ' + (trough.val <= 1 ? 'v-bad' : 'v-warn');
       ovVerdictRoomAsync(c.spendRed);
-      // timeline SVG
-      const W = 880, H = 96, x0 = 20, x1 = W - 20, yBand = 34, hBand = 24;
+      // timeline SVG — sized from the real container width so label text stays at its intended size
+      const host = document.getElementById('ovVerdictTl');
+      const W = Math.max(360, Math.round(host.clientWidth) || 880);
+      const H = 104, x0 = 14, x1 = W - 14, yBand = 40, hBand = 22, FS = 11;
       const span = Math.max(1, endYr - nowYr);
       const px = (y) => x0 + (Math.min(Math.max(y, nowYr), endYr) - nowYr) / span * (x1 - x0);
       const rx = px(retYr);
-      const acc = ovAccent(), track = ovTrack(), soft = ovInkSoft();
-      let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
-      // year ticks
-      const stepY = Math.max(1, Math.round(span / 6));
+      const acc = ovAccent(), soft = ovInkSoft();
+      const est = (t) => t.length * FS * 0.55;   // rough text width, to decide if a label fits
+      let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">';
+      // year ticks along the bottom
+      const nice = [1, 2, 5, 10, 20, 25, 50];
+      let stepY = Math.max(1, Math.round(span / Math.max(3, Math.floor(W / 110))));
+      stepY = nice.find(v => v >= stepY) || stepY;
       for (let y = nowYr; y <= endYr; y += stepY)
-        svg += '<text x="' + px(y) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="10" fill="' + soft + '">' + y + '</text>';
+        svg += '<text x="' + px(y).toFixed(1) + '" y="' + (H - 5) + '" text-anchor="middle" font-size="' + FS + '" fill="' + soft + '">' + y + '</text>';
+      svg += '<text x="' + x1 + '" y="' + (H - 5) + '" text-anchor="end" font-size="' + FS + '" fill="' + soft + '">' + endYr + '</text>';
       // working band
       if (rx > x0 + 4) {
-        svg += '<rect x="' + x0 + '" y="' + yBand + '" width="' + (rx - x0) + '" height="' + hBand + '" rx="6" fill="' + acc + '" opacity="0.85"/>';
-        if (rx - x0 > 90) svg += '<text x="' + ((x0 + rx) / 2) + '" y="' + (yBand + 16) + '" text-anchor="middle" font-size="10.5" fill="#fff" font-weight="700">working \u00B7 saving</text>';
+        svg += '<rect x="' + x0 + '" y="' + yBand + '" width="' + (rx - x0).toFixed(1) + '" height="' + hBand + '" rx="6" fill="' + acc + '" opacity="0.85"/>';
+        const wl = 'working';
+        if (rx - x0 > est(wl) + 14) svg += '<text x="' + ((x0 + rx) / 2).toFixed(1) + '" y="' + (yBand + 15) + '" text-anchor="middle" font-size="' + FS + '" fill="#fff" font-weight="700">' + wl + '</text>';
       }
-      // drawdown band, coloured by health: green, amber over the lean run, red past dry
+      // drawdown band, coloured by health: green, amber over a genuine lean dip, red past dry
       const leanCap = Math.max(trough.val * 1.25, trough.val + 1);
       let leanL = null, leanR = null;
       (drawdownRows || []).forEach(r => {
@@ -2694,31 +2701,45 @@
         if (cv <= leanCap) { if (leanL == null) leanL = r.year; leanR = r.year; }
       });
       const gEnd = dryRow ? px(dryRow.year) : x1;
-      svg += '<rect x="' + rx + '" y="' + yBand + '" width="' + Math.max(0, gEnd - rx) + '" height="' + hBand + '" rx="6" fill="#10b981" opacity="0.75"/>';
+      svg += '<rect x="' + rx.toFixed(1) + '" y="' + yBand + '" width="' + Math.max(0, gEnd - rx).toFixed(1) + '" height="' + hBand + '" rx="6" fill="#10b981" opacity="0.75"/>';
       if (leanL != null && !dryRow) {
         const lx = Math.max(rx, px(leanL)), lw = Math.max(0, px(leanR) - lx);
-        if (lw > 2) svg += '<rect x="' + lx + '" y="' + yBand + '" width="' + lw + '" height="' + hBand + '" fill="#f59e0b" opacity="0.55"/>';
+        // only shade a genuine localised dip — not the whole drawdown
+        if (lw > 2 && lw < (x1 - rx) * 0.45) svg += '<rect x="' + lx.toFixed(1) + '" y="' + yBand + '" width="' + lw.toFixed(1) + '" height="' + hBand + '" fill="#f59e0b" opacity="0.55"/>';
       }
-      if (dryRow) svg += '<rect x="' + gEnd + '" y="' + yBand + '" width="' + Math.max(0, x1 - gEnd) + '" height="' + hBand + '" rx="6" fill="#ef4444" opacity="0.6"/>';
-      const bandLabel = holds ? ('drawdown \u00B7 plan holds to ' + endYr) : ('pot empties in ' + dryRow.year);
-      if (x1 - rx > 170) svg += '<text x="' + ((rx + x1) / 2) + '" y="' + (yBand + 16) + '" text-anchor="middle" font-size="10.5" fill="#fff" font-weight="700">' + bandLabel + '</text>';
-      // retire marker
-      svg += '<line x1="' + rx + '" y1="16" x2="' + rx + '" y2="' + (yBand + hBand + 16) + '" stroke="' + acc + '" stroke-width="3"/>'
-           + '<circle cx="' + rx + '" cy="16" r="4.5" fill="' + acc + '"/>';
+      if (dryRow) svg += '<rect x="' + gEnd.toFixed(1) + '" y="' + yBand + '" width="' + Math.max(0, x1 - gEnd).toFixed(1) + '" height="' + hBand + '" rx="6" fill="#ef4444" opacity="0.6"/>';
+      const bandLabel = holds ? ('plan holds to ' + endYr) : ('pot empties in ' + dryRow.year);
+      if (x1 - rx > est(bandLabel) + 18) svg += '<text x="' + ((rx + x1) / 2).toFixed(1) + '" y="' + (yBand + 15) + '" text-anchor="middle" font-size="' + FS + '" fill="#fff" font-weight="700">' + bandLabel + '</text>';
+      // retire marker + label above the band
+      svg += '<line x1="' + rx.toFixed(1) + '" y1="20" x2="' + rx.toFixed(1) + '" y2="' + (yBand + hBand + 6) + '" stroke="' + acc + '" stroke-width="2.5"/>'
+           + '<circle cx="' + rx.toFixed(1) + '" cy="20" r="4" fill="' + acc + '"/>';
       if (retD) {
-        const anchor = rx > W * 0.72 ? 'end' : 'start';
-        svg += '<text x="' + (anchor === 'end' ? rx - 7 : rx + 7) + '" y="20" text-anchor="' + anchor + '" font-size="10.5" fill="' + acc + '" font-weight="700">retire '
-             + ovMon[retD.getMonth()] + ' ' + retD.getFullYear() + ' \u00B7 spend ' + Math.round(c.spendRed * 100) + '%</text>';
+        const rl = 'retire ' + ovMon[retD.getMonth()] + ' ' + retD.getFullYear() + ' \u00B7 spend ' + Math.round(c.spendRed * 100) + '%';
+        const anchor = (rx + est(rl) + 12 > x1) ? 'end' : 'start';
+        svg += '<text x="' + (anchor === 'end' ? rx - 8 : rx + 8).toFixed(1) + '" y="24" text-anchor="' + anchor + '" font-size="' + FS + '" fill="' + acc + '" font-weight="700">' + rl + '</text>';
       }
-      // trough flag
-      if (trough.year > nowYr) {
+      // trough flag — sits between the band and the year row, so it never collides with the ticks
+      if (trough.year > nowYr && trough.year < endYr) {
         const tx = px(trough.year), tCol = trough.val <= 1 ? '#ef4444' : '#f59e0b';
-        svg += '<line x1="' + tx + '" y1="' + (yBand + hBand) + '" x2="' + tx + '" y2="' + (yBand + hBand + 14) + '" stroke="' + tCol + '" stroke-width="2" stroke-dasharray="3 2"/>'
-             + '<text x="' + tx + '" y="' + (yBand + hBand + 26) + '" text-anchor="middle" font-size="10" fill="' + tCol + '" font-weight="700">lowest ' + ovShortMoney(trough.val) + ' \u00B7 ' + trough.year + '</text>';
+        const tl = 'lowest ' + ovShortMoney(trough.val) + ' \u00B7 ' + trough.year;
+        const tAnchor = (tx + est(tl) / 2 > x1) ? 'end' : ((tx - est(tl) / 2 < x0) ? 'start' : 'middle');
+        const tlx = tAnchor === 'end' ? x1 : (tAnchor === 'start' ? x0 : tx);
+        svg += '<line x1="' + tx.toFixed(1) + '" y1="' + (yBand + hBand) + '" x2="' + tx.toFixed(1) + '" y2="' + (yBand + hBand + 8) + '" stroke="' + tCol + '" stroke-width="2"/>'
+             + '<text x="' + tlx.toFixed(1) + '" y="' + (yBand + hBand + 20) + '" text-anchor="' + tAnchor + '" font-size="' + FS + '" fill="' + tCol + '" font-weight="700">' + tl + '</text>';
       }
       svg += '</svg>';
-      document.getElementById('ovVerdictTl').innerHTML = svg;
+      host.innerHTML = svg;
     }
+
+    // the timeline is sized from real pixels, so it must be redrawn when the window changes
+    let _vResizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(_vResizeTimer);
+      _vResizeTimer = setTimeout(() => {
+        const sec = document.getElementById('ovVerdictSection');
+        if (sec && sec.style.display !== 'none' && lastDrawdownCfg) ovRenderVerdict();
+      }, 180);
+    });
 
     // ---- Overview pension-performance blocks ----
     // Mirrors the KPI table's per-pension calculation EXACTLY (same tier-based
@@ -3684,7 +3705,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front82';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front83';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', HolidayCosts:'holiday_costs.html', Holidays:'holidays.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
