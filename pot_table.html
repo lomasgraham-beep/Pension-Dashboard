@@ -53,6 +53,8 @@
   .lowyr { color:var(--sub); }
   .off { color:var(--sub); }
   .off.on { color:var(--accent); font-weight:600; }
+  .shape { padding-top:3px !important; padding-bottom:3px !important; }
+  .shape .spark { display:block; margin-left:auto; }
   .pct.capped { color:var(--sub); }
   .pct .lk { display:inline-block; margin-left:5px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.3px;
              color:var(--accent); border:1px solid var(--accent); border-radius:4px; padding:0 3px; vertical-align:middle; }
@@ -76,7 +78,7 @@
 </head>
 <body>
   <div class="head">
-    <div class="h-title">Pot at Retirement <span class="build">(build: pt4)</span></div>
+    <div class="h-title">Pot at Retirement <span class="build">(build: pt5)</span></div>
     <div class="h-sub" id="hsub">Pot value for each possible retirement month, from this month onwards. <b>Safe spend %</b> is the most you could spend at that date and still have both pots last (capped by the spend lock). <b>Lowest pot</b> is the lowest the combined pot falls to during drawdown at that spend, and the year it happens (red if it empties).</div>
     <div class="ctlrow">
       <span class="ctl-label">Offset months</span>
@@ -163,10 +165,20 @@
   }
   // lowest the combined pot falls to during drawdown at the given spend, and the year it happens
   function troughAt(base, spendPct) {
+    return potStats(base, spendPct).trough;
+  }
+  // one drawdown → trough + the combined-pot series (for the row sparkline)
+  function potStats(base, spendPct) {
     const rows = drawdownRows(base, spendPct);
-    let minV = base.pots.graham + (p2Name ? base.pots.julie : 0), minY = base.startYr;
-    rows.forEach(r => { const c = Math.max(0, r.combinedClosing || 0); if (c < minV) { minV = c; minY = r.year; } });
-    return { val: minV, year: minY };
+    const start = base.pots.graham + (p2Name ? base.pots.julie : 0);
+    let minV = start, minY = base.startYr;
+    const series = [{ year: base.startYr, c: start }];
+    rows.forEach(r => {
+      const c = Math.max(0, r.combinedClosing || 0);
+      series.push({ year: r.year, c: c });
+      if (c < minV) { minV = c; minY = r.year; }
+    });
+    return { trough: { val: minV, year: minY }, series: series, start: start };
   }
   function passes(base, spendPct) {                       // joint: household pots last
     const e = endPots(base, spendPct);
@@ -183,8 +195,9 @@
     return lo;
   }
 
-  function rowHtml(d, d2, pct, capped, g, j, trough, isPlan) {
+  function rowHtml(d, d2, pct, capped, g, j, stats, isPlan) {
     const t = g + (p2Name ? j : 0);
+    const trough = stats.trough;
     const dry = trough.val < 1;
     return '<tr' + (isPlan ? ' class="planrow"' : '') + '>'
       + '<td class="ym">' + ymLabelD(d) + (isPlan ? '<span class="plantag">your plan</span>' : '') + '</td>'
@@ -194,7 +207,25 @@
       + (p2Name ? '<td>' + gbp(j) + '</td>' : '')
       + '<td class="tot">' + gbp(t) + '</td>'
       + '<td class="low' + (dry ? ' dry' : '') + '">' + gbp(trough.val) + '</td>'
-      + '<td class="lowyr">' + trough.year + '</td></tr>';
+      + '<td class="lowyr">' + trough.year + '</td>'
+      + '<td class="shape">' + sparkSVG(stats) + '</td></tr>';
+  }
+
+  // tiny trajectory sparkline: aqua combined-pot path + trough dot coloured by depth
+  function sparkSVG(stats) {
+    const s = stats.series;
+    if (!s || s.length < 2) return '';
+    const W = 120, H = 26, pad = 2;
+    const minYr = s[0].year, maxYr = s[s.length - 1].year;
+    const maxV = Math.max(1, stats.start, ...s.map(p => p.c));
+    const sx = (yr) => pad + (maxYr === minYr ? 0 : (yr - minYr) / (maxYr - minYr)) * (W - pad * 2);
+    const sy = (v) => (H - pad) - (v / maxV) * (H - pad * 2);
+    const d = s.map((p, i) => (i ? 'L' : 'M') + sx(p.year).toFixed(1) + ' ' + sy(p.c).toFixed(1)).join(' ');
+    const t = stats.trough;
+    const tCol = t.val <= 1 ? 'var(--risk)' : (t.val < stats.start * 0.25 ? '#f59e0b' : 'var(--safe, #10b981)');
+    return '<svg class="spark" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">'
+      + '<path d="' + d + '" style="fill:none;stroke:var(--accent);stroke-width:1.7" stroke-linejoin="round" stroke-linecap="round"/>'
+      + '<circle cx="' + sx(t.year).toFixed(1) + '" cy="' + sy(t.val).toFixed(1) + '" r="2.7" style="fill:' + tCol + '"/></svg>';
   }
 
   // build one row's HTML for a given month offset and spend lock (cap)
@@ -204,8 +235,8 @@
     let base = r.base, d2 = null;
     if (off > 0) { d2 = addMonths(r.d, off); base = baseFor(d2); }
     const g = base.pots.graham, j = base.pots.julie;
-    const trough = troughAt(base, effPct);
-    return rowHtml(r.d, d2, effPct, capped, g, j, trough, r.isPlan);
+    const stats = potStats(base, effPct);          // one drawdown feeds trough + sparkline
+    return rowHtml(r.d, d2, effPct, capped, g, j, stats, r.isPlan);
   }
 
   function computeTable() {
@@ -213,7 +244,7 @@
     const tbl = document.getElementById('ptbl'), tbody = document.getElementById('tbody');
     document.getElementById('phead').innerHTML =
       '<th>Retire</th><th>Offset months</th><th>Safe spend %</th><th>' + esc(p1Name) + '</th>'
-      + (p2Name ? '<th>' + esc(p2Name) + '</th>' : '') + '<th>Total</th><th>Lowest pot</th><th>Low year</th>';
+      + (p2Name ? '<th>' + esc(p2Name) + '</th>' : '') + '<th>Total</th><th>Lowest pot</th><th>Low year</th><th>Shape to horizon</th>';
     tbody.innerHTML = '';
     rowsCache = [];
     tbl.style.display = 'table';

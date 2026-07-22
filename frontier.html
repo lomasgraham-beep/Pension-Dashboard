@@ -51,6 +51,9 @@
                            background:linear-gradient(90deg,#16a34a 0%,#f59e0b 50%,#dc2626 100%); }
   .ctl input[type=range]::-moz-range-thumb, .ctlgrid input[type=range]::-moz-range-thumb { width:32px; height:32px; border-radius:50%; background:#fff;
                            border:4px solid var(--accent); box-shadow:0 1px 5px rgba(0,0,0,.4); }
+  /* colour rule: colour = risk. A date is not a risk level, so the retire-date track is neutral. */
+  .ctlgrid #dateTest::-webkit-slider-runnable-track { background:var(--panelborder); }
+  .ctlgrid #dateTest::-moz-range-track { background:var(--panelborder); }
   .ctl .spendVal, .ctlgrid .spendVal { min-width:42px; text-align:right; font-size:15px; }
   /* two-row control grid: keeps the spend + date sliders vertically aligned */
   .ctlgrid { display:grid; grid-template-columns:auto 36px 230px 36px auto minmax(0,auto);
@@ -159,7 +162,7 @@
 
   <div class="head">
     <div class="hrow">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front20)</span></span>
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front21)</span></span>
       <div class="seg" id="seg">
         <button type="button" class="seg-btn active" data-mode="joint">Joint</button>
         <button type="button" class="seg-btn" data-mode="p1" id="segP1">Graham</button>
@@ -243,13 +246,14 @@
   const shortGBP = (n) => Math.abs(n) >= 1e6 ? '£' + (n / 1e6).toFixed(1) + 'M' : (Math.abs(n) >= 1e3 ? '£' + Math.round(n / 1e3) + 'K' : '£' + Math.round(n));
 
   // ---- engine plumbing (mirrors the dashboard cfg; both members retire on the swept date) ----
-  function buildPlan(retireDate) {
+  // growthDelta (optional) shifts the accumulation growth rate for the uncertainty band.
+  function buildPlan(retireDate, growthDelta) {
     const rbm = {};
     if (p1Name) rbm[p1Name] = retireDate;
     if (p2Name) rbm[p2Name] = retireDate;
     return {
       retirementDate: retireDate, retireByMember: rbm,
-      growthRate: savedBase.growthRate,
+      growthRate: savedBase.growthRate + (growthDelta || 0),
       phase1Date: savedBase.phase1Date, phase1Days: savedBase.phase1Days,
       phase2Date: savedBase.phase2Date, phase2Days: savedBase.phase2Days,
       p2phase: savedBase.p2phase, gRatio: savedBase.gRatio,
@@ -258,8 +262,8 @@
       retired: false
     };
   }
-  function baseFor(retireDate) {
-    const pl = buildPlan(retireDate);
+  function baseFor(retireDate, growthDelta) {
+    const pl = buildPlan(retireDate, growthDelta);
     const stateNames = new Set((data.guaranteed || [])
       .map(x => x.income_name).filter(n => n && n.toLowerCase().indexOf('state') >= 0));
     const js = PensionEngine.forecast(data, pl, 1);
@@ -524,10 +528,10 @@
 
   // ---- pot-value mini chart (runs one engine drawdown for the current date + spend) ----
   const POT_COMB = 'var(--accent)', POT_G = '#6ea8fe', POT_J = '#c58bf2';
-  function potTrajectory(monthOffset, spendPct) {
+  function potTrajectory(monthOffset, spendPct, growthDelta) {
     if (!data || !savedBase) return null;
     try {
-      const base = baseFor(dateFromMonths(monthOffset));
+      const base = baseFor(dateFromMonths(monthOffset), growthDelta);
       const cfg = {
         pots: base.pots, potsAtOwnRetire: base.own, gRatio: savedBase.gRatio,
         spendRed: spendPct / 100, startYear: base.startYr, retirementDate: base.pl.retirementDate,
@@ -540,11 +544,12 @@
       return rows.map(r => ({ year: r.year, g: Math.max(0, r.g_closing || 0), j: Math.max(0, r.j_closing || 0), c: Math.max(0, r.combinedClosing || 0) }));
     } catch (e) { return null; }
   }
-  function potChartSVG(series, W, H) {
+  function potChartSVG(series, W, H, band) {
     const padL = 46, padR = 12, padT = 14, padB = 24;
     const x0 = padL, x1 = W - padR, yb = H - padB, yt = padT;
     const minYr = series[0].year, maxYr = series[series.length - 1].year;
-    const maxV = niceMax(Math.max(1, ...series.map(s => s.c)));
+    const bandMax = (band && band.hi) ? Math.max(0, ...band.hi.map(s => s.c)) : 0;
+    const maxV = niceMax(Math.max(1, bandMax, ...series.map(s => s.c)));
     const sx = (yr) => x0 + (maxYr === minYr ? 0 : (yr - minYr) / (maxYr - minYr)) * (x1 - x0);
     const sy = (v) => yb - (Math.min(v, maxV) / maxV) * (yb - yt);
     const pts = (key) => series.map((s, i) => (i ? 'L' : 'M') + sx(s.year).toFixed(1) + ' ' + sy(s[key]).toFixed(1)).join(' ');
@@ -571,17 +576,44 @@
       svg += '<line x1="' + xx.toFixed(1) + '" y1="' + yt + '" x2="' + xx.toFixed(1) + '" y2="' + yb + '" style="stroke:var(--panelborder);stroke-width:1;opacity:.25"/>';
       svg += '<text x="' + xx.toFixed(1) + '" y="' + (H - 7) + '" font-size="' + FS + '" text-anchor="middle" style="fill:var(--sub)">' + yr + '</text>';
     });
+    // uncertainty band: envelope between the low/high growth-to-retirement runs
+    if (band && band.lo && band.hi && band.lo.length > 1 && band.hi.length > 1) {
+      const bp = (arr) => arr.map((s, i) => (i ? 'L' : 'M') + sx(s.year).toFixed(1) + ' ' + sy(s.c).toFixed(1)).join(' ');
+      const back = band.lo.slice().reverse().map(s => 'L' + sx(s.year).toFixed(1) + ' ' + sy(s.c).toFixed(1)).join(' ');
+      svg += '<path d="' + bp(band.hi) + ' ' + back + ' Z" style="fill:var(--accent);opacity:.13;stroke:none"/>';
+    }
+    // lean-years shading: the contiguous run of years around the trough where the pot sits near its floor
+    const troughIdx = series.reduce((mi, s, i) => (s.c < series[mi].c ? i : mi), 0);
+    const trough = series[troughIdx];
+    const nearFloor = Math.max(trough.c * 1.25, trough.c + maxV * 0.04);
+    let li = troughIdx, ri = troughIdx;
+    while (li > 0 && series[li - 1].c <= nearFloor) li--;
+    while (ri < series.length - 1 && series[ri + 1].c <= nearFloor) ri++;
+    if (ri > li && trough.year > minYr && trough.year < maxYr) {
+      svg += '<rect x="' + sx(series[li].year).toFixed(1) + '" y="' + yt + '" width="'
+           + (sx(series[ri].year) - sx(series[li].year)).toFixed(1) + '" height="' + (yb - yt)
+           + '" style="fill:var(--marg);opacity:.10"/>';
+    }
     // soft fill under the combined line
     svg += '<path d="' + pts('c') + ' L' + sx(maxYr).toFixed(1) + ' ' + yb.toFixed(1) + ' L' + sx(minYr).toFixed(1) + ' ' + yb.toFixed(1) + ' Z" style="fill:var(--accent);opacity:.10;stroke:none"/>';
     // lines
     if (p2Name) svg += line('j', POT_J, 1.8);
     svg += line('g', POT_G, 1.8) + line('c', POT_COMB, 2.8);
+    // trough marker (amber; red if the pot empties) — the decision point
+    const dry = series.find(s => s.c <= 1);
+    if (trough.year > minYr) {
+      const tCol = trough.c <= 1 ? 'var(--risk)' : 'var(--marg)';
+      const tx = sx(trough.year), ty = sy(trough.c);
+      svg += '<circle cx="' + tx.toFixed(1) + '" cy="' + ty.toFixed(1) + '" r="3.6" style="fill:' + tCol + '"/>';
+      const anchor = (tx > (x0 + x1) / 2) ? 'end' : 'start';
+      const lx = anchor === 'end' ? tx - 6 : tx + 6;
+      svg += '<text x="' + lx.toFixed(1) + '" y="' + Math.max(yt + FS, ty - 7).toFixed(1) + '" font-size="' + FS + '" text-anchor="' + anchor + '" style="fill:' + tCol + ';font-weight:700">low ' + kGBP(trough.c) + ' \u00B7 ' + trough.year + '</text>';
+    }
     // end marker + value
     const last = series[series.length - 1], ex = sx(last.year), ey = sy(last.c);
     svg += '<circle cx="' + ex.toFixed(1) + '" cy="' + ey.toFixed(1) + '" r="3" style="fill:var(--accent)"/>';
     svg += '<text x="' + (ex - 5).toFixed(1) + '" y="' + (ey - 5).toFixed(1) + '" font-size="' + FS + '" text-anchor="end" style="fill:var(--ink);font-weight:700">' + kGBP(last.c) + '</text>';
     // runs-dry flag (combined pot hits zero before the horizon)
-    const dry = series.find(s => s.c <= 1);
     if (dry && dry.year < maxYr) {
       const dx = sx(dry.year);
       svg += '<line x1="' + dx.toFixed(1) + '" y1="' + yt + '" x2="' + dx.toFixed(1) + '" y2="' + yb + '" style="stroke:var(--risk);stroke-width:1.5;stroke-dasharray:3 2;opacity:.85"/>';
@@ -593,12 +625,15 @@
     const svgBox = document.getElementById('potSvg'), leg = document.getElementById('potLeg');
     const series = potTrajectory(monthOffset, spendPct);
     if (!series || series.length < 2) { svgBox.innerHTML = '<div class="pot-msg">Pot projection unavailable</div>'; leg.innerHTML = ''; return; }
+    // uncertainty band: growth-to-retirement ±2% (drawdown-phase growth is fixed in the engine)
+    const band = { lo: potTrajectory(monthOffset, spendPct, -0.02), hi: potTrajectory(monthOffset, spendPct, 0.02) };
     const W = Math.max(220, Math.round(svgBox.clientWidth) || 290);
     const H = Math.max(170, Math.round(svgBox.clientHeight) || 320);
-    svgBox.innerHTML = potChartSVG(series, W, H);
+    svgBox.innerHTML = potChartSVG(series, W, H, band);
     leg.innerHTML = '<span><i style="background:' + POT_COMB + '"></i>Combined</span>'
       + '<span><i style="background:' + POT_G + '"></i>' + esc(p1Name || 'Graham') + '</span>'
-      + (p2Name ? '<span><i style="background:' + POT_J + '"></i>' + esc(p2Name) + '</span>' : '');
+      + (p2Name ? '<span><i style="background:' + POT_J + '"></i>' + esc(p2Name) + '</span>' : '')
+      + '<span><i style="background:var(--accent);opacity:.25;height:8px"></i>growth \u00B12%</span>';
   }
   function schedulePotChart(monthOffset, spendPct) {
     if (potTimer) clearTimeout(potTimer);
