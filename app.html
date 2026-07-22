@@ -127,6 +127,13 @@
 
     /* countdown + progress */
     .ov-path-top { display:grid; grid-template-columns:minmax(220px,1fr) 2fr; gap:12px; margin-bottom:14px; }
+    .ov-vpills { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+    .vpill { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:8px 14px; min-width:110px; }
+    .vpill .kv { font-size:17px; font-weight:700; }
+    .vpill .kl { font-size:10px; color:var(--ink-soft, #64748b); text-transform:uppercase; letter-spacing:.4px; margin-top:1px; }
+    .vpill .kv.v-good { color:#10b981; } .vpill .kv.v-warn { color:#f59e0b; } .vpill .kv.v-bad { color:#ef4444; }
+    .vpill .kv.v-aq { color:var(--accent); }
+    #ovVerdictTl svg { display:block; width:100%; height:auto; }
     .ov-count { display:flex; align-items:center; gap:16px; background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; }
     .ov-count .cnum { font-size:26px; font-weight:700; color:var(--accent-dark); line-height:1; }
     .ov-count .csub { font-size:12.5px; color:var(--ink-soft); margin-top:5px; }
@@ -553,7 +560,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-378</span>
+      <span class="build-stamp">LC-379</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -580,6 +587,18 @@
 
   <div id="Overview" class="tabcontent active">
     <div id="status" class="s-load">Loading…</div>
+
+    <!-- ===== Verdict: the one-glance answer ===== -->
+    <div class="ov-section" id="ovVerdictSection" style="display:none;">
+      <div class="ov-head"><div class="ttl"><span class="bar4"></span> The verdict</div></div>
+      <div class="ov-vpills">
+        <div class="vpill"><div class="kv" id="ovVerdictWord">&mdash;</div><div class="kl">verdict</div></div>
+        <div class="vpill"><div class="kv" id="ovVerdictRet">&mdash;</div><div class="kl">planned retire</div></div>
+        <div class="vpill"><div class="kv" id="ovVerdictRoom">&mdash;</div><div class="kl">room to spare</div></div>
+        <div class="vpill"><div class="kv" id="ovVerdictLow">&mdash;</div><div class="kl">lowest pot</div></div>
+      </div>
+      <div id="ovVerdictTl"></div>
+    </div>
 
     <!-- ===== Section 1: where things stand now ===== -->
     <div class="ov-section">
@@ -1704,7 +1723,7 @@
       const box = document.getElementById(id);
       if (!box) return;
       const msg = (err && err.message) ? err.message : String(err || 'Unknown chart error');
-      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-378 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
+      box.innerHTML = '<div class="chart-error"><span class="chart-error-icon">!</span><div><strong>Chart could not be drawn.</strong><div>The model has loaded, but this chart hit an invalid value. Try changing one slider, or reload after uploading this LC-379 file.</div><div style="margin-top:6px;"><code>' + chartErrText(msg) + '</code></div></div></div>';
     }
     function safeOptionalChart(drawFn, chartId, headId) {
       try { drawFn(); }
@@ -2584,8 +2603,121 @@
       ovRenderRealTerms(projCombined, c.retirementDate);
       ovRenderSurvive();
       ovRenderCoverage();
+      ovRenderVerdict();
 
       renderPerfBlocks();
+    }
+
+    // ---- Verdict hero: one-glance answer built from the drawdown already computed ----
+    let _vRoomTimer = null, _vRoomKey = null, _vRoomVal = null;
+    function ovVerdictTrough() {
+      let start = (livePots.graham || 0) + (livePots.julie || 0);
+      let minV = start, minY = lastDrawdownCfg ? lastDrawdownCfg.startYear : new Date().getFullYear();
+      (drawdownRows || []).forEach(r => {
+        const c = Math.max(0, r.combinedClosing || 0);
+        if (c < minV) { minV = c; minY = r.year; }
+      });
+      return { val: minV, year: minY };
+    }
+    function ovVerdictSurvives(spendRed) {
+      if (!lastDrawdownCfg) return true;
+      const cfg = Object.assign({}, lastDrawdownCfg, { spendRed: spendRed });
+      const rows = PensionEngine.drawdown(data, cfg) || [];
+      if (!rows.length) return true;
+      const last = rows[rows.length - 1];
+      return ((last.g_taxFree || 0) + (last.g_taxable || 0) + (last.j_taxFree || 0) + (last.j_taxable || 0)) >= 1000;
+    }
+    function ovVerdictRoomAsync(planSpend) {
+      const key = JSON.stringify([planSpend, lastDrawdownCfg && lastDrawdownCfg.startYear,
+        lastDrawdownCfg && lastDrawdownCfg.pots, lastDrawdownCfg && lastDrawdownCfg.gRatio]);
+      if (key === _vRoomKey && _vRoomVal != null) { ovVerdictRoomShow(_vRoomVal, planSpend); return; }
+      clearTimeout(_vRoomTimer);
+      _vRoomTimer = setTimeout(() => {
+        let lo = 0.2, hi = 2.0;
+        if (ovVerdictSurvives(hi)) lo = hi;
+        else for (let i = 0; i < 9; i++) { const mid = (lo + hi) / 2; if (ovVerdictSurvives(mid)) lo = mid; else hi = mid; }
+        _vRoomKey = key; _vRoomVal = lo;
+        ovVerdictRoomShow(lo, planSpend);
+      }, 350);
+    }
+    function ovVerdictRoomShow(safeMax, planSpend) {
+      const el = document.getElementById('ovVerdictRoom');
+      if (!el) return;
+      const room = Math.round((safeMax - planSpend) * 100);
+      el.textContent = (room >= 0 ? '+' : '') + room + '%';
+      el.className = 'kv ' + (room >= 20 ? 'v-aq' : (room >= 0 ? 'v-warn' : 'v-bad'));
+    }
+    function ovRenderVerdict() {
+      const sec = document.getElementById('ovVerdictSection');
+      if (!sec || !lastDrawdownCfg || !(drawdownRows || []).length) { if (sec) sec.style.display = 'none'; return; }
+      sec.style.display = '';
+      const c = readControls();
+      const nowYr = new Date().getFullYear();
+      const retD = c.retirementDate;
+      const retYr = retD ? (retD.getFullYear() + retD.getMonth() / 12) : nowYr;
+      const endYr = drawdownRows[drawdownRows.length - 1].year;
+      const trough = ovVerdictTrough();
+      const dryRow = (drawdownRows || []).find(r => Math.max(0, r.combinedClosing || 0) <= 1);
+      const holds = !dryRow;
+      // pills
+      const w = document.getElementById('ovVerdictWord');
+      w.textContent = holds ? 'On track \u2713' : ('Runs dry ' + dryRow.year);
+      w.className = 'kv ' + (holds ? 'v-good' : 'v-bad');
+      document.getElementById('ovVerdictRet').textContent = retD
+        ? (ovMon[retD.getMonth()] + ' ' + retD.getFullYear() + ' \u00B7 ' + Math.round(c.spendRed * 100) + '%')
+        : '\u2014';
+      const lowEl = document.getElementById('ovVerdictLow');
+      lowEl.textContent = ovShortMoney(trough.val) + ' \u00B7 ' + trough.year;
+      lowEl.className = 'kv ' + (trough.val <= 1 ? 'v-bad' : 'v-warn');
+      ovVerdictRoomAsync(c.spendRed);
+      // timeline SVG
+      const W = 880, H = 96, x0 = 20, x1 = W - 20, yBand = 34, hBand = 24;
+      const span = Math.max(1, endYr - nowYr);
+      const px = (y) => x0 + (Math.min(Math.max(y, nowYr), endYr) - nowYr) / span * (x1 - x0);
+      const rx = px(retYr);
+      const acc = ovAccent(), track = ovTrack(), soft = ovInkSoft();
+      let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
+      // year ticks
+      const stepY = Math.max(1, Math.round(span / 6));
+      for (let y = nowYr; y <= endYr; y += stepY)
+        svg += '<text x="' + px(y) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="10" fill="' + soft + '">' + y + '</text>';
+      // working band
+      if (rx > x0 + 4) {
+        svg += '<rect x="' + x0 + '" y="' + yBand + '" width="' + (rx - x0) + '" height="' + hBand + '" rx="6" fill="' + acc + '" opacity="0.85"/>';
+        if (rx - x0 > 90) svg += '<text x="' + ((x0 + rx) / 2) + '" y="' + (yBand + 16) + '" text-anchor="middle" font-size="10.5" fill="#fff" font-weight="700">working \u00B7 saving</text>';
+      }
+      // drawdown band, coloured by health: green, amber over the lean run, red past dry
+      const leanCap = Math.max(trough.val * 1.25, trough.val + 1);
+      let leanL = null, leanR = null;
+      (drawdownRows || []).forEach(r => {
+        const cv = Math.max(0, r.combinedClosing || 0);
+        if (cv <= leanCap) { if (leanL == null) leanL = r.year; leanR = r.year; }
+      });
+      const gEnd = dryRow ? px(dryRow.year) : x1;
+      svg += '<rect x="' + rx + '" y="' + yBand + '" width="' + Math.max(0, gEnd - rx) + '" height="' + hBand + '" rx="6" fill="#10b981" opacity="0.75"/>';
+      if (leanL != null && !dryRow) {
+        const lx = Math.max(rx, px(leanL)), lw = Math.max(0, px(leanR) - lx);
+        if (lw > 2) svg += '<rect x="' + lx + '" y="' + yBand + '" width="' + lw + '" height="' + hBand + '" fill="#f59e0b" opacity="0.55"/>';
+      }
+      if (dryRow) svg += '<rect x="' + gEnd + '" y="' + yBand + '" width="' + Math.max(0, x1 - gEnd) + '" height="' + hBand + '" rx="6" fill="#ef4444" opacity="0.6"/>';
+      const bandLabel = holds ? ('drawdown \u00B7 plan holds to ' + endYr) : ('pot empties in ' + dryRow.year);
+      if (x1 - rx > 170) svg += '<text x="' + ((rx + x1) / 2) + '" y="' + (yBand + 16) + '" text-anchor="middle" font-size="10.5" fill="#fff" font-weight="700">' + bandLabel + '</text>';
+      // retire marker
+      svg += '<line x1="' + rx + '" y1="16" x2="' + rx + '" y2="' + (yBand + hBand + 16) + '" stroke="' + acc + '" stroke-width="3"/>'
+           + '<circle cx="' + rx + '" cy="16" r="4.5" fill="' + acc + '"/>';
+      if (retD) {
+        const anchor = rx > W * 0.72 ? 'end' : 'start';
+        svg += '<text x="' + (anchor === 'end' ? rx - 7 : rx + 7) + '" y="20" text-anchor="' + anchor + '" font-size="10.5" fill="' + acc + '" font-weight="700">retire '
+             + ovMon[retD.getMonth()] + ' ' + retD.getFullYear() + ' \u00B7 spend ' + Math.round(c.spendRed * 100) + '%</text>';
+      }
+      // trough flag
+      if (trough.year > nowYr) {
+        const tx = px(trough.year), tCol = trough.val <= 1 ? '#ef4444' : '#f59e0b';
+        svg += '<line x1="' + tx + '" y1="' + (yBand + hBand) + '" x2="' + tx + '" y2="' + (yBand + hBand + 14) + '" stroke="' + tCol + '" stroke-width="2" stroke-dasharray="3 2"/>'
+             + '<text x="' + tx + '" y="' + (yBand + hBand + 26) + '" text-anchor="middle" font-size="10" fill="' + tCol + '" font-weight="700">lowest ' + ovShortMoney(trough.val) + ' \u00B7 ' + trough.year + '</text>';
+      }
+      svg += '</svg>';
+      document.getElementById('ovVerdictTl').innerHTML = svg;
     }
 
     // ---- Overview pension-performance blocks ----
@@ -3552,7 +3684,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front80';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front81';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', HolidayCosts:'holiday_costs.html', Holidays:'holidays.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
