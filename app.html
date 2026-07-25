@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=hol1"></script>
-  <script src="engine.js?v=ann6"></script>
+  <script src="engine.js?v=ann7"></script>
   <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
@@ -568,7 +568,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-382</span>
+      <span class="build-stamp">LC-383</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -720,6 +720,7 @@
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
     </div>
     <iframe id="frame-Cash" class="app-frame" title="Cash and Purchases"></iframe>
   </div>
@@ -734,6 +735,7 @@
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
     </div>
     <iframe id="frame-Crashes" class="app-frame" title="Market Crashes"></iframe>
   </div>
@@ -749,6 +751,7 @@
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
     </div>
     <iframe id="frame-Annuities" class="app-frame" title="Annuities"></iframe>
   </div>
@@ -764,6 +767,7 @@
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
     </div>
     <iframe id="frame-ScenarioGrid" class="app-frame" title="Scenario Grid"></iframe>
   </div>
@@ -779,6 +783,7 @@
       <button class="subtab-link active-sub" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
     </div>
     <iframe id="frame-Frontier" class="app-frame" title="Retire Frontier"></iframe>
   </div>
@@ -794,6 +799,7 @@
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
     </div>
     <iframe id="frame-MultiModel" class="app-frame" title="Multi Modelling"></iframe>
   </div>
@@ -809,8 +815,24 @@
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
     </div>
     <iframe id="frame-PotTable" class="app-frame" title="Pot at Retirement"></iframe>
+  </div>
+  <div id="Sensitivity" class="tabcontent">
+    <div class="subtab-buttons">
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
+      <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
+      <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
+      <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
+      <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
+      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link active-sub" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
+    </div>
+    <iframe id="frame-Sensitivity" class="app-frame" title="Sensitivity"></iframe>
   </div>
 
   <div id="Modelling" class="tabcontent">
@@ -824,6 +846,7 @@
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
     </div>
     <!-- Intelligent Modelling moved to a standalone top-level tab in LC-327. -->
     <div class="modelbar modelbar-after-intel">
@@ -886,13 +909,19 @@
             </button>
             <button type="button" class="info-btn" onclick="toggleInfo(event,'info_privcontrib')" aria-label="About pension contributions">i</button>
           </div>
-          <div class="info-text" id="info_privcontrib">A flat monthly amount paid into your <strong>private (Pru)</strong> pension pots &mdash; your workplace pensions are never touched. The most you can set follows the current working pattern: up to &pound;1,500 on a 5-day week, &pound;500 on a 3-day week. Contributions stop at retirement, and any dated override you&rsquo;ve set on the Contributions page still takes precedence. <span style="color:var(--ink-soft);">What-if only &mdash; the projection updates live but this is never saved to your plan.</span> If a person has two private pots, both are set to the same amount.</div>
+          <div class="info-text" id="info_privcontrib">A flat monthly amount paid into your <strong>private (Pru)</strong> pension pots &mdash; your workplace pensions are never touched. The most you can set follows the current working pattern: up to &pound;1,500 on a 5-day week, &pound;500 on a 3-day week. Contributions stop at retirement, and any dated override you&rsquo;ve set on the Contributions page still takes precedence. <span style="color:var(--ink-soft);">What-if only &mdash; the projection updates live but this is never saved to your plan.</span> If a person has two private pots, both are set to the same amount. Amounts are what <strong>lands in the pot</strong> &mdash; any HMRC tax-relief top-up is already included in the figure you set (same convention as the Contributions page).</div>
           <div class="contrib-panel" id="privContribPanel">
             <div id="privContribSliders"></div>
           </div>
         </div>
-        <div class="ctrl"><label>State pension growth <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
-          <div class="hint">Annual rise on the State Pension. Default 2.5%. Drag down for the triple lock weakened, capped, or frozen (0%). <span style="color:var(--ink-soft);">What-if only, never saved.</span></div></div>
+        <div class="ctrl"><label>State pension growth <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="4.5" step="0.1" value="2.5" oninput="onParam()">
+          <div class="hint">Annual rise on the State Pension. Default 2.5%; the triple lock has averaged nearer 4%, so drag up to model it holding, or down for it weakened, capped, or frozen (0%). <span style="color:var(--ink-soft);">What-if only, never saved.</span></div></div>
+        <!-- Model assumptions card (LC-383) — every number in the app is built on these -->
+        <div class="ctrl ctrl-wide">
+          <label>Model assumptions
+            <button type="button" class="info-btn" onclick="toggleInfo(event,'info_assumptions')" aria-label="About the model assumptions">i</button></label>
+          <div class="info-text" id="info_assumptions"><strong>Inflation:</strong> bills, dining and holidays rise 2.5% a year, counted from <em>today</em> (engine ann7) in annual steps. <strong>Growth:</strong> the Pension growth slider applies to the whole horizon &mdash; before <em>and</em> after retirement (engine ann7). <strong>Tax:</strong> personal allowance &pound;12,570 (frozen), 20% basic rate, 40% above &pound;50,270, applied monthly PAYE-style per person. Withdrawals follow UFPLS 25/75 or FAD rules as set above. <strong>State Pension:</strong> rises by the slider above (default 2.5%), grown from today. DB incomes escalate at their own scheme rate from retirement. <strong>Contributions:</strong> figures are gross amounts landing in the pot, stopping at each person's retirement.</div>
+        </div>
         <!-- Row 2 -->
         <div class="ctrl"><label>Spending in retirement <span id="m_spend_v" class="sv">100%</span></label><input type="range" id="m_spend" min="25" max="200" step="1" value="100" oninput="onParam()"></div>
         <div class="ctrl" id="ctrlRatio"><label><span class="nm-p1">Graham</span> drawdown ratio <span id="m_ratio_v" class="sv">50%</span></label><input type="range" id="m_ratio" min="0" max="100" step="1" value="50" oninput="onParam()"></div>
@@ -973,6 +1002,7 @@
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
     </div>
     <div class="modelbar">
       <button class="mdl-btn mdl-btn-primary" onclick="openSaveOverlay()">Save model</button>
@@ -1092,6 +1122,7 @@
       <button id="subbtn-Guaranteed" class="subtab-link" onclick="showSub(event,'Guaranteed')">Guaranteed Incomes</button>
       <button id="subbtn-Defaults" class="subtab-link" onclick="showSub(event,'Defaults')">Defaults</button>
       <button id="subbtn-BankAccts" class="subtab-link" onclick="showSub(event,'BankAccts')">Bank Accounts</button>
+      <button id="subbtn-Backup" class="subtab-link" onclick="showSub(event,'Backup')">Backup</button>
     </div>
     <p class="note">Edit your reference data. Saving here updates the plan; reopen this dashboard to see new projections.</p>
     <div id="sub-Members" class="subtabcontent"><iframe id="frame-Members" class="app-frame" title="Members"></iframe></div>
@@ -1101,6 +1132,7 @@
     <div id="sub-Guaranteed" class="subtabcontent"><iframe id="frame-Guaranteed" class="app-frame" title="Guaranteed Incomes"></iframe></div>
     <div id="sub-Defaults" class="subtabcontent"><iframe id="frame-Defaults" class="app-frame" title="Defaults"></iframe></div>
     <div id="sub-BankAccts" class="subtabcontent"><iframe id="frame-BankAccts" class="app-frame" title="Bank Accounts"></iframe></div>
+    <div id="sub-Backup" class="subtabcontent"><iframe id="frame-Backup" class="app-frame" title="Backup and Restore"></iframe></div>
   </div>
   </div><!-- /.shell -->
 
@@ -3121,6 +3153,15 @@
       if (!panel || !btn) return;
       const open = panel.classList.toggle('show');
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      try { localStorage.setItem('mpm_privPanelOpen', open ? '1' : '0'); } catch (e) {}   // LC-383
+    }
+    function restorePrivPanelState() {   // LC-383: reopen the panel if it was open last visit
+      try {
+        if (localStorage.getItem('mpm_privPanelOpen') === '1') {
+          const panel = document.getElementById('privContribPanel'), btn = document.getElementById('privContribToggle');
+          if (panel && btn && !panel.classList.contains('show')) { panel.classList.add('show'); btn.setAttribute('aria-expanded', 'true'); }
+        }
+      } catch (e) {}
     }
 
     // Retirement date used to auto-set the crystallisation date for "Tax-free first".
@@ -3446,6 +3487,7 @@
           julie: plan.crystallisationDateJulie ? App.parseLocalDate(plan.crystallisationDateJulie) : null
         },
         ufplsDivertTf: plan.ufplsDivertTf,
+        growthRate: plan.growthRate,   // LC-383 (engine ann7): growth slider now applies through drawdown too
         sp: sp
       };
     }
@@ -3818,8 +3860,8 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front83';   // frame-file cache-buster: bump when any framed page changes
-    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', HolidayCosts:'holiday_costs.html', Holidays:'holidays.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html' };
+    const FV = '?v=front84';   // frame-file cache-buster: bump when any framed page changes
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', HolidayCosts:'holiday_costs.html', Holidays:'holidays.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
@@ -3881,7 +3923,13 @@
 
     // ---- Shared modelling rail: one control set, shown on Modelling and Retirement ----
     let railTab = 'Modelling';                          // which tab currently hosts the rail
-    const railCollapsed = { Modelling: false, Retirement: false };   // per-tab collapsed state (session)
+    // LC-383: rail collapsed state persists across visits (per tab), as does the
+    // Pension-contributions panel's open state. Best-effort — private browsing safe.
+    const railCollapsed = (function () {
+      try { const j = JSON.parse(localStorage.getItem('mpm_railCollapsed')); if (j && typeof j === 'object') return { Modelling: !!j.Modelling, Retirement: !!j.Retirement }; } catch (e) {}
+      return { Modelling: false, Retirement: false };
+    })();
+    function persistRailCollapsed() { try { localStorage.setItem('mpm_railCollapsed', JSON.stringify(railCollapsed)); } catch (e) {} }
     function placeRail(tabId) {
       railTab = tabId;
       const rail = document.getElementById('modelRail');
@@ -3895,8 +3943,8 @@
       document.querySelectorAll('.model-layout').forEach(l => l.classList.remove('collapsed'));
       if (layout && railCollapsed[railTab]) layout.classList.add('collapsed');
     }
-    function collapseRail() { railCollapsed[railTab] = true; applyRailCollapse(); }
-    function expandRail() { railCollapsed[railTab] = false; applyRailCollapse(); }
+    function collapseRail() { railCollapsed[railTab] = true; applyRailCollapse(); persistRailCollapsed(); }
+    function expandRail() { railCollapsed[railTab] = false; applyRailCollapse(); persistRailCollapsed(); }
 
     function showTab(evt, id) {
       document.querySelectorAll('.tabcontent').forEach(el => { el.style.display = 'none'; el.classList.remove('active'); });
@@ -3905,7 +3953,7 @@
       // mark the matching tab button active (works whether triggered by a button click or the dropdown)
       document.querySelectorAll('.tab-link').forEach(b => { if (b.getAttribute('onclick') && b.getAttribute('onclick').indexOf("'" + id + "'") >= 0) b.classList.add('active-btn'); });
       // Modelling group: keep the Modelling top button lit while any of its panels is active
-      const MODEL_IDS = ['Modelling', 'Retirement', 'Cash', 'Crashes', 'Annuities', 'ScenarioGrid', 'Frontier', 'MultiModel', 'PotTable'];
+      const MODEL_IDS = ['Modelling', 'Retirement', 'Cash', 'Crashes', 'Annuities', 'ScenarioGrid', 'Frontier', 'MultiModel', 'PotTable', 'Sensitivity'];
       if (MODEL_IDS.indexOf(id) >= 0) {
         document.querySelectorAll('.tab-link').forEach(b => { const oc = b.getAttribute('onclick') || ''; if (oc.indexOf("'Modelling'") >= 0) b.classList.add('active-btn'); });
       }
@@ -3939,6 +3987,7 @@
         pingFrame('frame-MultiModel');
       }
       if (id === 'PotTable') { ensureFrame('frame-PotTable', 'pot_table.html' + FV); pingFrame('frame-PotTable'); }
+      if (id === 'Sensitivity') { ensureFrame('frame-Sensitivity', 'sensitivity.html' + FV); pingFrame('frame-Sensitivity'); }
       if (id === 'KPI' && !window.__kpi) { window.__kpi = true; showSub(null, 'PerfKPIs'); }
       if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Budget'); }
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
@@ -4066,6 +4115,7 @@
 
         buildTierSliders();
         buildPrivContribSliders();
+        restorePrivPanelState();   // LC-383: reopen the panel if it was open last visit
         buildColChooser();
         applyControls(savedPlan);
         applyRetiredMode();
@@ -4333,6 +4383,17 @@
       closeModelOverlay('mdlLoadOverlay');
       showModelOverlay('mdlBusyOverlay');
       try {
+        // LC-383: rolling safety snapshot — capture the CURRENT state into a single
+        // auto-backup model (overwritten each load) so a destructive load is reversible.
+        try {
+          const snapState = await collectModelState();
+          const snapName = 'Auto-backup (before load)';
+          const snapSummary = 'Taken automatically before loading \u201c' + (model.name || 'a model') + '\u201d on ' + new Date().toLocaleString('en-GB');
+          const now0 = new Date().toISOString();
+          const prior = await App.rest('op_saved_models?name=eq.' + encodeURIComponent(snapName) + '&select=id');
+          if (prior && prior.length) await App.write('PATCH', 'op_saved_models?id=eq.' + encodeURIComponent(prior[0].id), { summary: snapSummary, payload: snapState, updated_at: now0 });
+          else await modelInsertReturning({ name: snapName, summary: snapSummary, payload: snapState, created_at: now0, updated_at: now0 });
+        } catch (e) { /* snapshot is best-effort; never block the load */ }
         const pl = model.payload || {};
         if (pl.modelling) {
           if (pl.modelling.p1) await patchModellingRow(p1Name, pl.modelling.p1);
@@ -4437,5 +4498,26 @@
   <!-- Best Plan Finder moved to intelligent_modelling.html in LC-327. -->
 
 
+
+<script>
+/* LC-383: engine build self-check + deploy stamp. */
+(function () {
+  var WANT = 'ann7', TAG = 'app LC-383';
+  function go() {
+    var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
+    if (got !== WANT) {
+      var b = document.createElement('div');
+      b.style.cssText = 'background:#b3261e;color:#ffffff;padding:8px 12px;font:600 13px/1.35 "Segoe UI",Tahoma,sans-serif;';
+      b.textContent = 'ENGINE MISMATCH \u2014 this app expects engine ' + WANT + ' but loaded "' + got + '". Deploy the latest engine.js first, then hard-refresh.';
+      document.body.insertBefore(b, document.body.firstChild);
+    }
+    var st = document.createElement('div');
+    st.style.cssText = 'text-align:right;padding:2px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
+    st.textContent = TAG + ' \u00b7 engine ' + got;
+    document.body.appendChild(st);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+})();
+</script>
 </body>
 </html>
