@@ -1,5 +1,11 @@
 /* ============================================================
    engine.js  —  Pension modelling engine (pure JavaScript)
+   build tag: ann6  (additive: optional per-member £/month override of PRIVATE (non-workplace)
+                     pension contributions, via plan.privContrib = { <member>: <£/month>, ... }.
+                     Only pots whose bd_pensions row has is_workplace === false are affected, and
+                     only for tiers that already have a contribution row. A dated contribution
+                     exception still takes precedence. Inert — output identical to ann5 — whenever
+                     plan.privContrib is absent/empty, so no member key is present.)
    build tag: ann5  (additive: single-figure dining + holiday terms now take an optional household
                      age-taper (data.diningTaper / data.holidayTaper, each a { taper_at_70/80/90 }
                      object) applied via the existing taperFor helper on the older member's age.
@@ -201,6 +207,18 @@
       return { override, oneOff };
     }
 
+    // ---- Private-pension £ contribution override (build ann6) ----
+    // Keys (member|pension) of PRIVATE pots: bd_pensions rows flagged is_workplace === false.
+    // (Only an explicit false counts as private; missing/true stays workplace, so existing data
+    // with no flag is unaffected.)
+    const privKeys = new Set();
+    (data.pensions || []).forEach(p => {
+      if (p.is_workplace === false) privKeys.add(p.member_name + '|' + p.pension_name);
+    });
+    // Optional what-if: a flat £/month applied to every PRIVATE pot of a member, replacing the
+    // normal contribution. Absent/empty => the override never fires and output matches ann5.
+    const privOv = (plan && plan.privContrib) ? plan.privContrib : null;
+
     // ---- Stage D: working-days tiers + workplace/private rules ----
     // Apply one member's contributions for the current month into pots.
     // All pensions are tier-driven and stop at the member's retirement date.
@@ -217,7 +235,13 @@
         const ex = exceptionFor(member, c.pension_name, curIdx);
         const rises = risesElapsed(loopStart, cur, c.increase_month);
         const normal = (Number(c.monthly_contribution) || 0) * contribMult * Math.pow(1 + (Number(c.august_increase_pct) || 0), rises);
-        const base = (ex.override != null) ? ex.override * contribMult : normal;
+        // Precedence: a dated exception override wins; else the private £ override (if this is a
+        // private pot and the member has a value); else the normal escalated contribution.
+        // With privOv null the middle branch can never run, so `base` equals the ann5 expression.
+        let base;
+        if (ex.override != null) base = ex.override * contribMult;
+        else if (privOv && privKeys.has(k) && privOv[member] != null) base = (Number(privOv[member]) || 0) * contribMult;
+        else base = normal;
         const added = base + ex.oneOff * contribMult;
         pots[k] += added;
         if (contribOut) contribOut[k] = (contribOut[k] || 0) + added;
