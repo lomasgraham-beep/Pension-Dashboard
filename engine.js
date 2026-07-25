@@ -1,5 +1,23 @@
 /* ============================================================
    engine.js  —  Pension modelling engine (pure JavaScript)
+   build tag: ann7  (three gated corrections, all drawdown-side; accumulation is untouched.
+                     1) INFLATE_FROM_TODAY — bills / dining / holidays inflate from TODAY rather
+                        than from the first retirement date, so a retirement N years out starts
+                        from a cost base ~N years of inflation higher. Inert (identical to ann6)
+                        when the flag is false, and a no-op in "retired" mode (retirement = now).
+                     2) HIGHER_RATE_TAX — adds the 40% band above £50,270/yr (PA £12,570 + basic
+                        band £37,700, both frozen, monthly PAYE basis) to fundPerson: dbNet, the
+                        marginal taxNet, and all three gross-from-net inversions (FAD, UFPLS+divert,
+                        UFPLS). Inert when false (band width = Infinity reduces every expression to
+                        the ann6 flat-20% form).
+                     3) DRAWDOWN_GROWTH_FROM_CFG — drawdown growth follows cfg.growthRate when the
+                        caller supplies it (so the accumulation growth slider / uncertainty band
+                        carries through retirement). Inert when the flag is false OR cfg.growthRate
+                        is absent (falls back to the hard-coded GROWTH = 5%), and numerically
+                        identical when cfg.growthRate === 0.05.
+                     CONVENTION NOTE (documented, no code change): monthly_contribution values and
+                     plan.privContrib are GROSS amounts landing in the pot — any HMRC relief-at-
+                     source top-up is already included in the stored figure. Do not add relief.)
    build tag: ann6  (additive: optional per-member £/month override of PRIVATE (non-workplace)
                      pension contributions, via plan.privContrib = { <member>: <£/month>, ... }.
                      Only pots whose bd_pensions row has is_workplace === false are affected, and
@@ -40,8 +58,17 @@
 
   // Assumptions inherited from the original engine so results match.
   const INFL = 0.025;     // inflation on outgoings & guaranteed income
-  const GROWTH = 0.05;    // pot growth during the drawdown phase
+  const GROWTH = 0.05;    // pot growth during the drawdown phase (fallback — see ann7 flag 3)
   const PA = 12570;       // personal allowance (frozen)
+  const BRB = 37700;      // basic-rate band width (£50,270 − £12,570); 40% applies above it
+
+  // ---- ann7 gated corrections (see header) ----
+  // Inertness: with all three false, the engine's output is numerically identical to ann6 —
+  // proven over the full drawdown surface (see the LC-383 proof harness). Each flag is also
+  // individually inert at runtime in the cases documented beside it.
+  const INFLATE_FROM_TODAY = true;      // false = ann6 behaviour (inflation starts at retirement)
+  const HIGHER_RATE_TAX = true;         // false = ann6 flat 20% above the PA
+  const DRAWDOWN_GROWTH_FROM_CFG = true;// false (or cfg.growthRate absent) = hard-coded 5%
 
   // ---- Mask-aware bill costing (build ann2) ----
   // The DB's total_annual generated column is premium x 12 for Monthly bills and ignores the
@@ -325,7 +352,13 @@
     const jDob = jM.dob ? new Date(jM.dob) : null;
 
     const MPA = PA / 12;                          // monthly personal allowance (PAYE-style)
-    const mGrow = Math.pow(1 + GROWTH, 1 / 12);   // monthly growth so 12 months = the annual rate
+    // Monthly basic-rate band width. With HIGHER_RATE_TAX off this is Infinity, which makes every
+    // higher-rate branch below unreachable and every band comparison true — i.e. exactly ann6.
+    const MBR = HIGHER_RATE_TAX ? BRB / 12 : Infinity;
+    // ann7 flag 3: drawdown growth follows cfg.growthRate when supplied; otherwise (or with the
+    // flag off) the hard-coded GROWTH — so untouched callers are byte-identical to ann6.
+    const dGrow = (DRAWDOWN_GROWTH_FROM_CFG && cfg.growthRate != null) ? Number(cfg.growthRate) : GROWTH;
+    const mGrow = Math.pow(1 + dGrow, 1 / 12);    // monthly growth so 12 months = the annual rate
 
     // Start at the actual retirement month; default to January of startYear.
     const rd = cfg.retirementDate || new Date(cfg.startYear, 0, 1);
@@ -380,6 +413,13 @@
     const nowMonth = new Date();
     const nowIdx = nowMonth.getFullYear() * 12 + nowMonth.getMonth();
     const preRetireYears = Math.max(0, (startIdx - nowIdx) / 12);
+
+    // ann7 flag 1: head-start span (years, today → first retirement) added inside the outgoings
+    // inflFactor, so bills/dining/holidays inflate from TODAY. 0 when the flag is off (identical
+    // to ann6: Math.floor(0 + elapsed) === Math.floor(elapsed)) and 0 in "retired" mode, where
+    // earliestRetIdx <= nowIdx. State pension already grows from today (preRetireYears above);
+    // DB incomes are stored as at-retirement values so they correctly escalate from retirement.
+    const preInflYears = INFLATE_FROM_TODAY ? Math.max(0, (earliestRetIdx - nowIdx) / 12) : 0;
 
     // Run to the month of the latest end-of-life date (partial final year is fine).
     const gEol = gM.end_of_life_date ? new Date(gM.end_of_life_date) : null;
@@ -573,34 +613,52 @@
     // `dvTf`: divert the 25% tax-free element of UFPLS draws to surplus savings.
     function fundPerson(target, inc, tfPot, txPot, potFloor, crystallised, dvTf) {
       const dbGross = inc.total;
-      let dbNet, paRem;
-      if (dbGross > MPA) { dbNet = MPA + (dbGross - MPA) * 0.80; paRem = 0; }
-      else { dbNet = dbGross; paRem = MPA - dbGross; }
+      // ann7 flag 2: dbNet consumes the PA, then the basic-rate band (20%), then 40% above.
+      // With MBR = Infinity (flag off) the first branch is unreachable and the others are the
+      // ann6 expressions with brRem = Infinity (never binds), so results are identical.
+      let dbNet, paRem, brRem;
+      if (dbGross > MPA + MBR) { dbNet = MPA + MBR * 0.80 + (dbGross - MPA - MBR) * 0.60; paRem = 0; brRem = 0; }
+      else if (dbGross > MPA) { dbNet = MPA + (dbGross - MPA) * 0.80; paRem = 0; brRem = MPA + MBR - dbGross; }
+      else { dbNet = dbGross; paRem = MPA - dbGross; brRem = MBR; }
       const netGap = Math.max(target - dbNet, 0);
-      // Net received from a given gross taxable amount after PAYE
-      function taxNet(gross) { return gross <= paRem ? gross : paRem + (gross - paRem) * 0.80; }
+      // Net received from a given gross taxable amount after PAYE: remaining PA at 0%, remaining
+      // basic band at 20%, anything above at 40%. brRem = Infinity reduces this to the ann6 form.
+      function taxNet(gross) {
+        if (gross <= paRem) return gross;
+        if (gross <= paRem + brRem) return paRem + (gross - paRem) * 0.80;
+        return paRem + brRem * 0.80 + (gross - paRem - brRem) * 0.60;
+      }
       const pot = tfPot + txPot;
       const potAvail = Math.max(pot - potFloor, 0);
       let G = 0, drawTf = 0, drawGross = 0, tfToSurplus = 0;
       if (netGap > 0) {
+        // Each inversion below is the exact inverse of taxNet for its mode, now piecewise over
+        // three segments: within the PA, within the basic band, and above it (40%). With
+        // brRem = Infinity (flag off) every middle condition is true, the third segments are
+        // unreachable, and the middle formulas are byte-for-byte the ann6 expressions.
         if (crystallised) {
           // FAD post-crystallisation: 100% taxable draw from txPot (tfPot is 0)
           if (netGap <= paRem) G = netGap;
-          else G = paRem + (netGap - paRem) / 0.80;
+          else if (netGap <= paRem + brRem * 0.80) G = paRem + (netGap - paRem) / 0.80;
+          else G = paRem + brRem + (netGap - paRem - brRem * 0.80) / 0.60;
           G = Math.min(G, potAvail);
           drawGross = G;
         } else if (dvTf) {
           // UFPLS + divert: only 75% taxable portion covers bills; 25% TF → surplus
           if (netGap <= paRem) G = netGap / 0.75;
-          else G = (netGap - 0.20 * paRem) / 0.60;
+          else if (netGap <= paRem + brRem * 0.80) G = (netGap - 0.20 * paRem) / 0.60;
+          else G = (paRem + brRem + (netGap - paRem - brRem * 0.80) / 0.60) / 0.75;
           G = Math.min(G, potAvail);
           drawTf = 0.25 * G; drawGross = 0.75 * G;
           tfToSurplus = drawTf;
         } else {
           // UFPLS default: full net (25% TF + 75% taxable net) covers bills
           const threshold = paRem / 0.75;    // G at which 0.75*G = paRem
+          // netGap at which 0.75*G exhausts the basic band (G = (paRem+brRem)/0.75)
+          const threshold2 = (0.85 * (paRem + brRem)) / 0.75 + 0.20 * paRem;
           if (netGap <= threshold) G = netGap;
-          else G = (netGap - 0.20 * paRem) / 0.85;
+          else if (netGap <= threshold2) G = (netGap - 0.20 * paRem) / 0.85;
+          else G = (netGap - 0.40 * paRem - 0.20 * brRem) / 0.70;
           G = Math.min(G, potAvail);
           drawTf = 0.25 * G; drawGross = 0.75 * G;
         }
@@ -684,7 +742,7 @@
         };
       }
 
-      const inflFactor = Math.pow(1 + INFL, Math.floor(elapsed));   // annual step: flat within each year since retirement
+      const inflFactor = Math.pow(1 + INFL, Math.floor(preInflYears + elapsed));   // annual step; preInflYears = 0 gives the ann6 basis (flat within each year since retirement)
       const billsM = bills.reduce((s, b) => s + billEffectiveAnnual(b) * (b.spend_reduction ? spendRed : 1.0) * taperFor(b, oldest), 0) / 12 * inflFactor;
       // Dining: new model uses a single annual figure (rota × meal costs), subject to the
       // spending-reduction slider AND an optional household age-taper (data.diningTaper, a single
