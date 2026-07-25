@@ -5,7 +5,7 @@
 <title>Scenario Grid</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=hol1"></script>
-<script src="engine.js?v=ann5"></script>
+<script src="engine.js?v=ann7"></script>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
   :root {
@@ -102,7 +102,7 @@
   <div class="grid-head">
     <div class="gh-left">
       <span class="gh-title">Scenario Grid</span>
-      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid8)</span></span>
+      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid9)</span></span>
       <span class="spend-ctl"><label>Spend %</label>
         <input id="sp0" type="number" min="0" max="200" step="5" value="50" inputmode="numeric">
         <input id="sp1" type="number" min="0" max="200" step="5" value="60" inputmode="numeric">
@@ -523,6 +523,30 @@
   google.charts.setOnLoadCallback(() => { chartsReady = true; drawAll(); });
 
   App.requireLogin(load, { title: 'Scenario Grid' });
+</script>
+
+<script>
+/* LC-383: engine build self-check + deploy stamp. The banner appears whenever the loaded
+   engine's exported BUILD is not the one this page was built against - e.g. a stale cached
+   copy or an engine.js that was not deployed first. In-flow (not fixed) so it is visible in
+   both scrolling and overflow:hidden flex layouts inside the Safari iframe. */
+(function () {
+  var WANT = 'ann7', TAG = 'grid9';
+  function go() {
+    var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
+    if (got !== WANT) {
+      var b = document.createElement('div');
+      b.style.cssText = 'flex:none;background:#b3261e;color:#ffffff;padding:8px 12px;font:600 13px/1.35 "Segoe UI",Tahoma,sans-serif;';
+      b.textContent = 'ENGINE MISMATCH \u2014 this page expects engine ' + WANT + ' but loaded "' + got + '". Deploy the latest engine.js first, then hard-refresh this page.';
+      document.body.insertBefore(b, document.body.firstChild);
+    }
+    var s = document.createElement('div');
+    s.style.cssText = 'flex:none;text-align:right;padding:2px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
+    s.textContent = TAG + ' \u00b7 engine ' + got;
+    document.body.appendChild(s);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+})();
 </script>
 </body>
 </html>

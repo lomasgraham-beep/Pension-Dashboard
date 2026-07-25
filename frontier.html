@@ -5,7 +5,7 @@
 <title>Retire Frontier</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=hol1"></script>
-<script src="engine.js?v=ann5"></script>
+<script src="engine.js?v=ann7"></script>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
   :root {
@@ -166,7 +166,7 @@
 
   <div class="head">
     <div class="hrow">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front23)</span></span>
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front24)</span></span>
       <div class="seg" id="seg">
         <button type="button" class="seg-btn active" data-mode="joint">Joint</button>
         <button type="button" class="seg-btn" data-mode="p1" id="segP1">Graham</button>
@@ -1006,6 +1006,30 @@
   google.charts.load('current', { packages: ['corechart'] });
   google.charts.setOnLoadCallback(() => { chartsReady = true; draw(); });
   App.requireLogin(load, { title: 'Retire Frontier' });
+</script>
+
+<script>
+/* LC-383: engine build self-check + deploy stamp. The banner appears whenever the loaded
+   engine's exported BUILD is not the one this page was built against - e.g. a stale cached
+   copy or an engine.js that was not deployed first. In-flow (not fixed) so it is visible in
+   both scrolling and overflow:hidden flex layouts inside the Safari iframe. */
+(function () {
+  var WANT = 'ann7', TAG = 'frontier front24';
+  function go() {
+    var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
+    if (got !== WANT) {
+      var b = document.createElement('div');
+      b.style.cssText = 'flex:none;background:#b3261e;color:#ffffff;padding:8px 12px;font:600 13px/1.35 "Segoe UI",Tahoma,sans-serif;';
+      b.textContent = 'ENGINE MISMATCH \u2014 this page expects engine ' + WANT + ' but loaded "' + got + '". Deploy the latest engine.js first, then hard-refresh this page.';
+      document.body.insertBefore(b, document.body.firstChild);
+    }
+    var s = document.createElement('div');
+    s.style.cssText = 'flex:none;text-align:right;padding:2px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
+    s.textContent = TAG + ' \u00b7 engine ' + got;
+    document.body.appendChild(s);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+})();
 </script>
 </body>
 </html>

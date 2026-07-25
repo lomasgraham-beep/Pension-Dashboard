@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Backup &amp; Restore</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=hol1"></script>
+<style>
+  :root { --accent:#1d3a63; --aqua:#0f766e; --ink:#2c3e50; --sub:#64748b; --line:#d3e3e3;
+          --bg:#e8f0f0; --panel:#ffffff; --panelborder:#d4e4e4; --danger:#b3261e; }
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; background:var(--bg); color:var(--ink); padding:14px; }
+  h2 { margin:0 0 4px; font-size:18px; }
+  .note { color:var(--sub); font-size:13px; margin:0 0 14px; line-height:1.4; }
+  .card { background:var(--panel); border:1px solid var(--panelborder); border-radius:10px;
+          padding:14px 16px; margin-bottom:14px; box-shadow:0 1px 3px rgba(15,52,52,0.10); }
+  .card h3 { margin:0 0 6px; font-size:15px; color:var(--accent); }
+  .card p { font-size:13px; color:var(--sub); margin:4px 0 10px; line-height:1.45; }
+  .btn { border:0; border-radius:9px; padding:11px 18px; font-size:14px; font-weight:700; cursor:pointer;
+         background:var(--accent); color:#ffffff; -webkit-tap-highlight-color:transparent; }
+  .btn:disabled { opacity:.45; }
+  .btn-danger { background:var(--danger); }
+  .btn-light { background:var(--panel); color:var(--ink); border:1px solid var(--panelborder); }
+  #msg, #rmsg { font-size:13px; font-weight:700; margin-left:10px; }
+  .ok { color:var(--aqua); } .err { color:var(--danger); }
+  table { border-collapse:collapse; font-size:12px; margin-top:10px; width:100%; max-width:560px; }
+  th, td { text-align:left; padding:4px 10px 4px 0; border-bottom:1px solid var(--line); }
+  th { color:var(--sub); font-weight:600; }
+  td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  .warnbox { border:1px solid var(--danger); border-radius:8px; background:#fdecea; color:#7f1d1d;
+             font-size:13px; padding:10px 12px; line-height:1.45; margin:10px 0; }
+  input[type=text] { font-size:15px; padding:9px 10px; border:1px solid var(--panelborder); border-radius:8px;
+                     background:var(--panel); color:var(--ink); width:160px; }
+  input[type=file] { font-size:13px; }
+  label.tick { display:inline-flex; align-items:center; gap:6px; font-size:12px; margin:2px 12px 2px 0; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#e2e8f0; --sub:#94a3b8; --line:#1f3a3a; --bg:#0b1620; --panel:#101d2a;
+            --panelborder:#1e3448; --accent:#3b82c4; --aqua:#5eead4; }
+    .warnbox { background:#3a1210; color:#fecaca; }
+  }
+</style>
+</head>
+<body>
+  <h2>Backup &amp; Restore <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(backup build: bk1)</span></h2>
+  <p class="note">One-click export of every table in the database to a single JSON file you keep, and a guarded
+  restore that puts a backup file back. This is the app's safety net — take a backup before any risky change,
+  and keep a recent one somewhere off this device.</p>
+
+  <div class="card">
+    <h3>Download a backup</h3>
+    <p>Fetches every table below and saves one JSON file to this device (share it to iCloud/Files to keep it safe).
+       Nothing is changed in the database.</p>
+    <button class="btn" id="dlBtn" onclick="doBackup()">Download backup</button><span id="msg"></span>
+    <div id="dlSummary"></div>
+  </div>
+
+  <div class="card">
+    <h3>Restore from a backup file</h3>
+    <p>Choose a backup file, review what it contains, then confirm. Restore <b>deletes every row</b> in each
+       ticked table and re-inserts the rows from the file.</p>
+    <div class="warnbox"><b>Restore is destructive.</b> Each ticked table is emptied first. Restoring
+      <b>bd_members</b> cascade-deletes rows in the seven tables that reference it, so when restoring members
+      always tick the whole set (the default). If a table's delete step reports 403/permission errors, that
+      table is missing a Row Level Security DELETE policy in Supabase — stop and add it before retrying,
+      otherwise rows will be duplicated.</div>
+    <input type="file" id="file" accept=".json,application/json" onchange="loadFile(this)">
+    <div id="preview"></div>
+    <div id="confirmRow" style="display:none;margin-top:10px;">
+      Type <b>RESTORE</b> to enable:
+      <input type="text" id="confirmTxt" autocomplete="off" autocapitalize="characters" oninput="gate()">
+      <button class="btn btn-danger" id="goBtn" disabled onclick="doRestore()">Restore now</button>
+      <span id="rmsg"></span>
+    </div>
+    <div id="rSummary"></div>
+  </div>
+
+<script>
+  /* Every table in the app, PARENTS FIRST. Inserts run in this order; deletes run in
+     reverse, so children are cleared before the parents they reference. */
+  const TABLES = [
+    'bd_members', 'bd_bill_category', 'bd_meal_cost', 'bd_holiday_cost',
+    'bd_holiday_settings', 'bd_dining_settings',
+    'bd_pensions', 'bd_pension_contributions', 'bd_contribution_exceptions', 'op_pension_logs',
+    'bd_working_tiers', 'bd_income_sources', 'bd_income_amounts', 'bd_guaranteed_incomes',
+    'bd_household_bills', 'bd_dining_habits', 'bd_dining_rota', 'bd_holiday_plan',
+    'bd_savings_accounts', 'bd_purchases', 'bd_annuities', 'bd_market_crashes',
+    'bd_bank_account', 'bd_card_txn', 'bd_merchant_map', 'bd_other_income',
+    'op_modelling_parameters', 'op_saved_models', 'op_multi_models'
+  ];
+  const CHUNK = 200;
+  let backup = null;   // parsed file awaiting restore
+
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+  async function doBackup() {
+    const btn = document.getElementById('dlBtn'), msg = document.getElementById('msg');
+    btn.disabled = true; msg.className = ''; msg.textContent = 'Fetching\u2026';
+    const out = { app: 'My Pension Project', kind: 'full-backup', exported_at: new Date().toISOString(), tables: {} };
+    const counts = [];
+    try {
+      for (const t of TABLES) {
+        let rows = [];
+        try { rows = await App.rest(t + '?limit=100000'); }
+        catch (e) { rows = []; counts.push([t, 'FAILED: ' + e.message]); out.tables[t] = []; continue; }
+        out.tables[t] = rows || [];
+        counts.push([t, (rows || []).length]);
+        msg.textContent = 'Fetched ' + t + '\u2026';
+      }
+      const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'pension_backup_' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      msg.className = 'ok'; msg.textContent = 'Backup downloaded.';
+      document.getElementById('dlSummary').innerHTML = tableHtml(counts);
+    } catch (e) { msg.className = 'err'; msg.textContent = 'Backup failed: ' + e.message; }
+    btn.disabled = false;
+  }
+
+  function tableHtml(counts) {
+    let h = '<table><tr><th>Table</th><th style="text-align:right;">Rows</th></tr>';
+    for (const [t, n] of counts) h += '<tr><td>' + esc(t) + '</td><td class="n">' + esc(n) + '</td></tr>';
+    return h + '</table>';
+  }
+
+  function loadFile(inp) {
+    backup = null;
+    document.getElementById('preview').innerHTML = '';
+    document.getElementById('confirmRow').style.display = 'none';
+    document.getElementById('rSummary').innerHTML = '';
+    const f = inp.files && inp.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = function () {
+      try {
+        const j = JSON.parse(r.result);
+        if (!j || j.kind !== 'full-backup' || !j.tables) throw new Error('not a backup file from this page');
+        backup = j;
+        let h = '<p style="margin-top:10px;">Backup taken <b>' + esc(j.exported_at || '?') + '</b>. Tick the tables to restore:</p>';
+        for (const t of TABLES) {
+          const n = (j.tables[t] || []).length;
+          h += '<label class="tick"><input type="checkbox" class="tsel" value="' + t + '" checked> ' +
+               esc(t) + ' (' + n + ')</label>';
+        }
+        document.getElementById('preview').innerHTML = h;
+        document.getElementById('confirmRow').style.display = 'block';
+        document.getElementById('confirmTxt').value = ''; gate();
+      } catch (e) {
+        document.getElementById('preview').innerHTML = '<p class="err">Could not read file: ' + esc(e.message) + '</p>';
+      }
+    };
+    r.readAsText(f);
+  }
+
+  function gate() {
+    document.getElementById('goBtn').disabled =
+      document.getElementById('confirmTxt').value.trim() !== 'RESTORE';
+  }
+
+  async function doRestore() {
+    if (!backup) return;
+    const sel = Array.prototype.slice.call(document.querySelectorAll('.tsel'))
+      .filter(c => c.checked).map(c => c.value);
+    if (!sel.length) return;
+    const btn = document.getElementById('goBtn'), rmsg = document.getElementById('rmsg');
+    btn.disabled = true; rmsg.className = ''; rmsg.textContent = 'Restoring\u2026';
+    const results = [];
+    try {
+      // delete children first (reverse dependency order)
+      for (const t of TABLES.slice().reverse()) {
+        if (sel.indexOf(t) < 0) continue;
+        rmsg.textContent = 'Clearing ' + t + '\u2026';
+        try { await App.write('DELETE', t + '?id=not.is.null', undefined); }
+        catch (e) { results.push([t, 'DELETE FAILED: ' + e.message]); }
+      }
+      // insert parents first
+      for (const t of TABLES) {
+        if (sel.indexOf(t) < 0) continue;
+        const rows = backup.tables[t] || [];
+        rmsg.textContent = 'Restoring ' + t + '\u2026';
+        let done = 0, fail = null;
+        for (let i = 0; i < rows.length; i += CHUNK) {
+          try { await App.write('POST', t, rows.slice(i, i + CHUNK)); done += Math.min(CHUNK, rows.length - i); }
+          catch (e) { fail = e.message; break; }
+        }
+        results.push([t, fail ? (done + '/' + rows.length + ' \u2014 ' + fail) : (done + ' restored')]);
+      }
+      rmsg.className = 'ok'; rmsg.textContent = 'Restore finished \u2014 check the counts below, then hard-refresh the app.';
+    } catch (e) { rmsg.className = 'err'; rmsg.textContent = 'Restore stopped: ' + e.message; }
+    document.getElementById('rSummary').innerHTML = tableHtml(results);
+    document.getElementById('confirmTxt').value = ''; gate();
+  }
+</script>
+
+<script>
+/* LC-383: deploy stamp (this page does not load the engine). */
+(function () {
+  var TAG = 'backup bk1';
+  function go() {
+    var s = document.createElement('div');
+    s.style.cssText = 'text-align:right;padding:2px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
+    s.textContent = TAG;
+    document.body.appendChild(s);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+})();
+</script>
+</body>
+</html>

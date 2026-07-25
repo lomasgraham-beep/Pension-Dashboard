@@ -5,7 +5,7 @@
 <title>Pot at Retirement</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=hol1"></script>
-<script src="engine.js?v=ann5"></script>
+<script src="engine.js?v=ann7"></script>
 <style>
   :root {
     --accent:#1d3a63; --safe:#10b981; --risk:#ef4444;
@@ -78,7 +78,7 @@
 </head>
 <body>
   <div class="head">
-    <div class="h-title">Pot at Retirement <span class="build">(build: pt5)</span></div>
+    <div class="h-title">Pot at Retirement <span class="build">(build: pt6)</span></div>
     <div class="h-sub" id="hsub">Pot value for each possible retirement month, from this month onwards. <b>Safe spend %</b> is the most you could spend at that date and still have both pots last (capped by the spend lock). <b>Lowest pot</b> is the lowest the combined pot falls to during drawdown at that spend, and the year it happens (red if it empties).</div>
     <div class="ctlrow">
       <span class="ctl-label">Offset months</span>
@@ -388,6 +388,30 @@
   document.getElementById('lockUp').addEventListener('click', () => nudge('lock', 1, 20, 200, 5));
   window.addEventListener('message', (ev) => { if (ev && ev.data === 'refresh-data') load(); });
   App.requireLogin(load, { title: 'Pot at Retirement' });
+</script>
+
+<script>
+/* LC-383: engine build self-check + deploy stamp. The banner appears whenever the loaded
+   engine's exported BUILD is not the one this page was built against - e.g. a stale cached
+   copy or an engine.js that was not deployed first. In-flow (not fixed) so it is visible in
+   both scrolling and overflow:hidden flex layouts inside the Safari iframe. */
+(function () {
+  var WANT = 'ann7', TAG = 'pot table pt6';
+  function go() {
+    var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
+    if (got !== WANT) {
+      var b = document.createElement('div');
+      b.style.cssText = 'flex:none;background:#b3261e;color:#ffffff;padding:8px 12px;font:600 13px/1.35 "Segoe UI",Tahoma,sans-serif;';
+      b.textContent = 'ENGINE MISMATCH \u2014 this page expects engine ' + WANT + ' but loaded "' + got + '". Deploy the latest engine.js first, then hard-refresh this page.';
+      document.body.insertBefore(b, document.body.firstChild);
+    }
+    var s = document.createElement('div');
+    s.style.cssText = 'flex:none;text-align:right;padding:2px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
+    s.textContent = TAG + ' \u00b7 engine ' + got;
+    document.body.appendChild(s);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+})();
 </script>
 </body>
 </html>
