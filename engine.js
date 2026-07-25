@@ -1070,6 +1070,7 @@
   }
 
   global.PensionEngine = {
+    BUILD: 'ann7',   // LC-383: exported so framed pages can self-check the loaded engine build
     INFL: INFL, GROWTH: GROWTH, PA: PA,
     latestPots: latestPots,
     forecast: forecast,
