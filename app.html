@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=hol1"></script>
-  <script src="engine.js?v=ann5"></script>
+  <script src="engine.js?v=ann6"></script>
   <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
@@ -22,16 +22,14 @@
       --ink-soft:#64748b;          /* secondary text */
       --line:#e2e8f0;              /* hairlines */
       --line-strong:#cbd5e1;
-      --shadow:0 1px 2px rgba(20,40,50,0.05), 0 6px 16px rgba(20,40,50,0.07);
-      --shadow-hover:0 4px 10px rgba(20,40,50,0.08), 0 10px 26px rgba(20,40,50,0.10);
-      --radius:12px;
-      --radius-sm:8px;
+      --shadow:0 1px 3px rgba(20,40,50,0.06), 0 4px 12px rgba(20,40,50,0.05);
+      --radius:10px;
       --pos:#2f8f5b; --neg:#c0392b; --warn:#e67e22; --bills:#c0392b;
     }
     * { box-sizing:border-box; }
     body { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding:20px; background:var(--page); color:var(--ink); }
-    .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
-    .topbar h1 { margin:0; font-size:23px; font-weight:700; color:var(--ink); letter-spacing:-0.015em; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+    .topbar h1 { margin:0; font-size:22px; color:var(--ink); letter-spacing:-0.01em; }
     .right { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
     .view-toggle { background:var(--surface); border-radius:8px; overflow:hidden; display:flex; border:1px solid var(--line-strong); box-shadow:var(--shadow); }
     .btn-toggle { background:transparent; border:none; padding:9px 16px; font-weight:600; cursor:pointer; color:var(--ink-soft); font-size:13px; transition:background .12s,color .12s; }
@@ -53,21 +51,19 @@
     /* responsive shell: horizontal top-bar nav at all widths above phone (sticky on scroll);
        phone (<=600px) swaps the strip for the dropdown selector further down. */
     .shell { display:block; }
-    .tab-buttons { display:flex; flex-wrap:wrap; gap:2px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius) var(--radius) 0 0; padding:8px 8px 0; box-shadow:var(--shadow); position:sticky; top:0; z-index:60; }
-    .tab-buttons button { background:transparent; border:none; cursor:pointer; padding:13px 18px; font-size:14.5px; font-weight:600; color:var(--ink-soft); border-radius:8px 8px 0 0; transition:background .15s,color .15s; position:relative; }
-    .tab-buttons button:hover { background:var(--surface-2); color:var(--ink); }
-    .tab-buttons button.active-btn { background:var(--accent-soft); color:var(--accent-dark); font-weight:700; }
-    .tab-buttons button.active-btn::after { content:''; position:absolute; left:10px; right:10px; bottom:-1px; height:3px; border-radius:3px 3px 0 0; background:var(--accent); }
+    .tab-buttons { display:flex; flex-wrap:wrap; gap:4px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius) var(--radius) 0 0; padding:6px 6px 0; box-shadow:var(--shadow); position:sticky; top:0; z-index:60; }
+    .tab-buttons button { background:transparent; border:none; cursor:pointer; padding:13px 16px; font-size:15px; font-weight:600; color:var(--ink-soft); border-radius:8px 8px 0 0; transition:background .12s,color .12s; }
+    .tab-buttons button:hover { background:var(--accent-soft); color:var(--accent-dark); }
+    .tab-buttons button.active-btn { background:var(--accent-soft); border-bottom:3px solid var(--accent); color:var(--accent-dark); }
     .tabcontent { display:none; padding:22px; background:var(--surface); border:1px solid var(--line); border-top:none; border-radius:0 0 var(--radius) var(--radius); box-shadow:var(--shadow); }
     .tabcontent.active { display:block; }
-    h2 { color:var(--ink); margin-top:0; padding-bottom:8px; border-bottom:2px solid var(--line); font-weight:700; font-size:19px; letter-spacing:-0.005em; }
+    h2 { color:var(--ink); margin-top:0; padding-bottom:6px; border-bottom:2px solid var(--line); font-weight:700; }
 
     .card-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:15px; margin-bottom:10px; }
-    .card { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:18px 15px; text-align:center; transition:box-shadow .15s,border-color .15s; }
-    .card:hover { box-shadow:var(--shadow-hover); border-color:var(--line-strong); }
+    .card { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:18px 15px; text-align:center; }
     .card.hl { background:var(--accent-soft); border-color:var(--accent-border); }
-    .card h3 { margin:0 0 8px; font-size:11.5px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; font-weight:700; }
-    .card .value { font-size:25px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; }
+    .card h3 { margin:0 0 8px; font-size:12px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; }
+    .card .value { font-size:24px; font-weight:700; color:var(--ink); }
     .card.hl .value { color:var(--accent-dark); }
     /* Overview pension-performance blocks (one card per measure, a row per pension) */
     .perf-member { margin:26px 0 4px; font-size:20px; color:var(--ink); font-weight:700; }
@@ -177,22 +173,20 @@
       .ov-path-top { grid-template-columns:1fr; }
     }
 
-    .chart-wrap { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius); padding:14px 6px 4px; }
-    .chart-wrap .chart-box { margin-bottom:6px; }
     .chart-box { width:100%; height:400px; margin-bottom:20px; }
     .chart-error { display:flex; align-items:flex-start; gap:10px; min-height:160px; padding:16px 18px; border:1px solid var(--line); border-left:4px solid var(--warn); border-radius:var(--radius); background:var(--surface-2); color:var(--ink); font-size:14px; line-height:1.45; }
     .chart-error strong { display:block; margin-bottom:4px; color:var(--ink); }
     .chart-error .chart-error-icon { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:var(--warn); color:#fff; font-weight:700; }
     .chart-error code { font-size:12px; color:var(--ink-soft); white-space:normal; word-break:break-word; }
     /* Custom two-row wrapping legend under charts (replaces google's paginating legend) */
-    .cx-legend { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:6px 14px; padding:6px 40px 10px; font-size:12px; color:var(--ink); font-weight:600; max-height:calc(1.4em * 2 + 12px); overflow:hidden; margin:-6px 0 4px; }
+    .cx-legend { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:4px 12px; padding:6px 40px 10px; font-size:12px; color:var(--ink); max-height:calc(1.4em * 2 + 12px); overflow:hidden; margin:-14px 0 12px; }
     .cx-legend .cx-item { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; line-height:1.35; }
     .cx-legend .cx-swatch { display:inline-block; width:12px; height:12px; border-radius:2px; flex:0 0 auto; }
     .cx-legend .cx-swatch.line { height:3px; border-radius:2px; }
-    .chart-wrap { position:relative; margin-bottom:20px; }
+    .chart-wrap { position:relative; }
     .chart-fs-btn { position:absolute; top:8px; right:8px; z-index:6; display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; padding:0; border:1px solid var(--line-strong); border-radius:8px; background:var(--surface); color:var(--ink-soft); cursor:pointer; opacity:0.8; box-shadow:var(--shadow); }
     .chart-fs-btn:hover { opacity:1; color:var(--accent); border-color:var(--accent-border); }
-    .chart-wrap.fs { position:fixed; inset:0; z-index:10000; margin:0; padding:12px 12px 16px; background:var(--surface); border:none; border-radius:0; overflow:auto; }
+    .chart-wrap.fs { position:fixed; inset:0; z-index:10000; margin:0; padding:12px 12px 16px; background:var(--surface); overflow:auto; }
     .chart-wrap.fs .chart-box { height:calc(var(--fs-h, 100vh) - 28px); margin:0; }
     .chart-wrap.fs .chart-fs-btn { position:fixed; top:14px; right:18px; width:44px; height:44px; opacity:1; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
@@ -229,8 +223,8 @@
     .subtab-buttons { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:15px; border-bottom:2px solid var(--line); padding-bottom:10px; position:sticky; top:var(--topnav-h, 52px); z-index:55; background:var(--surface); padding-top:8px; box-shadow:0 4px 5px -4px rgba(0,0,0,0.12); }
     .subtab-group-label { flex-basis:100%; width:100%; margin:6px 0 0; font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-soft); }
     .subtab-group-label:first-child { margin-top:0; }
-    .subtab-link { background:var(--surface); border:1px solid var(--line-strong); color:var(--ink-soft); padding:9px 16px; border-radius:20px; font-weight:600; cursor:pointer; font-size:13.5px; transition:background .12s,color .12s,border-color .12s; }
-    .subtab-link:hover { background:var(--accent-soft); border-color:var(--accent-border); color:var(--accent-dark); }
+    .subtab-link { background:var(--surface-2); border:1px solid var(--line-strong); color:var(--ink-soft); padding:9px 16px; border-radius:8px; font-weight:600; cursor:pointer; font-size:14px; transition:background .12s,color .12s; }
+    .subtab-link:hover { background:var(--accent-soft); }
     .subtab-link.active-sub { background:var(--accent); color:#fff; border-color:var(--accent); }
     .subtabcontent { display:none; }
     .subtabcontent[style*="block"] { display:block; }
@@ -248,8 +242,8 @@
        .tab-buttons rules above already give the strip; it is sticky so it stays
        reachable while scrolling long tables/charts on iPad and desktop. */
     .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
-    .params { background:var(--surface-2); border:1px solid var(--line); border-radius:var(--radius-sm); padding:18px 20px; margin:0 0 14px; }
-    .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:20px 26px; }
+    .params { background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:16px 18px; margin:0 0 14px; }
+    .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:18px 26px; }
     @media (min-width: 1000px) { .params .grid { grid-template-columns:repeat(3, 1fr); } }
     /* Wide screens: Modelling controls become a fixed left rail, charts fill the right and rise to top */
     @media (min-width: 1300px) {
@@ -270,12 +264,12 @@
     /* below the rail breakpoint, the collapse controls are irrelevant (stacked layout) */
     @media (max-width: 1299px) { .rail-collapse, .rail-strip { display:none !important; } }
     .params .ctrl-wide { grid-column:1 / -1; }
-    .params label { display:block; font-weight:700; font-size:13.5px; color:var(--ink); margin-bottom:9px; letter-spacing:0.005em; }
+    .params label { display:block; font-weight:bold; font-size:14px; color:var(--ink); margin-bottom:8px; }
     .params .ctrl { display:flex; flex-direction:column; }
     .params .ctrl > label { min-height:2.6em; }   /* reserve 2 lines so sliders align even when a label wraps */
     .params .ctrl > label.switch { min-height:0; }
     .params .sv { color:var(--accent); font-weight:bold; font-size:15px; }
-    .params .hint { font-size:12px; color:var(--ink-soft); margin-top:5px; line-height:1.4; }
+    .params .hint { font-size:12px; color:#94a3b8; margin-top:4px; }
 
     /* ---- Rail containment ----
        .ctrl is a flex column and .grid is a grid; flex/grid children default to
@@ -365,8 +359,7 @@
     .sw-on { color:var(--pos); } .sw-off { color:var(--warn); }
 
     .params .actions { margin-top:18px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-    .params .pbtn { padding:13px 22px; border:none; border-radius:var(--radius-sm); font-weight:700; cursor:pointer; font-size:15px; color:#fff; transition:filter .12s,transform .05s; }
-    .params .pbtn:active { transform:translateY(1px); }
+    .params .pbtn { padding:13px 22px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:15px; color:#fff; }
     .pbtn-save { background:#27ae60; } .pbtn-save:hover { background:#219150; }
     .pbtn-reset { background:#64748b; } .pbtn-reset:hover { background:#475569; }
     .pbtn-mss { background:var(--accent); } .pbtn-mss:hover { filter:brightness(0.92); }
@@ -378,6 +371,14 @@
     .floors-panel { display:none; margin-top:10px; }
     .floors-panel.show { display:grid; grid-template-columns:1fr 1fr; gap:14px 26px; align-items:start; }
     .floors-panel .hint { grid-column:1 / -1; }
+    /* ---- Collapsible private (Pru) contribution panel (LC-382) ---- */
+    .contrib-head { display:flex; align-items:center; gap:2px; }
+    .contrib-toggle { display:inline-flex; align-items:center; gap:9px; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:8px 12px; color:var(--ink); font-weight:bold; font-size:13px; cursor:pointer; }
+    .contrib-toggle .contrib-caret { font-size:11px; color:var(--accent); transition:transform .15s ease; }
+    .contrib-toggle[aria-expanded="true"] .contrib-caret { transform:rotate(90deg); }
+    .contrib-panel { display:none; margin-top:12px; }
+    .contrib-panel.show { display:block; }
+    .contrib-panel .ctrl + .ctrl { margin-top:14px; }
     .info-btn { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; margin-left:10px; border:none; border-radius:50%; background:var(--accent); color:#fff; font-style:italic; font-weight:bold; font-size:12px; font-family:Georgia, serif; cursor:pointer; flex:0 0 auto; }
     .info-btn:hover { background:var(--accent-dark); }
     .info-text { display:none; margin-top:8px; font-size:12px; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:8px 10px; }
@@ -567,7 +568,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-381</span>
+      <span class="build-stamp">LC-382</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -877,6 +878,19 @@
           <div class="info-text" id="info_divert">When on (UFPLS mode only): the 25% tax-free element of each pension withdrawal is diverted to surplus savings instead of covering bills. Bills are funded entirely by the 75% taxable portion (net of tax), so the gross withdrawal is larger but you build a tax-free cash buffer. When off (default): the full net &mdash; 25% tax-free plus 75% taxable net &mdash; covers bills.</div>
         </div>
         <div id="tierSliders" style="display:contents;"></div>
+        <!-- Private (Pru) pension contributions — collapsible; built by buildPrivContribSliders() (LC-382) -->
+        <div class="ctrl ctrl-wide" id="privContribBlock" style="display:none;">
+          <div class="contrib-head">
+            <button type="button" class="contrib-toggle" id="privContribToggle" aria-expanded="false" aria-controls="privContribPanel" onclick="togglePrivPanel()">
+              <span>Pension contributions</span><span class="contrib-caret">&#9656;</span>
+            </button>
+            <button type="button" class="info-btn" onclick="toggleInfo(event,'info_privcontrib')" aria-label="About pension contributions">i</button>
+          </div>
+          <div class="info-text" id="info_privcontrib">A flat monthly amount paid into your <strong>private (Pru)</strong> pension pots &mdash; your workplace pensions are never touched. The most you can set follows the current working pattern: up to &pound;1,500 on a 5-day week, &pound;500 on a 3-day week. Contributions stop at retirement, and any dated override you&rsquo;ve set on the Contributions page still takes precedence. <span style="color:var(--ink-soft);">What-if only &mdash; the projection updates live but this is never saved to your plan.</span> If a person has two private pots, both are set to the same amount.</div>
+          <div class="contrib-panel" id="privContribPanel">
+            <div id="privContribSliders"></div>
+          </div>
+        </div>
         <div class="ctrl"><label>State pension growth <span id="m_sprate_v" class="sv">2.5%</span></label><input type="range" id="m_sprate" min="0" max="3.5" step="0.1" value="2.5" oninput="onParam()">
           <div class="hint">Annual rise on the State Pension. Default 2.5%. Drag down for the triple lock weakened, capped, or frozen (0%). <span style="color:var(--ink-soft);">What-if only, never saved.</span></div></div>
         <!-- Row 2 -->
@@ -3020,6 +3034,95 @@
       tierKeys.forEach(tk => { const el = document.getElementById(tk.sid), lab = document.getElementById(tk.sid + '_v'); if (el && lab) lab.textContent = monthLabel(idxToDate(el.value)); });
     }
 
+    // ---- Private (Pru) pension contribution sliders (LC-382) ----
+    // One £/month slider per member who has a PRIVATE pot (bd_pensions.is_workplace === false)
+    // with a contribution at their current working tier. What-if only: absent from readControls()
+    // until dragged off its base, so the engine (ann6) behaves identically when untouched.
+    let privContribMeta = [];   // [{ member, sid, base, max, days }]
+    const gbpInt = n => '\u00a3' + Math.round(n).toLocaleString('en-GB');
+    // The member's active working-days tier TODAY (latest from_date <= now), or null.
+    function currentTierDays(member) {
+      const now = new Date();
+      let best = null;
+      (data.workingTiers || []).forEach(t => {
+        if (t.member_name !== member || !t.from_date) return;
+        const f = App.parseLocalDate(t.from_date);
+        if (f && f <= now && (best === null || f > best.f)) best = { f, days: Number(t.days) };
+      });
+      return best ? best.days : null;
+    }
+    // Cap follows the working pattern: £1,500 at 5 days, £500 at 3 days (linear: 500·d − 1000),
+    // clamped to £0–£1,500. Unknown tier defaults to the 5-day cap.
+    function contribCapForDays(days) {
+      if (days == null) return 1500;
+      return Math.max(0, Math.min(1500, 500 * days - 1000));
+    }
+    function buildPrivContribSliders() {
+      const host = document.getElementById('privContribSliders');
+      const block = document.getElementById('privContribBlock');
+      if (!host) return;
+      privContribMeta = [];
+      // private pots grouped by member; keep the highest current-tier contribution as the seed
+      const privByMember = {};
+      (data.pensions || []).forEach(p => {
+        if (p.is_workplace !== false) return;                 // only explicit private pots
+        (privByMember[p.member_name] = privByMember[p.member_name] || []).push(p.pension_name);
+      });
+      let html = '';
+      Object.keys(privByMember).sort().forEach(member => {
+        const days = currentTierDays(member);
+        // current contribution to this member's private pot(s) at the active tier — seed value
+        let seed = 0, hasRow = false;
+        (data.contributions || []).forEach(c => {
+          if (c.member_name !== member) return;
+          if (privByMember[member].indexOf(c.pension_name) < 0) return;
+          if (days != null && Number(c.working_days) !== Number(days)) return;
+          hasRow = true;
+          seed = Math.max(seed, Number(c.monthly_contribution) || 0);
+        });
+        if (!hasRow) return;                                   // nothing to override at this tier
+        const base = Math.round(seed / 10) * 10;               // snap to the £10 grid
+        const cap = contribCapForDays(days);
+        const max = Math.max(cap, Math.ceil(base / 10) * 10, 100);   // always let the current value be reached
+        const sid = 'm_priv_' + member.replace(/[^a-zA-Z0-9]/g, '_');
+        privContribMeta.push({ member, sid, base, max, days });
+        const nm = (member === p1Name) ? '<span class="nm-p1">' + member + '</span>'
+                 : (member === p2Name) ? '<span class="nm-p2">' + member + '</span>' : member;
+        const patt = (days != null) ? (days + '-day week') : 'current pattern';
+        html += '<div class="ctrl"><label>' + nm + ' private (Pru) contribution <span id="' + sid + '_v" class="sv">\u2014</span></label>'
+              + '<input type="range" id="' + sid + '" min="0" max="' + max + '" step="10" value="' + base + '" oninput="onParam()">'
+              + '<div class="hint">Flat £/month into ' + nm + '\u2019s private pot. Max ' + gbpInt(max) + ' at ' + patt + '. What-if only.</div></div>';
+      });
+      host.innerHTML = html;
+      if (block) block.style.display = privContribMeta.length ? '' : 'none';   // hide the whole panel if nobody qualifies
+      decorateSliders(host);   // give the new sliders their −/+ bump buttons
+      syncPrivContribLabels();
+    }
+    function resetPrivContribSliders() {
+      privContribMeta.forEach(pk => { const el = document.getElementById(pk.sid); if (el) el.value = pk.base; });
+    }
+    function syncPrivContribLabels() {
+      privContribMeta.forEach(pk => { const lab = document.getElementById(pk.sid + '_v'); const el = document.getElementById(pk.sid); if (lab && el) lab.textContent = gbpInt(el.value); });
+    }
+    // Only moved sliders become an override; untouched => absent, so the engine stays inert.
+    function readPrivContrib() {
+      const ov = {};
+      privContribMeta.forEach(pk => {
+        const el = document.getElementById(pk.sid);
+        if (!el) return;
+        const v = Math.round(parseFloat(el.value) || 0);
+        if (v !== pk.base) ov[pk.member] = v;
+      });
+      return Object.keys(ov).length ? ov : null;
+    }
+    function togglePrivPanel() {
+      const panel = document.getElementById('privContribPanel');
+      const btn = document.getElementById('privContribToggle');
+      if (!panel || !btn) return;
+      const open = panel.classList.toggle('show');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
     // Retirement date used to auto-set the crystallisation date for "Tax-free first".
     // Mirrors the shared/per-member logic used for retireByMember: while the live slider
     // still sits on the saved baseline, honour the member's own saved retirement date;
@@ -3086,7 +3189,8 @@
         jFloorPct: (parseFloat(document.getElementById('m_jfloor').value) || 0) / 100,
         spRate: parseFloat(document.getElementById('m_sprate').value) / 100,
         spDelay: parseInt(document.getElementById('m_spdelay').value) || 0,
-        tierDateOverrides: readTierOverrides()
+        tierDateOverrides: readTierOverrides(),
+        privContrib: readPrivContrib()
       };
     }
     function applyControls(plan) {
@@ -3109,6 +3213,7 @@
       document.getElementById('m_sprate').value = 2.5;
       document.getElementById('m_spdelay').value = 0;
       resetTierSliders();
+      resetPrivContribSliders();
       syncLabels();
     }
     function syncLabels() {
@@ -3122,6 +3227,7 @@
       const dly = parseInt(document.getElementById('m_spdelay').value) || 0;
       document.getElementById('m_spdelay_v').textContent = dly + (dly === 1 ? ' yr' : ' yrs');
       syncTierLabels();
+      syncPrivContribLabels();
       refreshRecentGrowthBtn();
     }
     // Annualise a total true-growth % measured over `months` months.
@@ -3959,6 +4065,7 @@
         if (p2Name && p2row) data.paramsByMember[p2Name] = p2row;
 
         buildTierSliders();
+        buildPrivContribSliders();
         buildColChooser();
         applyControls(savedPlan);
         applyRetiredMode();
