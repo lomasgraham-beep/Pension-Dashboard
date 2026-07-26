@@ -51,7 +51,7 @@
 </style>
 </head>
 <body>
-  <h2>Monthly Audit <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(audit build: maudit5)</span></h2>
+  <h2>Monthly Audit <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(audit build: maudit6)</span></h2>
   <p class="note">The engine's own month-by-month workings, shown so each row's sums can be checked by eye:
   <b>Bills + Dining + Holidays = Outgoings</b>, then <b>Gross fixed income &minus; Tax = Net</b>, the
   <b>Gap</b> that's left, and the <b>pension draw</b> (with its own tax) that fills it. Each row closes with <b>Pot start &minus; Draw + Growth = Pot closing</b> exactly &mdash; growth shows red when a market crash is pulling the pot down. The reconciliation
@@ -79,8 +79,8 @@
   let p1Init = 'G', p2Init = 'J';
   // Four collapsible column groups. Each remembers its expanded/collapsed state.
   const GROUPS = ['costs', 'income', 'draw', 'pot'];
-  const exp = { costs: false, income: false, draw: false, pot: false };
-  GROUPS.forEach(g => { try { exp[g] = localStorage.getItem('maudit_exp_' + g) === '1'; } catch (e) {} });
+  const exp = { costs: true, income: true, draw: true, pot: true };   // default expanded
+  GROUPS.forEach(g => { try { const v = localStorage.getItem('maudit_exp_' + g); if (v !== null) exp[g] = (v === '1'); } catch (e) {} });
   function toggleGrp(g) { exp[g] = !exp[g]; try { localStorage.setItem('maudit_exp_' + g, exp[g] ? '1' : '0'); } catch (e) {} render(); }
   const caret = g => exp[g] ? ' \u25be' : ' \u25b8';   // ▾ expanded / ▸ collapsed
 
@@ -405,7 +405,7 @@
 <script>
 /* LC-384: engine build self-check + deploy stamp. */
 (function () {
-  var WANT = 'ann7', TAG = 'monthly audit maudit5';
+  var WANT = 'ann7', TAG = 'monthly audit maudit6';
   function go() {
     var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
     if (got !== WANT) {
