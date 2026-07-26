@@ -27,6 +27,7 @@
   table { border-collapse:collapse; font-size:12.5px; white-space:nowrap; }
   th, td { padding:5px 9px; border-bottom:1px solid var(--line); text-align:right; font-variant-numeric:tabular-nums; }
   th { color:#ffffff; background:var(--accent); font-weight:600; position:relative; }
+  th.tgl { cursor:pointer; user-select:none; -webkit-user-select:none; }
   th.g1 { background:#2c5282; } th.g2 { background:#0f766e; } th.g3 { background:#8a5a12; } th.g4 { background:#5b3fa8; }
   td:first-child, th:first-child { text-align:left; }
   td.eq { font-weight:700; }
@@ -45,7 +46,7 @@
 </style>
 </head>
 <body>
-  <h2>Monthly Audit <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(audit build: maudit1)</span></h2>
+  <h2>Monthly Audit <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(audit build: maudit2)</span></h2>
   <p class="note">The engine's own month-by-month workings, shown so each row's sums can be checked by eye:
   <b>Bills + Dining + Holidays = Outgoings</b>, then <b>Gross fixed income &minus; Tax = Net</b>, the
   <b>Gap</b> that's left, and the <b>pension draw</b> (with its own tax) that fills it. The reconciliation
@@ -70,6 +71,40 @@
 
 <script>
   let monthly = null, yearly = null, who = 'c';
+  let p1Init = 'G', p2Init = 'J';
+  let incExp = false;
+  try { incExp = localStorage.getItem('maudit_incExp') === '1'; } catch (e) {}
+  function toggleInc() { incExp = !incExp; try { localStorage.setItem('maudit_incExp', incExp ? '1' : '0'); } catch (e) {} render(); }
+
+  // Distinct gross-income sources for the current view, in stable order (state first,
+  // then first-appearance). Combined view keys per person so both State Pensions show.
+  function sourceCols() {
+    const seen = [], keyset = {};
+    function noteList(list, tag) {
+      (list || []).forEach(src => {
+        const key = (tag ? tag + '|' : '') + (src.name || '?');
+        if (!keyset[key]) { keyset[key] = { key: key, name: src.name || '?', tag: tag, kind: src.kind || '' }; seen.push(keyset[key]); }
+      });
+    }
+    for (const m of monthly) {
+      if (who === 'g') noteList(m.g_sources, '');
+      else if (who === 'j') noteList(m.j_sources, '');
+      else { noteList(m.g_sources, p1Init); noteList(m.j_sources, p2Init); }
+    }
+    seen.sort((a, b) => ((a.kind === 'state' ? 0 : 1) - (b.kind === 'state' ? 0 : 1)));
+    return seen.map(c => ({ key: c.key, label: c.name + (c.tag ? ' (' + c.tag + ')' : '') }));
+  }
+  function sourceVal(m, col) {
+    const parts = col.key.split('|');
+    const tag = parts.length > 1 ? parts[0] : '', nm = parts.length > 1 ? parts[1] : parts[0];
+    let lists;
+    if (who === 'g') lists = [m.g_sources];
+    else if (who === 'j') lists = [m.j_sources];
+    else lists = tag === p1Init ? [m.g_sources] : [m.j_sources];
+    let v = 0;
+    for (const list of lists) (list || []).forEach(srcx => { if ((srcx.name || '?') === nm) v += srcx.gross || 0; });
+    return v;
+  }
   const gbp = n => '\u00a3' + Math.round(n).toLocaleString('en-GB');
 
   function pick(m) {
@@ -91,6 +126,14 @@
       tax: m.g_tax + m.j_tax, closing: m.g_closing + m.j_closing };
   }
 
+  function incHead() {
+    if (!incExp) return '<th class="g2 tgl" onclick="toggleInc()" title="Tap to show each income source">Gross income \u25b8</th><th class="g2">Tax</th><th class="g2">= Net income</th>';
+    const cols = sourceCols();
+    let h = '';
+    for (const c of cols) h += '<th class="g2">' + c.label + '</th>';
+    h += '<th class="g2 tgl" onclick="toggleInc()" title="Tap to collapse">= Gross \u25be</th><th class="g2">Tax</th><th class="g2">= Net income</th>';
+    return h;
+  }
   function render() {
     const yr = Number(document.getElementById('yearSel').value);
     const ms = monthly.filter(m => m.year === yr);
@@ -99,9 +142,21 @@
     let h = '<tr>' +
       '<th>Month ' + yr + '</th>' +
       '<th class="g1">Bills</th><th class="g1">Dining</th><th class="g1">Hols</th><th class="g1">= Outgoings' + (who==='c'?'':' (share)') + '</th>' +
-      '<th class="g2">Gross income</th><th class="g2">Tax</th><th class="g2">= Net income</th>' +
+      incHead() +
       '<th class="g3">Gap</th><th class="g3">Draw (gross)</th><th class="g3">Tax on draw</th>' +
       '<th class="g4">Pot closing</th><th></th></tr>';
+    const srcCols = incExp ? sourceCols() : [];
+    const srcTot = {};
+    function incCells(m, p) {
+      let h = '';
+      if (incExp) for (const c of srcCols) {
+        const v = sourceVal(m, c);
+        srcTot[c.key] = (srcTot[c.key] || 0) + v;
+        h += '<td class="c2">' + (v > 0.005 ? gbp(v) : '\u2014') + '</td>';
+      }
+      h += '<td class="c2' + (incExp ? ' eq' : '') + '">' + gbp(p.gross) + '</td><td class="c2">' + gbp(p.taxInc) + '</td><td class="c2 eq">' + gbp(p.net) + '</td>';
+      return h;
+    }
     const tot = { bills:0, dining:0, hols:0, out:0, gross:0, taxInc:0, net:0, gap:0, draw:0, taxDraw:0 };
     const share = w => who === 'c' ? 1 : null;   // costs columns: combined shows full; person view scales by their target ratio
     for (const m of ms) {
@@ -117,12 +172,13 @@
       h += '<tr><td>' + m.label + flags + '</td>' +
         '<td class="c1">' + gbp(bills) + '</td><td class="c1">' + gbp(dining) + '</td><td class="c1">' + gbp(hols) + '</td>' +
         '<td class="c1 eq">' + gbp(out) + '</td>' +
-        '<td class="c2">' + gbp(p.gross) + '</td><td class="c2">' + gbp(p.taxInc) + '</td><td class="c2 eq">' + gbp(p.net) + '</td>' +
+        incCells(m, p) +
         '<td class="c3 eq">' + gbp(p.gap) + '</td><td class="c3">' + gbp(p.draw) + '</td><td class="c3">' + gbp(p.taxDraw) + '</td>' +
         '<td class="c4 eq">' + gbp(p.closing) + '</td><td></td></tr>';
     }
     h += '<tr class="tot"><td>Year total</td>' +
       '<td>' + gbp(tot.bills) + '</td><td>' + gbp(tot.dining) + '</td><td>' + gbp(tot.hols) + '</td><td>' + gbp(tot.out) + '</td>' +
+      (incExp ? srcCols.map(c => '<td>' + gbp(srcTot[c.key] || 0) + '</td>').join('') : '') +
       '<td>' + gbp(tot.gross) + '</td><td>' + gbp(tot.taxInc) + '</td><td>' + gbp(tot.net) + '</td>' +
       '<td>' + gbp(tot.gap) + '</td><td>' + gbp(tot.draw) + '</td><td>' + gbp(tot.taxDraw) + '</td>' +
       '<td>' + (ms.length ? gbp(pick(ms[ms.length-1]).closing) : '\u2014') + '</td><td></td></tr>';
@@ -145,7 +201,7 @@
           ['Closing', ms.length ? pick(ms[ms.length-1]).closing : 0, yrow[pfx + 'closing']]
         ];
       }
-      let rec = '<tr class="rec"><td>vs yearly table (' + whoLbl + ')</td><td colspan="11">';
+      let rec = '<tr class="rec"><td>vs yearly table (' + whoLbl + ')</td><td colspan="' + (11 + (incExp ? srcCols.length : 0)) + '">';
       rec += cells.map(([n, a, b]) =>
         n + ': ' + gbp(a) + ' vs ' + gbp(b) + ' <span class="' + (near(a, b) ? 'ok' : 'bad') + '">' + (near(a, b) ? '\u2713' : '\u2717') + '</span>'
       ).join(' &nbsp;\u00b7&nbsp; ');
@@ -217,6 +273,8 @@
       const sortedM = (members || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
       const p1Name = sortedM[0] ? sortedM[0].name : 'Graham';
       const p2Name = sortedM[1] ? sortedM[1].name : null;
+      p1Init = (p1Name || 'G').charAt(0).toUpperCase();
+      p2Init = (p2Name || 'J').charAt(0).toUpperCase();
       const pRows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name) + '&order=updated_at.desc&limit=1');
       const p = (pRows && pRows.length) ? pRows[0] : {};
       let p2row = null, p2phase = null;
@@ -278,7 +336,7 @@
 <script>
 /* LC-384: engine build self-check + deploy stamp. */
 (function () {
-  var WANT = 'ann7', TAG = 'monthly audit maudit1';
+  var WANT = 'ann7', TAG = 'monthly audit maudit2';
   function go() {
     var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
     if (got !== WANT) {
