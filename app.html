@@ -568,7 +568,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-383</span>
+      <span class="build-stamp">LC-384</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -721,6 +721,7 @@
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
+      <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
     <iframe id="frame-Cash" class="app-frame" title="Cash and Purchases"></iframe>
   </div>
@@ -736,6 +737,7 @@
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
+      <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
     <iframe id="frame-Crashes" class="app-frame" title="Market Crashes"></iframe>
   </div>
@@ -752,6 +754,7 @@
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
+      <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
     <iframe id="frame-Annuities" class="app-frame" title="Annuities"></iframe>
   </div>
@@ -768,6 +771,7 @@
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
+      <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
     <iframe id="frame-ScenarioGrid" class="app-frame" title="Scenario Grid"></iframe>
   </div>
@@ -784,6 +788,7 @@
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
+      <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
     <iframe id="frame-Frontier" class="app-frame" title="Retire Frontier"></iframe>
   </div>
@@ -800,6 +805,7 @@
       <button class="subtab-link active-sub" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
+      <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
     <iframe id="frame-MultiModel" class="app-frame" title="Multi Modelling"></iframe>
   </div>
@@ -816,6 +822,7 @@
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
+      <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
     <iframe id="frame-PotTable" class="app-frame" title="Pot at Retirement"></iframe>
   </div>
@@ -831,8 +838,25 @@
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
+      <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
     <iframe id="frame-Sensitivity" class="app-frame" title="Sensitivity"></iframe>
+  </div>
+  <div id="MonthlyAudit" class="tabcontent">
+    <div class="subtab-buttons">
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
+      <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
+      <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
+      <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
+      <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
+      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
+      <button class="subtab-link active-sub" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
+    </div>
+    <iframe id="frame-MonthlyAudit" class="app-frame" title="Monthly Audit"></iframe>
   </div>
 
   <div id="Modelling" class="tabcontent">
@@ -847,6 +871,7 @@
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
+      <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
     <!-- Intelligent Modelling moved to a standalone top-level tab in LC-327. -->
     <div class="modelbar modelbar-after-intel">
@@ -1003,6 +1028,7 @@
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
       <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
+      <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
     <div class="modelbar">
       <button class="mdl-btn mdl-btn-primary" onclick="openSaveOverlay()">Save model</button>
@@ -3860,7 +3886,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front84';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front85';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', HolidayCosts:'holiday_costs.html', Holidays:'holidays.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -3953,7 +3979,7 @@
       // mark the matching tab button active (works whether triggered by a button click or the dropdown)
       document.querySelectorAll('.tab-link').forEach(b => { if (b.getAttribute('onclick') && b.getAttribute('onclick').indexOf("'" + id + "'") >= 0) b.classList.add('active-btn'); });
       // Modelling group: keep the Modelling top button lit while any of its panels is active
-      const MODEL_IDS = ['Modelling', 'Retirement', 'Cash', 'Crashes', 'Annuities', 'ScenarioGrid', 'Frontier', 'MultiModel', 'PotTable', 'Sensitivity'];
+      const MODEL_IDS = ['Modelling', 'Retirement', 'Cash', 'Crashes', 'Annuities', 'ScenarioGrid', 'Frontier', 'MultiModel', 'PotTable', 'Sensitivity', 'MonthlyAudit'];
       if (MODEL_IDS.indexOf(id) >= 0) {
         document.querySelectorAll('.tab-link').forEach(b => { const oc = b.getAttribute('onclick') || ''; if (oc.indexOf("'Modelling'") >= 0) b.classList.add('active-btn'); });
       }
@@ -3988,6 +4014,7 @@
       }
       if (id === 'PotTable') { ensureFrame('frame-PotTable', 'pot_table.html' + FV); pingFrame('frame-PotTable'); }
       if (id === 'Sensitivity') { ensureFrame('frame-Sensitivity', 'sensitivity.html' + FV); pingFrame('frame-Sensitivity'); }
+      if (id === 'MonthlyAudit') { ensureFrame('frame-MonthlyAudit', 'monthly_audit.html' + FV); pingFrame('frame-MonthlyAudit'); }
       if (id === 'KPI' && !window.__kpi) { window.__kpi = true; showSub(null, 'PerfKPIs'); }
       if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Budget'); }
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
@@ -4502,7 +4529,7 @@
 <script>
 /* LC-383: engine build self-check + deploy stamp. */
 (function () {
-  var WANT = 'ann7', TAG = 'app LC-383';
+  var WANT = 'ann7', TAG = 'app LC-384';
   function go() {
     var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
     if (got !== WANT) {
