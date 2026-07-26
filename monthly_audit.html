@@ -38,6 +38,7 @@
   tr.tot td { font-weight:700; border-top:2px solid var(--accent); }
   tr.rec td { font-size:11.5px; color:var(--sub); border-bottom:2px solid var(--accent); }
   .ok { color:var(--aqua); font-weight:700; } .bad { color:var(--danger); font-weight:700; }
+  td.neg { color:var(--danger); font-weight:700; }
   .flag { font-size:11px; }
   .infnote { font-size:12px; color:var(--sub); margin:6px 0 0; }
   @media (prefers-color-scheme: dark) {
@@ -49,10 +50,10 @@
 </style>
 </head>
 <body>
-  <h2>Monthly Audit <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(audit build: maudit3)</span></h2>
+  <h2>Monthly Audit <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(audit build: maudit4)</span></h2>
   <p class="note">The engine's own month-by-month workings, shown so each row's sums can be checked by eye:
   <b>Bills + Dining + Holidays = Outgoings</b>, then <b>Gross fixed income &minus; Tax = Net</b>, the
-  <b>Gap</b> that's left, and the <b>pension draw</b> (with its own tax) that fills it. The reconciliation
+  <b>Gap</b> that's left, and the <b>pension draw</b> (with its own tax) that fills it. Each row closes with <b>Pot start &minus; Draw + Growth = Pot closing</b> exactly &mdash; growth shows red when a market crash is pulling the pot down. The reconciliation
   line under each year proves these months add up to exactly what the yearly tables show &mdash; same engine, same run.</p>
   <div id="status" class="s-load">Loading&hellip;</div>
 
@@ -110,6 +111,11 @@
   }
   const gbp = n => '\u00a3' + Math.round(n).toLocaleString('en-GB');
 
+  function growthOf(m) {
+    if (who === 'g') return m.g_tfGrowth + m.g_txGrowth;
+    if (who === 'j') return m.j_tfGrowth + m.j_txGrowth;
+    return m.tfGrowth + m.txGrowth;
+  }
   function potStart(m) {
     if (who === 'g') return m.g_taxFree + m.g_taxable;
     if (who === 'j') return m.j_taxFree + m.j_taxable;
@@ -153,7 +159,7 @@
       '<th class="g1">Bills</th><th class="g1">Dining</th><th class="g1">Hols</th><th class="g1">= Outgoings' + (who==='c'?'':' (share)') + '</th>' +
       incHead() +
       '<th class="g3">Gap</th><th class="g3">Draw (gross)</th><th class="g3">Tax on draw</th>' +
-      '<th class="g4">Pot closing</th><th></th></tr>';
+      '<th class="g4">Growth %</th><th class="g4">Growth \u00a3</th><th class="g4">Pot closing</th><th></th></tr>';
     const srcCols = incExp ? sourceCols() : [];
     const srcTot = {};
     function incCells(m, p) {
@@ -166,7 +172,16 @@
       h += '<td class="c2' + (incExp ? ' eq' : '') + '">' + gbp(p.gross) + '</td><td class="c2">' + gbp(p.taxInc) + '</td><td class="c2 eq">' + gbp(p.net) + '</td>';
       return h;
     }
-    const tot = { bills:0, dining:0, hols:0, out:0, gross:0, taxInc:0, net:0, gap:0, draw:0, taxDraw:0 };
+    const tot = { bills:0, dining:0, hols:0, out:0, gross:0, taxInc:0, net:0, gap:0, draw:0, taxDraw:0, grow:0 };
+    function growthCells(m, p) {
+      const g = growthOf(m);
+      tot.grow += g;
+      const baseAmt = p.closing - g;                       // pot after draw, before growth
+      const rate = baseAmt > 0 ? g / baseAmt : 0;
+      const cls = g < -0.005 ? ' neg' : '';
+      return '<td class="c4' + cls + '">' + (rate * 100).toFixed(2) + '%</td>' +
+             '<td class="c4' + cls + '">' + (g < 0 ? '\u2212' + gbp(-g).slice(1) : gbp(g)) + '</td>';
+    }
     const share = w => who === 'c' ? 1 : null;   // costs columns: combined shows full; person view scales by their target ratio
     for (const m of ms) {
       const p = pick(m);
@@ -184,6 +199,7 @@
         '<td class="c1 eq">' + gbp(out) + '</td>' +
         incCells(m, p) +
         '<td class="c3 eq">' + gbp(p.gap) + '</td><td class="c3">' + gbp(p.draw) + '</td><td class="c3">' + gbp(p.taxDraw) + '</td>' +
+        growthCells(m, p) +
         '<td class="c4 eq">' + gbp(p.closing) + '</td><td></td></tr>';
     }
     h += '<tr class="tot"><td>Year total</td>' +
@@ -192,6 +208,7 @@
       (incExp ? srcCols.map(c => '<td>' + gbp(srcTot[c.key] || 0) + '</td>').join('') : '') +
       '<td>' + gbp(tot.gross) + '</td><td>' + gbp(tot.taxInc) + '</td><td>' + gbp(tot.net) + '</td>' +
       '<td>' + gbp(tot.gap) + '</td><td>' + gbp(tot.draw) + '</td><td>' + gbp(tot.taxDraw) + '</td>' +
+      '<td>\u2014</td><td' + (tot.grow < 0 ? ' class="neg"' : '') + '>' + (tot.grow < 0 ? '\u2212' + gbp(-tot.grow).slice(1) : gbp(tot.grow)) + '</td>' +
       '<td>' + (ms.length ? gbp(pick(ms[ms.length-1]).closing) : '\u2014') + '</td><td></td></tr>';
     // reconciliation vs the engine's own YEARLY row (combined view only has a full counterpart)
     if (yrow) {
@@ -212,7 +229,7 @@
           ['Closing', ms.length ? pick(ms[ms.length-1]).closing : 0, yrow[pfx + 'closing']]
         ];
       }
-      let rec = '<tr class="rec"><td>vs yearly table (' + whoLbl + ')</td><td colspan="' + (12 + (incExp ? srcCols.length : 0)) + '">';
+      let rec = '<tr class="rec"><td>vs yearly table (' + whoLbl + ')</td><td colspan="' + (14 + (incExp ? srcCols.length : 0)) + '">';
       rec += cells.map(([n, a, b]) =>
         n + ': ' + gbp(a) + ' vs ' + gbp(b) + ' <span class="' + (near(a, b) ? 'ok' : 'bad') + '">' + (near(a, b) ? '\u2713' : '\u2717') + '</span>'
       ).join(' &nbsp;\u00b7&nbsp; ');
@@ -347,7 +364,7 @@
 <script>
 /* LC-384: engine build self-check + deploy stamp. */
 (function () {
-  var WANT = 'ann7', TAG = 'monthly audit maudit3';
+  var WANT = 'ann7', TAG = 'monthly audit maudit4';
   function go() {
     var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
     if (got !== WANT) {
