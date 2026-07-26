@@ -6,6 +6,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=hol1"></script>
 <script src="engine.js?v=ann7"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root { --accent:#1d3a63; --aqua:#0f766e; --ink:#2c3e50; --sub:#64748b; --line:#d3e3e3;
           --bg:#e8f0f0; --panel:#ffffff; --panelborder:#d4e4e4; --danger:#b3261e;
@@ -51,7 +52,7 @@
 </style>
 </head>
 <body>
-  <h2>Monthly Audit <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(audit build: maudit6)</span></h2>
+  <h2>Monthly Audit <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(audit build: maudit7)</span></h2>
   <p class="note">The engine's own month-by-month workings, shown so each row's sums can be checked by eye:
   <b>Bills + Dining + Holidays = Outgoings</b>, then <b>Gross fixed income &minus; Tax = Net</b>, the
   <b>Gap</b> that's left, and the <b>pension draw</b> (with its own tax) that fills it. Each row closes with <b>Pot start &minus; Draw + Growth = Pot closing</b> exactly &mdash; growth shows red when a market crash is pulling the pot down. The reconciliation
@@ -67,6 +68,7 @@
       <button data-who="g" onclick="setWho('g')">Graham</button>
       <button data-who="j" onclick="setWho('j')">Julie</button>
     </div>
+    <button id="expBtn" onclick="exportXlsx()" title="Download every month as an Excel workbook that recomputes tax, draw, growth and pot roll-forward from the drivers, so you can verify the engine independently">&#8615; Export &amp; verify (xlsx)</button>
   </div>
 
   <div class="card" id="tblCard" style="display:none;">
@@ -77,6 +79,7 @@
 <script>
   let monthly = null, yearly = null, who = 'c';
   let p1Init = 'G', p2Init = 'J';
+  let EXP = null;   // driver context for the Export/verify workbook (populated in load())
   // Four collapsible column groups. Each remembers its expanded/collapsed state.
   const GROUPS = ['costs', 'income', 'draw', 'pot'];
   const exp = { costs: true, income: true, draw: true, pot: true };   // default expanded
@@ -299,6 +302,271 @@
     if (i >= 0 && i < sel.options.length) { sel.selectedIndex = i; render(); }
   }
 
+  // ---------------------------------------------------------------------------
+  // Export & verify (Tier A): every month, every year, as an xlsx whose cells
+  // RE-DERIVE tax bands, the UFPLS/FAD draw, growth (incl. crash trajectory) and
+  // the pot roll-forward from the drivers on the Inputs sheet — independently of
+  // engine.js. Each recomputed quantity sits beside the engine's own value with a
+  // Δ column that reads ~0 when they agree. Open in Excel or Numbers (both
+  // recalculate on open) to reveal any Δ.
+  // ---------------------------------------------------------------------------
+  function exportXlsx() {
+    if (typeof XLSX === 'undefined') { alert('Spreadsheet library is still loading — give it a second and tap again.'); return; }
+    if (!monthly || !monthly.length || !EXP) { alert('Let the page finish loading before exporting.'); return; }
+    const GBP = '\u00a3#,##0', DZ = '0.00;[Red]-0.00', F6 = '0.000000';
+    const MPA = 12570 / 12, MBR = 37700 / 12, base = Math.pow(1 + EXP.growthRate, 1 / 12);
+    const P1 = EXP.p1Name || 'Graham', P2 = EXP.p2Name || null, hasJ = !!P2;
+    const crs = EXP.crashes || [];
+    const persons = [{ k: 'G', name: P1, retIdx: EXP.gRetIdx, crystIdx: EXP.gCrystIdx }];
+    if (hasJ) persons.push({ k: 'J', name: P2, retIdx: EXP.jRetIdx, crystIdx: EXP.jCrystIdx });
+
+    // ---- column registry (order = layout; letters derived, so no hand-counting) ----
+    const COLS = [], CIX = {}, HDR = {};
+    function reg(n, h) { CIX[n] = COLS.length; COLS.push(n); HDR[n] = h; }
+    function colL(i) { let s = '', x = i + 1; while (x > 0) { const r = (x - 1) % 26; s = String.fromCharCode(65 + r) + s; x = (x - r - 1) / 26 | 0; } return s; }
+    function A(n, row) { return colL(CIX[n]) + row; }
+    reg('YEAR', 'Year'); reg('MONTH', 'Month'); reg('MIDX', 'Month index'); reg('GAGE', P1 + ' age'); reg('JAGE', (P2 || 'Julie') + ' age');
+    reg('BILLS', 'Bills'); reg('DINING', 'Dining'); reg('HOLS', 'Holidays'); reg('OUTE', 'Outgoings (engine)'); reg('OUTR', 'Outgoings (re-sum)'); reg('OUTD', '\u0394 out');
+    crs.forEach((c, k) => reg('CR' + k, 'Crash ' + (k + 1) + ' factor'));
+    reg('ACTIVE', 'Crash active?'); reg('MFAC', 'Month growth factor');
+    const PH = {
+      TGT: 'target', DBG: 'fixed income gross', TFS: 'pot start TF', TXS: 'pot start TX', MODE: 'mode 0/1/2',
+      DBNETR: 'net inc (recomp)', DBNETE: 'net inc (engine)', DBNETD: '\u0394', PA: 'PA left', BR: 'basic band left', GAP: 'net gap',
+      DRAWR: 'draw (recomp)', DRAWE: 'draw (engine)', DRAWD: '\u0394', DGROSS: 'taxable draw', TAXR: 'tax (recomp)', TAXE: 'tax (engine)', TAXD: '\u0394',
+      POTAD: 'pot after draw', GM: 'growth factor', GRWR: 'growth (recomp)', GRWE: 'growth (engine)', GRWD: '\u0394',
+      CLOR: 'closing (recomp)', CLOE: 'closing (engine)', CLOD: '\u0394', ROLLD: '\u0394 roll-fwd'
+    };
+    const PORDER = ['TGT', 'DBG', 'TFS', 'TXS', 'MODE', 'DBNETR', 'DBNETE', 'DBNETD', 'PA', 'BR', 'GAP', 'DRAWR', 'DRAWE', 'DRAWD', 'DGROSS', 'TAXR', 'TAXE', 'TAXD', 'POTAD', 'GM', 'GRWR', 'GRWE', 'GRWD', 'CLOR', 'CLOE', 'CLOD', 'ROLLD'];
+    persons.forEach(p => PORDER.forEach(s => reg(p.k + '_' + s, p.name + ' \u2014 ' + PH[s])));
+    ['DRAWR', 'DRAWE', 'DRAWD', 'TAXR', 'TAXE', 'TAXD', 'GRWR', 'GRWE', 'GRWD', 'CLOR', 'CLOE', 'CLOD'].forEach(s => reg('C_' + s, 'Combined \u2014 ' + PH[s]));
+
+    function crashFactorJS(midx) {
+      let f = null;
+      for (const c of crs) {
+        const fs = Math.pow(1 - c.F, 1 / c.D), rs = c.F < 1 ? Math.pow(1 / (1 - c.F), 1 / c.R) : 1;
+        if (midx >= c.startIdx && midx < c.startIdx + c.D) f = (f == null ? 1 : f) * fs;
+        else if (midx >= c.startIdx + c.D && midx < c.startIdx + c.D + c.R) f = (f == null ? 1 : f) * rs;
+      }
+      return f;
+    }
+
+    // ---- Inputs sheet ----
+    const inp = {};
+    const iset = (addr, cell) => { inp[addr] = cell; };
+    iset('A1', { t: 's', v: 'Inputs \u2014 the drivers the Audit sheet recomputes from. Change nothing here to verify; the Audit formulas reference these cells.' });
+    iset('A2', { t: 's', v: 'Monthly personal allowance (\u00a312,570 \u00f7 12)' }); iset('B2', { t: 'n', v: MPA, z: '#,##0.00' });
+    iset('A3', { t: 's', v: 'Monthly basic-rate band (\u00a337,700 \u00f7 12)' }); iset('B3', { t: 'n', v: MBR, z: '#,##0.00' });
+    iset('A4', { t: 's', v: 'Drawdown growth rate (annual)' }); iset('B4', { t: 'n', v: EXP.growthRate, z: '0.0000' });
+    iset('A5', { t: 's', v: 'Base monthly growth factor = (1+rate)^(1/12)' }); iset('B5', { t: 'n', v: base, f: '(1+B4)^(1/12)', z: F6 });
+    iset('A6', { t: 's', v: P1 + ' retirement month-index' }); iset('B6', { t: 'n', v: EXP.gRetIdx, z: '0' });
+    iset('A7', { t: 's', v: (P2 || 'Julie') + ' retirement month-index' }); iset('B7', hasJ ? { t: 'n', v: EXP.jRetIdx, z: '0' } : { t: 's', v: 'n/a' });
+    iset('A8', { t: 's', v: 'UFPLS: divert 25% tax-free to surplus? (1=yes)' }); iset('B8', { t: 'n', v: EXP.divertTf ? 1 : 0, z: '0' });
+    iset('A10', { t: 's', v: 'Market crashes' });
+    ['Crash name', 'StartIdx', 'Fall F', 'Fall mths', 'Recover mths', 'fallStep', 'recoverStep'].forEach((h, i) => iset(colL(i) + '10', { t: 's', v: h }));
+    crs.forEach((c, k) => {
+      const r = 11 + k;
+      iset('A' + r, { t: 's', v: c.name });
+      iset('B' + r, { t: 'n', v: c.startIdx, z: '0' });
+      iset('C' + r, { t: 'n', v: c.F, z: '0.000' });
+      iset('D' + r, { t: 'n', v: c.D, z: '0' });
+      iset('E' + r, { t: 'n', v: c.R, z: '0' });
+      iset('F' + r, { t: 'n', v: Math.pow(1 - c.F, 1 / c.D), f: '(1-C' + r + ')^(1/D' + r + ')', z: F6 });
+      iset('G' + r, { t: 'n', v: c.F < 1 ? Math.pow(1 / (1 - c.F), 1 / c.R) : 1, f: 'IF(C' + r + '<1,(1/(1-C' + r + '))^(1/E' + r + '),1)', z: F6 });
+    });
+    const inLast = Math.max(8, 10 + crs.length);
+    inp['!ref'] = 'A1:G' + (inLast + 1);
+    inp['!cols'] = [{ wch: 44 }, { wch: 12 }, { wch: 9 }, { wch: 9 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+
+    // ---- Audit sheet ----
+    const au = {};
+    const aset = (n, row, cell) => { au[colL(CIX[n]) + row] = cell; };
+    COLS.forEach((n, i) => { au[colL(i) + '1'] = { t: 's', v: HDR[n] }; });
+
+    const years = [], byYear = {};
+    monthly.forEach(m => { if (!byYear[m.year]) { byYear[m.year] = []; years.push(m.year); } byYear[m.year].push(m); });
+
+    let R = 2;
+    years.forEach(yr => {
+      const ms = byYear[yr], firstR = R;
+      ms.forEach(m => {
+        const midx = m.year * 12 + m.month, mi = A('MIDX', R);
+        aset('YEAR', R, { t: 'n', v: m.year, z: '0' });
+        aset('MONTH', R, { t: 's', v: m.label });
+        aset('MIDX', R, { t: 'n', v: midx, z: '0' });
+        aset('GAGE', R, { t: 'n', v: m.gAge != null ? m.gAge : 0, z: '0' });
+        aset('JAGE', R, { t: 'n', v: m.jAge != null ? m.jAge : 0, z: '0' });
+        aset('BILLS', R, { t: 'n', v: m.billsTotal, z: GBP });
+        aset('DINING', R, { t: 'n', v: m.diningTotal, z: GBP });
+        aset('HOLS', R, { t: 'n', v: m.holidayTotal, z: GBP });
+        aset('OUTE', R, { t: 'n', v: m.outgoings, z: GBP });
+        aset('OUTR', R, { t: 'n', v: m.billsTotal + m.diningTotal + m.holidayTotal, f: A('BILLS', R) + '+' + A('DINING', R) + '+' + A('HOLS', R), z: GBP });
+        aset('OUTD', R, { t: 'n', v: (m.billsTotal + m.diningTotal + m.holidayTotal) - m.outgoings, f: A('OUTR', R) + '-' + A('OUTE', R), z: DZ });
+        crs.forEach((c, k) => {
+          const rr = 11 + k, cS = 'Inputs!$B$' + rr, cD = 'Inputs!$D$' + rr, cRr = 'Inputs!$E$' + rr, cFS = 'Inputs!$F$' + rr, cRS = 'Inputs!$G$' + rr;
+          const fs = Math.pow(1 - c.F, 1 / c.D), rs = c.F < 1 ? Math.pow(1 / (1 - c.F), 1 / c.R) : 1;
+          let vv = 1; if (midx >= c.startIdx && midx < c.startIdx + c.D) vv = fs; else if (midx >= c.startIdx + c.D && midx < c.startIdx + c.D + c.R) vv = rs;
+          aset('CR' + k, R, { t: 'n', v: vv, f: 'IF(AND(' + mi + '>=' + cS + ',' + mi + '<' + cS + '+' + cD + '),' + cFS + ',IF(AND(' + mi + '>=' + cS + '+' + cD + ',' + mi + '<' + cS + '+' + cD + '+' + cRr + '),' + cRS + ',1))', z: F6 });
+        });
+        if (crs.length) {
+          const actTerms = crs.map((c, k) => 'IF(AND(' + mi + '>=Inputs!$B$' + (11 + k) + ',' + mi + '<Inputs!$B$' + (11 + k) + '+Inputs!$D$' + (11 + k) + '+Inputs!$E$' + (11 + k) + '),1,0)').join('+');
+          let actv = 0; crs.forEach(c => { if (midx >= c.startIdx && midx < c.startIdx + c.D + c.R) actv++; });
+          aset('ACTIVE', R, { t: 'n', v: actv, f: actTerms, z: '0' });
+          const cf = crashFactorJS(midx);
+          aset('MFAC', R, { t: 'n', v: cf == null ? base : cf, f: 'IF(' + A('ACTIVE', R) + '>0,PRODUCT(' + A('CR0', R) + ':' + A('CR' + (crs.length - 1), R) + '),Inputs!$B$5)', z: F6 });
+        } else {
+          aset('ACTIVE', R, { t: 'n', v: 0, z: '0' });
+          aset('MFAC', R, { t: 'n', v: base, f: 'Inputs!$B$5', z: F6 });
+        }
+        let cDR = 0, cTR = 0, cGR = 0, cCR = 0;
+        persons.forEach(p => {
+          const low = p.k === 'G' ? 'g' : 'j', pk = p.k;
+          const tgt = pk === 'G' ? m.gTarget : m.jTarget;
+          const dbg = m[low + '_other'], tfs = m[low + '_taxFree'], txs = m[low + '_taxable'];
+          const dbnetE = m[low + '_otherNet'], drawE = m[low + '_draw'], taxE = m[low + '_tax'];
+          const grwE = m[low + '_tfGrowth'] + m[low + '_txGrowth'], cloE = m[low + '_closing'];
+          const retRef = pk === 'G' ? 'Inputs!$B$6' : 'Inputs!$B$7';
+          const modeCode = (midx >= p.crystIdx) ? 2 : (EXP.divertTf ? 1 : 0);
+          // JS mirror for cached values
+          const paV = dbg > MPA ? 0 : MPA - dbg;
+          const brV = dbg > MPA + MBR ? 0 : (dbg > MPA ? MPA + MBR - dbg : MBR);
+          const dbnetV = dbg > MPA + MBR ? (MPA + MBR * 0.8 + (dbg - MPA - MBR) * 0.6) : (dbg > MPA ? MPA + (dbg - MPA) * 0.8 : dbg);
+          const gapV = Math.max(tgt - dbnetV, 0);
+          let rawG;
+          if (modeCode === 2) rawG = gapV <= paV ? gapV : (gapV <= paV + brV * 0.8 ? paV + (gapV - paV) / 0.8 : paV + brV + (gapV - paV - brV * 0.8) / 0.6);
+          else if (modeCode === 1) rawG = gapV <= paV ? gapV / 0.75 : (gapV <= paV + brV * 0.8 ? (gapV - 0.2 * paV) / 0.6 : (paV + brV + (gapV - paV - brV * 0.8) / 0.6) / 0.75);
+          else { const th = paV / 0.75, th2 = (0.85 * (paV + brV)) / 0.75 + 0.2 * paV; rawG = gapV <= th ? gapV : (gapV <= th2 ? (gapV - 0.2 * paV) / 0.85 : (gapV - 0.4 * paV - 0.2 * brV) / 0.7); }
+          const drawV = Math.min(rawG, tfs + txs);
+          const dgrossV = modeCode === 2 ? drawV : 0.75 * drawV;
+          const taxNetV = x => x <= paV ? x : (x <= paV + brV ? paV + (x - paV) * 0.8 : paV + brV * 0.8 + (x - paV - brV) * 0.6);
+          const taxRV = (dbg - dbnetV) + (dgrossV - taxNetV(dgrossV));
+          const potadV = tfs + txs - drawV;
+          const cf = crashFactorJS(midx), mfacV = cf == null ? base : cf;
+          const gmV = (midx >= (pk === 'G' ? EXP.gRetIdx : EXP.jRetIdx)) ? mfacV : 1;
+          const grwRV = potadV * (gmV - 1), cloRV = potadV * gmV;
+          cDR += drawV; cTR += taxRV; cGR += grwRV; cCR += cloRV;
+          // cell refs
+          const dbgc = A(pk + '_DBG', R), pac = A(pk + '_PA', R), brc = A(pk + '_BR', R), gapc = A(pk + '_GAP', R),
+                tgtc = A(pk + '_TGT', R), dbnetrc = A(pk + '_DBNETR', R), tfsc = A(pk + '_TFS', R), txsc = A(pk + '_TXS', R),
+                modec = A(pk + '_MODE', R), drawrc = A(pk + '_DRAWR', R), dgrossc = A(pk + '_DGROSS', R),
+                potadc = A(pk + '_POTAD', R), gmc = A(pk + '_GM', R);
+          aset(pk + '_TGT', R, { t: 'n', v: tgt, z: GBP });
+          aset(pk + '_DBG', R, { t: 'n', v: dbg, z: GBP });
+          aset(pk + '_TFS', R, { t: 'n', v: tfs, z: GBP });
+          aset(pk + '_TXS', R, { t: 'n', v: txs, z: GBP });
+          aset(pk + '_MODE', R, { t: 'n', v: modeCode, z: '0' });
+          aset(pk + '_DBNETR', R, { t: 'n', v: dbnetV, f: 'IF(' + dbgc + '>Inputs!$B$2+Inputs!$B$3,Inputs!$B$2+Inputs!$B$3*0.8+(' + dbgc + '-Inputs!$B$2-Inputs!$B$3)*0.6,IF(' + dbgc + '>Inputs!$B$2,Inputs!$B$2+(' + dbgc + '-Inputs!$B$2)*0.8,' + dbgc + '))', z: GBP });
+          aset(pk + '_DBNETE', R, { t: 'n', v: dbnetE, z: GBP });
+          aset(pk + '_DBNETD', R, { t: 'n', v: dbnetV - dbnetE, f: dbnetrc + '-' + A(pk + '_DBNETE', R), z: DZ });
+          aset(pk + '_PA', R, { t: 'n', v: paV, f: 'IF(' + dbgc + '>Inputs!$B$2,0,Inputs!$B$2-' + dbgc + ')', z: GBP });
+          aset(pk + '_BR', R, { t: 'n', v: brV, f: 'IF(' + dbgc + '>Inputs!$B$2+Inputs!$B$3,0,IF(' + dbgc + '>Inputs!$B$2,Inputs!$B$2+Inputs!$B$3-' + dbgc + ',Inputs!$B$3))', z: GBP });
+          aset(pk + '_GAP', R, { t: 'n', v: gapV, f: 'MAX(' + tgtc + '-' + dbnetrc + ',0)', z: GBP });
+          const plainG = 'IF(' + gapc + '<=' + pac + '/0.75,' + gapc + ',IF(' + gapc + '<=(0.85*(' + pac + '+' + brc + '))/0.75+0.2*' + pac + ',(' + gapc + '-0.2*' + pac + ')/0.85,(' + gapc + '-0.4*' + pac + '-0.2*' + brc + ')/0.7))';
+          const divG = 'IF(' + gapc + '<=' + pac + ',' + gapc + '/0.75,IF(' + gapc + '<=' + pac + '+' + brc + '*0.8,(' + gapc + '-0.2*' + pac + ')/0.6,(' + pac + '+' + brc + '+(' + gapc + '-' + pac + '-' + brc + '*0.8)/0.6)/0.75))';
+          const fadG = 'IF(' + gapc + '<=' + pac + ',' + gapc + ',IF(' + gapc + '<=' + pac + '+' + brc + '*0.8,' + pac + '+(' + gapc + '-' + pac + ')/0.8,' + pac + '+' + brc + '+(' + gapc + '-' + pac + '-' + brc + '*0.8)/0.6))';
+          const rawGf = 'IF(' + modec + '=2,' + fadG + ',IF(' + modec + '=1,' + divG + ',' + plainG + '))';
+          aset(pk + '_DRAWR', R, { t: 'n', v: drawV, f: 'MIN(' + rawGf + ',' + tfsc + '+' + txsc + ')', z: GBP });
+          aset(pk + '_DRAWE', R, { t: 'n', v: drawE, z: GBP });
+          aset(pk + '_DRAWD', R, { t: 'n', v: drawV - drawE, f: drawrc + '-' + A(pk + '_DRAWE', R), z: DZ });
+          aset(pk + '_DGROSS', R, { t: 'n', v: dgrossV, f: 'IF(' + modec + '=2,' + drawrc + ',0.75*' + drawrc + ')', z: GBP });
+          const taxNetf = 'IF(' + dgrossc + '<=' + pac + ',' + dgrossc + ',IF(' + dgrossc + '<=' + pac + '+' + brc + ',' + pac + '+(' + dgrossc + '-' + pac + ')*0.8,' + pac + '+' + brc + '*0.8+(' + dgrossc + '-' + pac + '-' + brc + ')*0.6))';
+          aset(pk + '_TAXR', R, { t: 'n', v: taxRV, f: '(' + dbgc + '-' + dbnetrc + ')+(' + dgrossc + '-(' + taxNetf + '))', z: GBP });
+          aset(pk + '_TAXE', R, { t: 'n', v: taxE, z: GBP });
+          aset(pk + '_TAXD', R, { t: 'n', v: taxRV - taxE, f: A(pk + '_TAXR', R) + '-' + A(pk + '_TAXE', R), z: DZ });
+          aset(pk + '_POTAD', R, { t: 'n', v: potadV, f: tfsc + '+' + txsc + '-' + drawrc, z: GBP });
+          aset(pk + '_GM', R, { t: 'n', v: gmV, f: 'IF(' + mi + '>=' + retRef + ',' + A('MFAC', R) + ',1)', z: F6 });
+          aset(pk + '_GRWR', R, { t: 'n', v: grwRV, f: potadc + '*(' + gmc + '-1)', z: GBP });
+          aset(pk + '_GRWE', R, { t: 'n', v: grwE, z: GBP });
+          aset(pk + '_GRWD', R, { t: 'n', v: grwRV - grwE, f: A(pk + '_GRWR', R) + '-' + A(pk + '_GRWE', R), z: DZ });
+          aset(pk + '_CLOR', R, { t: 'n', v: cloRV, f: potadc + '*' + gmc, z: GBP });
+          aset(pk + '_CLOE', R, { t: 'n', v: cloE, z: GBP });
+          aset(pk + '_CLOD', R, { t: 'n', v: cloRV - cloE, f: A(pk + '_CLOR', R) + '-' + A(pk + '_CLOE', R), z: DZ });
+          aset(pk + '_ROLLD', R, { t: 'n', v: cloE - (tfs + txs - drawE + grwE), f: A(pk + '_CLOE', R) + '-(' + tfsc + '+' + txsc + '-' + A(pk + '_DRAWE', R) + '+' + A(pk + '_GRWE', R) + ')', z: DZ });
+        });
+        const sumP = s => A('G_' + s, R) + (hasJ ? '+' + A('J_' + s, R) : '');
+        aset('C_DRAWR', R, { t: 'n', v: cDR, f: sumP('DRAWR'), z: GBP });
+        aset('C_DRAWE', R, { t: 'n', v: m.drawdown, z: GBP });
+        aset('C_DRAWD', R, { t: 'n', v: cDR - m.drawdown, f: A('C_DRAWR', R) + '-' + A('C_DRAWE', R), z: DZ });
+        aset('C_TAXR', R, { t: 'n', v: cTR, f: sumP('TAXR'), z: GBP });
+        aset('C_TAXE', R, { t: 'n', v: m.g_tax + m.j_tax, z: GBP });
+        aset('C_TAXD', R, { t: 'n', v: cTR - (m.g_tax + m.j_tax), f: A('C_TAXR', R) + '-' + A('C_TAXE', R), z: DZ });
+        aset('C_GRWR', R, { t: 'n', v: cGR, f: sumP('GRWR'), z: GBP });
+        aset('C_GRWE', R, { t: 'n', v: m.tfGrowth + m.txGrowth, z: GBP });
+        aset('C_GRWD', R, { t: 'n', v: cGR - (m.tfGrowth + m.txGrowth), f: A('C_GRWR', R) + '-' + A('C_GRWE', R), z: DZ });
+        aset('C_CLOR', R, { t: 'n', v: cCR, f: sumP('CLOR'), z: GBP });
+        aset('C_CLOE', R, { t: 'n', v: m.combinedClosing, z: GBP });
+        aset('C_CLOD', R, { t: 'n', v: cCR - m.combinedClosing, f: A('C_CLOR', R) + '-' + A('C_CLOE', R), z: DZ });
+        R++;
+      });
+      const lastR = R - 1, rt = R;
+      aset('YEAR', rt, { t: 's', v: 'Year ' + yr + ' total' });
+      const sumCols = ['BILLS', 'DINING', 'HOLS', 'OUTE', 'OUTR', 'G_DRAWR', 'G_DRAWE', 'G_TAXR', 'G_TAXE', 'G_GRWR', 'G_GRWE', 'C_DRAWR', 'C_DRAWE', 'C_TAXR', 'C_TAXE', 'C_GRWR', 'C_GRWE'];
+      if (hasJ) ['J_DRAWR', 'J_DRAWE', 'J_TAXR', 'J_TAXE', 'J_GRWR', 'J_GRWE'].forEach(n => sumCols.push(n));
+      sumCols.forEach(n => {
+        let s = 0; for (let x = firstR; x <= lastR; x++) { const a = au[colL(CIX[n]) + x]; if (a && typeof a.v === 'number') s += a.v; }
+        aset(n, rt, { t: 'n', v: s, f: 'SUM(' + A(n, firstR) + ':' + A(n, lastR) + ')', z: GBP });
+      });
+      const lm = ms[ms.length - 1];
+      aset('G_CLOE', rt, { t: 'n', v: lm.g_closing, f: A('G_CLOE', lastR), z: GBP });
+      if (hasJ) aset('J_CLOE', rt, { t: 'n', v: lm.j_closing, f: A('J_CLOE', lastR), z: GBP });
+      aset('C_CLOE', rt, { t: 'n', v: lm.combinedClosing, f: A('C_CLOE', lastR), z: GBP });
+      R++;
+      const yrow = (yearly || []).find(y => y.year === yr);
+      if (yrow) {
+        const rr2 = R;
+        aset('YEAR', rr2, { t: 's', v: 'vs yearly table' });
+        let so = 0; for (let x = firstR; x <= lastR; x++) { const a = au[colL(CIX['OUTE']) + x]; if (a) so += a.v; }
+        aset('OUTD', rr2, { t: 'n', v: so - (yrow.outgoings || 0), f: A('OUTE', rt) + '-' + (yrow.outgoings || 0), z: DZ });
+        aset('C_DRAWD', rr2, { t: 'n', v: 0, f: A('C_DRAWE', rt) + '-' + (yrow.drawdown || 0), z: DZ });
+        aset('C_TAXD', rr2, { t: 'n', v: 0, f: A('C_TAXE', rt) + '-' + ((yrow.g_tax || 0) + (yrow.j_tax || 0)), z: DZ });
+        aset('C_CLOD', rr2, { t: 'n', v: 0, f: A('C_CLOE', rt) + '-' + (yrow.combinedClosing || 0), z: DZ });
+        R++;
+      }
+      R++; // spacer
+    });
+    au['!ref'] = 'A1:' + colL(COLS.length - 1) + R;
+    au['!cols'] = COLS.map((n, i) => ({ wch: i === 1 ? 10 : (i === 0 ? 14 : 13) }));
+
+    // ---- Notes sheet ----
+    const notes = {};
+    const nlines = [
+      'Monthly Audit \u2014 Export & verify (Tier A)',
+      '',
+      'Every cell labelled "(recomp)" is a live Excel formula that RE-DERIVES the value from the drivers,',
+      'independently of engine.js. Beside it sits the engine\'s own value "(engine)" and a \u0394 column.',
+      'Open in Excel or Numbers (both recalculate on open); every \u0394 should read ~0.',
+      '',
+      'What is recomputed from first principles:',
+      '  \u2022 net income & tax \u2014 UK bands 0% / 20% / 40% on a monthly PAYE basis (PA and basic band on Inputs).',
+      '  \u2022 pension draw \u2014 the exact UFPLS 25/75, UFPLS+divert, or FAD (100% taxable) inversion, capped at the pot.',
+      '  \u2022 growth \u2014 (1+rate)^(1/12), replaced by the crash trajectory when a crash is live that month; frozen pre-retirement.',
+      '  \u2022 pot roll-forward \u2014 pot start \u2212 draw + growth = closing, and the engine\u2019s own closing identity (\u0394 roll-fwd).',
+      '',
+      'Taken as given (the "how it was built" layer, per Tier A):',
+      '  \u2022 each person\u2019s monthly spend target and guaranteed/annuity income (inflation, 70/80/90 taper, escalation).',
+      '  \u2022 the per-month withdrawal mode (0=UFPLS, 1=divert, 2=FAD) \u2014 crystallisation timing is a setup choice.',
+      '',
+      'This page runs the engine in Manual mode, so per-person figures reconcile exactly (no cross-partner redistribution).',
+      'The "vs yearly table" rows check each year\u2019s month-sums against the engine\u2019s own yearly output.',
+      '',
+      'Generated ' + new Date().toISOString().slice(0, 19).replace('T', ' ') + ' \u00b7 audit build maudit7'
+    ];
+    nlines.forEach((t, i) => { notes['A' + (i + 1)] = { t: 's', v: t }; });
+    notes['!ref'] = 'A1:A' + (nlines.length + 1);
+    notes['!cols'] = [{ wch: 118 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, au, 'Audit');
+    XLSX.utils.book_append_sheet(wb, inp, 'Inputs');
+    XLSX.utils.book_append_sheet(wb, notes, 'Notes');
+    const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([out], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'monthly_audit_verify_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+  }
+
   async function load() {
     const status = document.getElementById('status');
     try {
@@ -387,6 +655,31 @@
         growthRate: growthRate,
         sp: PensionEngine.baselineSP(stateNames)
       };
+      // ---- Capture the drivers the Export/verify workbook recomputes from (Tier A). ----
+      // These mirror exactly the inputs the engine's fundPerson()/crash logic consumes, so the
+      // xlsx can re-derive tax, draw, growth and pot roll-forward independently of the engine.
+      const _idxOf = d => (d instanceof Date && !isNaN(d)) ? d.getFullYear() * 12 + d.getMonth() : null;
+      const _gRet = (plan.retireByMember && plan.retireByMember[p1Name]) || planRetire;
+      const _jRet = (p2Name && plan.retireByMember && plan.retireByMember[p2Name]) || null;
+      const _cd = cfg.crystallisationDate || {};
+      const _gCryst = (cfg.withdrawalMethod.graham === 'fad' && _cd.graham) ? _idxOf(_cd.graham) : Infinity;
+      const _jCryst = (cfg.withdrawalMethod.julie === 'fad' && _cd.julie) ? _idxOf(_cd.julie) : Infinity;
+      EXP = {
+        p1Name: p1Name, p2Name: p2Name, p1Init: p1Init, p2Init: p2Init,
+        growthRate: growthRate,
+        gRetIdx: _idxOf(_gRet), jRetIdx: _jRet ? _idxOf(_jRet) : null,
+        gCrystIdx: _gCryst, jCrystIdx: _jCryst,
+        divertTf: !!cfg.ufplsDivertTf,
+        crashes: (data.crashes || []).map(c => {
+          const d = c.start_date ? new Date(c.start_date) : null;
+          if (!d || isNaN(d)) return null;
+          return { name: c.crash_name || 'Market crash',
+                   startIdx: d.getFullYear() * 12 + d.getMonth(),
+                   F: Math.max(0, Math.min(0.99, (Number(c.fall_pct) || 0) / 100)),
+                   D: Math.max(1, Math.round(Number(c.fall_months) || 1)),
+                   R: Math.max(1, Math.round(Number(c.recovery_months) || 1)) };
+        }).filter(Boolean)
+      };
       yearly = PensionEngine.drawdown(data, cfg) || [];
       monthly = yearly.monthly || [];
       if (!monthly.length) throw new Error('engine returned no monthly data \u2014 check the engine build banner below');
@@ -405,7 +698,7 @@
 <script>
 /* LC-384: engine build self-check + deploy stamp. */
 (function () {
-  var WANT = 'ann7', TAG = 'monthly audit maudit6';
+  var WANT = 'ann7', TAG = 'monthly audit maudit7';
   function go() {
     var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
     if (got !== WANT) {
