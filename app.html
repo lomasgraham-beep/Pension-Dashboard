@@ -183,6 +183,7 @@
     .cx-legend .cx-item { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; line-height:1.35; }
     .cx-legend .cx-swatch { display:inline-block; width:12px; height:12px; border-radius:2px; flex:0 0 auto; }
     .cx-legend .cx-swatch.line { height:3px; border-radius:2px; }
+    .chart-card .cx-legend { margin:6px 0 2px; }
     .chart-wrap { position:relative; }
     .chart-fs-btn { position:absolute; top:8px; right:8px; z-index:6; display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; padding:0; border:1px solid var(--line-strong); border-radius:8px; background:var(--surface); color:var(--ink-soft); cursor:pointer; opacity:0.8; box-shadow:var(--shadow); }
     .chart-fs-btn:hover { opacity:1; color:var(--accent); border-color:var(--accent-border); }
@@ -585,7 +586,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-405</span>
+      <span class="build-stamp">LC-406</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -4585,7 +4586,8 @@
 <script>
 /* LC-383: engine build self-check + deploy stamp. */
 (function () {
-  var WANT = 'ann7', TAG = 'app LC-389';
+  var WANT = 'ann7';
+  var TAG = 'app ' + (((document.querySelector('.build-stamp') || {}).textContent) || 'LC-?');   // read the real LC stamp — never drifts
   function go() {
     var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
     if (got !== WANT) {
