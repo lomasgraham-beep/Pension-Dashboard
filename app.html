@@ -586,7 +586,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-409</span>
+      <span class="build-stamp">LC-410</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1989,7 +1989,7 @@
             3: { targetAxisIndex:0, color:'#5fa8dc' },  // Graham guaranteed
             4: { targetAxisIndex:0, color:'#e67e22' },  // Julie annuity (amber)
             5: { targetAxisIndex:0, color:'#1d3a63' },  // Graham annuity (teal)
-            6: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
+            6: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4, annotations: { textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } } }
           };
         } else {
           incSeries = {
@@ -1997,7 +1997,7 @@
             1: { targetAxisIndex:0, color:'#3498db' },
             2: { targetAxisIndex:0, color:'#a67fc9' },
             3: { targetAxisIndex:0, color:'#5fa8dc' },
-            4: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
+            4: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4, annotations: { textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } } }
           };
         }
         incTitle = 'Income';
@@ -2020,13 +2020,13 @@
             0: { targetAxisIndex:0, color:'#3498db' },  // drawdown
             1: { targetAxisIndex:0, color:'#9b59b6' },  // guaranteed
             2: { targetAxisIndex:0, color:'#1d3a63' },  // annuity (teal)
-            3: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
+            3: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4, annotations: { textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } } }
           };
         } else {
           incSeries = {
             0: { targetAxisIndex:0, color:'#3498db' },
             1: { targetAxisIndex:0, color:'#9b59b6' },
-            2: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
+            2: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4, annotations: { textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } } }
           };
         }
         incTitle = currentView + ' Income';
@@ -2079,6 +2079,8 @@
       const potSeries = {};
       potSeries[potSpendIdx] = { type: 'line', targetAxisIndex: 1, color: inkCol, lineWidth: 3, pointSize: 4 };
       potSeries[potFixedIdx] = { type: 'line', targetAxisIndex: 1, color: '#17b5c4', lineWidth: 3, pointSize: 4, lineDashStyle: [6, 4] };
+      // event ● markers ride the top bar series — keep those red; domain markers (Retire/Low) go neutral below
+      potSeries[potBarCount - 1] = Object.assign(potSeries[potBarCount - 1] || {}, { annotations: { textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } } });
       const spendVAxis = phone
         ? { viewWindow: { min: 0, max: spendMax }, ticks: shortTicks(spendMax), textStyle: axisText, gridlines: { count: 0 } }
         : { title: 'Spend & pension income (£)', viewWindow: { min: 0, max: spendMax }, ticks: shortTicks(spendMax, 6), textStyle: axisText, gridlines: { count: 0 } };
@@ -2086,10 +2088,10 @@
       new google.visualization.ComboChart(document.getElementById('potChart')).draw(dPots, {
         title: '', seriesType: 'bars', isStacked: true, series: potSeries,
         legend: { position: 'none' }, chartArea: potArea, colors: potColors,
-        focusTarget: 'category',
+        focusTarget: 'category', curveType: 'function',
         vAxes: { 0: potVAxis, 1: spendVAxis },
         hAxis: { showTextEvery: phone ? 5 : 2, slantedText: true, slantedTextAngle: 45, textStyle: axisText },
-        annotations: { alwaysOutside:true, textStyle:{ fontSize:13, color:'#c0392b', bold:true }, stem:{ color:'#c0392b' } }
+        annotations: { alwaysOutside:true, textStyle:{ fontSize:12, color: inkCol, bold:true }, stem:{ color: gridCol } }
       });
       // Custom legend: stacked bars (in colour order) + two lines on 2nd axis
       const potLegendEntries = joint
@@ -2112,13 +2114,13 @@
       new google.visualization.ComboChart(document.getElementById('incomeChart')).draw(dInc, {
         title: '', seriesType:'bars', isStacked:true, series: incSeries,
         legend:{position:'none'}, chartArea: incArea,
-        focusTarget: 'category',
+        focusTarget: 'category', curveType: 'function',
         vAxes: {
           0: { title: phone ? '' : 'Income (£)', viewWindow:{min:0, max:incMax}, ticks: incTicks, textStyle: axisText, gridlines: { color: gridCol }, baselineColor: gridCol },
           1: { title: phone ? '' : 'Total drawdown (£)', viewWindow:{min:0, max:incMax}, ticks: incTicks, textStyle: axisText, gridlines: { count: 0 } }
         },
         hAxis: { showTextEvery: phone ? 5 : 2, slantedText: true, slantedTextAngle: 45, textStyle: axisText },
-        annotations: { alwaysOutside:true, textStyle:{ fontSize:13, color:'#c0392b', bold:true }, stem:{ color:'#c0392b' } }
+        annotations: { alwaysOutside:true, textStyle:{ fontSize:12, color: inkCol, bold:true }, stem:{ color: gridCol } }
       });
       // Custom legend for income chart — order matches the series indices above
       const incLegendEntries = [];
@@ -2195,7 +2197,7 @@
           1: { type: 'line', color: ovAccent(), lineWidth: 3 }
         },
         legend: { position: 'none' },
-        focusTarget: 'category',
+        focusTarget: 'category', curveType: 'function',
         chartArea: phone ? { left: 60, right: 16, top: 20, bottom: 70, height: '70%' } : { left: 88, right: 30, top: 20, bottom: 70 },
         vAxis: { minValue: 0, viewWindow: { min: 0, max: bandTop }, title: phone ? '' : 'Total pot (£)', ticks: shortTicks(bandTop, phone ? 5 : 6), textStyle: { fontSize: phone ? 10 : 12, color: ovInk() }, gridlines: { color: ovTrack() } },
         hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, chartRound(months / (phone ? 6 : 12))), slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: phone ? 9 : 11 } },
@@ -2370,7 +2372,7 @@
         series: series,
         colors: palette.slice(0, viewWindows.length),
         legend: { position: 'none' },
-        focusTarget: 'category',
+        focusTarget: 'category', curveType: 'function',
         chartArea: phone ? { left: 60, right: 16, top: 20, bottom: 60, height: '74%' } : { left: 88, right: 30, top: 20, bottom: 60 },
         vAxis: { viewWindow: { min: yMin, max: yMax }, title: phone ? '' : 'Net position (£)', ticks: shortTicksRange(yMin, yMax, phone ? 5 : 6),
                  baselineColor: ovInk(), textStyle: { fontSize: phone ? 10 : 12, color: ovInk() }, gridlines: { color: ovTrack() } },
@@ -3525,7 +3527,7 @@
       const sel = document.getElementById('tabSelect');
       if (sel) Array.from(sel.options).forEach(o => { if (o.value === 'Forecast' || o.value === 'KPIs') o.hidden = on; });
     }
-    // ---- Slider fill (LC-409): paint the track left of the thumb in the accent colour.
+    // ---- Slider fill (LC-410): paint the track left of the thumb in the accent colour.
     // Safari has no native progress-fill styling for range inputs, so a background
     // gradient is set per slider and refreshed on input and after programmatic changes.
     function paintSlider(r) {
