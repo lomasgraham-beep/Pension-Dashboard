@@ -204,7 +204,7 @@
     /* Modelling page contrast: tinted panel so the rail, model bar and chart card lift as white cards */
     #Modelling.tabcontent { background:var(--surface-2); }
     #Modelling .subtab-buttons { background:var(--surface-2); }
-    #Modelling .params, #Modelling .modelbar { background:var(--surface); box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); }
+    #Modelling .modelbar { background:var(--surface); box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
     .toggle-switch { appearance:none; -webkit-appearance:none; width:48px; height:28px; background:#cbd5e1; border-radius:999px; position:relative; cursor:pointer; outline:none; transition:background 0.2s; flex:none; vertical-align:middle; }
     .toggle-switch:checked { background:#27ae60; }
@@ -259,15 +259,14 @@
        reachable while scrolling long tables/charts on iPad and desktop. */
     .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
     .params { background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:16px 18px; margin:0 0 14px; }
-    .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:18px 26px; }
-    @media (min-width: 1000px) { .params .grid { grid-template-columns:repeat(4, 1fr); } }
-    @media (min-width: 1360px) { .params .grid { grid-template-columns:repeat(5, 1fr); } }
-    /* Charts first, full width; the control rail sits below them as a wide multi-column card (LC-412) */
+    .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px 16px; align-items:start; grid-auto-flow:row dense; }
+    @media (min-width: 1100px) { .params .grid { grid-template-columns:repeat(4, 1fr); } }
+    @media (min-width: 1600px) { .params .grid { grid-template-columns:repeat(5, 1fr); } }
+    /* Charts first, full width; the control rail sits below them as a wide multi-column card (LC-413) */
     .model-layout { display:flex; flex-direction:column; gap:16px; }
     .model-layout > .model-main { order:1; min-width:0; }
     .model-layout > .rail-slot, .model-layout > .rail-strip, .model-layout > .params { order:2; }
     .model-layout > .rail-slot:empty { display:none; }
-    .model-layout .params { margin:0; }
     .model-layout .model-main h2 { margin-top:0; }
     @media (min-width: 1300px) {
       .rail-collapse { width:100%; margin-bottom:10px; padding:8px; border:1px solid var(--line); border-radius:999px; background:var(--surface-2); color:var(--ink-soft); font-weight:bold; font-size:13px; cursor:pointer; }
@@ -282,6 +281,10 @@
     .params .ctrl-wide { grid-column: span 2; }
     .params label { display:block; font-weight:bold; font-size:14px; color:var(--ink); margin-bottom:8px; }
     .params .ctrl { display:flex; flex-direction:column; }
+    .model-layout .params { margin:0; background:transparent; border:none; box-shadow:none; padding:0; }
+    .params .grid > .ctrl { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 16px; box-shadow:0 1px 2px rgba(15,23,42,0.05); align-self:start; }
+    .params .grid > .rail-sec { margin:20px 2px 2px; }
+    .params .grid > .rail-sec:first-child { margin-top:2px; }
     .params .ctrl > label { min-height:2.6em; }   /* reserve 2 lines so sliders align even when a label wraps */
     .params .ctrl > label.switch { min-height:0; }
     .params .sv { display:inline-block; background:var(--accent-soft); border:1px solid var(--accent-border); color:var(--accent-dark); border-radius:999px; padding:2px 10px; font-size:12.5px; font-weight:700; margin-left:4px; }
@@ -340,7 +343,7 @@
     .params .switch .track::after { content:''; position:absolute; top:3px; left:3px; width:26px; height:26px; background:#fff; border-radius:50%; box-shadow:0 1px 3px rgba(0,0,0,0.3); transition:left .15s; }
     .params .switch input:checked + .track { background:#27ae60; }
     .params .switch input:checked + .track::after { left:27px; }
-    .params .switch .switch-text { font-weight:bold; font-size:15px; color:var(--ink); flex:1 1 auto; min-width:0; }
+    .params .switch .switch-text { font-weight:bold; font-size:15px; color:var(--ink); flex:0 1 auto; min-width:0; }
     /* icon rides the right content edge (fill above pushes it there); no extra left margin
        so it can't be shoved past the panel border on the fixed-width controls rail. */
     .params .switch .info-btn { margin-left:0; }
@@ -586,7 +589,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-412</span>
+      <span class="build-stamp">LC-413</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -3527,7 +3530,7 @@
       const sel = document.getElementById('tabSelect');
       if (sel) Array.from(sel.options).forEach(o => { if (o.value === 'Forecast' || o.value === 'KPIs') o.hidden = on; });
     }
-    // ---- Slider fill (LC-412): paint the track left of the thumb in the accent colour.
+    // ---- Slider fill (LC-413): paint the track left of the thumb in the accent colour.
     // Safari has no native progress-fill styling for range inputs, so a background
     // gradient is set per slider and refreshed on input and after programmatic changes.
     function paintSlider(r) {
