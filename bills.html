@@ -111,7 +111,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half). The darker <strong>Holidays</strong> and <strong>Dining</strong> lines are drawn from their planners &mdash; read-only here and counted towards the yearly total, but not saved as bills. <span style="color:var(--accent-dark);">(bills build: paymonths7)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half).<strong>Renewal</strong> is the policy renewal date for insurances &mdash; when set, that insurance shows on the Budget page only in its renewal month. The darker <strong>Holidays</strong> and <strong>Dining</strong> lines are drawn from their planners &mdash; read-only here and counted towards the yearly total, but not saved as bills. <span style="color:var(--accent-dark);">(bills build: paymonths8)</span></p>
   <div class="bar" style="align-items:flex-start;">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -126,8 +126,8 @@
   </div>
   <div class="catdef" id="catDef" style="display:none;"></div>
   <table id="tbl">
-    <thead><tr><th>Bill Name</th><th>Category</th><th>Paid by</th><th>Account</th><th>Premium &pound;</th><th>Frequency</th><th>Annual &pound;</th><th class="sched">Paid in<br><span style="font-weight:normal;font-size:11px;">(months)</span></th><th>Reduce?</th><th>Taper 70</th><th>Taper 80</th><th>Taper 90</th><th></th></tr></thead>
-    <tbody><tr><td colspan="13">Loading&hellip;</td></tr></tbody>
+    <thead><tr><th>Bill Name</th><th>Category</th><th>Paid by</th><th>Account</th><th>Premium &pound;</th><th>Frequency</th><th>Annual &pound;</th><th class="sched">Paid in<br><span style="font-weight:normal;font-size:11px;">(months)</span></th><th>Renewal<br><span style="font-weight:normal;font-size:11px;">(insurances)</span></th><th>Reduce?</th><th>Taper 70</th><th>Taper 80</th><th>Taper 90</th><th></th></tr></thead>
+    <tbody><tr><td colspan="14">Loading&hellip;</td></tr></tbody>
   </table>
 
 <script>
@@ -299,6 +299,7 @@
       '<td><select class="f-freq" onchange="onFreq(this)">' + freqOpt(r.frequency) + '</select></td>' +
       '<td class="annual-cell" style="font-weight:bold; color:var(--accent-dark);">' + fmt(annualOf(r.premium, r.frequency, r.pay_months)) + '</td>' +
       '<td class="sched">' + scheduleCellHtml(r) + '</td>' +
+      '<td><input type="date" class="f-renewal" value="' + esc(r.renewal_date || '') + '" onchange="mark()" style="min-width:130px;"></td>' +
       '<td style="text-align:center;"><input type="checkbox" class="f-red" ' + (r.spend_reduction ? 'checked' : '') + ' onchange="mark()" style="width:auto;"></td>' +
       '<td><input type="number" class="f-t70 taper" step="0.05" min="0" max="1" value="' + (r.taper_at_70 != null ? r.taper_at_70 : 1) + '" oninput="mark()"></td>' +
       '<td><input type="number" class="f-t80 taper" step="0.05" min="0" max="1" value="' + (r.taper_at_80 != null ? r.taper_at_80 : 1) + '" oninput="mark()"></td>' +
@@ -325,6 +326,7 @@
       rows[i].paid_account = tr.querySelector('.f-account').value.trim() || null;
       rows[i].premium = Math.round(parseFloat(tr.querySelector('.f-premium').value) || 0);
       rows[i].frequency = tr.querySelector('.f-freq').value;
+      rows[i].renewal_date = tr.querySelector('.f-renewal').value || null;
       rows[i].spend_reduction = tr.querySelector('.f-red').checked;
       rows[i].taper_at_70 = parseFloat(tr.querySelector('.f-t70').value);
       rows[i].taper_at_80 = parseFloat(tr.querySelector('.f-t80').value);
@@ -353,6 +355,7 @@
       '<td>Annual</td>' +
       '<td class="d-annual">' + fmt(annual) + '</td>' +
       '<td class="sched"><span class="d-mut">All</span></td>' +
+      '<td class="d-mut">&mdash;</td>' +
       '<td style="text-align:center;" class="d-mut">&mdash;</td>' +
       '<td class="d-mut">&mdash;</td><td class="d-mut">&mdash;</td><td class="d-mut">&mdash;</td>' +
       '<td><span class="d-mut">edit in ' + editTab + '</span></td>' +
@@ -371,7 +374,7 @@
     if (diningInView(cat))  derived += derivedRowHtml('Dining', DIN_CAT, dinAnnual, 'from rota', 'Dining tab');
     if (holidayInView(cat)) derived += derivedRowHtml('Holidays', HOL_CAT, holAnnual, 'from planner', 'Holidays tab');
     const body = derived + html;
-    tbody.innerHTML = body || '<tr><td colspan="13">No bills in this view. Use \u201cAdd bill\u201d or change the filter.</td></tr>';
+    tbody.innerHTML = body || '<tr><td colspan="14">No bills in this view. Use \u201cAdd bill\u201d or change the filter.</td></tr>';
     updateProj();
     updateCatDef();
   }
@@ -410,7 +413,7 @@
 
   function addRow() {
     syncDom();
-    rows.push({ id: undefined, bill_name: '', category_code: document.getElementById('filterCat').value === 'All' ? '' : document.getElementById('filterCat').value, premium: 0, frequency: 'Monthly', bill_month: null, pay_months: null, spend_reduction: false, taper_at_70: 1, taper_at_80: 1, taper_at_90: 1 });
+    rows.push({ id: undefined, bill_name: '', category_code: document.getElementById('filterCat').value === 'All' ? '' : document.getElementById('filterCat').value, premium: 0, frequency: 'Monthly', bill_month: null, pay_months: null, renewal_date: null, spend_reduction: false, taper_at_70: 1, taper_at_80: 1, taper_at_90: 1 });
     populateCatFilter(); render(); setDirty();
   }
   function delRow(btn) {
@@ -429,7 +432,7 @@
       for (const r of rows) {
         reconcileSchedule(r);
         // total_annual is a GENERATED column — never write it; the DB computes it from premium + frequency
-        const payload = { bill_name: r.bill_name, category_code: r.category_code, paid_by: r.paid_by || null, paid_account: r.paid_account || null, premium: r.premium, frequency: r.frequency, bill_month: r.bill_month != null ? r.bill_month : null, pay_months: r.pay_months || null, spend_reduction: r.spend_reduction, taper_at_70: r.taper_at_70, taper_at_80: r.taper_at_80, taper_at_90: r.taper_at_90 };
+        const payload = { bill_name: r.bill_name, category_code: r.category_code, paid_by: r.paid_by || null, paid_account: r.paid_account || null, premium: r.premium, frequency: r.frequency, bill_month: r.bill_month != null ? r.bill_month : null, pay_months: r.pay_months || null, renewal_date: r.renewal_date || null, spend_reduction: r.spend_reduction, taper_at_70: r.taper_at_70, taper_at_80: r.taper_at_80, taper_at_90: r.taper_at_90 };
         if (r.id != null) await App.write('PATCH', 'bd_household_bills?id=eq.' + r.id, payload);
         else await App.write('POST', 'bd_household_bills', payload);
       }
