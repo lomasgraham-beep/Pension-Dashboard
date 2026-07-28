@@ -20,17 +20,26 @@
   .filter-bar label { display:block; font-size:12px; color:#64748b; font-weight:bold; margin-bottom:4px; }
   .filter-bar select { padding:8px; border:1px solid #ccc; border-radius:6px; font-size:14px; }
   .charts { display:flex; gap:20px; flex-wrap:wrap; margin-bottom:25px; }
-  .chart-wrap { position:relative; flex:1; min-width:380px; background:#fff; border:1px solid #cbd5e1; border-radius:10px; padding:10px 8px 8px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); }
-  .chart-box { width:100%; height:350px; }
+  .chart-card { background:#fff; border:1px solid #cbd5e1; border-radius:10px; padding:12px 12px 10px; margin-bottom:25px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); }
+  .chart-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+  .chart-tabs { display:inline-flex; border:1px solid #cbd5e1; border-radius:10px; overflow:hidden; background:#f1f5f9; }
+  .chart-tab { border:0; border-right:1px solid #cbd5e1; background:transparent; color:#475569; padding:11px 18px; min-height:42px; font-weight:700; cursor:pointer; font-size:15px; }
+  .chart-tab:last-child { border-right:0; }
+  .chart-tab:hover { background:#e3edfb; color:#1e293b; }
+  .chart-tab.on { background:#2c3e50; color:#fff; }
+  .chart-tools { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .cum-lbl { font-size:12px; color:#64748b; font-weight:bold; }
+  .chart-wrap { position:relative; }
+  .chart-box { width:100%; height:440px; }
   .chart-fs-btn { position:absolute; top:8px; right:8px; z-index:6; display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; padding:0; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#64748b; cursor:pointer; opacity:0.85; box-shadow:0 1px 3px rgba(0,0,0,0.12); }
   .chart-fs-btn:hover { opacity:1; color:#2c3e50; border-color:#94a3b8; }
   .chart-wrap.fs { position:fixed; inset:0; z-index:10000; margin:0; padding:12px 12px 16px; background:#fff; overflow:auto; flex:none; min-width:0; }
   .chart-wrap.fs .chart-box { height:calc(var(--fs-h, 100vh) - 28px) !important; width:100%; }
   .chart-wrap.fs .chart-fs-btn { position:fixed; top:14px; right:18px; width:44px; height:44px; opacity:1; }
   .table-card { background:#fff; border:1px solid #cbd5e1; border-radius:10px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); overflow-x:auto; margin:18px 0 24px; }
-  table { width:100%; border-collapse:collapse; font-size:15px; }
-  th,td { padding:13px 16px; border-bottom:1px solid #d5dde5; text-align:right; }
-  th { white-space:normal; text-align:center; vertical-align:bottom; line-height:1.2; font-size:12.5px; text-transform:uppercase; letter-spacing:0.03em; }
+  table { width:100%; border-collapse:collapse; font-size:22px; }
+  th,td { padding:14px 18px; border-bottom:1px solid #d5dde5; text-align:right; }
+  th { white-space:normal; text-align:center; vertical-align:bottom; line-height:1.2; font-size:19px; text-transform:uppercase; letter-spacing:0.03em; }
   td { white-space:nowrap; }
   th:first-child,td:first-child,th:nth-child(2),td:nth-child(2) { text-align:left; }
   th { background:#2c3e50; color:#fff; border-bottom:2px solid #1f2d3d; }
@@ -52,7 +61,7 @@
   @media (prefers-color-scheme: dark) {
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
     h1, h2, h3, h4 { color:#f1f5f9 !important; }
-    .table-card, .chart-wrap, .panel, .card, .login-box, .login-card, .tier-card, .tier-block,
+    .table-card, .chart-card, .panel, .card, .login-box, .login-card, .tier-card, .tier-block,
     .summary, .pot-card, .member-card, .filter-bar, .derived, .inc-mgr,
     [style*="background:#fff"], [style*="background: #fff"],
     [style*="background:#f8fafc"], [style*="background:#f4f7f6"],
@@ -96,7 +105,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr9)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr10)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
     <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span> expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
@@ -112,15 +121,30 @@
     <div><label>Filter Member</label><select id="fMember" onchange="updatePensionFilter()"><option value="All">All Members</option></select></div>
     <div><label>Filter Pension</label><select id="fPension" onchange="drawCharts()"><option value="All">All Pensions</option></select></div>
   </div>
-  <div class="charts"><div class="chart-wrap"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="chartValue" class="chart-box"></div></div><div class="chart-wrap"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="chartGrowth" class="chart-box"></div></div></div>
-  <div style="display:flex; align-items:center; gap:8px; margin:4px 0 8px;">
-    <span style="font-size:12px; color:#64748b; font-weight:bold;">Accumulated growth unit</span>
-    <span id="cumToggle" style="display:inline-flex; border:1px solid #cbd5e1; border-radius:6px; overflow:hidden;">
-      <button type="button" id="cumGbpBtn" onclick="setCumMode('gbp')" style="border:none; border-right:1px solid #cbd5e1; padding:6px 16px; font-size:14px; cursor:pointer; background:#2c3e50; color:#fff;">£</button>
-      <button type="button" id="cumPctBtn" onclick="setCumMode('pct')" style="border:none; padding:6px 16px; font-size:14px; cursor:pointer; background:transparent; color:#64748b;">%</button>
-    </span>
+  <div class="chart-card">
+    <div class="chart-head">
+      <div class="chart-tabs">
+        <button type="button" class="chart-tab on" data-chart="value" onclick="showKpiChart('value')">Total Value</button>
+        <button type="button" class="chart-tab" data-chart="growth" onclick="showKpiChart('growth')">Monthly Growth</button>
+        <button type="button" class="chart-tab" data-chart="cum" onclick="showKpiChart('cum')">Accumulated Growth</button>
+      </div>
+      <div class="chart-tools">
+        <span id="cumToggleWrap" style="display:none; align-items:center; gap:8px;">
+          <span class="cum-lbl">Unit</span>
+          <span id="cumToggle" style="display:inline-flex; border:1px solid #cbd5e1; border-radius:6px; overflow:hidden;">
+            <button type="button" id="cumGbpBtn" onclick="setCumMode('gbp')" style="border:none; border-right:1px solid #cbd5e1; padding:6px 16px; font-size:14px; cursor:pointer; background:#2c3e50; color:#fff;">£</button>
+            <button type="button" id="cumPctBtn" onclick="setCumMode('pct')" style="border:none; padding:6px 16px; font-size:14px; cursor:pointer; background:transparent; color:#64748b;">%</button>
+          </span>
+        </span>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button>
+      <div id="chartValue" class="chart-box"></div>
+      <div id="chartGrowth" class="chart-box" style="display:none;"></div>
+      <div id="chartCumGrowth" class="chart-box" style="display:none;"></div>
+    </div>
   </div>
-  <div class="charts"><div class="chart-wrap" style="min-width:100%;"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="chartCumGrowth" class="chart-box" style="height:380px;"></div></div></div>
 <script>
   const fmt = App.fmt, fmtDiff = App.fmtDiff;
   let allLogs = [], allContributions = [], grahamParams = null, allExceptions = [];
@@ -133,6 +157,7 @@
   const CH_AXIS = { color:'#334155', fontSize:12 };
   const CH_TITLE = { color:'#0f172a', fontSize:15, bold:true };
   const CH_GRID = '#cbd5e1', CH_BASE = '#94a3b8';
+  let activeChart = 'value';   // which single chart is shown: 'value' | 'growth' | 'cum'
   google.charts.load('current', { packages:['corechart'] });
   google.charts.setOnLoadCallback(() => { chartsReady = true; initChartFsButtons(); if (allLogs.length) drawCharts(); });
 
@@ -513,7 +538,23 @@
     drawCumGrowthChart();
   }
 
-  function drawCharts() { drawValueChart(); drawGrowthChart(); drawCumGrowthChart(); }
+  function drawActiveChart() {
+    if (activeChart === 'growth') drawGrowthChart();
+    else if (activeChart === 'cum') drawCumGrowthChart();
+    else drawValueChart();
+  }
+  function drawCharts() { drawActiveChart(); }
+  // Single full-width chart with a selector — show one chart, hide the rest, redraw the shown one
+  // (Google Charts must draw into a visible element to size correctly).
+  function showKpiChart(which) {
+    activeChart = which;
+    document.querySelectorAll('.chart-tab').forEach(b => b.classList.toggle('on', b.dataset.chart === which));
+    document.getElementById('chartValue').style.display     = (which === 'value')  ? '' : 'none';
+    document.getElementById('chartGrowth').style.display    = (which === 'growth') ? '' : 'none';
+    document.getElementById('chartCumGrowth').style.display = (which === 'cum')    ? '' : 'none';
+    const cw = document.getElementById('cumToggleWrap'); if (cw) cw.style.display = (which === 'cum') ? 'inline-flex' : 'none';
+    drawActiveChart();
+  }
 
   function updatePensionFilter() {
     const mf = document.getElementById('fMember').value, sel = document.getElementById('fPension'), cur = sel.value;
