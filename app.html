@@ -586,7 +586,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-408</span>
+      <span class="build-stamp">LC-409</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1820,6 +1820,27 @@
       return Number.isFinite(n) ? n : 0;
     }
     function chartRound(v) { return Math.round(chartNumber(v)); }
+    // Compact currency for axis labels: £1.2M, £250K, £500 (shared by every modelling chart)
+    function shortGBP(n) {
+      const a = Math.abs(n), s = n < 0 ? '-' : '';
+      if (a >= 1e6) { const v = a / 1e6; return s + '£' + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + 'M'; }
+      if (a >= 1e3) { return s + '£' + Math.round(a / 1e3) + 'K'; }
+      return s + '£' + chartRound(a);
+    }
+    function shortTicks(maxValue, steps) {
+      steps = steps || 5; const ticks = [];
+      if (maxValue <= 0) return [{ v: 0, f: '£0' }];
+      const step = maxValue / steps;
+      for (let i = 0; i <= steps; i++) { const v = chartRound(step * i); ticks.push({ v: v, f: shortGBP(v) }); }
+      return ticks;
+    }
+    function shortTicksRange(minValue, maxValue, steps) {
+      steps = steps || 6; const ticks = []; const span = maxValue - minValue;
+      if (!(span > 0)) return [{ v: 0, f: '£0' }];
+      const step = span / steps;
+      for (let i = 0; i <= steps; i++) { const v = chartRound(minValue + step * i); ticks.push({ v: v, f: shortGBP(v) }); }
+      return ticks;
+    }
     function chartErrText(v) {
       return String(v == null ? '' : v).replace(/[&<>"']/g, function (ch) {
         return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch];
@@ -1870,6 +1891,27 @@
       function evDot(year) { return eventByYear[year] ? '●' : null; }
       function evText(year) { return eventByYear[year] || null; }
 
+      // Vertical reference markers on the year axis: full retirement, plus the trough
+      // (lowest total pot in the current view) — the number you judge a scenario by.
+      const domAnn = {};
+      (function () {
+        try { const d = idxToDate(document.getElementById('m_retire').value); if (d) domAnn[d.getFullYear()] = { a: 'Retire', t: 'Full retirement — ' + monthLabel(d) }; } catch (e) {}
+        let troughYr = null, troughVal = Infinity;
+        yrRows.forEach(r => {
+          const v = joint
+            ? (chartNumber(r.g_taxFree) + chartNumber(r.g_taxable) + chartNumber(r.j_taxFree) + chartNumber(r.j_taxable))
+            : (function () { const x = vrow(r); return chartNumber(x.tf) + chartNumber(x.tx); })();
+          if (v < troughVal) { troughVal = v; troughYr = r.year; }
+        });
+        if (troughYr != null && isFinite(troughVal)) {
+          const prev = domAnn[troughYr];
+          domAnn[troughYr] = { a: (prev ? prev.a + ' · ' : '') + 'Low ' + shortGBP(troughVal),
+                              t: (prev ? prev.t + '; ' : '') + 'Lowest pot: ' + shortGBP(troughVal) + ' in ' + troughYr };
+        }
+      })();
+      function dAnn(y) { return domAnn[y] ? domAnn[y].a : null; }
+      function dAnnT(y) { return domAnn[y] ? domAnn[y].t : null; }
+
       // annual spend line: total household outgoings (joint) or this person's share (single view)
       function spendForRow(r) {
         if (joint) return chartRound(r.outgoings || 0);
@@ -1889,6 +1931,7 @@
       // ---------- POT CHART (stacked columns) ----------
       const dPots = new google.visualization.DataTable();
       dPots.addColumn('string','Year');
+      dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});   // domain markers (Retire / Low)
       let potColors, potTitle;
       if (joint) {
         // order bottom -> top: p2 tax-free, p1 tax-free, p2 taxable, p1 taxable
@@ -1896,17 +1939,17 @@
         dPots.addColumn('number', p2Name + ' taxable');  dPots.addColumn('number', p1Name + ' taxable');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
         dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Pension income (net)');
-        yrRows.forEach(r => dPots.addRow([String(r.year),
+        yrRows.forEach(r => dPots.addRow([String(r.year), dAnn(r.year), dAnnT(r.year),
           chartRound(r.j_taxFree), chartRound(r.g_taxFree), chartRound(r.j_taxable), chartRound(r.g_taxable),
           evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]));
-        potColors = ['#c39bd3','#85c1e9','#8e44ad','#2471a3']; // Julie light, Graham light, Julie dark, Graham dark
+        potColors = ['#a67fc9','#5fa8dc','#8e44ad','#2471a3']; // Julie light, Graham light, Julie dark, Graham dark
         potTitle = 'Combined Pots';
       } else {
         dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
         dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Pension income (net)');
-        yrRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), chartRound(v.tf), chartRound(v.tx), evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]); });
-        potColors = ['#2ecc71','#e74c3c'];
+        yrRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), dAnn(r.year), dAnnT(r.year), chartRound(v.tf), chartRound(v.tx), evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]); });
+        potColors = ['#27ae60','#c0392b'];
         potTitle = currentView + ' Pots';
       }
 
@@ -1915,6 +1958,7 @@
       // Annuity income is split out so you can see the step-up at each purchase.
       const dInc = new google.visualization.DataTable();
       dInc.addColumn('string','Year');
+      dInc.addColumn({type:'string', role:'annotation'}); dInc.addColumn({type:'string', role:'annotationText'});   // domain markers (Retire / Low)
       let incSeries, incTitle;
       const hasAnnuity = (drawdownRows.annuityWindows || []).some(w => w.purchased);
       if (joint) {
@@ -1930,7 +1974,7 @@
         dInc.addColumn({type:'string', role:'annotation'}); dInc.addColumn({type:'string', role:'annotationText'});
         yrRows.forEach(r => {
           const gAnn = chartRound(r.g_annuityIncome || 0), jAnn = chartRound(r.j_annuityIncome || 0);
-          const row = [String(r.year),
+          const row = [String(r.year), dAnn(r.year), dAnnT(r.year),
             chartRound(r.j_draw), chartRound(r.g_draw),
             chartRound(Math.max(0, chartNumber(r.j_other) - jAnn)), chartRound(Math.max(0, chartNumber(r.g_other) - gAnn))];
           if (hasAnnuity) row.push(jAnn, gAnn);
@@ -1941,8 +1985,8 @@
           incSeries = {
             0: { targetAxisIndex:0, color:'#9b59b6' },  // Julie drawdown
             1: { targetAxisIndex:0, color:'#3498db' },  // Graham drawdown
-            2: { targetAxisIndex:0, color:'#c39bd3' },  // Julie guaranteed
-            3: { targetAxisIndex:0, color:'#85c1e9' },  // Graham guaranteed
+            2: { targetAxisIndex:0, color:'#a67fc9' },  // Julie guaranteed
+            3: { targetAxisIndex:0, color:'#5fa8dc' },  // Graham guaranteed
             4: { targetAxisIndex:0, color:'#e67e22' },  // Julie annuity (amber)
             5: { targetAxisIndex:0, color:'#1d3a63' },  // Graham annuity (teal)
             6: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
@@ -1951,8 +1995,8 @@
           incSeries = {
             0: { targetAxisIndex:0, color:'#9b59b6' },
             1: { targetAxisIndex:0, color:'#3498db' },
-            2: { targetAxisIndex:0, color:'#c39bd3' },
-            3: { targetAxisIndex:0, color:'#85c1e9' },
+            2: { targetAxisIndex:0, color:'#a67fc9' },
+            3: { targetAxisIndex:0, color:'#5fa8dc' },
             4: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4 }
           };
         }
@@ -1966,7 +2010,7 @@
         yrRows.forEach(r => {
           const v = vrow(r);
           const ann = chartRound(currentView === p1Name ? (r.g_annuityIncome || 0) : (r.j_annuityIncome || 0));
-          const row = [String(r.year), chartRound(v.draw), chartRound(Math.max(0, chartNumber(v.other) - ann))];
+          const row = [String(r.year), dAnn(r.year), dAnnT(r.year), chartRound(v.draw), chartRound(Math.max(0, chartNumber(v.other) - ann))];
           if (hasAnnuity) row.push(ann);
           row.push(chartRound(v.draw), evDot(r.year), evText(r.year));
           dInc.addRow(row);
@@ -2009,24 +2053,11 @@
       // On narrow screens, percentage chart margins are too small for the y-axis
       // numbers (they clip to "£…"). Use a fixed left margin + short £1.2M/£250K ticks.
       const phone = window.innerWidth <= 600;
-      const axisText = phone ? { fontSize: 10 } : { fontSize: 12 };
+      const inkCol = ovInk(), gridCol = ovTrack();   // theme tokens, so dark mode stays legible
+      const axisText = phone ? { fontSize: 10, color: inkCol } : { fontSize: 12, color: inkCol };
       const potArea = phone ? { left: 50, right: 50, top: 24, bottom: 90, height: '62%' } : { width: '88%', height: '78%', top: 24 };
       const incArea = phone ? { left: 50, right: 50, top: 24, bottom: 90, height: '62%' } : { width: '88%', height: '78%', top: 24 };
 
-      // Compact currency for phone axis labels: £1.2M, £250K, £500
-      function shortGBP(n) {
-        const a = Math.abs(n);
-        if (a >= 1e6) { const v = n / 1e6; return '£' + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + 'M'; }
-        if (a >= 1e3) { const v = n / 1e3; return '£' + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(0)) + 'K'; }
-        return '£' + chartRound(n);
-      }
-      function shortTicks(maxValue, steps) {
-        steps = steps || 5; const ticks = [];
-        if (maxValue <= 0) return [{ v: 0, f: '£0' }];
-        const step = maxValue / steps;
-        for (let i = 0; i <= steps; i++) { const v = chartRound(step * i); ticks.push({ v: v, f: shortGBP(v) }); }
-        return ticks;
-      }
       // stacked pot chart max = largest row total across the STACKED bar segments only
       // (exclude the Annual spend column, which is a line on the 2nd axis, not stacked)
       const potBarCount = joint ? 4 : 2;
@@ -2040,24 +2071,24 @@
       }
       potMax = Math.ceil((potMax * 1.05) / 1000) * 1000 || 1000;
 
-      const potVAxis = phone
-        ? { minValue: 0, viewWindow: { min: 0, max: potMax }, ticks: shortTicks(potMax), textStyle: axisText }
-        : { minValue: 0, format: '£#,###', textStyle: axisText };
-      const incTicks = phone ? shortTicks(incMax) : null;
+      const potVAxis = { minValue: 0, viewWindow: { min: 0, max: potMax }, ticks: shortTicks(potMax, phone ? 5 : 6), textStyle: axisText, gridlines: { color: gridCol }, baselineColor: gridCol };
+      const incTicks = shortTicks(incMax, phone ? 5 : 6);
 
       const potSpendIdx = joint ? 4 : 2;
       const potFixedIdx = joint ? 5 : 3;
       const potSeries = {};
-      potSeries[potSpendIdx] = { type: 'line', targetAxisIndex: 1, color: '#2c3e50', lineWidth: 3, pointSize: 4 };
+      potSeries[potSpendIdx] = { type: 'line', targetAxisIndex: 1, color: inkCol, lineWidth: 3, pointSize: 4 };
       potSeries[potFixedIdx] = { type: 'line', targetAxisIndex: 1, color: '#17b5c4', lineWidth: 3, pointSize: 4, lineDashStyle: [6, 4] };
       const spendVAxis = phone
-        ? { viewWindow: { min: 0, max: spendMax }, ticks: shortTicks(spendMax), textStyle: axisText }
-        : { title: 'Spend & pension income (£)', viewWindow: { min: 0, max: spendMax }, format: '£#,###', textStyle: axisText };
+        ? { viewWindow: { min: 0, max: spendMax }, ticks: shortTicks(spendMax), textStyle: axisText, gridlines: { count: 0 } }
+        : { title: 'Spend & pension income (£)', viewWindow: { min: 0, max: spendMax }, ticks: shortTicks(spendMax, 6), textStyle: axisText, gridlines: { count: 0 } };
 
       new google.visualization.ComboChart(document.getElementById('potChart')).draw(dPots, {
         title: '', seriesType: 'bars', isStacked: true, series: potSeries,
         legend: { position: 'none' }, chartArea: potArea, colors: potColors,
+        focusTarget: 'category',
         vAxes: { 0: potVAxis, 1: spendVAxis },
+        hAxis: { showTextEvery: phone ? 5 : 2, slantedText: true, slantedTextAngle: 45, textStyle: axisText },
         annotations: { alwaysOutside:true, textStyle:{ fontSize:13, color:'#c0392b', bold:true }, stem:{ color:'#c0392b' } }
       });
       // Custom legend: stacked bars (in colour order) + two lines on 2nd axis
@@ -2067,13 +2098,13 @@
             { label: p1Name + ' tax-free', color: potColors[1], type: 'bar' },
             { label: p2Name + ' taxable',  color: potColors[2], type: 'bar' },
             { label: p1Name + ' taxable',  color: potColors[3], type: 'bar' },
-            { label: 'Annual spend',       color: '#2c3e50',    type: 'line' },
+            { label: 'Annual spend',       color: inkCol,       type: 'line' },
             { label: 'Pension income (net)', color: '#17b5c4',  type: 'line' }
           ]
         : [
             { label: 'Tax-Free Pot',       color: potColors[0], type: 'bar' },
             { label: 'Taxable Pot',        color: potColors[1], type: 'bar' },
-            { label: 'Annual spend',       color: '#2c3e50',    type: 'line' },
+            { label: 'Annual spend',       color: inkCol,       type: 'line' },
             { label: 'Pension income (net)', color: '#17b5c4',  type: 'line' }
           ];
       renderCustomLegend(document.getElementById('potChart').closest('.chart-wrap'), potLegendEntries);
@@ -2081,10 +2112,12 @@
       new google.visualization.ComboChart(document.getElementById('incomeChart')).draw(dInc, {
         title: '', seriesType:'bars', isStacked:true, series: incSeries,
         legend:{position:'none'}, chartArea: incArea,
+        focusTarget: 'category',
         vAxes: {
-          0: phone ? { title:'', viewWindow:{min:0, max:incMax}, ticks: incTicks, textStyle: axisText } : { title:'Income (£)', viewWindow:{min:0, max:incMax}, format:'£#,###', textStyle: axisText },
-          1: phone ? { title:'', viewWindow:{min:0, max:incMax}, ticks: incTicks, textStyle: axisText } : { title:'Total drawdown (£)', viewWindow:{min:0, max:incMax}, format:'£#,###', textStyle: axisText }
+          0: { title: phone ? '' : 'Income (£)', viewWindow:{min:0, max:incMax}, ticks: incTicks, textStyle: axisText, gridlines: { color: gridCol }, baselineColor: gridCol },
+          1: { title: phone ? '' : 'Total drawdown (£)', viewWindow:{min:0, max:incMax}, ticks: incTicks, textStyle: axisText, gridlines: { count: 0 } }
         },
+        hAxis: { showTextEvery: phone ? 5 : 2, slantedText: true, slantedTextAngle: 45, textStyle: axisText },
         annotations: { alwaysOutside:true, textStyle:{ fontSize:13, color:'#c0392b', bold:true }, stem:{ color:'#c0392b' } }
       });
       // Custom legend for income chart — order matches the series indices above
@@ -2093,8 +2126,8 @@
         incLegendEntries.push(
           { label: p2Name + ' drawdown',   color: '#9b59b6', type: 'bar' },
           { label: p1Name + ' drawdown',   color: '#3498db', type: 'bar' },
-          { label: p2Name + ' guaranteed', color: '#c39bd3', type: 'bar' },
-          { label: p1Name + ' guaranteed', color: '#85c1e9', type: 'bar' }
+          { label: p2Name + ' guaranteed', color: '#a67fc9', type: 'bar' },
+          { label: p1Name + ' guaranteed', color: '#5fa8dc', type: 'bar' }
         );
         if (hasAnnuity) incLegendEntries.push(
           { label: p2Name + ' annuity', color: '#e67e22', type: 'bar' },
@@ -2159,11 +2192,12 @@
         seriesType: 'line',
         series: {
           0: { type: 'area', color: '#c0392b', areaOpacity: 0.12, lineWidth: 0, enableInteractivity: false, visibleInLegend: false },
-          1: { type: 'line', color: '#1d3a63', lineWidth: 3 }
+          1: { type: 'line', color: ovAccent(), lineWidth: 3 }
         },
         legend: { position: 'none' },
+        focusTarget: 'category',
         chartArea: phone ? { left: 60, right: 16, top: 20, bottom: 70, height: '70%' } : { left: 88, right: 30, top: 20, bottom: 70 },
-        vAxis: { minValue: 0, viewWindow: { min: 0, max: bandTop }, title: phone ? '' : 'Total pot (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
+        vAxis: { minValue: 0, viewWindow: { min: 0, max: bandTop }, title: phone ? '' : 'Total pot (£)', ticks: shortTicks(bandTop, phone ? 5 : 6), textStyle: { fontSize: phone ? 10 : 12, color: ovInk() }, gridlines: { color: ovTrack() } },
         hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, chartRound(months / (phone ? 6 : 12))), slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: phone ? 9 : 11 } },
         annotations: { style: 'point', textStyle: { fontSize: 11, color: '#c0392b', bold: true } }
       });
@@ -2250,8 +2284,9 @@
         isStacked: true,
         legend: { position: 'none' },
         colors: allColors,
+        focusTarget: 'category',
         chartArea: phone ? { left: 60, right: 16, top: 20, bottom: 60, height: '74%' } : { left: 88, right: 30, top: 20, bottom: 60 },
-        vAxis: { minValue: 0, viewWindow: { min: 0, max: top }, title: phone ? '' : 'Balance (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
+        vAxis: { minValue: 0, viewWindow: { min: 0, max: top }, title: phone ? '' : 'Balance (£)', ticks: shortTicks(top, phone ? 5 : 6), textStyle: { fontSize: phone ? 10 : 12, color: ovInk() }, gridlines: { color: ovTrack() } },
         hAxis: { title: phone ? '' : 'Year', textStyle: { fontSize: phone ? 9 : 11 }, showTextEvery: phone ? 2 : 1 },
         annotations: { alwaysOutside: true, textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } }
       });
@@ -2335,9 +2370,10 @@
         series: series,
         colors: palette.slice(0, viewWindows.length),
         legend: { position: 'none' },
+        focusTarget: 'category',
         chartArea: phone ? { left: 60, right: 16, top: 20, bottom: 60, height: '74%' } : { left: 88, right: 30, top: 20, bottom: 60 },
-        vAxis: { viewWindow: { min: yMin, max: yMax }, title: phone ? '' : 'Net position (£)', format: '£#,###',
-                 baselineColor: '#444', textStyle: { fontSize: phone ? 10 : 12 } },
+        vAxis: { viewWindow: { min: yMin, max: yMax }, title: phone ? '' : 'Net position (£)', ticks: shortTicksRange(yMin, yMax, phone ? 5 : 6),
+                 baselineColor: ovInk(), textStyle: { fontSize: phone ? 10 : 12, color: ovInk() }, gridlines: { color: ovTrack() } },
         hAxis: { title: phone ? '' : 'Year', textStyle: { fontSize: phone ? 9 : 11 }, showTextEvery: phone ? 4 : 2 }
       });
       renderCustomLegend(wrap, viewWindows.map((w, i) => ({
@@ -3489,7 +3525,7 @@
       const sel = document.getElementById('tabSelect');
       if (sel) Array.from(sel.options).forEach(o => { if (o.value === 'Forecast' || o.value === 'KPIs') o.hidden = on; });
     }
-    // ---- Slider fill (LC-408): paint the track left of the thumb in the accent colour.
+    // ---- Slider fill (LC-409): paint the track left of the thumb in the accent colour.
     // Safari has no native progress-fill styling for range inputs, so a background
     // gradient is set per slider and refreshed on input and after programmatic changes.
     function paintSlider(r) {
