@@ -262,7 +262,7 @@
     .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px 16px; align-items:start; grid-auto-flow:row dense; }
     @media (min-width: 1100px) { .params .grid { grid-template-columns:repeat(4, 1fr); } }
     @media (min-width: 1600px) { .params .grid { grid-template-columns:repeat(5, 1fr); } }
-    /* Charts first, full width; the control rail sits below them as a wide multi-column card (LC-413) */
+    /* Charts first, full width; the control rail sits below them as a wide multi-column card (LC-414) */
     .model-layout { display:flex; flex-direction:column; gap:16px; }
     .model-layout > .model-main { order:1; min-width:0; }
     .model-layout > .rail-slot, .model-layout > .rail-strip, .model-layout > .params { order:2; }
@@ -589,7 +589,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-413</span>
+      <span class="build-stamp">LC-414</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -2056,7 +2056,7 @@
       // On narrow screens, percentage chart margins are too small for the y-axis
       // numbers (they clip to "£…"). Use a fixed left margin + short £1.2M/£250K ticks.
       const phone = window.innerWidth <= 600;
-      const inkCol = ovInk(), gridCol = ovTrack();   // theme tokens, so dark mode stays legible
+      const inkCol = '#334155', gridCol = '#d5dde5';   // chart plot is always white in both themes, so fixed dark ink stays readable
       const axisText = phone ? { fontSize: 10, color: inkCol } : { fontSize: 12, color: inkCol };
       const potArea = phone ? { left: 50, right: 50, top: 24, bottom: 90, height: '62%' } : { width: '88%', height: '78%', top: 24 };
       const incArea = phone ? { left: 50, right: 50, top: 24, bottom: 90, height: '62%' } : { width: '88%', height: '78%', top: 24 };
@@ -2202,7 +2202,7 @@
         legend: { position: 'none' },
         focusTarget: 'category', curveType: 'function',
         chartArea: phone ? { left: 60, right: 16, top: 20, bottom: 70, height: '70%' } : { left: 88, right: 30, top: 20, bottom: 70 },
-        vAxis: { minValue: 0, viewWindow: { min: 0, max: bandTop }, title: phone ? '' : 'Total pot (£)', ticks: shortTicks(bandTop, phone ? 5 : 6), textStyle: { fontSize: phone ? 10 : 12, color: ovInk() }, gridlines: { color: ovTrack() } },
+        vAxis: { minValue: 0, viewWindow: { min: 0, max: bandTop }, title: phone ? '' : 'Total pot (£)', ticks: shortTicks(bandTop, phone ? 5 : 6), textStyle: { fontSize: phone ? 10 : 12, color: '#334155' }, gridlines: { color: '#d5dde5' } },
         hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, chartRound(months / (phone ? 6 : 12))), slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: phone ? 9 : 11 } },
         annotations: { style: 'point', textStyle: { fontSize: 11, color: '#c0392b', bold: true } }
       });
@@ -2291,7 +2291,7 @@
         colors: allColors,
         focusTarget: 'category',
         chartArea: phone ? { left: 60, right: 16, top: 20, bottom: 60, height: '74%' } : { left: 88, right: 30, top: 20, bottom: 60 },
-        vAxis: { minValue: 0, viewWindow: { min: 0, max: top }, title: phone ? '' : 'Balance (£)', ticks: shortTicks(top, phone ? 5 : 6), textStyle: { fontSize: phone ? 10 : 12, color: ovInk() }, gridlines: { color: ovTrack() } },
+        vAxis: { minValue: 0, viewWindow: { min: 0, max: top }, title: phone ? '' : 'Balance (£)', ticks: shortTicks(top, phone ? 5 : 6), textStyle: { fontSize: phone ? 10 : 12, color: '#334155' }, gridlines: { color: '#d5dde5' } },
         hAxis: { title: phone ? '' : 'Year', textStyle: { fontSize: phone ? 9 : 11 }, showTextEvery: phone ? 2 : 1 },
         annotations: { alwaysOutside: true, textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } }
       });
@@ -2378,7 +2378,7 @@
         focusTarget: 'category', curveType: 'function',
         chartArea: phone ? { left: 60, right: 16, top: 20, bottom: 60, height: '74%' } : { left: 88, right: 30, top: 20, bottom: 60 },
         vAxis: { viewWindow: { min: yMin, max: yMax }, title: phone ? '' : 'Net position (£)', ticks: shortTicksRange(yMin, yMax, phone ? 5 : 6),
-                 baselineColor: ovInk(), textStyle: { fontSize: phone ? 10 : 12, color: ovInk() }, gridlines: { color: ovTrack() } },
+                 baselineColor: ovInk(), textStyle: { fontSize: phone ? 10 : 12, color: '#334155' }, gridlines: { color: '#d5dde5' } },
         hAxis: { title: phone ? '' : 'Year', textStyle: { fontSize: phone ? 9 : 11 }, showTextEvery: phone ? 4 : 2 }
       });
       renderCustomLegend(wrap, viewWindows.map((w, i) => ({
@@ -3530,7 +3530,7 @@
       const sel = document.getElementById('tabSelect');
       if (sel) Array.from(sel.options).forEach(o => { if (o.value === 'Forecast' || o.value === 'KPIs') o.hidden = on; });
     }
-    // ---- Slider fill (LC-413): paint the track left of the thumb in the accent colour.
+    // ---- Slider fill (LC-414): paint the track left of the thumb in the accent colour.
     // Safari has no native progress-fill styling for range inputs, so a background
     // gradient is set per slider and refreshed on input and after programmatic changes.
     function paintSlider(r) {
