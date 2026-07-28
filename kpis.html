@@ -22,11 +22,10 @@
   .charts { display:flex; gap:20px; flex-wrap:wrap; margin-bottom:25px; }
   .chart-card { background:#fff; border:1px solid #cbd5e1; border-radius:10px; padding:12px 12px 10px; margin-bottom:25px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); }
   .chart-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
-  .chart-tabs { display:inline-flex; border:1px solid #cbd5e1; border-radius:10px; overflow:hidden; background:#f1f5f9; }
-  .chart-tab { border:0; border-right:1px solid #cbd5e1; background:transparent; color:#475569; padding:11px 18px; min-height:42px; font-weight:700; cursor:pointer; font-size:15px; }
-  .chart-tab:last-child { border-right:0; }
+  .chart-tabs { display:inline-flex; gap:6px; flex-wrap:wrap; }
+  .chart-tab { border:1px solid #cbd5e1; background:#f1f5f9; color:#475569; padding:10px 18px; min-height:42px; font-weight:700; cursor:pointer; font-size:15px; border-radius:999px; box-shadow:0 1px 2px rgba(15,23,42,0.08); }
   .chart-tab:hover { background:#e3edfb; color:#1e293b; }
-  .chart-tab.on { background:#2c3e50; color:#fff; }
+  .chart-tab.on { background:#2c3e50; color:#fff; border-color:#2c3e50; }
   .chart-tools { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .cum-lbl { font-size:12px; color:#64748b; font-weight:bold; }
   .chart-wrap { position:relative; }
@@ -105,7 +104,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr10)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr11)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
     <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span> expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>

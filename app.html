@@ -31,10 +31,10 @@
     .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
     .topbar h1 { margin:0; font-size:22px; color:var(--ink); letter-spacing:-0.01em; }
     .right { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
-    .view-toggle { background:var(--surface); border-radius:8px; overflow:hidden; display:flex; border:1px solid var(--line-strong); box-shadow:var(--shadow); }
-    .btn-toggle { background:transparent; border:none; padding:9px 16px; font-weight:600; cursor:pointer; color:var(--ink-soft); font-size:13px; transition:background .12s,color .12s; }
-    .btn-toggle:hover { background:var(--accent-soft); }
-    .btn-toggle.active-toggle { background:var(--accent); color:#fff; }
+    .view-toggle { display:flex; gap:6px; }
+    .btn-toggle { background:var(--accent-soft); border:1px solid var(--accent-border); padding:9px 16px; font-weight:600; cursor:pointer; color:var(--accent-dark); font-size:13px; border-radius:999px; box-shadow:var(--shadow); transition:background .12s,color .12s,border-color .12s; }
+    .btn-toggle:hover { background:var(--accent-border); }
+    .btn-toggle.active-toggle { background:var(--accent); color:#fff; border-color:var(--accent); }
     .scope-toggle { display:flex; align-items:center; gap:10px; margin:0 0 14px; flex-wrap:wrap; }
     .ret-controls { display:flex; flex-wrap:wrap; align-items:center; gap:12px 28px; margin:0 0 14px; }
     .ret-controls > div { margin:0; }
@@ -189,16 +189,23 @@
     .chart-wrap.fs { position:fixed; inset:0; z-index:10000; margin:0; padding:12px 12px 16px; background:var(--surface); overflow:auto; }
     .chart-wrap.fs .chart-box { height:calc(var(--fs-h, 100vh) - 28px); margin:0; }
     .chart-wrap.fs .chart-fs-btn { position:fixed; top:14px; right:18px; width:44px; height:44px; opacity:1; }
-    /* Single-chart selector (Modelling page): one full-width chart with segmented tabs */
-    .chart-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:12px 12px 10px; margin-bottom:20px; box-shadow:var(--shadow); }
+    /* Single-chart selector (Modelling page): one full-width chart with pill tabs */
+    .chart-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:12px 12px 10px; margin-bottom:20px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); }
     .chart-card > h3 { display:none !important; }
     .chart-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
-    .chart-tabs { display:inline-flex; border:1px solid var(--line-strong); border-radius:10px; overflow:hidden; background:var(--surface-2); }
-    .chart-tab { border:0; border-right:1px solid var(--line-strong); background:transparent; color:var(--ink-soft); padding:11px 18px; min-height:42px; font-weight:700; cursor:pointer; font-size:15px; }
-    .chart-tab:last-child { border-right:0; }
-    .chart-tab:hover { background:var(--accent-soft); color:var(--accent-dark); }
-    .chart-tab.on { background:var(--accent); color:#fff; }
+    .chart-tabs { display:inline-flex; gap:6px; flex-wrap:wrap; }
+    .chart-tab { border:1px solid var(--accent-border); background:var(--accent-soft); color:var(--accent-dark); padding:10px 18px; min-height:42px; font-weight:700; cursor:pointer; font-size:15px; border-radius:999px; box-shadow:var(--shadow); transition:background .12s,color .12s,border-color .12s; }
+    .chart-tab:hover { background:var(--accent-border); color:var(--accent-dark); }
+    .chart-tab.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .chart-tools { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
     .chart-card .chart-box { height:660px; margin-bottom:0; }
+    /* Modelling page contrast: tinted panel so the rail, model bar and chart card lift as white cards */
+    #Modelling.tabcontent { background:var(--surface-2); }
+    #Modelling .subtab-buttons { background:var(--surface-2); }
+    #Modelling .params, #Modelling .modelbar { background:var(--surface); box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); }
+    /* Inline group labels in the modelling sub-nav */
+    .subnav-grp { align-self:center; font-size:11px; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-soft); margin:0 2px 0 10px; }
+    .subtab-buttons .subnav-grp:first-child { margin-left:0; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
     .toggle-switch { appearance:none; -webkit-appearance:none; width:48px; height:28px; background:#cbd5e1; border-radius:999px; position:relative; cursor:pointer; outline:none; transition:background 0.2s; flex:none; vertical-align:middle; }
     .toggle-switch:checked { background:#27ae60; }
@@ -578,7 +585,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-404</span>
+      <span class="build-stamp">LC-405</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -728,15 +735,15 @@
 
   <div id="Cash" class="tabcontent">
     <div class="subtab-buttons">
-      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <button class="subtab-link active-sub" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <span class="subnav-grp">Scenarios</span><button class="subtab-link active-sub" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -744,15 +751,15 @@
   </div>
   <div id="Crashes" class="tabcontent">
     <div class="subtab-buttons">
-      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -761,15 +768,15 @@
 
   <div id="Annuities" class="tabcontent">
     <div class="subtab-buttons">
-      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -778,15 +785,15 @@
 
   <div id="ScenarioGrid" class="tabcontent">
     <div class="subtab-buttons">
-      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -795,15 +802,15 @@
 
   <div id="Frontier" class="tabcontent">
     <div class="subtab-buttons">
-      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -812,15 +819,15 @@
 
   <div id="MultiModel" class="tabcontent">
     <div class="subtab-buttons">
-      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -829,15 +836,15 @@
 
   <div id="PotTable" class="tabcontent">
     <div class="subtab-buttons">
-      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <button class="subtab-link active-sub" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <span class="subnav-grp">Analysis</span><button class="subtab-link active-sub" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -845,15 +852,15 @@
   </div>
   <div id="Sensitivity" class="tabcontent">
     <div class="subtab-buttons">
-      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -861,15 +868,15 @@
   </div>
   <div id="MonthlyAudit" class="tabcontent">
     <div class="subtab-buttons">
-      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -878,15 +885,15 @@
 
   <div id="Modelling" class="tabcontent">
     <div class="subtab-buttons">
-      <button class="subtab-link active-sub" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <span class="subnav-grp">Model</span><button class="subtab-link active-sub" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -995,20 +1002,26 @@
     <div class="model-main">
     <h2><span class="viewlabel">Joint</span> Projections<button type="button" class="explain-btn" onclick="toggleScenarioSummary('scenarioSummary_rm')" aria-expanded="false">&#9432; Explain this scenario</button></h2>
     <div id="scenarioSummary_rm" class="scenario-summary" style="display:none;"></div>
-    <div class="scope-toggle">
-      <span class="scope-lbl">Show:</span>
-      <div class="view-toggle">
-        <button class="btn-toggle vt active-toggle" data-view="Joint" onclick="setView('Joint')">Joint</button>
-        <button class="btn-toggle vt" data-view="p1" onclick="setView(p1Name)">Graham</button>
-        <button class="btn-toggle vt" data-view="p2" onclick="setView(p2Name)">Julie</button>
+    <div class="chart-card">
+      <div class="chart-head">
+        <div class="chart-tabs">
+          <button type="button" class="chart-tab on" data-mchart="pot" onclick="showModelChart('pot')">Pot Value</button>
+          <button type="button" class="chart-tab" data-mchart="income" onclick="showModelChart('income')">Income</button>
+          <button type="button" id="mtab-crash" class="chart-tab" data-mchart="crash" style="display:none;" onclick="showModelChart('crash')">Market Crashes</button>
+          <button type="button" id="mtab-cash" class="chart-tab" data-mchart="cash" style="display:none;" onclick="showModelChart('cash')">Cash Savings</button>
+          <button type="button" id="mtab-annuity" class="chart-tab" data-mchart="annuity" style="display:none;" onclick="showModelChart('annuity')">Annuity Payback</button>
+        </div>
+        <div class="chart-tools">
+          <div class="view-toggle">
+            <button class="btn-toggle vt active-toggle" data-view="Joint" onclick="setView('Joint')">Joint</button>
+            <button class="btn-toggle vt" data-view="p1" onclick="setView(p1Name)">Graham</button>
+            <button class="btn-toggle vt" data-view="p2" onclick="setView(p2Name)">Julie</button>
+          </div>
+          <button type="button" id="yfBtn" onclick="toggleYearFilter()" style="padding:9px 16px; border:1px solid var(--accent-border); border-radius:999px; background:var(--accent-soft); color:var(--accent-dark); font-weight:600; font-size:13px; cursor:pointer; box-shadow:var(--shadow);">Filter years &#9662;</button>
+          <span id="yfStatus" style="font-size:12px; color:var(--ink-soft);">All years shown</span>
+        </div>
       </div>
-    </div>
-    <div id="yearFilterBar" style="margin:0 0 14px;">
-      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-        <button type="button" id="yfBtn" onclick="toggleYearFilter()" style="padding:9px 14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); color:var(--ink); font-weight:bold; font-size:14px; cursor:pointer;">Filter years &#9662;</button>
-        <span id="yfStatus" style="font-size:13px; color:var(--ink-soft);">All years shown</span>
-      </div>
-      <div id="yfPanel" style="display:none; position:relative; margin-top:8px; padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); max-width:640px;">
+      <div id="yfPanel" style="display:none; position:relative; margin:0 0 12px; padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); max-width:640px;">
         <button type="button" onclick="closeYearFilter()" aria-label="Close year filter" title="Close filter" style="position:absolute; top:8px; right:10px; width:28px; height:28px; border:1px solid var(--line); border-radius:7px; background:var(--surface); color:var(--ink-soft); font-size:17px; line-height:1; cursor:pointer;">&times;</button>
         <div style="font-size:13px; color:var(--ink-soft); margin-bottom:12px; padding-right:34px;">Tick the years to show on every chart on this page. With none ticked, all years are shown. Press <strong>Save filter</strong> to remember this selection on this device.</div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px;">
@@ -1019,17 +1032,6 @@
           <span id="yfMsg" style="font-size:14px; font-weight:bold; color:#27ae60;"></span>
         </div>
         <div id="yfGrid" style="display:flex; flex-wrap:wrap; gap:7px 10px;"></div>
-      </div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-head">
-        <div class="chart-tabs">
-          <button type="button" class="chart-tab on" data-mchart="pot" onclick="showModelChart('pot')">Pot Value</button>
-          <button type="button" class="chart-tab" data-mchart="income" onclick="showModelChart('income')">Income</button>
-          <button type="button" id="mtab-crash" class="chart-tab" data-mchart="crash" style="display:none;" onclick="showModelChart('crash')">Market Crashes</button>
-          <button type="button" id="mtab-cash" class="chart-tab" data-mchart="cash" style="display:none;" onclick="showModelChart('cash')">Cash Savings</button>
-          <button type="button" id="mtab-annuity" class="chart-tab" data-mchart="annuity" style="display:none;" onclick="showModelChart('annuity')">Annuity Payback</button>
-        </div>
       </div>
       <div class="chart-wrap"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="potChart" class="chart-box"></div></div>
       <div class="chart-wrap" style="display:none;"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="incomeChart" class="chart-box"></div></div>
@@ -1046,15 +1048,15 @@
 
   <div id="Retirement" class="tabcontent">
     <div class="subtab-buttons">
-      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Retirement')">Retirement</button>
-      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -2003,8 +2005,8 @@
       // numbers (they clip to "£…"). Use a fixed left margin + short £1.2M/£250K ticks.
       const phone = window.innerWidth <= 600;
       const axisText = phone ? { fontSize: 10 } : { fontSize: 12 };
-      const potArea = phone ? { left: 50, right: 50, top: 40, bottom: 90, height: '58%' } : { width: '80%', height: '66%' };
-      const incArea = phone ? { left: 50, right: 50, top: 40, bottom: 90, height: '58%' } : { width: '80%', height: '66%' };
+      const potArea = phone ? { left: 50, right: 50, top: 24, bottom: 90, height: '62%' } : { width: '88%', height: '78%', top: 24 };
+      const incArea = phone ? { left: 50, right: 50, top: 24, bottom: 90, height: '62%' } : { width: '88%', height: '78%', top: 24 };
 
       // Compact currency for phone axis labels: £1.2M, £250K, £500
       function shortGBP(n) {
@@ -2048,7 +2050,7 @@
         : { title: 'Spend & pension income (£)', viewWindow: { min: 0, max: spendMax }, format: '£#,###', textStyle: axisText };
 
       new google.visualization.ComboChart(document.getElementById('potChart')).draw(dPots, {
-        title: potTitle, seriesType: 'bars', isStacked: true, series: potSeries,
+        title: '', seriesType: 'bars', isStacked: true, series: potSeries,
         legend: { position: 'none' }, chartArea: potArea, colors: potColors,
         vAxes: { 0: potVAxis, 1: spendVAxis },
         annotations: { alwaysOutside:true, textStyle:{ fontSize:13, color:'#c0392b', bold:true }, stem:{ color:'#c0392b' } }
@@ -2072,7 +2074,7 @@
       renderCustomLegend(document.getElementById('potChart').closest('.chart-wrap'), potLegendEntries);
 
       new google.visualization.ComboChart(document.getElementById('incomeChart')).draw(dInc, {
-        title: incTitle, seriesType:'bars', isStacked:true, series: incSeries,
+        title: '', seriesType:'bars', isStacked:true, series: incSeries,
         legend:{position:'none'}, chartArea: incArea,
         vAxes: {
           0: phone ? { title:'', viewWindow:{min:0, max:incMax}, ticks: incTicks, textStyle: axisText } : { title:'Income (£)', viewWindow:{min:0, max:incMax}, format:'£#,###', textStyle: axisText },
@@ -2148,14 +2150,14 @@
       const phone = window.innerWidth <= 600;
       const months = monthly.length;
       new google.visualization.ComboChart(box).draw(dt, {
-        title: 'Total pot through market crashes' + (currentView !== 'Joint' ? ' — ' + currentView : ''),
+        title: '',
         seriesType: 'line',
         series: {
           0: { type: 'area', color: '#c0392b', areaOpacity: 0.12, lineWidth: 0, enableInteractivity: false, visibleInLegend: false },
           1: { type: 'line', color: '#1d3a63', lineWidth: 3 }
         },
         legend: { position: 'none' },
-        chartArea: phone ? { left: 60, right: 16, top: 40, bottom: 70, height: '64%' } : { left: 88, right: 30, top: 44, bottom: 70 },
+        chartArea: phone ? { left: 60, right: 16, top: 20, bottom: 70, height: '70%' } : { left: 88, right: 30, top: 20, bottom: 70 },
         vAxis: { minValue: 0, viewWindow: { min: 0, max: bandTop }, title: phone ? '' : 'Total pot (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
         hAxis: { title: phone ? '' : 'Month', showTextEvery: Math.max(1, chartRound(months / (phone ? 6 : 12))), slantedText: true, slantedTextAngle: 45, textStyle: { fontSize: phone ? 9 : 11 } },
         annotations: { style: 'point', textStyle: { fontSize: 11, color: '#c0392b', bold: true } }
@@ -2239,11 +2241,11 @@
       const allColors = acctColors.concat(surplusCols.map(c => c.color));
       const phone = window.innerWidth <= 600;
       new google.visualization.ColumnChart(box).draw(dt, {
-        title: 'Savings balance by account' + (currentView !== 'Joint' ? ' — ' + currentView : ''),
+        title: '',
         isStacked: true,
         legend: { position: 'none' },
         colors: allColors,
-        chartArea: phone ? { left: 60, right: 16, top: 40, bottom: 60, height: '68%' } : { left: 88, right: 30, top: 40, bottom: 60 },
+        chartArea: phone ? { left: 60, right: 16, top: 20, bottom: 60, height: '74%' } : { left: 88, right: 30, top: 20, bottom: 60 },
         vAxis: { minValue: 0, viewWindow: { min: 0, max: top }, title: phone ? '' : 'Balance (£)', format: '£#,###', textStyle: { fontSize: phone ? 10 : 12 } },
         hAxis: { title: phone ? '' : 'Year', textStyle: { fontSize: phone ? 9 : 11 }, showTextEvery: phone ? 2 : 1 },
         annotations: { alwaysOutside: true, textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } }
@@ -2323,12 +2325,12 @@
       const phone = window.innerWidth <= 600;
       const series = {}; viewWindows.forEach((_, i) => { series[i] = { type: 'line', lineWidth: 3, pointSize: 4 }; });
       new google.visualization.ComboChart(box).draw(dt, {
-        title: 'Cumulative annuity payback' + (currentView !== 'Joint' ? ' — ' + currentView : ''),
+        title: '',
         seriesType: 'line',
         series: series,
         colors: palette.slice(0, viewWindows.length),
         legend: { position: 'none' },
-        chartArea: phone ? { left: 60, right: 16, top: 40, bottom: 60, height: '68%' } : { left: 88, right: 30, top: 40, bottom: 60 },
+        chartArea: phone ? { left: 60, right: 16, top: 20, bottom: 60, height: '74%' } : { left: 88, right: 30, top: 20, bottom: 60 },
         vAxis: { viewWindow: { min: yMin, max: yMax }, title: phone ? '' : 'Net position (£)', format: '£#,###',
                  baselineColor: '#444', textStyle: { fontSize: phone ? 10 : 12 } },
         hAxis: { title: phone ? '' : 'Year', textStyle: { fontSize: phone ? 9 : 11 }, showTextEvery: phone ? 4 : 2 }
@@ -3941,7 +3943,7 @@
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front100';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front101';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', DiningNew:'dining_new.html', HolidayCosts:'holiday_costs.html', Holidays:'holidays.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
