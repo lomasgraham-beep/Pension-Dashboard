@@ -260,26 +260,26 @@
     .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
     .params { background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:16px 18px; margin:0 0 14px; }
     .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:18px 26px; }
-    @media (min-width: 1000px) { .params .grid { grid-template-columns:repeat(3, 1fr); } }
-    /* Wide screens: Modelling controls become a fixed left rail, charts fill the right and rise to top */
+    @media (min-width: 1000px) { .params .grid { grid-template-columns:repeat(4, 1fr); } }
+    @media (min-width: 1360px) { .params .grid { grid-template-columns:repeat(5, 1fr); } }
+    /* Charts first, full width; the control rail sits below them as a wide multi-column card (LC-412) */
+    .model-layout { display:flex; flex-direction:column; gap:16px; }
+    .model-layout > .model-main { order:1; min-width:0; }
+    .model-layout > .rail-slot, .model-layout > .rail-strip, .model-layout > .params { order:2; }
+    .model-layout > .rail-slot:empty { display:none; }
+    .model-layout .params { margin:0; }
+    .model-layout .model-main h2 { margin-top:0; }
     @media (min-width: 1300px) {
-      .model-layout { display:flex; gap:18px; align-items:flex-start; }
-      .model-layout .params { flex:0 0 300px; width:300px; align-self:flex-start; margin:0; }
-      .model-layout .params .grid { grid-template-columns:1fr; gap:14px; }   /* stack sliders top-to-bottom */
-      .model-layout .params .ctrl > label { min-height:0; }                  /* labels can wrap freely */
-      .model-layout .params .floors-panel.show { grid-template-columns:1fr; }
-      .model-layout .model-main { flex:1 1 auto; min-width:0; }
-      .model-layout .model-main h2 { margin-top:0; }                         /* charts rise to the top */
-      .rail-collapse { width:100%; margin-bottom:10px; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); color:var(--ink-soft); font-weight:bold; font-size:13px; cursor:pointer; }
-      .rail-strip { display:none; flex:0 0 30px; width:30px; align-self:stretch; min-height:300px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); cursor:pointer; }
-      .rail-strip span { writing-mode:vertical-rl; transform:rotate(180deg); display:block; text-align:center; padding:14px 0; color:var(--ink-soft); font-weight:bold; font-size:13px; white-space:nowrap; }
-      /* collapsed: hide the rail, show the thin strip */
+      .rail-collapse { width:100%; margin-bottom:10px; padding:8px; border:1px solid var(--line); border-radius:999px; background:var(--surface-2); color:var(--ink-soft); font-weight:bold; font-size:13px; cursor:pointer; }
+      .rail-strip { display:none; width:100%; border:1px solid var(--line); border-radius:999px; background:var(--surface-2); cursor:pointer; }
+      .rail-strip span { display:block; text-align:center; padding:10px 0; color:var(--ink-soft); font-weight:bold; font-size:13px; }
+      /* collapsed: hide the rail, show the slim bar */
       .model-layout.collapsed .params { display:none; }
       .model-layout.collapsed .rail-strip { display:block; }
     }
-    /* below the rail breakpoint, the collapse controls are irrelevant (stacked layout) */
+    /* below the rail breakpoint, the collapse controls are irrelevant */
     @media (max-width: 1299px) { .rail-collapse, .rail-strip { display:none !important; } }
-    .params .ctrl-wide { grid-column:1 / -1; }
+    .params .ctrl-wide { grid-column: span 2; }
     .params label { display:block; font-weight:bold; font-size:14px; color:var(--ink); margin-bottom:8px; }
     .params .ctrl { display:flex; flex-direction:column; }
     .params .ctrl > label { min-height:2.6em; }   /* reserve 2 lines so sliders align even when a label wraps */
@@ -586,7 +586,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-411</span>
+      <span class="build-stamp">LC-412</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -3527,7 +3527,7 @@
       const sel = document.getElementById('tabSelect');
       if (sel) Array.from(sel.options).forEach(o => { if (o.value === 'Forecast' || o.value === 'KPIs') o.hidden = on; });
     }
-    // ---- Slider fill (LC-411): paint the track left of the thumb in the accent colour.
+    // ---- Slider fill (LC-412): paint the track left of the thumb in the accent colour.
     // Safari has no native progress-fill styling for range inputs, so a background
     // gradient is set per slider and refreshed on input and after programmatic changes.
     function paintSlider(r) {
