@@ -80,7 +80,7 @@
 </head>
 <body>
   <h1 id="pageTitle">Monthly Budget</h1>
-  <p class="note">Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box is an estimate for reference only and is not part of any total here. Insurances are listed under Cash Summary. <span style="color:#94a3b8;">(budget build: v28)</span></p>
+  <p class="note">Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box shows the Groceries and Fuel spend, which is deducted in the Cash Summary. Insurances are listed under Cash Summary. <span style="color:#94a3b8;">(budget build: v29)</span></p>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
     <span class="period-toggle">
@@ -323,7 +323,8 @@
     }
 
     const pens = pensionBlock(d);
-    const cash = cashSummary(avails, avgAvails, pens.total);
+    const ccParts = creditCardParts(d);
+    const cash = cashSummary(avails, avgAvails, pens.total, ccParts);
     const cc = creditCardBox(d);
 
     // two stacked columns: left = first person + pensions; right = second person + credit card + cash summary + insurances due
@@ -467,30 +468,39 @@
     return { html: html, total: total };
   }
 
-  // reference-only: the two credit-card bills we surface on the budget — Groceries and Fuel. NOT part of any total on this page.
-  function creditCardBox(d) {
+  // Groceries and Fuel drawn on the credit card. Now deducted in the Cash Summary, so they DO count toward totals.
+  // total = amount for the current view; avg = smoothed monthly (for the monthly-mode average reference row).
+  function creditCardParts(d) {
     const cardBills = (d.bills || []).filter(b => b.paid_by === 'Credit card');
-    // match by bill name OR category code, summing any that qualify (robust to exact naming)
-    const sumMatch = re => cardBills.filter(b => re.test(b.bill_name || '') || re.test(b.category_code || '')).reduce((s, b) => s + billView(b), 0);
-    const groc = sumMatch(/grocer/i);
-    const fuel = sumMatch(/fuel|petrol|diesel/i);
+    const match = re => cardBills.filter(b => re.test(b.bill_name || '') || re.test(b.category_code || ''));
+    const grocB = match(/grocer/i), fuelB = match(/fuel|petrol|diesel/i);
+    const sum = (arr, fn) => arr.reduce((s, b) => s + fn(b), 0);
+    const groc = sum(grocB, billView), fuel = sum(fuelB, billView);
+    const avg = sum(grocB, billViewAvg) + sum(fuelB, billViewAvg);
+    return { groc: groc, fuel: fuel, total: groc + fuel, avg: avg };
+  }
+
+  function creditCardBox(d) {
+    const p = creditCardParts(d);
     return '<div class="panelcard">' +
       '<div class="blocktitle">Credit Card</div>' +
-      '<div class="subtitle">Estimated ' + (isAnnual() ? 'for the year' : 'for ' + monthLabelShort()) + ' &mdash; not included in totals</div>' +
+      '<div class="subtitle">Estimated ' + (isAnnual() ? 'for the year' : 'for ' + monthLabelShort()) + ' &mdash; deducted in Cash Summary</div>' +
       '<table><tbody>' +
-        '<tr><td>Groceries</td><td class="amt">' + fmt(groc) + '</td></tr>' +
-        '<tr><td>Fuel</td><td class="amt">' + fmt(fuel) + '</td></tr>' +
+        '<tr><td>Groceries</td><td class="amt">' + fmt(p.groc) + '</td></tr>' +
+        '<tr><td>Fuel</td><td class="amt">' + fmt(p.fuel) + '</td></tr>' +
       '</tbody></table>' +
     '</div>';
   }
 
-  function cashSummary(avails, avgAvails, pensTotal) {
+  function cashSummary(avails, avgAvails, pensTotal, card) {
     const names = Object.keys(avails);
     const sumAvail = names.reduce((s, n) => s + (avails[n] || 0), 0);
     const sumAvgAvail = names.reduce((s, n) => s + (avgAvails[n] || 0), 0);
     const pens = Number(pensTotal) || 0;
-    const totalCash = sumAvail - pens;
-    const totalCashAvg = sumAvgAvail - pens;
+    const cardT = (card && Number(card.total)) || 0;
+    const cardA = (card && Number(card.avg)) || 0;
+    const totalCash = sumAvail - pens - cardT;
+    const totalCashAvg = sumAvgAvail - pens - cardA;
     let availRows = names.map(n => '<tr><td>' + esc(n) + ' available</td><td class="amt">' + fmt(avails[n] || 0) + '</td></tr>').join('');
     const avgRow = (!isAnnual() && Math.abs(totalCash - totalCashAvg) > 0.5)
       ? '<tr><td class="muted2">Average month (reference)</td><td class="amt muted2">' + fmt(totalCashAvg) + '</td></tr>' : '';
@@ -500,6 +510,7 @@
         availRows +
         '<tr class="total"><td>Sum of available</td><td class="amt">' + fmt(sumAvail) + '</td></tr>' +
         '<tr class="total"><td>Less pensions</td><td class="amt neg">\u2212' + fmt(pens) + '</td></tr>' +
+        '<tr class="total"><td>Less credit card (Groceries + Fuel)</td><td class="amt neg">\u2212' + fmt(cardT) + '</td></tr>' +
         '<tr class="avail"><td>Total cash available ' + (isAnnual() ? '(annual)' : 'in ' + monthLabelShort()) + '</td><td class="amt">' + fmt(totalCash) + '</td></tr>' +
         avgRow +
       '</tbody></table>' +
