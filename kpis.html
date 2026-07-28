@@ -7,38 +7,42 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=auth01"></script>
 <style>
-  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:#333; }
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#e9eef3; color:#1e293b; }
   h2 { color:#2c3e50; margin-top:0; }
   .note { color:#64748b; font-size:13px; margin-top:-4px; }
   .card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:15px; margin:18px 0; }
-  .card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:15px; text-align:center; }
-  .card.hl { background:#eff6ff; border-color:#bfdbfe; }
-  .card h3 { margin:0 0 8px; font-size:12px; color:#64748b; text-transform:uppercase; }
-  .card .value { font-size:24px; font-weight:bold; }
+  .card { background:#fff; border:1px solid #cbd5e1; border-radius:10px; padding:16px; text-align:center; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); }
+  .card.hl { background:#e8f1ff; border-color:#93c5fd; }
+  .card h3 { margin:0 0 8px; font-size:12px; color:#475569; text-transform:uppercase; letter-spacing:0.03em; }
+  .card .value { font-size:27px; font-weight:bold; }
   .pos-growth { color:#27ae60; } .neg-growth { color:#c0392b; }
-  .filter-bar { display:flex; gap:18px; flex-wrap:wrap; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; margin-bottom:15px; }
+  .filter-bar { display:flex; gap:18px; flex-wrap:wrap; background:#fff; border:1px solid #cbd5e1; border-radius:10px; padding:12px 14px; margin-bottom:15px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); }
   .filter-bar label { display:block; font-size:12px; color:#64748b; font-weight:bold; margin-bottom:4px; }
   .filter-bar select { padding:8px; border:1px solid #ccc; border-radius:6px; font-size:14px; }
   .charts { display:flex; gap:20px; flex-wrap:wrap; margin-bottom:25px; }
-  .chart-wrap { position:relative; flex:1; min-width:380px; }
+  .chart-wrap { position:relative; flex:1; min-width:380px; background:#fff; border:1px solid #cbd5e1; border-radius:10px; padding:10px 8px 8px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); }
   .chart-box { width:100%; height:350px; }
   .chart-fs-btn { position:absolute; top:8px; right:8px; z-index:6; display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; padding:0; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#64748b; cursor:pointer; opacity:0.85; box-shadow:0 1px 3px rgba(0,0,0,0.12); }
   .chart-fs-btn:hover { opacity:1; color:#2c3e50; border-color:#94a3b8; }
   .chart-wrap.fs { position:fixed; inset:0; z-index:10000; margin:0; padding:12px 12px 16px; background:#fff; overflow:auto; flex:none; min-width:0; }
   .chart-wrap.fs .chart-box { height:calc(var(--fs-h, 100vh) - 28px) !important; width:100%; }
   .chart-wrap.fs .chart-fs-btn { position:fixed; top:14px; right:18px; width:44px; height:44px; opacity:1; }
-  table { width:auto; border-collapse:collapse; font-size:14px; }
-  th,td { padding:9px 16px 9px 10px; border-bottom:1px solid #e2e8f0; text-align:right; }
-  th { white-space:normal; text-align:center; vertical-align:bottom; line-height:1.2; max-width:90px; }
+  .table-card { background:#fff; border:1px solid #cbd5e1; border-radius:10px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); overflow-x:auto; margin:18px 0 24px; }
+  table { width:100%; border-collapse:collapse; font-size:15px; }
+  th,td { padding:13px 16px; border-bottom:1px solid #d5dde5; text-align:right; }
+  th { white-space:normal; text-align:center; vertical-align:bottom; line-height:1.2; font-size:12.5px; text-transform:uppercase; letter-spacing:0.03em; }
   td { white-space:nowrap; }
   th:first-child,td:first-child,th:nth-child(2),td:nth-child(2) { text-align:left; }
-  th { background:#f8fafc; color:#2c3e50; }
+  th { background:#2c3e50; color:#fff; border-bottom:2px solid #1f2d3d; }
+  tbody tr:nth-child(even) td { background:#f1f5f9; }
+  tbody tr:hover td { background:#e3edfb; }
+  tbody tr:last-child td { border-bottom:none; }
   #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
 
   @media (max-width: 600px) {
     body { padding:12px; }
-    table { font-size:12px; }
+    table { font-size:13px; }
     th, td { padding:6px 8px 6px 0; }
     th { max-width:60px; font-size:11px; }
     th:first-child, td:first-child { padding-right:10px; }
@@ -48,7 +52,7 @@
   @media (prefers-color-scheme: dark) {
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
     h1, h2, h3, h4 { color:#f1f5f9 !important; }
-    .panel, .card, .login-box, .login-card, .tier-card, .tier-block,
+    .table-card, .chart-wrap, .panel, .card, .login-box, .login-card, .tier-card, .tier-block,
     .summary, .pot-card, .member-card, .filter-bar, .derived, .inc-mgr,
     [style*="background:#fff"], [style*="background: #fff"],
     [style*="background:#f8fafc"], [style*="background:#f4f7f6"],
@@ -92,11 +96,17 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr8)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr9)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
     <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span> expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
     <div class="card" id="kpiCardP2"><h3><span class="nm-p2">Julie</span> expected monthly growth</h3><div id="kpiJ" class="value">£0</div></div>
+  </div>
+  <div class="table-card">
+    <table id="kpiTable">
+      <thead><tr><th>Member</th><th>Pension</th><th>Current Value</th><th>Latest Monthly Growth</th><th>Expected (Median)</th><th>Avg Monthly £</th><th>Median Monthly %</th></tr></thead>
+      <tbody><tr><td colspan="7">Crunching…</td></tr></tbody>
+    </table>
   </div>
   <div class="filter-bar">
     <div><label>Filter Member</label><select id="fMember" onchange="updatePensionFilter()"><option value="All">All Members</option></select></div>
@@ -111,11 +121,6 @@
     </span>
   </div>
   <div class="charts"><div class="chart-wrap" style="min-width:100%;"><button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button><div id="chartCumGrowth" class="chart-box" style="height:380px;"></div></div></div>
-  <table id="kpiTable">
-    <thead><tr><th>Member</th><th>Pension</th><th>Current Value</th><th>Latest Monthly Growth</th><th>Expected (Median)</th><th>Avg Monthly £</th><th>Median Monthly %</th></tr></thead>
-    <tbody><tr><td colspan="7">Crunching…</td></tr></tbody>
-  </table>
-
 <script>
   const fmt = App.fmt, fmtDiff = App.fmtDiff;
   let allLogs = [], allContributions = [], grahamParams = null, allExceptions = [];
@@ -124,6 +129,10 @@
   let p1Name = 'Graham', p2Name = null;
   let chartsReady = false;
   let cumMode = 'gbp';   // accumulated-growth chart unit: 'gbp' (£) or 'pct' (% of starting value)
+  // Shared chart styling for stronger contrast (darker labels/titles, firmer gridlines).
+  const CH_AXIS = { color:'#334155', fontSize:12 };
+  const CH_TITLE = { color:'#0f172a', fontSize:15, bold:true };
+  const CH_GRID = '#cbd5e1', CH_BASE = '#94a3b8';
   google.charts.load('current', { packages:['corechart'] });
   google.charts.setOnLoadCallback(() => { chartsReady = true; initChartFsButtons(); if (allLogs.length) drawCharts(); });
 
@@ -328,9 +337,12 @@
     const nf = new google.visualization.NumberFormat({ prefix: '£', fractionDigits: 0 });
     for (let i = 1; i <= pensions.length; i++) nf.format(dt, i);
     new google.visualization.LineChart(document.getElementById('chartValue')).draw(dt, {
-      title: 'Total Pension Value — Last 12 Months', curveType: 'function', legend: { position: 'bottom' },
-      chartArea: { left: 85, right: 30, top: 40, bottom: 60 }, vAxis: { format: '£#,###', minValue: 0 },
-      lineWidth: 3, pointsVisible: true, interpolateNulls: true, colors: ['#3498db', '#9b59b6', '#2ecc71', '#e67e22', '#f1c40f', '#e74c3c']
+      title: 'Total Pension Value — Last 12 Months', curveType: 'function',
+      legend: { position: 'bottom', textStyle: CH_AXIS }, titleTextStyle: CH_TITLE,
+      chartArea: { left: 85, right: 30, top: 40, bottom: 60 },
+      vAxis: { format: '£#,###', minValue: 0, textStyle: CH_AXIS, gridlines: { color: CH_GRID }, baselineColor: CH_BASE },
+      hAxis: { textStyle: CH_AXIS },
+      lineWidth: 3, pointsVisible: true, interpolateNulls: true, colors: ['#2563eb', '#7c3aed', '#059669', '#d97706', '#ca8a04', '#dc2626']
     });
   }
 
@@ -398,13 +410,13 @@
       dt.addRow([d.toLocaleString('default', { month: 'short', year: 'numeric' }), plotted, v >= 0 ? '#27ae60' : '#c0392b', note, (n >= 2 ? trendAt(idx) : null)]);
     });
 
-    const vAxis = { format: '£#,###' };
+    const vAxis = { format: '£#,###', textStyle: CH_AXIS, gridlines: { color: CH_GRID }, baselineColor: CH_BASE };
     if (vMax) vAxis.viewWindow = { max: vMax, min: Math.min(0, ...vals) };
 
     new google.visualization.ComboChart(document.getElementById('chartGrowth')).draw(dt, {
       title: 'Combined Organic Monthly Growth (£)' + (vMax ? '  — axis capped; ▲ = true value' : ''),
       legend: { position: 'none' }, annotations: { alwaysOutside: false, stem: { color: 'transparent' }, textStyle: { fontSize: 10, color: '#333', bold: true } },
-      chartArea: { left: 85, right: 30, top: 40, bottom: 60 }, vAxis: vAxis,
+      titleTextStyle: CH_TITLE, chartArea: { left: 85, right: 30, top: 40, bottom: 60 }, vAxis: vAxis, hAxis: { textStyle: CH_AXIS },
       seriesType: 'bars',
       series: { 0: { type: 'bars' }, 1: { type: 'line', color: trendColor, lineWidth: 3, pointSize: 0, enableInteractivity: false } }
     });
@@ -477,12 +489,14 @@
       title: isPct
         ? 'Accumulated Organic Growth Since First Log — by Pension (% of starting value)'
         : 'Accumulated Organic Growth Since First Log — by Pension (£)',
-      curveType: 'function', legend: { position: 'bottom' },
+      curveType: 'function', legend: { position: 'bottom', textStyle: CH_AXIS }, titleTextStyle: CH_TITLE,
       chartArea: { left: 85, right: 30, top: 40, bottom: 80 },
-      vAxis: isPct ? { format: "#,##0.0'%'" } : { format: '£#,###' },
-      hAxis: { format: 'MM/yy', slantedText: true, slantedTextAngle: 45 },
-      lineWidth: 2, pointsVisible: true, pointSize: 3, interpolateNulls: true,
-      colors: ['#3498db', '#9b59b6', '#2ecc71', '#e67e22', '#f1c40f', '#e74c3c']
+      vAxis: isPct
+        ? { format: "#,##0.0'%'", textStyle: CH_AXIS, gridlines: { color: CH_GRID }, baselineColor: CH_BASE }
+        : { format: '£#,###', textStyle: CH_AXIS, gridlines: { color: CH_GRID }, baselineColor: CH_BASE },
+      hAxis: { format: 'MM/yy', slantedText: true, slantedTextAngle: 45, textStyle: CH_AXIS },
+      lineWidth: 3, pointsVisible: true, pointSize: 3, interpolateNulls: true,
+      colors: ['#2563eb', '#7c3aed', '#059669', '#d97706', '#ca8a04', '#dc2626']
     });
   }
 
