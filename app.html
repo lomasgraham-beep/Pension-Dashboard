@@ -52,9 +52,9 @@
        phone (<=600px) swaps the strip for the dropdown selector further down. */
     .shell { display:block; }
     .tab-buttons { display:flex; flex-wrap:wrap; gap:6px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius) var(--radius) 0 0; padding:8px; box-shadow:var(--shadow); position:sticky; top:0; z-index:60; }
-    .tab-buttons button { background:transparent; border:1px solid transparent; cursor:pointer; padding:11px 18px; font-size:15px; font-weight:600; color:var(--ink-soft); border-radius:999px; transition:background .12s,color .12s,border-color .12s; }
-    .tab-buttons button:hover { background:var(--accent-soft); color:var(--accent-dark); }
-    .tab-buttons button.active-btn { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .tab-buttons button { background:var(--accent-soft); border:1px solid var(--accent-border); cursor:pointer; padding:11px 18px; font-size:15px; font-weight:600; color:var(--accent-dark); border-radius:999px; box-shadow:var(--shadow); transition:background .12s,color .12s,border-color .12s,box-shadow .12s; }
+    .tab-buttons button:hover { background:var(--accent-border); color:var(--accent-dark); }
+    .tab-buttons button.active-btn { background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 2px 5px rgba(20,40,50,0.20), 0 6px 16px rgba(20,40,50,0.14); }
     .tabcontent { display:none; padding:22px; background:var(--surface); border:1px solid var(--line); border-top:none; border-radius:0 0 var(--radius) var(--radius); box-shadow:var(--shadow); }
     .tabcontent.active { display:block; }
     h2 { color:var(--ink); margin-top:0; padding-bottom:6px; border-bottom:2px solid var(--line); font-weight:700; }
@@ -223,9 +223,9 @@
     .subtab-buttons { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:15px; border-bottom:2px solid var(--line); padding-bottom:10px; position:sticky; top:var(--topnav-h, 52px); z-index:55; background:var(--surface); padding-top:8px; box-shadow:0 4px 5px -4px rgba(0,0,0,0.12); }
     .subtab-group-label { flex-basis:100%; width:100%; margin:6px 0 0; font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-soft); }
     .subtab-group-label:first-child { margin-top:0; }
-    .subtab-link { background:var(--surface-2); border:1px solid var(--line-strong); color:var(--ink-soft); padding:9px 18px; border-radius:999px; font-weight:600; cursor:pointer; font-size:14px; transition:background .12s,color .12s; }
-    .subtab-link:hover { background:var(--accent-soft); }
-    .subtab-link.active-sub { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .subtab-link { background:var(--accent-soft); border:1px solid var(--accent-border); color:var(--accent-dark); padding:9px 18px; border-radius:999px; font-weight:600; cursor:pointer; font-size:14px; box-shadow:var(--shadow); transition:background .12s,color .12s,border-color .12s,box-shadow .12s; }
+    .subtab-link:hover { background:var(--accent-border); color:var(--accent-dark); }
+    .subtab-link.active-sub { background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 2px 5px rgba(20,40,50,0.20), 0 6px 16px rgba(20,40,50,0.14); }
     .subtabcontent { display:none; }
     .subtabcontent[style*="block"] { display:block; }
     #LivingCosts, #BasicData { min-width:0; }
@@ -568,7 +568,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-398</span>
+      <span class="build-stamp">LC-399</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
