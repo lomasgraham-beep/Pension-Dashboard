@@ -80,7 +80,7 @@
 </head>
 <body>
   <h1 id="pageTitle">Monthly Budget</h1>
-  <p class="note">Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box shows the Groceries and Fuel spend, which is deducted in the Cash Summary. Insurances are listed under Cash Summary. <span style="color:#94a3b8;">(budget build: v30)</span></p>
+  <p class="note">Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box shows the Groceries and Fuel spend, which is deducted in the Cash Summary. Insurances are listed under Cash Summary. <span style="color:#94a3b8;">(budget build: v31)</span></p>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
     <span class="period-toggle">
@@ -518,23 +518,18 @@
   }
 
   // Insurances box. Matches any bill whose category contains "insurance" (case-insensitive),
-  // across every account/payer — so pot-funded and card insurances show too.
-  // Monthly view: a policy with a renewal_date shows ONLY in its renewal month, at the full annual premium;
-  //               a policy with no renewal_date falls back to its monthly figure (legacy behaviour).
-  // Annual view: every policy at its yearly cost.
+  // across every account/payer — but ONLY policies that have a renewal_date set appear here.
+  // Monthly view: a policy shows only in its renewal month, at the full annual premium.
+  // Annual view: every dated policy at its yearly cost.
   function insurancesDueBox(d) {
     const annualCost = b => annualToMonthly(b.premium, b.frequency) * 12;   // full yearly policy cost
     const renMonth = b => { const m = /^\d{4}-(\d{2})-\d{2}/.exec((b.renewal_date || '').trim()); return m ? Number(m[1]) : null; };
-    const ins = (d.bills || []).filter(b => /insurance/i.test(b.category_code || ''));
+    const ins = (d.bills || []).filter(b => /insurance/i.test(b.category_code || '') && renMonth(b) != null);
     let due;
     if (isAnnual()) {
       due = ins.map(b => ({ name: b.bill_name || '\u2014', amt: annualCost(b) }));
     } else {
-      due = ins.map(b => {
-        const rm = renMonth(b);
-        if (rm != null) return (rm === viewM) ? { name: b.bill_name || '\u2014', amt: annualCost(b) } : null;
-        return { name: b.bill_name || '\u2014', amt: billView(b) };   // no renewal date set → legacy monthly figure
-      }).filter(Boolean);
+      due = ins.filter(b => renMonth(b) === viewM).map(b => ({ name: b.bill_name || '\u2014', amt: annualCost(b) }));
     }
     due = due.filter(x => x.amt > 0).sort((a, b) => b.amt - a.amt);
     let rows, total = 0;
