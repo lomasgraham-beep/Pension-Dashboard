@@ -586,7 +586,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-410</span>
+      <span class="build-stamp">LC-411</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1942,14 +1942,14 @@
         yrRows.forEach(r => dPots.addRow([String(r.year), dAnn(r.year), dAnnT(r.year),
           chartRound(r.j_taxFree), chartRound(r.g_taxFree), chartRound(r.j_taxable), chartRound(r.g_taxable),
           evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]));
-        potColors = ['#a67fc9','#5fa8dc','#8e44ad','#2471a3']; // Julie light, Graham light, Julie dark, Graham dark
+        potColors = ['#f472b6','#38bdf8','#c026d3','#2563eb']; // Julie tax-free (pink), Graham tax-free (sky), Julie taxable (fuchsia), Graham taxable (royal)
         potTitle = 'Combined Pots';
       } else {
         dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
         dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Pension income (net)');
         yrRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), dAnn(r.year), dAnnT(r.year), chartRound(v.tf), chartRound(v.tx), evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]); });
-        potColors = ['#27ae60','#c0392b'];
+        potColors = ['#10b981','#f59e0b'];   // tax-free emerald, taxable amber
         potTitle = currentView + ' Pots';
       }
 
@@ -1983,21 +1983,21 @@
         });
         if (hasAnnuity) {
           incSeries = {
-            0: { targetAxisIndex:0, color:'#9b59b6' },  // Julie drawdown
-            1: { targetAxisIndex:0, color:'#3498db' },  // Graham drawdown
-            2: { targetAxisIndex:0, color:'#a67fc9' },  // Julie guaranteed
-            3: { targetAxisIndex:0, color:'#5fa8dc' },  // Graham guaranteed
-            4: { targetAxisIndex:0, color:'#e67e22' },  // Julie annuity (amber)
-            5: { targetAxisIndex:0, color:'#1d3a63' },  // Graham annuity (teal)
-            6: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4, annotations: { textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } } }
+            0: { targetAxisIndex:0, color:'#c026d3' },  // Julie drawdown (fuchsia)
+            1: { targetAxisIndex:0, color:'#2563eb' },  // Graham drawdown (royal)
+            2: { targetAxisIndex:0, color:'#f472b6' },  // Julie guaranteed (pink)
+            3: { targetAxisIndex:0, color:'#38bdf8' },  // Graham guaranteed (sky)
+            4: { targetAxisIndex:0, color:'#fb923c' },  // Julie annuity (orange)
+            5: { targetAxisIndex:0, color:'#14b8a6' },  // Graham annuity (teal)
+            6: { type:'line', targetAxisIndex:1, color:'#f59e0b', lineWidth:4, annotations: { textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } } }
           };
         } else {
           incSeries = {
-            0: { targetAxisIndex:0, color:'#9b59b6' },
-            1: { targetAxisIndex:0, color:'#3498db' },
-            2: { targetAxisIndex:0, color:'#a67fc9' },
-            3: { targetAxisIndex:0, color:'#5fa8dc' },
-            4: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4, annotations: { textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } } }
+            0: { targetAxisIndex:0, color:'#c026d3' },
+            1: { targetAxisIndex:0, color:'#2563eb' },
+            2: { targetAxisIndex:0, color:'#f472b6' },
+            3: { targetAxisIndex:0, color:'#38bdf8' },
+            4: { type:'line', targetAxisIndex:1, color:'#f59e0b', lineWidth:4, annotations: { textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } } }
           };
         }
         incTitle = 'Income';
@@ -2017,16 +2017,16 @@
         });
         if (hasAnnuity) {
           incSeries = {
-            0: { targetAxisIndex:0, color:'#3498db' },  // drawdown
-            1: { targetAxisIndex:0, color:'#9b59b6' },  // guaranteed
-            2: { targetAxisIndex:0, color:'#1d3a63' },  // annuity (teal)
-            3: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4, annotations: { textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } } }
+            0: { targetAxisIndex:0, color:'#2563eb' },  // drawdown (royal)
+            1: { targetAxisIndex:0, color:'#8b5cf6' },  // guaranteed (violet)
+            2: { targetAxisIndex:0, color:'#14b8a6' },  // annuity (teal)
+            3: { type:'line', targetAxisIndex:1, color:'#f59e0b', lineWidth:4, annotations: { textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } } }
           };
         } else {
           incSeries = {
-            0: { targetAxisIndex:0, color:'#3498db' },
-            1: { targetAxisIndex:0, color:'#9b59b6' },
-            2: { type:'line', targetAxisIndex:1, color:'#f39c12', lineWidth:4, annotations: { textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } } }
+            0: { targetAxisIndex:0, color:'#2563eb' },
+            1: { targetAxisIndex:0, color:'#8b5cf6' },
+            2: { type:'line', targetAxisIndex:1, color:'#f59e0b', lineWidth:4, annotations: { textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } } }
           };
         }
         incTitle = currentView + ' Income';
@@ -2078,7 +2078,7 @@
       const potFixedIdx = joint ? 5 : 3;
       const potSeries = {};
       potSeries[potSpendIdx] = { type: 'line', targetAxisIndex: 1, color: inkCol, lineWidth: 3, pointSize: 4 };
-      potSeries[potFixedIdx] = { type: 'line', targetAxisIndex: 1, color: '#17b5c4', lineWidth: 3, pointSize: 4, lineDashStyle: [6, 4] };
+      potSeries[potFixedIdx] = { type: 'line', targetAxisIndex: 1, color: '#14b8a6', lineWidth: 3, pointSize: 4, lineDashStyle: [6, 4] };
       // event ● markers ride the top bar series — keep those red; domain markers (Retire/Low) go neutral below
       potSeries[potBarCount - 1] = Object.assign(potSeries[potBarCount - 1] || {}, { annotations: { textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } } });
       const spendVAxis = phone
@@ -2101,13 +2101,13 @@
             { label: p2Name + ' taxable',  color: potColors[2], type: 'bar' },
             { label: p1Name + ' taxable',  color: potColors[3], type: 'bar' },
             { label: 'Annual spend',       color: inkCol,       type: 'line' },
-            { label: 'Pension income (net)', color: '#17b5c4',  type: 'line' }
+            { label: 'Pension income (net)', color: '#14b8a6',  type: 'line' }
           ]
         : [
             { label: 'Tax-Free Pot',       color: potColors[0], type: 'bar' },
             { label: 'Taxable Pot',        color: potColors[1], type: 'bar' },
             { label: 'Annual spend',       color: inkCol,       type: 'line' },
-            { label: 'Pension income (net)', color: '#17b5c4',  type: 'line' }
+            { label: 'Pension income (net)', color: '#14b8a6',  type: 'line' }
           ];
       renderCustomLegend(document.getElementById('potChart').closest('.chart-wrap'), potLegendEntries);
 
@@ -2126,23 +2126,23 @@
       const incLegendEntries = [];
       if (joint) {
         incLegendEntries.push(
-          { label: p2Name + ' drawdown',   color: '#9b59b6', type: 'bar' },
-          { label: p1Name + ' drawdown',   color: '#3498db', type: 'bar' },
-          { label: p2Name + ' guaranteed', color: '#a67fc9', type: 'bar' },
-          { label: p1Name + ' guaranteed', color: '#5fa8dc', type: 'bar' }
+          { label: p2Name + ' drawdown',   color: '#c026d3', type: 'bar' },
+          { label: p1Name + ' drawdown',   color: '#2563eb', type: 'bar' },
+          { label: p2Name + ' guaranteed', color: '#f472b6', type: 'bar' },
+          { label: p1Name + ' guaranteed', color: '#38bdf8', type: 'bar' }
         );
         if (hasAnnuity) incLegendEntries.push(
-          { label: p2Name + ' annuity', color: '#e67e22', type: 'bar' },
-          { label: p1Name + ' annuity', color: '#1d3a63', type: 'bar' }
+          { label: p2Name + ' annuity', color: '#fb923c', type: 'bar' },
+          { label: p1Name + ' annuity', color: '#14b8a6', type: 'bar' }
         );
-        incLegendEntries.push({ label: 'Total drawdown', color: '#f39c12', type: 'line' });
+        incLegendEntries.push({ label: 'Total drawdown', color: '#f59e0b', type: 'line' });
       } else {
         incLegendEntries.push(
-          { label: 'Drawdown',          color: '#3498db', type: 'bar' },
-          { label: 'Guaranteed income', color: '#9b59b6', type: 'bar' }
+          { label: 'Drawdown',          color: '#2563eb', type: 'bar' },
+          { label: 'Guaranteed income', color: '#8b5cf6', type: 'bar' }
         );
-        if (hasAnnuity) incLegendEntries.push({ label: 'Annuity income', color: '#1d3a63', type: 'bar' });
-        incLegendEntries.push({ label: 'Total drawdown', color: '#f39c12', type: 'line' });
+        if (hasAnnuity) incLegendEntries.push({ label: 'Annuity income', color: '#14b8a6', type: 'bar' });
+        incLegendEntries.push({ label: 'Total drawdown', color: '#f59e0b', type: 'line' });
       }
       renderCustomLegend(document.getElementById('incomeChart').closest('.chart-wrap'), incLegendEntries);
       safeOptionalChart(drawCrashChart, 'crashChart', 'crashChartHead');
@@ -2277,7 +2277,7 @@
       const top = Math.ceil(Math.max(peak, 1) * 1.05 / 1000) * 1000;
 
       // a pleasant palette for the account segments (surplus colours come from surplusCols)
-      const palette = ['#1d3a63', '#e67e22', '#0e7490', '#b7791f', '#9b2c2c', '#2f855a', '#553c9a'];
+      const palette = ['#2563eb', '#f59e0b', '#14b8a6', '#c026d3', '#ef4444', '#10b981', '#8b5cf6'];
       const acctColors = showAccts.map((_, i) => palette[i % palette.length]);
       const allColors = acctColors.concat(surplusCols.map(c => c.color));
       const phone = window.innerWidth <= 600;
@@ -2324,7 +2324,7 @@
       // one line per annuity
       viewWindows.forEach(w => dt.addColumn('number', (w.name || 'Annuity') + ' (' + w.member + ')'));
 
-      const palette = ['#1d3a63', '#e67e22', '#6b5b95', '#c0392b', '#2471a3', '#27ae60'];
+      const palette = ['#2563eb', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#10b981'];
       const years = []; for (let y = firstYear; y <= lastYear; y++) years.push(y);
 
       // cumulative income per annuity: starts at -purchase amount in its purchase year,
@@ -3527,7 +3527,7 @@
       const sel = document.getElementById('tabSelect');
       if (sel) Array.from(sel.options).forEach(o => { if (o.value === 'Forecast' || o.value === 'KPIs') o.hidden = on; });
     }
-    // ---- Slider fill (LC-410): paint the track left of the thumb in the accent colour.
+    // ---- Slider fill (LC-411): paint the track left of the thumb in the accent colour.
     // Safari has no native progress-fill styling for range inputs, so a background
     // gradient is set per slider and refreshed on input and after programmatic changes.
     function paintSlider(r) {
