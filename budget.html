@@ -74,7 +74,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Per-person budget for the month you're viewing: net income in, the bills that actually leave each account that month, and what's left. Use the controls to step to next month or jump ahead; the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box is an estimate for reference only and is not part of any total here. Insurances due in the month shown are listed under Cash Summary. <span style="color:#94a3b8;">(budget build: v24)</span></p>
+  <p class="note">Per-person budget for the month you're viewing: net income in, the bills that actually leave each account that month, and what's left. Use the controls to step to next month or jump ahead; the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box is an estimate for reference only and is not part of any total here. Insurances due in the month shown are listed under Cash Summary. <span style="color:#94a3b8;">(budget build: v25)</span></p>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
     <button class="nav-btn" id="prevBtn" onclick="stepMonth(-1)">&#9664; Prev</button>
@@ -179,7 +179,7 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, tiers, incAmts, otherInc, pensContribs, bankAccts, billCats, diningRota, mealCost, holidayPlan, holidayCost, holidaySettings] = await Promise.all([
+      const [members, bills, tiers, incAmts, otherInc, pensContribs, bankAccts, billCats, diningRota, mealCost, holidayPlan, holidayCost, holidaySettings, diningSettings] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_working_tiers?order=from_date.asc'),
@@ -192,7 +192,8 @@
         App.rest('bd_meal_cost'),
         App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
         App.rest('bd_holiday_cost'),
-        App.rest('bd_holiday_settings?id=eq.1')
+        App.rest('bd_holiday_settings?id=eq.1'),
+        App.rest('bd_dining_settings?id=eq.1')
       ]);
       const names = (members || []).map(m => m.name).filter(Boolean);
       if (!names.length) { status.textContent = 'No members found.'; return; }
@@ -210,7 +211,17 @@
         holidayFundingAcct = (potAcct && potAcct.funded_from != null && String(potAcct.funded_from).trim() !== '')
           ? String(potAcct.funded_from).trim() : potId;   // funding account, or the pot itself if not funded-from
       }
-      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct };
+      // dining monthly set-aside = annual dining cost ÷ 12, shown against its pot's funding account (mirrors holidays)
+      const dinSettings = (diningSettings && diningSettings[0]) || {};
+      const diningMonthly = diningAnnual / 12;
+      let diningFundingAcct = null;
+      const dPotId = dinSettings.savings_account ? String(dinSettings.savings_account).trim() : '';
+      if (dPotId) {
+        const dPotAcct = (bankAccts || []).find(a => (a.account_id || '').trim() === dPotId);
+        diningFundingAcct = (dPotAcct && dPotAcct.funded_from != null && String(dPotAcct.funded_from).trim() !== '')
+          ? String(dPotAcct.funded_from).trim() : dPotId;   // funding account, or the pot itself if not funded-from
+      }
+      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct, diningMonthly: diningMonthly, diningFundingAcct: diningFundingAcct };
       names.forEach(n => { selectedTier[n] = currentTierDays(n, DATA.tiers); });
       status.style.display = 'none';
       initNav();
@@ -348,6 +359,11 @@
         rows += '<tr class="pot-line"><td>Holiday savings</td><td class="amt">' + fmt(d.holidayMonthly) + '</td></tr>';
         boxTotal += d.holidayMonthly; boxAvg += d.holidayMonthly;
       }
+      // dining savings set-aside: smoothed monthly against this pot's funding account
+      if (d.diningFundingAcct && acctId === d.diningFundingAcct && d.diningMonthly > 0) {
+        rows += '<tr class="pot-line"><td>Dining savings</td><td class="amt">' + fmt(d.diningMonthly) + '</td></tr>';
+        boxTotal += d.diningMonthly; boxAvg += d.diningMonthly;
+      }
       totalBillsAvg += boxAvg;     // count the average even if nothing is charged this particular month
       if (!rows) return;           // nothing actually leaves this account this month → no box
       totalBills += boxTotal;
@@ -419,7 +435,8 @@
     (d.bills || []).filter(b => b.paid_by === 'Credit card').forEach(b => {
       total += monthCharge(b, viewM);
     });
-    total += (Number(d.diningAnnual) || 0) / 12;   // dining is paid on the card (smoothed)
+    // dining stays on the card ONLY when it isn't set aside to a savings pot (else it would be counted twice)
+    if (!d.diningFundingAcct) total += (Number(d.diningAnnual) || 0) / 12;
     return '<div class="panelcard">' +
       '<div class="blocktitle">Credit Card</div>' +
       '<div class="subtitle">Estimated for ' + monthLabelShort() + ' &mdash; not included in totals</div>' +

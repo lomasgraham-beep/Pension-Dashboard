@@ -46,6 +46,7 @@
   .taper-fld { display:flex; flex-direction:column; }
   .taper-fld label { font-size:12px; font-weight:bold; color:#64748b; margin-bottom:3px; text-transform:uppercase; }
   .taper-fld input { width:80px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; text-align:right; background:#fff; }
+  .taper-fld select { padding:9px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; background:#fff; color:#333; min-width:240px; }
 
   @media (prefers-color-scheme: dark) {
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
@@ -72,12 +73,13 @@
     .taper-sub { color:#94a3b8 !important; }
     .taper-fld label { color:#94a3b8 !important; }
     .taper-fld input { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    .taper-fld select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
   }
 </style>
 </head>
 <body>
   <h1>Dining <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(52-week rota)</span></h1>
-  <p class="note">Set each meal's level (L/M/H) per day across 52 weeks. Costs are looked up from Meal Costs. Each row totals automatically; the year total feeds retirement modelling once switched on. Use <b>Clear week</b> / <b>Copy to weeks&hellip;</b> inside a week, or <b>Clear all</b> above. <span style="color:#94a3b8;">(dining build: v6)</span></p>
+  <p class="note">Set each meal's level (L/M/H) per day across 52 weeks. Costs are looked up from Meal Costs. Each row totals automatically; the year total feeds retirement modelling once switched on. Use <b>Clear week</b> / <b>Copy to weeks&hellip;</b> inside a week, or <b>Clear all</b> above. <span style="color:#94a3b8;">(dining build: v7)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div class="taper-card" id="taperCard" style="display:none;">
@@ -87,6 +89,14 @@
       <div class="taper-fld"><label>At 70</label><input type="number" id="tap70" step="0.05" min="0" max="1" value="1" onfocus="tapBlank(this)" onblur="tapRestore(this)"></div>
       <div class="taper-fld"><label>At 80</label><input type="number" id="tap80" step="0.05" min="0" max="1" value="1" onfocus="tapBlank(this)" onblur="tapRestore(this)"></div>
       <div class="taper-fld"><label>At 90</label><input type="number" id="tap90" step="0.05" min="0" max="1" value="1" onfocus="tapBlank(this)" onblur="tapRestore(this)"></div>
+    </div>
+  </div>
+
+  <div class="taper-card" id="savingsCard" style="display:none;">
+    <div class="taper-head">Dining savings pot</div>
+    <div class="taper-sub">Which account the monthly dining set-aside is shown against on the Budget page. Any account can be chosen; it defaults to the same pot as Holidays. Leave as <b>none</b> to keep dining on the credit card total instead. Save to apply.</div>
+    <div class="taper-row">
+      <div class="taper-fld"><label>Savings account</label><select id="potSel"></select></div>
     </div>
   </div>
 
@@ -117,6 +127,8 @@
 
   let rota = [];        // bd_dining_rota rows
   let costMap = {};     // "Meal|L" -> integer cost
+  let accounts = [];    // bd_bank_account rows (for the savings-pot dropdown)
+  let holidayPot = '';  // bd_holiday_settings.savings_account — used as the default pot
   let dirty = {};       // id -> true
   let settings = null;  // bd_dining_settings (single row) — holds age-taper multipliers
   function tnum(v, d) { return v != null && isFinite(Number(v)) ? Number(v) : d; }
@@ -128,21 +140,28 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [rotaRows, costRows, sRows] = await Promise.all([
+      const [rotaRows, costRows, sRows, aRows, hRows] = await Promise.all([
         App.rest('bd_dining_rota?order=week_no.asc,meal_type.asc'),
         App.rest('bd_meal_cost'),
-        App.rest('bd_dining_settings?id=eq.1')
+        App.rest('bd_dining_settings?id=eq.1'),
+        App.rest('bd_bank_account?order=bank_name.asc,account_id.asc'),
+        App.rest('bd_holiday_settings?id=eq.1')
       ]);
       rota = rotaRows || [];
       costMap = {};
       (costRows || []).forEach(c => { costMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
       settings = (sRows && sRows[0]) || {};
+      accounts = aRows || [];
+      const hSet = (hRows && hRows[0]) || {};
+      holidayPot = (hSet.savings_account != null && String(hSet.savings_account).trim() !== '') ? String(hSet.savings_account).trim() : '';
       document.getElementById('tap70').value = tnum(settings.taper_at_70, 1);
       document.getElementById('tap80').value = tnum(settings.taper_at_80, 1);
       document.getElementById('tap90').value = tnum(settings.taper_at_90, 1);
+      renderPot();
       dirty = {};
       status.style.display = 'none';
       document.getElementById('taperCard').style.display = 'block';
+      document.getElementById('savingsCard').style.display = 'block';
       document.getElementById('bar').style.display = 'flex';
       render();
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
@@ -303,17 +322,39 @@
 
   // ----------------------------------------------------------------------
 
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+  // Savings-pot dropdown: lists every account. Current selection = dining's own
+  // savings_account if set, otherwise defaults to the holiday pot.
+  function renderPot() {
+    const sel = document.getElementById('potSel');
+    const own = (settings.savings_account != null && String(settings.savings_account).trim() !== '') ? String(settings.savings_account).trim() : '';
+    const cur = own || holidayPot || '';
+    let opts = '<option value="">\u2014 none (keep on credit card) \u2014</option>';
+    (accounts || []).filter(a => a.account_id).forEach(a => {
+      const bits = [a.bank_name, a.account_holder].filter(Boolean).join(' \u00b7 ');
+      const lbl = a.account_id + (bits ? ' (' + bits + ')' : '');
+      opts += '<option value="' + esc(a.account_id) + '"' + (cur === a.account_id ? ' selected' : '') + '>' + esc(lbl) + '</option>';
+    });
+    sel.innerHTML = opts;
+  }
+
   async function saveAll() {
     const msg = document.getElementById('msg');
     const ids = Object.keys(dirty);
     const t70 = readTaper('tap70'), t80 = readTaper('tap80'), t90 = readTaper('tap90');
     const taperChanged = !settings || tnum(settings.taper_at_70, 1) !== t70 || tnum(settings.taper_at_80, 1) !== t80 || tnum(settings.taper_at_90, 1) !== t90;
-    if (!ids.length && !taperChanged) { msg.style.color = '#64748b'; msg.textContent = 'No changes to save.'; return; }
+    const ownStored = (settings && settings.savings_account != null && String(settings.savings_account).trim() !== '') ? String(settings.savings_account).trim() : '';
+    const potVal = (document.getElementById('potSel').value || '').trim();
+    const potChanged = potVal !== ownStored;
+    const settingsChanged = taperChanged || potChanged;
+    if (!ids.length && !settingsChanged) { msg.style.color = '#64748b'; msg.textContent = 'No changes to save.'; return; }
     msg.style.color = '#1e3a8a'; msg.textContent = 'Saving…';
     try {
-      if (taperChanged) {
-        await App.write('PATCH', 'bd_dining_settings?id=eq.1', { taper_at_70: t70, taper_at_80: t80, taper_at_90: t90 });
-        settings = Object.assign({}, settings, { taper_at_70: t70, taper_at_80: t80, taper_at_90: t90 });
+      if (settingsChanged) {
+        const sPayload = { taper_at_70: t70, taper_at_80: t80, taper_at_90: t90, savings_account: potVal || null };
+        await App.write('PATCH', 'bd_dining_settings?id=eq.1', sPayload);
+        settings = Object.assign({}, settings, sPayload);
       }
       for (const id of ids) {
         const r = rota.find(x => x.id === id);
@@ -334,7 +375,7 @@
 <script>
 /* LC-383: deploy stamp (this page does not load the engine). */
 (function () {
-  var TAG = 'dining v6';
+  var TAG = 'dining v7';
   function go() {
     var s = document.createElement('div');
     s.style.cssText = 'text-align:right;padding:2px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
