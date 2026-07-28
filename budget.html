@@ -80,7 +80,7 @@
 </head>
 <body>
   <h1 id="pageTitle">Monthly Budget</h1>
-  <p class="note">Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box is an estimate for reference only and is not part of any total here. Insurances are listed under Cash Summary. <span style="color:#94a3b8;">(budget build: v27)</span></p>
+  <p class="note">Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box is an estimate for reference only and is not part of any total here. Insurances are listed under Cash Summary. <span style="color:#94a3b8;">(budget build: v28)</span></p>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
     <span class="period-toggle">
@@ -467,19 +467,20 @@
     return { html: html, total: total };
   }
 
-  // reference-only: total monthly credit-card cost (bills paid on the card + Dining). NOT part of any total on this page.
+  // reference-only: the two credit-card bills we surface on the budget — Groceries and Fuel. NOT part of any total on this page.
   function creditCardBox(d) {
-    let total = 0;
-    (d.bills || []).filter(b => b.paid_by === 'Credit card').forEach(b => {
-      total += billView(b);
-    });
-    // dining stays on the card ONLY when it isn't set aside to a savings pot (else it would be counted twice)
-    if (!d.diningFundingAcct) total += ((Number(d.diningAnnual) || 0) / 12) * periodScale();
+    const cardBills = (d.bills || []).filter(b => b.paid_by === 'Credit card');
+    // match by bill name OR category code, summing any that qualify (robust to exact naming)
+    const sumMatch = re => cardBills.filter(b => re.test(b.bill_name || '') || re.test(b.category_code || '')).reduce((s, b) => s + billView(b), 0);
+    const groc = sumMatch(/grocer/i);
+    const fuel = sumMatch(/fuel|petrol|diesel/i);
     return '<div class="panelcard">' +
       '<div class="blocktitle">Credit Card</div>' +
       '<div class="subtitle">Estimated ' + (isAnnual() ? 'for the year' : 'for ' + monthLabelShort()) + ' &mdash; not included in totals</div>' +
       '<table><tbody>' +
-        '<tr class="total"><td>Estimated total</td><td class="amt">' + fmt(total) + '</td></tr></tbody></table>' +
+        '<tr><td>Groceries</td><td class="amt">' + fmt(groc) + '</td></tr>' +
+        '<tr><td>Fuel</td><td class="amt">' + fmt(fuel) + '</td></tr>' +
+      '</tbody></table>' +
     '</div>';
   }
 
