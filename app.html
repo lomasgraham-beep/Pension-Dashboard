@@ -259,10 +259,10 @@
        reachable while scrolling long tables/charts on iPad and desktop. */
     .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
     .params { background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:16px 18px; margin:0 0 14px; }
-    .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px 16px; align-items:start; grid-auto-flow:row dense; }
+    .params .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:10px 12px; align-items:start; grid-auto-flow:row dense; }
     @media (min-width: 1100px) { .params .grid { grid-template-columns:repeat(4, 1fr); } }
     @media (min-width: 1600px) { .params .grid { grid-template-columns:repeat(5, 1fr); } }
-    /* Charts first, full width; the control rail sits below them as a wide multi-column card (LC-414) */
+    /* Charts first, full width; the control rail sits below them as a wide multi-column card (LC-415) */
     .model-layout { display:flex; flex-direction:column; gap:16px; }
     .model-layout > .model-main { order:1; min-width:0; }
     .model-layout > .rail-slot, .model-layout > .rail-strip, .model-layout > .params { order:2; }
@@ -279,18 +279,19 @@
     /* below the rail breakpoint, the collapse controls are irrelevant */
     @media (max-width: 1299px) { .rail-collapse, .rail-strip { display:none !important; } }
     .params .ctrl-wide { grid-column: span 2; }
-    .params label { display:block; font-weight:bold; font-size:14px; color:var(--ink); margin-bottom:8px; }
+    .params label { display:block; font-weight:bold; font-size:14px; color:var(--ink); margin-bottom:5px; }
     .params .ctrl { display:flex; flex-direction:column; }
     .model-layout .params { margin:0; background:transparent; border:none; box-shadow:none; padding:0; }
-    .params .grid > .ctrl { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 16px; box-shadow:0 1px 2px rgba(15,23,42,0.05); align-self:start; }
-    .params .grid > .rail-sec { margin:20px 2px 2px; }
+    .params .grid > .ctrl, .params .grid > #tierSliders > .ctrl { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:11px 13px; box-shadow:0 1px 2px rgba(15,23,42,0.05); align-self:start; }
+    .params .grid > .rail-sec { margin:12px 2px 0; }
     .params .grid > .rail-sec:first-child { margin-top:2px; }
-    .params .ctrl > label { min-height:2.6em; }   /* reserve 2 lines so sliders align even when a label wraps */
+    .params .ctrl > label { min-height:0; }
     .params .ctrl > label.switch { min-height:0; }
     .params .sv { display:inline-block; background:var(--accent-soft); border:1px solid var(--accent-border); color:var(--accent-dark); border-radius:999px; padding:2px 10px; font-size:12.5px; font-weight:700; margin-left:4px; }
-    .rail-sec { grid-column:1/-1; font-size:11px; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-soft); border-top:1px solid var(--line); padding-top:12px; margin:6px 0 -4px; }
+    .rail-sec { grid-column:1/-1; font-size:11px; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-soft); border-top:1px solid var(--line); padding-top:8px; margin:6px 0 -4px; }
     .params .grid .rail-sec:first-child { border-top:0; padding-top:0; margin-top:0; }
-    .params .hint { font-size:12px; color:#94a3b8; margin-top:4px; }
+    .params .hint { font-size:12px; color:#94a3b8; margin-top:3px; }
+    #m_wm_g, #m_wm_j { flex:1 1 140px; }   /* fill tile width to match the full-width feel of sibling controls */
 
     /* ---- Rail containment ----
        .ctrl is a flex column and .grid is a grid; flex/grid children default to
@@ -589,7 +590,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-414</span>
+      <span class="build-stamp">LC-415</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -3530,7 +3531,7 @@
       const sel = document.getElementById('tabSelect');
       if (sel) Array.from(sel.options).forEach(o => { if (o.value === 'Forecast' || o.value === 'KPIs') o.hidden = on; });
     }
-    // ---- Slider fill (LC-414): paint the track left of the thumb in the accent colour.
+    // ---- Slider fill (LC-415): paint the track left of the thumb in the accent colour.
     // Safari has no native progress-fill styling for range inputs, so a background
     // gradient is set per slider and refreshed on input and after programmatic changes.
     function paintSlider(r) {
