@@ -568,7 +568,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-401</span>
+      <span class="build-stamp">LC-402</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -579,7 +579,6 @@
     <option value="LogEntry">Log Entry</option>
     <option value="Modelling">Modelling</option>
     <option value="Intelligent">Intelligent Modelling</option>
-    <option value="KPI">KPI</option>
     <option value="LivingCosts">Living Costs</option>
     <option value="BasicData">Basic Data</option>
   </select>
@@ -588,12 +587,17 @@
     <button class="tab-link" onclick="showTab(event,'LogEntry')">Log Entry</button>
     <button class="tab-link" onclick="showTab(event,'Modelling')">Modelling</button>
     <button class="tab-link" onclick="showTab(event,'Intelligent')">Intelligent Modelling</button>
-    <button class="tab-link" id="tabbtn-KPI" onclick="showTab(event,'KPI')">KPI</button>
     <button class="tab-link" onclick="showTab(event,'LivingCosts')">Living Costs</button>
     <button class="tab-link" onclick="showTab(event,'BasicData')">Basic Data</button>
   </div>
 
   <div id="Overview" class="tabcontent active">
+    <div class="subtab-buttons">
+      <button id="subbtn-OverviewDash" class="subtab-link active-sub" onclick="showSub(event,'OverviewDash')">Dashboard</button>
+      <button id="subbtn-PerfKPIs" class="subtab-link" onclick="showSub(event,'PerfKPIs')">Performance KPIs</button>
+      <button id="subbtn-MonForecast" class="subtab-link" onclick="showSub(event,'MonForecast')">Monthly Forecast</button>
+    </div>
+    <div id="sub-OverviewDash" class="subtabcontent" style="display:block;">
     <div id="status" class="s-load">Loading…</div>
 
     <!-- ===== Verdict: the one-glance answer ===== -->
@@ -707,6 +711,9 @@
 
     <!-- ===== Section 3: per-pension detail ===== -->
     <div id="ovPerf"></div>
+    </div><!-- /sub-OverviewDash -->
+    <div id="sub-PerfKPIs" class="subtabcontent"><iframe id="frame-PerfKPIs" class="app-frame" title="Performance KPIs"></iframe></div>
+    <div id="sub-MonForecast" class="subtabcontent"><iframe id="frame-MonForecast" class="app-frame" title="Monthly Forecast"></iframe></div>
   </div>
 
   <div id="Cash" class="tabcontent">
@@ -1088,14 +1095,6 @@
     <iframe id="frame-Intelligent" class="app-frame" title="Intelligent Modelling"></iframe>
   </div>
 
-  <div id="KPI" class="tabcontent">
-    <div class="subtab-buttons">
-      <button id="subbtn-PerfKPIs" class="subtab-link active-sub" onclick="showSub(event,'PerfKPIs')">Performance KPIs</button>
-      <button id="subbtn-MonForecast" class="subtab-link" onclick="showSub(event,'MonForecast')">Monthly Forecast</button>
-    </div>
-    <div id="sub-PerfKPIs" class="subtabcontent"><iframe id="frame-PerfKPIs" class="app-frame" title="Performance KPIs"></iframe></div>
-    <div id="sub-MonForecast" class="subtabcontent"><iframe id="frame-MonForecast" class="app-frame" title="Monthly Forecast"></iframe></div>
-  </div>
   <div id="LogEntry" class="tabcontent">
     <iframe id="frame-LogEntry" class="app-frame" title="Log Entry and Recent Logs"></iframe>
   </div>
@@ -4015,7 +4014,6 @@
       if (id === 'PotTable') { ensureFrame('frame-PotTable', 'pot_table.html' + FV); pingFrame('frame-PotTable'); }
       if (id === 'Sensitivity') { ensureFrame('frame-Sensitivity', 'sensitivity.html' + FV); pingFrame('frame-Sensitivity'); }
       if (id === 'MonthlyAudit') { ensureFrame('frame-MonthlyAudit', 'monthly_audit.html' + FV); pingFrame('frame-MonthlyAudit'); }
-      if (id === 'KPI' && !window.__kpi) { window.__kpi = true; showSub(null, 'PerfKPIs'); }
       if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Budget'); }
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
     }
