@@ -74,7 +74,7 @@
 </head>
 <body>
   <h1>Monthly Budget</h1>
-  <p class="note">Per-person budget for the month you're viewing: net income in, the bills that actually leave each account that month, and what's left. Use the controls to step to next month or jump ahead; the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box is an estimate for reference only and is not part of any total here. Insurances due in the month shown are listed under Cash Summary. <span style="color:#94a3b8;">(budget build: v25)</span></p>
+  <p class="note">Per-person budget for the month you're viewing: net income in, the bills that actually leave each account that month, and what's left. Use the controls to step to next month or jump ahead; the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box is an estimate for reference only and is not part of any total here. Insurances due in the month shown are listed under Cash Summary. <span style="color:#94a3b8;">(budget build: v26)</span></p>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
     <button class="nav-btn" id="prevBtn" onclick="stepMonth(-1)">&#9664; Prev</button>
@@ -221,7 +221,7 @@
         diningFundingAcct = (dPotAcct && dPotAcct.funded_from != null && String(dPotAcct.funded_from).trim() !== '')
           ? String(dPotAcct.funded_from).trim() : dPotId;   // funding account, or the pot itself if not funded-from
       }
-      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct, diningMonthly: diningMonthly, diningFundingAcct: diningFundingAcct };
+      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct, diningMonthly: diningMonthly, diningFundingAcct: diningFundingAcct, holidayPotId: potId, diningPotId: dPotId };
       names.forEach(n => { selectedTier[n] = currentTierDays(n, DATA.tiers); });
       status.style.display = 'none';
       initNav();
@@ -354,15 +354,22 @@
         rows += '<tr class="pot-line"><td>Insurance/car savings</td><td class="amt">' + fmt(potSum) + '</td></tr>';
         boxTotal += potSum; boxAvg += potSum;
       }
-      // holiday savings set-aside: smoothed monthly against this pot's funding account
-      if (d.holidayFundingAcct && acctId === d.holidayFundingAcct && d.holidayMonthly > 0) {
-        rows += '<tr class="pot-line"><td>Holiday savings</td><td class="amt">' + fmt(d.holidayMonthly) + '</td></tr>';
-        boxTotal += d.holidayMonthly; boxAvg += d.holidayMonthly;
-      }
-      // dining savings set-aside: smoothed monthly against this pot's funding account
-      if (d.diningFundingAcct && acctId === d.diningFundingAcct && d.diningMonthly > 0) {
-        rows += '<tr class="pot-line"><td>Dining savings</td><td class="amt">' + fmt(d.diningMonthly) + '</td></tr>';
-        boxTotal += d.diningMonthly; boxAvg += d.diningMonthly;
+      // savings set-asides against this pot's funding account.
+      // When holidays & dining share the SAME pot, show one combined line; otherwise separate lines.
+      const sharePot = d.holidayPotId && d.diningPotId && d.holidayPotId === d.diningPotId;
+      if (sharePot && acctId === d.holidayFundingAcct && (d.holidayMonthly + d.diningMonthly) > 0) {
+        const combined = d.holidayMonthly + d.diningMonthly;
+        rows += '<tr class="pot-line"><td>Dining and Holidays savings</td><td class="amt">' + fmt(combined) + '</td></tr>';
+        boxTotal += combined; boxAvg += combined;
+      } else {
+        if (d.holidayFundingAcct && acctId === d.holidayFundingAcct && d.holidayMonthly > 0) {
+          rows += '<tr class="pot-line"><td>Holiday savings</td><td class="amt">' + fmt(d.holidayMonthly) + '</td></tr>';
+          boxTotal += d.holidayMonthly; boxAvg += d.holidayMonthly;
+        }
+        if (d.diningFundingAcct && acctId === d.diningFundingAcct && d.diningMonthly > 0) {
+          rows += '<tr class="pot-line"><td>Dining savings</td><td class="amt">' + fmt(d.diningMonthly) + '</td></tr>';
+          boxTotal += d.diningMonthly; boxAvg += d.diningMonthly;
+        }
       }
       totalBillsAvg += boxAvg;     // count the average even if nothing is charged this particular month
       if (!rows) return;           // nothing actually leaves this account this month → no box
