@@ -204,9 +204,6 @@
     #Modelling.tabcontent { background:var(--surface-2); }
     #Modelling .subtab-buttons { background:var(--surface-2); }
     #Modelling .params, #Modelling .modelbar { background:var(--surface); box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); }
-    /* Inline group labels in the modelling sub-nav */
-    .subnav-grp { align-self:center; font-size:11px; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-soft); margin:0 2px 0 10px; }
-    .subtab-buttons .subnav-grp:first-child { margin-left:0; }
     table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
     .toggle-switch { appearance:none; -webkit-appearance:none; width:48px; height:28px; background:#cbd5e1; border-radius:999px; position:relative; cursor:pointer; outline:none; transition:background 0.2s; flex:none; vertical-align:middle; }
     .toggle-switch:checked { background:#27ae60; }
@@ -586,7 +583,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-406</span>
+      <span class="build-stamp">LC-407</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -736,15 +733,15 @@
 
   <div id="Cash" class="tabcontent">
     <div class="subtab-buttons">
-      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <span class="subnav-grp">Scenarios</span><button class="subtab-link active-sub" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link active-sub" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -752,15 +749,15 @@
   </div>
   <div id="Crashes" class="tabcontent">
     <div class="subtab-buttons">
-      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -769,15 +766,15 @@
 
   <div id="Annuities" class="tabcontent">
     <div class="subtab-buttons">
-      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -786,15 +783,15 @@
 
   <div id="ScenarioGrid" class="tabcontent">
     <div class="subtab-buttons">
-      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -803,15 +800,15 @@
 
   <div id="Frontier" class="tabcontent">
     <div class="subtab-buttons">
-      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -820,15 +817,15 @@
 
   <div id="MultiModel" class="tabcontent">
     <div class="subtab-buttons">
-      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -837,15 +834,15 @@
 
   <div id="PotTable" class="tabcontent">
     <div class="subtab-buttons">
-      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <span class="subnav-grp">Analysis</span><button class="subtab-link active-sub" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link active-sub" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -853,15 +850,15 @@
   </div>
   <div id="Sensitivity" class="tabcontent">
     <div class="subtab-buttons">
-      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -869,15 +866,15 @@
   </div>
   <div id="MonthlyAudit" class="tabcontent">
     <div class="subtab-buttons">
-      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -886,15 +883,15 @@
 
   <div id="Modelling" class="tabcontent">
     <div class="subtab-buttons">
-      <span class="subnav-grp">Model</span><button class="subtab-link active-sub" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link active-sub" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
-      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
@@ -1049,15 +1046,15 @@
 
   <div id="Retirement" class="tabcontent">
     <div class="subtab-buttons">
-      <span class="subnav-grp">Model</span><button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
+      <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Retirement')">Retirement</button>
-      <span class="subnav-grp">Scenarios</span><button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
+      <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
       <button class="subtab-link" onclick="showTab(event,'ScenarioGrid')">Scenario Grid</button>
       <button class="subtab-link" onclick="showTab(event,'Frontier')">Frontier</button>
       <button class="subtab-link" onclick="showTab(event,'MultiModel')">Multi Modelling</button>
-      <span class="subnav-grp">Analysis</span><button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
+      <button class="subtab-link" onclick="showTab(event,'PotTable')">Pot Table</button>
       <button class="subtab-link" onclick="showTab(event,'Sensitivity')">Sensitivity</button>
       <button class="subtab-link" onclick="showTab(event,'MonthlyAudit')">Monthly Audit</button>
     </div>
