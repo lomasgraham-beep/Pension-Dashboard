@@ -15,6 +15,7 @@
   .btn-danger { background:#c0392b; }
   .wk-head { cursor:pointer; user-select:none; }
   .chev { display:inline-block; width:1em; color:#cbd5e1; }
+  .wk-flag { display:inline-block; margin-left:8px; padding:1px 8px; border-radius:999px; font-size:11px; font-weight:700; letter-spacing:0.02em; vertical-align:middle; background:#17b5c4; color:#08333a; border:1px solid #0e8a97; }
   .grand { font-weight:bold; color:#2c3e50; font-size:16px; }
   .wk { border:1px solid #e2e8f0; border-radius:8px; margin-bottom:14px; overflow:hidden; background:#fff; }
   .wk-head { background:#2c3e50; color:#fff; font-weight:bold; padding:8px 12px; display:flex; justify-content:space-between; }
@@ -55,6 +56,7 @@
     .grand { color:#f1f5f9 !important; }
     .wk { background:#1e293b !important; border-color:#334155 !important; }
     .wk-head { background:#15803d !important; color:#fff !important; }
+    .wk-flag { background:#0e7490 !important; color:#e0f7fb !important; border-color:#22d3ee !important; }
     th { background:#0b2818 !important; color:#86efac !important; }
     td { border-color:#334155 !important; color:#cbd5e1 !important; }
     td.meal { color:#f1f5f9 !important; }
@@ -79,7 +81,7 @@
 </head>
 <body>
   <h1>Dining <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(52-week rota)</span></h1>
-  <p class="note">Set each meal's level (L/M/H) per day across 52 weeks. Costs are looked up from Meal Costs. Each row totals automatically; the year total feeds retirement modelling once switched on. Use <b>Clear week</b> / <b>Copy to weeks&hellip;</b> inside a week, or <b>Clear all</b> above. <span style="color:#94a3b8;">(dining build: v7)</span></p>
+  <p class="note">Set each meal's level (L/M/H) per day across 52 weeks. Costs are looked up from Meal Costs. Each row totals automatically; the year total feeds retirement modelling once switched on. Use <b>Clear week</b> / <b>Copy to weeks&hellip;</b> inside a week, or <b>Clear all</b> above. <span style="color:#94a3b8;">(dining build: v8)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div class="taper-card" id="taperCard" style="display:none;">
@@ -126,6 +128,7 @@
   function monthFor(no) { return MONTHS_SHORT[new Date(YEAR, 0, 1 + (no - 1) * 7).getMonth()]; }
 
   let rota = [];        // bd_dining_rota rows
+  let holidayWeeks = new Set();   // week_no set with a holiday recorded (from bd_holiday_plan)
   let costMap = {};     // "Meal|L" -> integer cost
   let accounts = [];    // bd_bank_account rows (for the savings-pot dropdown)
   let holidayPot = '';  // bd_holiday_settings.savings_account — used as the default pot
@@ -140,14 +143,21 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [rotaRows, costRows, sRows, aRows, hRows] = await Promise.all([
+      const [rotaRows, costRows, sRows, aRows, hRows, hplanRows] = await Promise.all([
         App.rest('bd_dining_rota?order=week_no.asc,meal_type.asc'),
         App.rest('bd_meal_cost'),
         App.rest('bd_dining_settings?id=eq.1'),
         App.rest('bd_bank_account?order=bank_name.asc,account_id.asc'),
-        App.rest('bd_holiday_settings?id=eq.1')
+        App.rest('bd_holiday_settings?id=eq.1'),
+        App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc')
       ]);
       rota = rotaRows || [];
+      holidayWeeks = new Set();
+      (hplanRows || []).forEach(r => {
+        const rec = (r.category && String(r.category).trim() !== '') || (Number(r.nights) > 0) ||
+          (Number(r.miles) > 0) || (Number(r.incidentals) > 0) || (r.label && String(r.label).trim() !== '');
+        if (rec) holidayWeeks.add(Number(r.week_no));
+      });
       costMap = {};
       (costRows || []).forEach(c => { costMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
       settings = (sRows && sRows[0]) || {};
@@ -199,7 +209,7 @@
       const collapsed = weekCollapsed[w] !== false;   // default collapsed
       html += '<div class="wk">' +
         '<div class="wk-head" onclick="toggleWeek(' + w + ')">' +
-          '<span><span class="chev" id="chev_' + w + '">' + (collapsed ? '\u25B8' : '\u25BE') + '</span> Week ' + w + ' \u00b7 ' + monthFor(w) + '</span>' +
+          '<span><span class="chev" id="chev_' + w + '">' + (collapsed ? '\u25B8' : '\u25BE') + '</span> Week ' + w + ' \u00b7 ' + monthFor(w) + (holidayWeeks.has(w) ? ' <span class="wk-flag">Holiday</span>' : '') + '</span>' +
           '<span id="wt_' + w + '">' + fmt(weekTotal) + '</span>' +
         '</div>' +
         '<div class="wk-body" id="wkbody_' + w + '" style="display:' + (collapsed ? 'none' : 'block') + ';">' +

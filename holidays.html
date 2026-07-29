@@ -27,6 +27,7 @@
   .wk { border:1px solid #e2e8f0; border-radius:8px; margin-bottom:14px; overflow:hidden; background:#fff; }
   .wk-head { background:#2c3e50; color:#fff; font-weight:bold; padding:8px 12px; display:flex; justify-content:space-between; cursor:pointer; user-select:none; }
   .wk-head .label { font-weight:normal; color:#cbd5e1; font-size:13px; margin-left:8px; }
+  .wk-flag { display:inline-block; margin-left:8px; padding:1px 8px; border-radius:999px; font-size:11px; font-weight:700; letter-spacing:0.02em; vertical-align:middle; background:#17b5c4; color:#08333a; border:1px solid #0e8a97; }
   .chev { display:inline-block; width:1em; color:#cbd5e1; }
   .wk-body { padding:12px; }
   .row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; }
@@ -63,6 +64,7 @@
     .grand { color:#f1f5f9 !important; }
     .wk { background:#1e293b !important; border-color:#334155 !important; }
     .wk-head { background:#1e293b !important; color:#f1f5f9 !important; border-bottom:1px solid #334155; }
+    .wk-flag { background:#0e7490 !important; color:#e0f7fb !important; border-color:#22d3ee !important; }
     .fld label { color:#94a3b8 !important; }
     .fld.tow label { color:#e2e8f0 !important; }
     .fld input, .fld select, select.cell { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
@@ -88,7 +90,7 @@
 </head>
 <body>
   <h1>Holidays <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(52-week plan)</span></h1>
-  <p class="note">Plan each week's holiday: type &amp; level (per-night cost from Holiday Costs), round-trip miles for fuel, incidentals, and eating out (looked up from Meal Costs). Each week totals automatically; the year total feeds the retirement model. <span style="color:#94a3b8;">(holidays build: v9)</span></p>
+  <p class="note">Plan each week's holiday: type &amp; level (per-night cost from Holiday Costs), round-trip miles for fuel, incidentals, and eating out (looked up from Meal Costs). Each week totals automatically; the year total feeds the retirement model. <span style="color:#94a3b8;">(holidays build: v10)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div class="taper-card" id="taperCard" style="display:none;">
@@ -129,6 +131,7 @@
   function monthFor(no) { return MONTHS_SHORT[new Date(YEAR, 0, 1 + (no - 1) * 7).getMonth()]; }
 
   let plan = [];         // bd_holiday_plan rows (this phase), one per week
+  let diningWeeks = new Set();   // week_no set with dining recorded (from bd_dining_rota)
   let ctx = null;        // holiday cost lookup context
   let settings = null;   // bd_holiday_settings (single row) — holds age-taper multipliers
   function tnum(v, d) { return v != null && isFinite(Number(v)) ? Number(v) : d; }
@@ -149,13 +152,19 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [planRows, costRows, mealRows, sRows] = await Promise.all([
+      const [planRows, costRows, mealRows, sRows, dinRows] = await Promise.all([
         App.rest('bd_holiday_plan?phase=eq.' + PHASE + '&order=week_no.asc'),
         App.rest('bd_holiday_cost'),
         App.rest('bd_meal_cost'),
-        App.rest('bd_holiday_settings?id=eq.1')
+        App.rest('bd_holiday_settings?id=eq.1'),
+        App.rest('bd_dining_rota?order=week_no.asc')
       ]);
       plan = planRows || [];
+      diningWeeks = new Set();
+      const DINCOLS = ['mon','tue','wed','thu','fri','sat','sun'];
+      (dinRows || []).forEach(r => {
+        if (DINCOLS.some(c => r[c] && String(r[c]).trim() !== '')) diningWeeks.add(Number(r.week_no));
+      });
       plan.forEach(normGrid);
       settings = (sRows && sRows[0]) || {};
       ctx = App.holidayCtx(costRows || [], mealRows || [], settings);
@@ -240,7 +249,7 @@
       const lbl = (w && w.label) ? '<span class="label">' + esc(w.label) + '</span>' : '';
       html += '<div class="wk">' +
         '<div class="wk-head" onclick="toggle(' + no + ')">' +
-          '<span><span class="chev" id="chev_' + no + '">' + (isC ? '\u25B8' : '\u25BE') + '</span> Week ' + no + ' \u00b7 ' + monthFor(no) + lbl + '</span>' +
+          '<span><span class="chev" id="chev_' + no + '">' + (isC ? '\u25B8' : '\u25BE') + '</span> Week ' + no + ' \u00b7 ' + monthFor(no) + lbl + (diningWeeks.has(no) ? ' <span class="wk-flag">Dining</span>' : '') + '</span>' +
           '<span class="wktot" id="wt_' + no + '">' + fmt(tot) + '</span>' +
         '</div>' +
         '<div class="wk-body" id="wkbody_' + no + '" style="display:' + (isC ? 'none' : 'block') + ';">' +
