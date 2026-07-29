@@ -579,6 +579,837 @@
   .mdl-bias{ margin-top:6px; width:130px; }
   .mdl-bias svg{ display:block; width:130px; height:auto; }
 
+
+/* ============================================================
+   LC-418 — Overview dashboard redesign
+   Navy + aqua visual hierarchy, responsive touch layouts,
+   automatic dark mode, and a white high-contrast chart canvas.
+   Loaded by common.js only in the top-level app shell.
+   ============================================================ */
+
+body.mpr-dashboard {
+  --mpr-navy-950:#041a31;
+  --mpr-navy-900:#062847;
+  --mpr-navy-800:#0a3a62;
+  --mpr-navy-700:#124f7c;
+  --mpr-aqua:#20c4cf;
+  --mpr-aqua-deep:#109aa8;
+  --mpr-aqua-soft:#e8f8fa;
+  --mpr-green:#219653;
+  --mpr-green-soft:#eaf8ef;
+  --mpr-amber:#d99100;
+  --mpr-red:#c0392b;
+  --mpr-bg:#f4f7f9;
+  --mpr-card:#ffffff;
+  --mpr-card-soft:#f8fafc;
+  --mpr-text:#112d4e;
+  --mpr-muted:#65758b;
+  --mpr-line:#dce5ed;
+  --mpr-shadow:0 2px 7px rgba(15,35,55,.06), 0 14px 34px rgba(15,35,55,.055);
+  --mpr-radius:16px;
+  background:var(--mpr-bg);
+  overflow-x:hidden;
+}
+
+body.mpr-dashboard .shell {
+  max-width:1600px;
+  margin:0 auto;
+}
+
+body.mpr-dashboard .topbar {
+  margin-bottom:12px;
+  min-height:48px;
+}
+
+body.mpr-dashboard .mpr-brand {
+  display:flex;
+  align-items:center;
+  gap:13px;
+  min-width:0;
+}
+
+body.mpr-dashboard .mpr-brand-mark {
+  position:relative;
+  flex:0 0 auto;
+  width:48px;
+  height:32px;
+}
+
+body.mpr-dashboard .mpr-brand-mark::before,
+body.mpr-dashboard .mpr-brand-mark::after {
+  content:"";
+  position:absolute;
+  bottom:2px;
+  width:27px;
+  height:25px;
+  border-radius:7px 7px 4px 4px;
+  transform:skewX(-25deg);
+}
+
+body.mpr-dashboard .mpr-brand-mark::before {
+  left:3px;
+  background:linear-gradient(145deg,#27cbd3,#129aa8);
+}
+
+body.mpr-dashboard .mpr-brand-mark::after {
+  right:2px;
+  background:linear-gradient(145deg,#123f70,#05254a);
+}
+
+body.mpr-dashboard .mpr-brand h1 {
+  color:var(--mpr-text);
+  font-size:24px;
+  font-weight:750;
+  letter-spacing:-.025em;
+  white-space:nowrap;
+}
+
+body.mpr-dashboard .mpr-connection {
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-height:36px;
+  padding:6px 10px;
+  border:1px solid transparent;
+  border-radius:999px;
+  color:var(--mpr-muted);
+  font-size:12.5px;
+  font-weight:700;
+  white-space:nowrap;
+}
+
+body.mpr-dashboard .mpr-connection-dot {
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:#94a3b8;
+  box-shadow:0 0 0 4px rgba(148,163,184,.14);
+}
+
+body.mpr-dashboard .mpr-connection.is-ok {
+  color:var(--mpr-green);
+}
+body.mpr-dashboard .mpr-connection.is-ok .mpr-connection-dot {
+  background:var(--mpr-green);
+  box-shadow:0 0 0 4px rgba(33,150,83,.12);
+}
+body.mpr-dashboard .mpr-connection.is-busy .mpr-connection-dot {
+  background:var(--mpr-aqua-deep);
+  box-shadow:0 0 0 4px rgba(32,196,207,.14);
+  animation:mpr-pulse 1.5s ease-in-out infinite;
+}
+body.mpr-dashboard .mpr-connection.is-error {
+  color:var(--mpr-red);
+  border-color:rgba(192,57,43,.2);
+  background:rgba(192,57,43,.06);
+}
+body.mpr-dashboard .mpr-connection.is-error .mpr-connection-dot {
+  background:var(--mpr-red);
+  box-shadow:0 0 0 4px rgba(192,57,43,.12);
+}
+
+@keyframes mpr-pulse {
+  0%,100% { opacity:.55; transform:scale(.85); }
+  50% { opacity:1; transform:scale(1); }
+}
+
+body.mpr-dashboard .tab-buttons {
+  gap:8px;
+  padding:8px 10px;
+  border-radius:14px 14px 0 0;
+  overflow-x:auto;
+  flex-wrap:nowrap;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+}
+body.mpr-dashboard .tab-buttons::-webkit-scrollbar,
+body.mpr-dashboard .subtab-buttons::-webkit-scrollbar { display:none; }
+body.mpr-dashboard .tab-buttons button,
+body.mpr-dashboard .subtab-link {
+  min-height:44px;
+  flex:0 0 auto;
+  touch-action:manipulation;
+}
+
+body.mpr-dashboard #Overview {
+  padding:12px 14px 18px;
+  background:var(--mpr-card);
+}
+
+body.mpr-dashboard #sub-OverviewDash > .mpr-source-hidden,
+body.mpr-dashboard #sub-OverviewDash > #ovPerf.mpr-source-hidden {
+  display:none !important;
+}
+
+body.mpr-dashboard #sub-OverviewDash > #status.mpr-status-compact {
+  display:none;
+}
+body.mpr-dashboard #sub-OverviewDash > #status.mpr-status-compact.is-error {
+  display:block;
+  margin:10px 0 14px;
+  border-radius:10px;
+  padding:11px 14px;
+  font-size:13px;
+}
+
+body.mpr-dashboard .subtab-buttons.mpr-subnav {
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:54px;
+  overflow-x:auto;
+  flex-wrap:nowrap;
+  padding-right:8px;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+}
+
+body.mpr-dashboard .mpr-subnav-meta {
+  margin-left:auto;
+  padding-left:12px;
+  color:var(--mpr-muted);
+  font-size:12px;
+  white-space:nowrap;
+  flex:0 0 auto;
+}
+
+body.mpr-dashboard .mpr-overview {
+  display:flex;
+  flex-direction:column;
+  gap:18px;
+  color:var(--mpr-text);
+}
+
+body.mpr-dashboard .mpr-panel {
+  background:var(--mpr-card);
+  border:1px solid var(--mpr-line);
+  border-radius:var(--mpr-radius);
+  box-shadow:var(--mpr-shadow);
+}
+
+body.mpr-dashboard .mpr-section-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  margin:0 0 16px;
+}
+
+body.mpr-dashboard .mpr-section-head h2 {
+  margin:0;
+  padding:0;
+  border:0;
+  color:var(--mpr-text);
+  font-size:18px;
+  line-height:1.25;
+  letter-spacing:-.01em;
+}
+
+body.mpr-dashboard .mpr-section-note {
+  color:var(--mpr-muted);
+  font-size:12px;
+}
+
+/* ---- Retirement readiness hero ---- */
+body.mpr-dashboard .mpr-readiness {
+  position:relative;
+  overflow:hidden;
+  padding:26px 28px 22px;
+  border:1px solid rgba(34,196,207,.18);
+  border-radius:18px;
+  color:#fff;
+  background:
+    radial-gradient(circle at 88% 0%,rgba(32,196,207,.17),transparent 34%),
+    linear-gradient(135deg,var(--mpr-navy-950),var(--mpr-navy-800));
+  box-shadow:0 14px 34px rgba(4,26,49,.18);
+}
+
+body.mpr-dashboard .mpr-ready-top {
+  display:grid;
+  grid-template-columns:255px repeat(6,minmax(105px,1fr));
+  gap:0;
+  align-items:stretch;
+}
+
+body.mpr-dashboard .mpr-ready-intro {
+  padding:2px 24px 8px 0;
+}
+
+body.mpr-dashboard .mpr-ready-intro h2 {
+  margin:0 0 16px;
+  padding:0;
+  border:0;
+  color:#fff;
+  font-size:24px;
+  line-height:1.15;
+  letter-spacing:-.025em;
+}
+
+body.mpr-dashboard .mpr-verdict-row {
+  display:flex;
+  align-items:center;
+  gap:11px;
+  flex-wrap:wrap;
+}
+
+body.mpr-dashboard .mpr-verdict-badge {
+  display:inline-flex;
+  align-items:center;
+  min-height:40px;
+  padding:8px 15px;
+  border-radius:11px;
+  color:#fff;
+  background:linear-gradient(135deg,#2caf62,#1d8b4b);
+  box-shadow:0 7px 16px rgba(24,116,63,.24);
+  font-size:15px;
+  font-weight:800;
+}
+body.mpr-dashboard .mpr-verdict-badge::before {
+  content:"✓";
+  margin-right:8px;
+  font-size:18px;
+}
+body.mpr-dashboard .mpr-verdict-badge.is-bad {
+  background:linear-gradient(135deg,#d65348,#a82d25);
+}
+body.mpr-dashboard .mpr-verdict-badge.is-bad::before { content:"!"; }
+
+body.mpr-dashboard .mpr-verdict-copy {
+  display:block;
+  margin-top:12px;
+  color:rgba(255,255,255,.88);
+  font-size:13px;
+  line-height:1.45;
+}
+
+body.mpr-dashboard .mpr-ready-metric {
+  min-width:0;
+  padding:2px 16px 8px;
+  border-left:1px solid rgba(255,255,255,.23);
+}
+
+body.mpr-dashboard .mpr-ready-label {
+  display:block;
+  min-height:34px;
+  color:rgba(255,255,255,.78);
+  font-size:11.5px;
+  line-height:1.35;
+}
+
+body.mpr-dashboard .mpr-ready-value,
+body.mpr-dashboard .mpr-ready-value.value,
+body.mpr-dashboard .mpr-ready-value .value {
+  display:block;
+  color:#fff !important;
+  font-size:25px !important;
+  font-weight:780 !important;
+  line-height:1.1;
+  letter-spacing:-.025em;
+  white-space:nowrap;
+}
+
+body.mpr-dashboard .mpr-ready-value .cnum {
+  color:#fff !important;
+  font-size:25px !important;
+  font-weight:780 !important;
+  line-height:1.1;
+}
+body.mpr-dashboard .mpr-ready-value .csub {
+  margin-top:6px;
+  color:rgba(255,255,255,.76) !important;
+  font-size:11px !important;
+  white-space:normal;
+}
+
+body.mpr-dashboard .mpr-ready-sub {
+  display:block;
+  margin-top:7px;
+  color:rgba(255,255,255,.72);
+  font-size:10.8px;
+  line-height:1.35;
+}
+
+body.mpr-dashboard .mpr-ready-metric #ovProgPct {
+  color:#fff;
+  font-size:25px;
+  font-weight:780;
+}
+
+body.mpr-dashboard .mpr-timeline {
+  margin-top:18px;
+  padding-top:10px;
+  border-top:1px solid rgba(255,255,255,.10);
+}
+body.mpr-dashboard .mpr-timeline #ovVerdictTl {
+  width:100%;
+  min-height:86px;
+}
+body.mpr-dashboard .mpr-timeline #ovVerdictTl svg {
+  display:block;
+  width:100% !important;
+  height:auto !important;
+  overflow:visible;
+}
+
+/* ---- Main two-column area ---- */
+body.mpr-dashboard .mpr-main-grid {
+  display:grid;
+  grid-template-columns:minmax(0,1.48fr) minmax(390px,1fr);
+  gap:18px;
+  align-items:stretch;
+}
+
+body.mpr-dashboard .mpr-main-grid > *,
+body.mpr-dashboard .mpr-lower-grid > * { min-width:0; }
+
+body.mpr-dashboard .mpr-chart-panel,
+body.mpr-dashboard .mpr-current-panel {
+  padding:20px 22px;
+}
+
+body.mpr-dashboard .mpr-chart-legend {
+  display:flex;
+  align-items:center;
+  gap:22px;
+  flex-wrap:wrap;
+  color:#52667e;
+  font-size:12px;
+}
+body.mpr-dashboard .mpr-chart-key {
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+}
+body.mpr-dashboard .mpr-chart-key::before {
+  content:"";
+  width:20px;
+  height:0;
+  border-top:3px solid #113b69;
+  border-radius:2px;
+}
+body.mpr-dashboard .mpr-chart-key.projected::before {
+  border-top-color:#159ba8;
+  border-top-style:dashed;
+}
+
+body.mpr-dashboard .mpr-chart-canvas {
+  min-height:305px;
+  display:flex;
+  align-items:center;
+}
+body.mpr-dashboard .mpr-chart-canvas #ovTrajHost {
+  width:100%;
+}
+body.mpr-dashboard .mpr-chart-canvas #ovTrajHost svg {
+  display:block;
+  width:100% !important;
+  height:auto !important;
+  min-height:270px;
+}
+
+/* ---- Current pensions ---- */
+body.mpr-dashboard .mpr-current-cards {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:18px;
+}
+
+body.mpr-dashboard .mpr-current-card {
+  min-width:0;
+  min-height:148px;
+  padding:14px 14px 10px;
+  border:1px solid var(--mpr-line);
+  border-radius:12px;
+  background:var(--mpr-card-soft);
+}
+body.mpr-dashboard .mpr-current-card.is-featured {
+  border-color:rgba(16,154,168,.65);
+  background:linear-gradient(145deg,#f2fcfd,#f8fbfd);
+  box-shadow:inset 0 0 0 1px rgba(32,196,207,.08);
+}
+
+body.mpr-dashboard .mpr-current-name {
+  display:block;
+  color:var(--mpr-text);
+  font-size:12px;
+  font-weight:750;
+}
+body.mpr-dashboard .mpr-current-card .value {
+  margin-top:8px;
+  color:var(--mpr-text) !important;
+  font-size:24px !important;
+  line-height:1;
+  font-weight:780 !important;
+  text-align:left;
+}
+body.mpr-dashboard .mpr-current-card .ov-delta {
+  margin-top:10px;
+  color:var(--mpr-muted);
+  font-size:11px;
+  line-height:1.35;
+}
+body.mpr-dashboard .mpr-current-card .ov-delta .pos,
+body.mpr-dashboard .mpr-current-card .ov-delta .neg {
+  font-weight:800;
+}
+body.mpr-dashboard .mpr-current-card .ov-microsub {
+  margin-top:2px;
+  font-size:10px;
+}
+body.mpr-dashboard .mpr-current-card .ov-spark {
+  height:31px;
+  margin:8px 0 0;
+}
+
+body.mpr-dashboard .mpr-breakdown-title {
+  margin:0 0 10px;
+  color:var(--mpr-text);
+  font-size:12.5px;
+  font-weight:800;
+}
+body.mpr-dashboard .mpr-current-panel .ov-bypension {
+  min-width:0;
+  width:100%;
+  gap:10px;
+}
+body.mpr-dashboard .mpr-current-panel .ov-bypension .bp-head { display:none; }
+body.mpr-dashboard .mpr-current-panel .ov-bp-row {
+  grid-template-columns:minmax(100px,1fr) auto;
+  gap:4px 12px;
+}
+body.mpr-dashboard .mpr-current-panel .ov-bp-row .bp-name,
+body.mpr-dashboard .mpr-current-panel .ov-bp-row .bp-val {
+  font-size:11.5px;
+}
+body.mpr-dashboard .mpr-current-panel .ov-bp-track {
+  height:7px;
+  background:#e8eef3;
+}
+
+body.mpr-dashboard .mpr-current-panel .ov-strip {
+  margin:16px 0 0 !important;
+  padding:9px 11px;
+  border:0;
+  border-radius:9px;
+  background:var(--mpr-aqua-soft);
+  color:var(--mpr-muted);
+  font-size:11.5px;
+}
+
+/* ---- Lower insight row ---- */
+body.mpr-dashboard .mpr-lower-grid {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);
+  gap:18px;
+}
+body.mpr-dashboard .mpr-resilience-panel,
+body.mpr-dashboard .mpr-performance-panel {
+  padding:19px 20px;
+}
+
+body.mpr-dashboard .mpr-resilience-cards {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+body.mpr-dashboard .mpr-resilience-cards .ov-survive {
+  min-width:0;
+  margin:0 !important;
+  padding:15px 16px;
+  border:1px solid var(--mpr-line);
+  border-radius:12px;
+  background:var(--mpr-card-soft);
+  align-items:center;
+  gap:13px;
+}
+body.mpr-dashboard .mpr-resilience-cards .ov-survive:first-child {
+  border-color:rgba(16,154,168,.55);
+  background:linear-gradient(145deg,#f3fcfd,#f8fbfd);
+}
+body.mpr-dashboard .mpr-resilience-cards .ov-survive > svg {
+  flex:0 0 46px;
+  width:46px;
+  height:46px;
+  padding:9px;
+  border-radius:50%;
+  background:linear-gradient(145deg,#0d3e70,#0b6b8a);
+}
+body.mpr-dashboard .mpr-resilience-cards .ov-survive:nth-child(2) > svg {
+  background:linear-gradient(145deg,#159ba8,#25c9cf);
+}
+body.mpr-dashboard .mpr-resilience-cards .ov-survive > svg path {
+  fill:#fff !important;
+  opacity:1 !important;
+}
+body.mpr-dashboard .mpr-resilience-cards .sv-num {
+  color:var(--mpr-text);
+  font-size:13px;
+  line-height:1.35;
+  font-weight:800;
+}
+body.mpr-dashboard .mpr-resilience-cards .sv-sub {
+  margin-top:5px;
+  color:var(--mpr-muted);
+  font-size:10.5px;
+  line-height:1.4;
+}
+body.mpr-dashboard .mpr-resilience-cards .ov-survive.warn {
+  border-color:rgba(217,145,0,.45);
+  background:#fffaf0;
+}
+body.mpr-dashboard .mpr-resilience-cards .ov-survive.danger {
+  border-color:rgba(192,57,43,.4);
+  background:#fff5f4;
+}
+
+body.mpr-dashboard .mpr-performance-link {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:44px;
+  padding:8px 4px 8px 12px;
+  border:0;
+  background:transparent;
+  color:var(--mpr-aqua-deep);
+  font:inherit;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+}
+body.mpr-dashboard .mpr-performance-link::after {
+  content:"→";
+  margin-left:8px;
+  font-size:18px;
+}
+body.mpr-dashboard .mpr-performance-link:hover,
+body.mpr-dashboard .mpr-performance-link:focus-visible {
+  color:var(--mpr-navy-700);
+  text-decoration:underline;
+}
+
+body.mpr-dashboard .mpr-performance-cards {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+}
+body.mpr-dashboard .mpr-performance-card {
+  min-width:0;
+  padding:14px 13px 10px;
+  border:1px solid var(--mpr-line);
+  border-radius:11px;
+  background:var(--mpr-card-soft);
+}
+body.mpr-dashboard .mpr-performance-name {
+  display:block;
+  color:var(--mpr-text);
+  font-size:11.5px;
+  font-weight:800;
+}
+body.mpr-dashboard .mpr-performance-pct {
+  display:block;
+  margin-top:8px;
+  color:var(--mpr-green);
+  font-size:22px;
+  font-weight:820;
+  letter-spacing:-.02em;
+}
+body.mpr-dashboard .mpr-performance-pct.is-negative { color:var(--mpr-red); }
+body.mpr-dashboard .mpr-performance-period {
+  display:block;
+  margin-top:3px;
+  color:var(--mpr-muted);
+  font-size:10px;
+}
+body.mpr-dashboard .mpr-performance-spark {
+  display:block;
+  width:100%;
+  height:34px;
+  margin-top:8px;
+}
+
+body.mpr-dashboard .mpr-disclaimer {
+  margin:-3px 2px 0;
+  color:var(--mpr-muted);
+  font-size:10.5px;
+  line-height:1.45;
+}
+
+body.mpr-dashboard .mpr-empty {
+  color:var(--mpr-muted);
+}
+
+/* Keep the actual retirement chart on a white canvas in both themes. */
+body.mpr-dashboard .mpr-chart-panel {
+  background:#fff;
+  color:#112d4e;
+}
+body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
+
+/* ---- Tablet / iPad portrait ---- */
+@media (max-width:1180px) {
+  body.mpr-dashboard .mpr-ready-top {
+    grid-template-columns:minmax(230px,1.15fr) repeat(3,minmax(135px,1fr));
+    row-gap:18px;
+  }
+  body.mpr-dashboard .mpr-ready-intro { grid-row:1 / span 2; }
+  body.mpr-dashboard .mpr-ready-metric:nth-child(5) { border-left:1px solid rgba(255,255,255,.23); }
+  body.mpr-dashboard .mpr-main-grid { grid-template-columns:1fr; }
+  body.mpr-dashboard .mpr-current-panel { min-width:0; }
+}
+
+@media (max-width:900px) {
+  body.mpr-dashboard { padding:12px; }
+  body.mpr-dashboard #Overview { padding:10px; }
+  body.mpr-dashboard .mpr-lower-grid { grid-template-columns:1fr; }
+  body.mpr-dashboard .mpr-readiness { padding:22px 20px 18px; }
+  body.mpr-dashboard .mpr-ready-top {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:16px 0;
+  }
+  body.mpr-dashboard .mpr-ready-intro {
+    grid-column:1 / -1;
+    grid-row:auto;
+    padding:0 0 4px;
+  }
+  body.mpr-dashboard .mpr-ready-metric {
+    border-left:1px solid rgba(255,255,255,.20);
+  }
+  body.mpr-dashboard .mpr-ready-metric:nth-child(even) { border-left:0; padding-left:0; }
+}
+
+/* ---- Phone / narrow touch layout ---- */
+@media (max-width:620px) {
+  body.mpr-dashboard {
+    padding:8px;
+    --mpr-radius:14px;
+  }
+  body.mpr-dashboard .topbar { align-items:flex-start; }
+  body.mpr-dashboard .mpr-brand-mark { width:38px; height:27px; }
+  body.mpr-dashboard .mpr-brand-mark::before,
+  body.mpr-dashboard .mpr-brand-mark::after { width:22px; height:21px; }
+  body.mpr-dashboard .mpr-brand h1 { font-size:20px; }
+  body.mpr-dashboard .topbar .right { gap:6px; justify-content:flex-end; }
+  body.mpr-dashboard .mpr-connection { padding:5px 7px; }
+  body.mpr-dashboard .mpr-connection-label { display:inline; font-size:11px; }
+
+  body.mpr-dashboard .tab-buttons { padding:7px; }
+  body.mpr-dashboard .tab-buttons button,
+  body.mpr-dashboard .subtab-link { min-height:44px; padding:9px 14px; font-size:13px; }
+  body.mpr-dashboard .mpr-subnav-meta { display:none; }
+
+  body.mpr-dashboard #Overview { padding:7px; }
+  body.mpr-dashboard .mpr-overview { gap:13px; }
+  body.mpr-dashboard .mpr-readiness { padding:20px 16px 14px; border-radius:15px; }
+  body.mpr-dashboard .mpr-ready-intro h2 { font-size:22px; }
+  body.mpr-dashboard .mpr-verdict-copy { font-size:12px; }
+  body.mpr-dashboard .mpr-ready-top { gap:15px 0; }
+  body.mpr-dashboard .mpr-ready-metric { padding:0 8px 2px 14px; }
+  body.mpr-dashboard .mpr-ready-label { min-height:31px; font-size:10px; }
+  body.mpr-dashboard .mpr-ready-value,
+  body.mpr-dashboard .mpr-ready-value.value,
+  body.mpr-dashboard .mpr-ready-value .value,
+  body.mpr-dashboard .mpr-ready-value .cnum,
+  body.mpr-dashboard .mpr-ready-metric #ovProgPct { font-size:20px !important; }
+  body.mpr-dashboard .mpr-ready-sub,
+  body.mpr-dashboard .mpr-ready-value .csub { font-size:9.5px !important; }
+  body.mpr-dashboard .mpr-timeline { overflow:visible; }
+  body.mpr-dashboard .mpr-timeline #ovVerdictTl { min-width:0; width:100%; }
+
+  body.mpr-dashboard .mpr-main-grid { gap:13px; }
+  body.mpr-dashboard .mpr-chart-panel,
+  body.mpr-dashboard .mpr-current-panel,
+  body.mpr-dashboard .mpr-resilience-panel,
+  body.mpr-dashboard .mpr-performance-panel { padding:16px 14px; }
+  body.mpr-dashboard .mpr-section-head { align-items:flex-start; margin-bottom:13px; }
+  body.mpr-dashboard .mpr-section-head h2 { font-size:17px; }
+  body.mpr-dashboard .mpr-chart-legend { gap:13px; font-size:10.5px; }
+  body.mpr-dashboard .mpr-chart-canvas { min-height:245px; overflow:visible; }
+  body.mpr-dashboard .mpr-chart-canvas #ovTrajHost { min-width:0; width:100%; }
+  body.mpr-dashboard .mpr-chart-canvas #ovTrajHost svg { min-height:230px; }
+
+  body.mpr-dashboard .mpr-current-cards {
+    display:flex;
+    gap:10px;
+    overflow-x:auto;
+    scroll-snap-type:x mandatory;
+    padding-bottom:5px;
+    -webkit-overflow-scrolling:touch;
+  }
+  body.mpr-dashboard .mpr-current-card {
+    flex:0 0 min(79vw,270px);
+    scroll-snap-align:start;
+  }
+  body.mpr-dashboard .mpr-resilience-cards { grid-template-columns:1fr; }
+  body.mpr-dashboard .mpr-performance-panel .mpr-section-head {
+    flex-direction:column;
+    align-items:flex-start;
+    gap:4px;
+  }
+  body.mpr-dashboard .mpr-performance-panel .mpr-performance-link {
+    min-height:36px;
+    padding:0;
+    white-space:nowrap;
+  }
+  body.mpr-dashboard .mpr-performance-cards {
+    display:flex;
+    overflow-x:auto;
+    scroll-snap-type:x mandatory;
+    padding-bottom:5px;
+    -webkit-overflow-scrolling:touch;
+  }
+  body.mpr-dashboard .mpr-performance-card {
+    flex:0 0 min(72vw,230px);
+    scroll-snap-align:start;
+  }
+  body.mpr-dashboard .mpr-performance-link { padding-right:0; }
+}
+
+/* ---- Automatic dark mode ---- */
+@media (prefers-color-scheme:dark) {
+  body.mpr-dashboard {
+    --mpr-bg:#07111d;
+    --mpr-card:#0d1b2a;
+    --mpr-card-soft:#122236;
+    --mpr-text:#e8f1fa;
+    --mpr-muted:#9fb1c4;
+    --mpr-line:#25374b;
+    --mpr-aqua-soft:#0d303b;
+    --mpr-shadow:0 2px 8px rgba(0,0,0,.22),0 16px 36px rgba(0,0,0,.17);
+  }
+  body.mpr-dashboard #Overview { background:var(--mpr-card); }
+  body.mpr-dashboard .mpr-brand h1 { color:var(--mpr-text); }
+  body.mpr-dashboard .mpr-current-card.is-featured {
+    background:linear-gradient(145deg,#0c2d38,#122236);
+  }
+  body.mpr-dashboard .mpr-current-panel .ov-bp-track { background:#25374b; }
+  body.mpr-dashboard .mpr-resilience-cards .ov-survive:first-child {
+    background:linear-gradient(145deg,#0d2c38,#122236);
+  }
+  body.mpr-dashboard .mpr-resilience-cards .ov-survive.warn { background:#33270d; }
+  body.mpr-dashboard .mpr-resilience-cards .ov-survive.danger { background:#341916; }
+  body.mpr-dashboard .mpr-performance-link { color:#59dbe2; }
+  body.mpr-dashboard .mpr-chart-panel {
+    background:#ffffff;
+    border-color:#33475d;
+  }
+  body.mpr-dashboard .mpr-chart-panel .mpr-section-note,
+  body.mpr-dashboard .mpr-chart-panel .mpr-chart-legend { color:#52667e; }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  body.mpr-dashboard *,
+  body.mpr-dashboard *::before,
+  body.mpr-dashboard *::after {
+    scroll-behavior:auto !important;
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+  }
+}
+
+
 </style>
 </head>
 <body>
@@ -587,7 +1418,7 @@
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-417</span>
+      <span class="build-stamp">LC-418</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -4659,6 +5490,518 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
 })();
+</script>
+<script>
+/* ============================================================
+   LC-418 — Overview dashboard redesign
+
+   This file deliberately leaves the pension calculations untouched.
+   It rearranges the existing Overview DOM, keeps all original IDs used
+   by app.html, and mirrors a handful of values for the new summary UI.
+   ============================================================ */
+(function () {
+  'use strict';
+
+  if (window.__mprOverview418) return;
+  window.__mprOverview418 = true;
+
+  const byId = (id) => document.getElementById(id);
+  const textOf = (id) => {
+    const el = byId(id);
+    return el ? String(el.textContent || '').replace(/\s+/g, ' ').trim() : '';
+  };
+  const firstText = (selector, fallback) => {
+    const el = document.querySelector(selector);
+    return (el && el.textContent ? el.textContent.trim() : '') || fallback;
+  };
+  const moneyFrom = (value) => {
+    const m = String(value || '').match(/£[\d,]+/);
+    return m ? m[0] : '—';
+  };
+  const yearFrom = (value) => {
+    const m = String(value || '').match(/\b(20\d{2})\b/);
+    return m ? m[1] : '';
+  };
+
+  function move(id, parent) {
+    const el = byId(id);
+    if (el && parent) parent.appendChild(el);
+    return el;
+  }
+
+  function make(tag, className, html) {
+    const el = document.createElement(tag);
+    if (className) el.className = className;
+    if (html != null) el.innerHTML = html;
+    return el;
+  }
+
+  function memberLabel(className, fallback) {
+    const span = document.createElement('span');
+    span.className = className;
+    span.textContent = firstText('.' + className, fallback);
+    return span;
+  }
+
+  function makeMetric(label, valueId, subId) {
+    const metric = make('div', 'mpr-ready-metric');
+    const lbl = make('span', 'mpr-ready-label');
+    lbl.textContent = label;
+    const value = make('span', 'mpr-ready-value');
+    value.id = valueId;
+    value.textContent = '—';
+    metric.append(lbl, value);
+    if (subId) {
+      const sub = make('span', 'mpr-ready-sub');
+      sub.id = subId;
+      metric.appendChild(sub);
+    }
+    return { metric, value };
+  }
+
+  function makeCurrentCard(labelNode, valueId, sparkId, deltaId, featured) {
+    const card = make('article', 'mpr-current-card' + (featured ? ' is-featured' : ''));
+    const label = make('span', 'mpr-current-name');
+    if (typeof labelNode === 'string') label.textContent = labelNode;
+    else if (labelNode) label.appendChild(labelNode);
+    card.appendChild(label);
+    move(valueId, card);
+    move(deltaId, card);
+    move(sparkId, card);
+    return card;
+  }
+
+  function makePerformanceCard(labelNode, key) {
+    const card = make('article', 'mpr-performance-card');
+    const label = make('span', 'mpr-performance-name');
+    if (typeof labelNode === 'string') label.textContent = labelNode;
+    else if (labelNode) label.appendChild(labelNode);
+    const pct = make('span', 'mpr-performance-pct');
+    pct.id = 'mprPerf' + key + 'Pct';
+    pct.textContent = '—';
+    const period = make('span', 'mpr-performance-period');
+    period.id = 'mprPerf' + key + 'Period';
+    period.textContent = 'growth over 12m';
+    const spark = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    spark.id = 'mprPerf' + key + 'Spark';
+    spark.setAttribute('class', 'mpr-performance-spark');
+    spark.setAttribute('viewBox', '0 0 240 40');
+    spark.setAttribute('preserveAspectRatio', 'none');
+    spark.setAttribute('aria-hidden', 'true');
+    card.append(label, pct, period, spark);
+    return card;
+  }
+
+  function buildBrandAndConnection() {
+    const topbar = document.querySelector('.topbar');
+    const heading = topbar ? topbar.querySelector('h1') : null;
+    if (topbar && heading && !topbar.querySelector('.mpr-brand')) {
+      const brand = make('div', 'mpr-brand');
+      const mark = make('span', 'mpr-brand-mark');
+      mark.setAttribute('aria-hidden', 'true');
+      topbar.insertBefore(brand, heading);
+      brand.append(mark, heading);
+    }
+
+    const right = topbar ? topbar.querySelector('.right') : null;
+    if (right && !byId('mprConnection')) {
+      const connection = make('span', 'mpr-connection is-busy');
+      connection.id = 'mprConnection';
+      connection.setAttribute('role', 'status');
+      connection.setAttribute('aria-live', 'polite');
+      connection.innerHTML = '<span class="mpr-connection-dot" aria-hidden="true"></span><span class="mpr-connection-label">Connecting</span>';
+      right.insertBefore(connection, right.firstChild);
+    }
+
+    const stamp = document.querySelector('.build-stamp');
+    if (stamp) stamp.textContent = 'LC-418';
+  }
+
+  function buildSubnav() {
+    const subnav = document.querySelector('#Overview > .subtab-buttons');
+    if (!subnav) return;
+    subnav.classList.add('mpr-subnav');
+    if (!byId('mprSubnavMeta')) {
+      const meta = make('span', 'mpr-subnav-meta');
+      meta.id = 'mprSubnavMeta';
+      meta.textContent = 'Waiting for latest log…';
+      subnav.appendChild(meta);
+    }
+  }
+
+  function buildDashboard() {
+    const dash = byId('sub-OverviewDash');
+    if (!dash || byId('mprOverview')) return null;
+
+    // Mark the legacy layout containers before inserting the replacement root.
+    Array.from(dash.children).forEach((child) => {
+      if (child.classList && (child.classList.contains('ov-section') || child.id === 'ovPerf')) {
+        child.classList.add('mpr-source-hidden');
+      }
+    });
+
+    const status = byId('status');
+    if (status) status.classList.add('mpr-status-compact');
+
+    const root = make('div', 'mpr-overview');
+    root.id = 'mprOverview';
+    if (status && status.nextSibling) dash.insertBefore(root, status.nextSibling);
+    else dash.appendChild(root);
+
+    // ---- retirement readiness hero ----
+    const hero = make('section', 'mpr-readiness');
+    hero.setAttribute('aria-labelledby', 'mprReadyTitle');
+    const top = make('div', 'mpr-ready-top');
+    const intro = make('div', 'mpr-ready-intro');
+    const title = make('h2');
+    title.id = 'mprReadyTitle';
+    title.textContent = 'Retirement readiness';
+    const verdictRow = make('div', 'mpr-verdict-row');
+    const verdict = make('span', 'mpr-verdict-badge');
+    verdict.id = 'mprVerdictBadge';
+    verdict.textContent = 'Calculating';
+    verdictRow.appendChild(verdict);
+    const verdictCopy = make('span', 'mpr-verdict-copy');
+    verdictCopy.id = 'mprVerdictCopy';
+    verdictCopy.textContent = 'Checking the current retirement plan…';
+    intro.append(title, verdictRow, verdictCopy);
+    top.appendChild(intro);
+
+    const current = makeMetric('Current pot (combined)', 'mprCurrentPot');
+    top.appendChild(current.metric);
+
+    const projected = makeMetric('Projected pot at retirement', 'mprProjectedMount', 'mprRealTerms');
+    const projectedMount = projected.value;
+    projectedMount.textContent = '';
+    move('ovProjCombined', projectedMount);
+    top.appendChild(projected.metric);
+
+    const funded = makeMetric('Target funded', 'mprFundedMount');
+    const fundedMount = funded.value;
+    fundedMount.textContent = '';
+    move('ovProgPct', fundedMount);
+    top.appendChild(funded.metric);
+
+    const retirement = makeMetric('Retirement date', 'mprRetirementDate');
+    top.appendChild(retirement.metric);
+
+    const timeMetric = makeMetric('Time remaining', 'mprTimeMount');
+    const timeMount = timeMetric.value;
+    timeMount.textContent = '';
+    const countNum = move('ovCountNum', timeMount);
+    const countSub = move('ovCountSub', timeMount);
+    if (countNum) countNum.classList.add('cnum');
+    if (countSub) countSub.classList.add('csub');
+    top.appendChild(timeMetric.metric);
+
+    const minimum = makeMetric('Minimum projected pot', 'mprMinimumPot', 'mprMinimumYear');
+    top.appendChild(minimum.metric);
+
+    hero.appendChild(top);
+    const timeline = make('div', 'mpr-timeline');
+    move('ovVerdictTl', timeline);
+    hero.appendChild(timeline);
+    root.appendChild(hero);
+
+    // ---- chart + current pensions ----
+    const main = make('div', 'mpr-main-grid');
+
+    const chartPanel = make('section', 'mpr-panel mpr-chart-panel');
+    const chartHead = make('div', 'mpr-section-head');
+    chartHead.innerHTML = '<h2>Your retirement path</h2><div class="mpr-chart-legend"><span class="mpr-chart-key">Logged history</span><span class="mpr-chart-key projected">Projected to retirement</span></div>';
+    const chartCanvas = make('div', 'mpr-chart-canvas');
+    move('ovTrajHost', chartCanvas);
+    chartPanel.append(chartHead, chartCanvas);
+
+    const currentPanel = make('section', 'mpr-panel mpr-current-panel');
+    const currentHead = make('div', 'mpr-section-head');
+    currentHead.innerHTML = '<h2>Current pensions</h2><span class="mpr-section-note">Growth excludes contributions</span>';
+    const currentCards = make('div', 'mpr-current-cards');
+    currentCards.append(
+      makeCurrentCard('Combined', 'ovCombined', 'ovSparkCombined', 'ovDeltaCombined', true),
+      makeCurrentCard(memberLabel('nm-p1', 'Graham'), 'ovGraham', 'ovSparkGraham', 'ovDeltaGraham', false),
+      makeCurrentCard(memberLabel('nm-p2', 'Julie'), 'ovJulie', 'ovSparkJulie', 'ovDeltaJulie', false)
+    );
+    currentCards.children[2].id = 'mprP2CurrentCard';
+    const breakdownTitle = make('h3', 'mpr-breakdown-title');
+    breakdownTitle.textContent = 'By pension';
+    const byPension = byId('ovByPension');
+    const breakdownMount = make('div');
+    if (byPension) breakdownMount.appendChild(byPension);
+    const strip = byId('ovStrip');
+    currentPanel.append(currentHead, currentCards, breakdownTitle, breakdownMount);
+    if (strip) currentPanel.appendChild(strip);
+
+    main.append(chartPanel, currentPanel);
+    root.appendChild(main);
+
+    // ---- resilience + compact performance ----
+    const lower = make('div', 'mpr-lower-grid');
+
+    const resilience = make('section', 'mpr-panel mpr-resilience-panel');
+    resilience.innerHTML = '<div class="mpr-section-head"><h2>Plan resilience</h2><span class="mpr-section-note">Across the full retirement</span></div>';
+    const resilienceCards = make('div', 'mpr-resilience-cards');
+    const surviveTile = move('ovSurvive', resilienceCards);
+    const coverageTile = move('ovCoverage', resilienceCards);
+    const surviveIcon = surviveTile ? surviveTile.querySelector('svg') : null;
+    const coverageIcon = coverageTile ? coverageTile.querySelector('svg') : null;
+    if (surviveIcon) surviveIcon.innerHTML = '<path d="M20 4 L33 9 V18 C33 27 27 33 20 36 C13 33 7 27 7 18 V9 Z M20 9 L12 12 V18 C12 24 15 28 20 31 C25 28 28 24 28 18 V12 Z" fill="currentColor"/>';
+    if (coverageIcon) coverageIcon.innerHTML = '<path d="M20 5 C12 5 6 11 5 19 H18 V30 C18 33 20 35 23 35 C26 35 28 33 28 30 H24 C24 31 24 32 23 32 C22 32 22 31 22 30 V19 H35 C34 11 28 5 20 5 Z M9 16 C11 11 15 9 20 9 C25 9 29 11 31 16 Z" fill="currentColor"/>';
+    resilience.appendChild(resilienceCards);
+
+    const performance = make('section', 'mpr-panel mpr-performance-panel');
+    const performanceHead = make('div', 'mpr-section-head');
+    const performanceTitle = make('h2');
+    performanceTitle.textContent = '12-month performance summary';
+    const performanceLink = make('button', 'mpr-performance-link');
+    performanceLink.type = 'button';
+    performanceLink.textContent = 'View full performance KPIs';
+    performanceLink.addEventListener('click', function () {
+      const target = byId('subbtn-PerfKPIs');
+      if (target) target.click();
+    });
+    performanceHead.append(performanceTitle, performanceLink);
+    const performanceCards = make('div', 'mpr-performance-cards');
+    performanceCards.append(
+      makePerformanceCard('Combined', 'Combined'),
+      makePerformanceCard(memberLabel('nm-p1', 'Graham'), 'Graham'),
+      makePerformanceCard(memberLabel('nm-p2', 'Julie'), 'Julie')
+    );
+    performanceCards.children[2].id = 'mprP2PerformanceCard';
+    performance.append(performanceHead, performanceCards);
+
+    lower.append(resilience, performance);
+    root.appendChild(lower);
+
+    const disclaimer = make('div', 'mpr-disclaimer');
+    disclaimer.appendChild(document.createTextNode('Projections are estimates, not guarantees. '));
+    const note = byId('ovNote');
+    if (note) disclaimer.appendChild(note);
+    root.appendChild(disclaimer);
+
+    return root;
+  }
+
+  function syncConnection() {
+    const source = byId('status');
+    const badge = byId('mprConnection');
+    if (!source || !badge) return;
+    const copy = String(source.textContent || '').trim();
+    const cls = String(source.className || '');
+    let state = 'busy';
+    let label = 'Connecting';
+    if (/s-err|error|failed/i.test(cls + ' ' + copy)) {
+      state = 'error';
+      label = 'Attention needed';
+    } else if (/s-ok|healthy|welcome|connected/i.test(cls + ' ' + copy)) {
+      state = 'ok';
+      label = 'Connected';
+    }
+    badge.className = 'mpr-connection is-' + state;
+    const labelEl = badge.querySelector('.mpr-connection-label');
+    if (labelEl) labelEl.textContent = label;
+    badge.title = copy || label;
+    source.classList.toggle('is-error', state === 'error');
+  }
+
+  function syncHero() {
+    const verdictSource = textOf('ovVerdictWord');
+    const retirementSource = textOf('ovVerdictRet');
+    const verdict = byId('mprVerdictBadge');
+    const copy = byId('mprVerdictCopy');
+    const retirement = byId('mprRetirementDate');
+
+    const isBad = /runs dry|not on track|shortfall/i.test(verdictSource);
+    const cleanVerdict = verdictSource.replace(/[✓✔]/g, '').trim();
+    if (verdict) {
+      verdict.textContent = cleanVerdict && cleanVerdict !== '—' ? cleanVerdict : 'Calculating';
+      verdict.classList.toggle('is-bad', isBad);
+    }
+
+    const retirementDate = retirementSource.split('·')[0].trim();
+    if (retirement) retirement.textContent = retirementDate || '—';
+    if (copy) {
+      if (retirementDate && retirementDate !== '—') {
+        copy.textContent = isBad
+          ? 'The current plan needs attention before ' + retirementDate + '.'
+          : 'On track to retire in ' + retirementDate + '.';
+      } else {
+        copy.textContent = 'Checking the current retirement plan…';
+      }
+    }
+
+    const current = byId('mprCurrentPot');
+    if (current) current.textContent = textOf('ovCombined') || '—';
+
+    const real = textOf('ovRealTerms');
+    const realMoney = (real.match(/≈\s*(£[\d,]+)/) || [])[1];
+    const infl = (real.match(/\(([\d.]+% inflation)\)/i) || [])[1];
+    const realTarget = byId('mprRealTerms');
+    if (realTarget) realTarget.textContent = realMoney
+      ? realMoney + ' in today’s money' + (infl ? ' (' + infl + ')' : '')
+      : '';
+
+    const surviveNum = textOf('ovSurviveNum');
+    const surviveSub = textOf('ovSurviveSub');
+    const lowFallback = textOf('ovVerdictLow');
+    const minimum = byId('mprMinimumPot');
+    const minimumYear = byId('mprMinimumYear');
+    if (minimum) minimum.textContent = moneyFrom(surviveNum) !== '—' ? moneyFrom(surviveNum) : moneyFrom(lowFallback);
+    const yr = yearFrom(surviveSub) || yearFrom(lowFallback);
+    if (minimumYear) minimumYear.textContent = yr ? 'in ' + yr : '';
+
+    const updated = byId('mprSubnavMeta');
+    const stampText = textOf('ovStamp');
+    if (updated) updated.textContent = stampText || 'Waiting for latest log…';
+  }
+
+  function performanceFrom(sourceId, key, sparkSourceId) {
+    const source = byId(sourceId);
+    const pctTarget = byId('mprPerf' + key + 'Pct');
+    const periodTarget = byId('mprPerf' + key + 'Period');
+    const sparkTarget = byId('mprPerf' + key + 'Spark');
+    if (!pctTarget || !periodTarget || !sparkTarget) return;
+
+    const pctSource = source ? source.querySelector('.pos, .neg') : null;
+    const rawPct = pctSource ? String(pctSource.textContent || '').replace(/[▲▼]/g, '').trim() : '';
+    pctTarget.textContent = rawPct || '—';
+    pctTarget.classList.toggle('is-negative', !!(pctSource && pctSource.classList.contains('neg')));
+    const sourceText = source ? String(source.textContent || '') : '';
+    const period = sourceText.match(/over\s+\d+m/i);
+    periodTarget.textContent = 'growth ' + (period ? period[0].toLowerCase() : 'over 12m');
+
+    const sparkSource = byId(sparkSourceId);
+    if (sparkSource) {
+      sparkTarget.innerHTML = sparkSource.innerHTML;
+      const vb = sparkSource.getAttribute('viewBox');
+      if (vb) sparkTarget.setAttribute('viewBox', vb);
+      const colour = pctTarget.classList.contains('is-negative') ? '#c0392b' : '#219653';
+      Array.from(sparkTarget.querySelectorAll('path')).forEach((path, index) => {
+        if (index === 0) {
+          path.setAttribute('fill', colour);
+          path.setAttribute('opacity', '.10');
+        } else {
+          path.setAttribute('stroke', colour);
+        }
+      });
+    }
+  }
+
+  function fixTimelineContrast() {
+    const host = byId('ovVerdictTl');
+    if (!host) return;
+    const svg = host.querySelector('svg');
+    if (!svg) return;
+    Array.from(svg.querySelectorAll('rect')).forEach((el) => {
+      const fill = String(el.getAttribute('fill') || '').toLowerCase();
+      if (!/10b981|f59e0b|ef4444/.test(fill)) el.setAttribute('fill', '#20c4cf');
+    });
+    Array.from(svg.querySelectorAll('circle')).forEach((el) => el.setAttribute('fill', '#20c4cf'));
+    Array.from(svg.querySelectorAll('line')).forEach((el) => {
+      const stroke = String(el.getAttribute('stroke') || '').toLowerCase();
+      if (!/f59e0b|ef4444/.test(stroke)) el.setAttribute('stroke', '#20c4cf');
+    });
+    Array.from(svg.querySelectorAll('text')).forEach((el) => {
+      const fill = String(el.getAttribute('fill') || '').toLowerCase();
+      if (!/#fff|white|f59e0b|ef4444/.test(fill)) el.setAttribute('fill', '#d8e6f2');
+    });
+  }
+
+  function fixChartContrast() {
+    const host = byId('ovTrajHost');
+    if (!host) return;
+    const compact = window.innerWidth <= 620;
+    Array.from(host.querySelectorAll('text')).forEach((el) => {
+      const isStrong = String(el.getAttribute('font-weight') || '') === '700';
+      el.setAttribute('fill', isStrong ? '#112d4e' : '#52667e');
+      if (compact) el.setAttribute('font-size', isStrong ? '25' : '21');
+    });
+    if (compact) {
+      Array.from(host.querySelectorAll('circle')).forEach((el) => el.setAttribute('r', '7'));
+      Array.from(host.querySelectorAll('path')).forEach((el) => {
+        if (el.getAttribute('fill') === 'none') el.setAttribute('stroke-width', el.getAttribute('stroke-dasharray') ? '4' : '5');
+      });
+    }
+  }
+
+  function syncSecondaryMemberVisibility() {
+    const source = byId('cardP2Now');
+    const hide = !source || source.style.display === 'none';
+    const current = byId('mprP2CurrentCard');
+    const performance = byId('mprP2PerformanceCard');
+    if (current) current.style.display = hide ? 'none' : '';
+    if (performance) performance.style.display = hide ? 'none' : '';
+  }
+
+  function syncAll() {
+    syncConnection();
+    syncHero();
+    performanceFrom('ovDeltaCombined', 'Combined', 'ovSparkCombined');
+    performanceFrom('ovDeltaGraham', 'Graham', 'ovSparkGraham');
+    performanceFrom('ovDeltaJulie', 'Julie', 'ovSparkJulie');
+    syncSecondaryMemberVisibility();
+    fixTimelineContrast();
+    fixChartContrast();
+  }
+
+  function observeSources() {
+    let queued = false;
+    const queue = function () {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function () {
+        queued = false;
+        syncAll();
+      });
+    };
+    const contentObserver = new MutationObserver(queue);
+    [
+      'ovVerdictWord', 'ovVerdictRet', 'ovVerdictLow',
+      'ovSurviveNum', 'ovSurviveSub', 'ovRealTerms', 'ovStamp',
+      'ovCombined', 'ovDeltaCombined', 'ovDeltaGraham', 'ovDeltaJulie',
+      'ovSparkCombined', 'ovSparkGraham', 'ovSparkJulie',
+      'ovVerdictTl', 'ovTrajHost'
+    ].forEach((id) => {
+      const el = byId(id);
+      if (el) contentObserver.observe(el, { childList:true, subtree:true, characterData:true });
+    });
+
+    // Only these two sources need attribute watching. Keeping SVG attributes out
+    // of the observer prevents our contrast pass from scheduling itself again.
+    const stateObserver = new MutationObserver(queue);
+    ['status', 'cardP2Now'].forEach((id) => {
+      const el = byId(id);
+      if (el) stateObserver.observe(el, { childList:true, subtree:true, characterData:true, attributes:true });
+    });
+
+    const dark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    if (dark) {
+      if (typeof dark.addEventListener === 'function') dark.addEventListener('change', queue);
+      else if (typeof dark.addListener === 'function') dark.addListener(queue);
+    }
+  }
+
+  function initialise() {
+    const overview = byId('Overview');
+    if (!overview || !byId('sub-OverviewDash') || !byId('ovCombined')) return;
+    document.body.classList.add('mpr-dashboard');
+    buildBrandAndConnection();
+    buildSubnav();
+    buildDashboard();
+    observeSources();
+    syncAll();
+
+    // Let the original responsive SVG renderers recalculate after their hosts move.
+    window.setTimeout(function () {
+      window.dispatchEvent(new Event('resize'));
+      syncAll();
+    }, 120);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialise, { once:true });
+  else initialise();
+})();
+
 </script>
 </body>
 </html>
