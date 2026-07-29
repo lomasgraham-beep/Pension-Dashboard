@@ -39,8 +39,7 @@
 
   /* coloured account boxes */
   .acct-box { margin:12px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; }
-  .acct-box .box-head { color:#fff; font-weight:bold; padding:8px 12px; font-size:14px; display:flex; justify-content:space-between; gap:10px; }
-  .acct-box .box-head .box-amt { font-variant-numeric:tabular-nums; }
+  .acct-box .box-head { color:#fff; font-weight:bold; padding:8px 12px; font-size:14px; display:flex; justify-content:flex-start; gap:10px; }
   .acct-box td { font-size:14px; }
   tr.pot-line td { font-style:italic; }
 
@@ -98,7 +97,7 @@
   </div>
   <div id="pageInfo" class="info-panel" hidden>
     <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box shows the Groceries, Fuel and Julie Hair &amp; Nails spend, which is deducted in the Cash Summary. Insurances are listed under Cash Summary.</p>
-    <span class="info-build">Budget build: v33</span>
+    <span class="info-build">Budget build: v34</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -442,9 +441,11 @@
       boxesHtml +=
         '<div class="acct-box">' +
           '<div class="box-head" style="background:' + meta.colour[acctId] + ';">' +
-            '<span>' + title + '</span><span class="box-amt">' + fmt(boxTotal) + '</span>' +
+            '<span>' + title + '</span>' +
           '</div>' +
-          '<table><tbody>' + rows + '</tbody></table>' +
+          '<table><tbody>' + rows +
+            '<tr class="total"><td>Total</td><td class="amt">' + fmt(boxTotal) + '</td></tr>' +
+          '</tbody></table>' +
         '</div>';
     });
     if (!boxesHtml) boxesHtml = '<div class="acct-box"><table><tbody><tr><td colspan="2" style="color:#94a3b8;">' +
@@ -529,6 +530,7 @@
         '<tr><td>Groceries</td><td class="amt">' + fmt(p.groc) + '</td></tr>' +
         '<tr><td>Fuel</td><td class="amt">' + fmt(p.fuel) + '</td></tr>' +
         '<tr><td>Hair and Nails</td><td class="amt">' + fmt(p.hairNails) + '</td></tr>' +
+        '<tr class="total"><td>Total</td><td class="amt">' + fmt(p.total) + '</td></tr>' +
       '</tbody></table>' +
     '</div>';
   }
