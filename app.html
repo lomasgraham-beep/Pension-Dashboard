@@ -239,6 +239,12 @@
     .subtab-buttons { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:15px; border-bottom:2px solid var(--line); padding-bottom:10px; position:sticky; top:var(--topnav-h, 52px); z-index:55; background:var(--surface); padding-top:8px; box-shadow:0 4px 5px -4px rgba(0,0,0,0.12); }
     .subtab-group-label { flex-basis:100%; width:100%; margin:6px 0 0; font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-soft); }
     .subtab-group-label:first-child { margin-top:0; }
+    /* LC-423: Living Costs sub-nav — each button group stays one row (horizontal-scroll if narrow) */
+    .subtab-buttons.lc-nav { flex-direction:column; align-items:stretch; }
+    .subtab-buttons.lc-nav .subtab-group-label { flex-basis:auto; width:auto; }
+    .subtab-buttons.lc-nav .subtab-row { display:flex; flex-wrap:nowrap; gap:6px; overflow-x:auto; overflow-y:hidden; padding-bottom:4px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+    .subtab-buttons.lc-nav .subtab-row::-webkit-scrollbar { display:none; }
+    .subtab-buttons.lc-nav .subtab-link { flex:0 0 auto; }
     .subtab-link { background:var(--accent-soft); border:1px solid var(--accent-border); color:var(--accent-dark); padding:9px 18px; border-radius:999px; font-weight:600; cursor:pointer; font-size:14px; box-shadow:var(--shadow); transition:background .12s,color .12s,border-color .12s,box-shadow .12s; }
     .subtab-link:hover { background:var(--accent-border); color:var(--accent-dark); }
     .subtab-link.active-sub { background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 2px 5px rgba(20,40,50,0.20), 0 6px 16px rgba(20,40,50,0.14); }
@@ -1432,7 +1438,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-422</span>
+      <span class="build-stamp">LC-423</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1974,8 +1980,9 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <iframe id="frame-LogEntry" class="app-frame" title="Log Entry and Recent Logs"></iframe>
   </div>
   <div id="LivingCosts" class="tabcontent">
-    <div class="subtab-buttons">
+    <div class="subtab-buttons lc-nav">
       <span class="subtab-group-label">Planned costs</span>
+      <div class="subtab-row">
       <button id="subbtn-Budget" class="subtab-link active-sub" onclick="showSub(event,'Budget')">Budget</button>
       <button id="subbtn-Bills" class="subtab-link" onclick="showSub(event,'Bills')">Bills</button>
       <button id="subbtn-BillsSummary" class="subtab-link" onclick="showSub(event,'BillsSummary')">Bills Summary</button>
@@ -1988,11 +1995,14 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       <button id="subbtn-HolidaySummary" class="subtab-link" onclick="showSub(event,'HolidaySummary')">Holiday Summary</button>
       <button id="subbtn-InsSavings" class="subtab-link" onclick="showSub(event,'InsSavings')">Insurance Savings</button>
       <button id="subbtn-CreditCard" class="subtab-link" onclick="showSub(event,'CreditCard')">Credit Card</button>
+      </div>
       <span class="subtab-group-label">Actual costs</span>
+      <div class="subtab-row">
       <button id="subbtn-CardEntry" class="subtab-link" onclick="showSub(event,'CardEntry')">Card Entry</button>
       <button id="subbtn-CardStatements" class="subtab-link" onclick="showSub(event,'CardStatements')">Card Statements</button>
       <button id="subbtn-CardCats" class="subtab-link" onclick="showSub(event,'CardCats')">Card Categories</button>
       <button id="subbtn-PayPal" class="subtab-link" onclick="showSub(event,'PayPal')">PayPal</button>
+      </div>
     </div>
     <div id="sub-Budget" class="subtabcontent"><iframe id="frame-Budget" class="app-frame" title="Monthly Budget"></iframe></div>
     <div id="sub-Bills" class="subtabcontent"><iframe id="frame-Bills" class="app-frame" title="Household Bills"></iframe></div>
@@ -5635,7 +5645,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-421';
+    if (stamp) stamp.textContent = 'LC-423';
   }
 
   function buildSubnav() {
