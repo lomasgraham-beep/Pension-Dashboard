@@ -6,7 +6,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=hol1"></script>
 <style>
-  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1100px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1500px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin:0; }
   .page-head { display:flex; align-items:center; gap:10px; margin:0 0 10px; }
   .info-btn { width:44px; height:44px; min-width:44px; padding:0; border:1px solid #bfe4e9; border-radius:50%; background:#e6f5f7; color:#14294a; display:inline-flex; align-items:center; justify-content:center; font:italic 700 22px/1 Georgia,serif; cursor:pointer; -webkit-tap-highlight-color:transparent; }
@@ -20,7 +20,7 @@
   #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
   .s-err { background:#fdecea !important; color:#c0392b !important; }
 
-  #cols { display:grid; grid-template-columns:repeat(2, 1fr); gap:18px; align-items:start; }
+  #cols { display:grid; grid-template-columns:minmax(0, 1.08fr) minmax(0, 1fr) minmax(0, 0.92fr); gap:18px; align-items:start; }
   .col-stack { display:flex; flex-direction:column; gap:18px; min-width:0; }
   .person { border:2px solid #2c3e50; border-radius:10px; background:#fff; overflow:hidden; }
   .blocktitle { background:#2c3e50; color:#fff; font-weight:bold; text-align:center; padding:9px; font-size:16px; }
@@ -45,7 +45,23 @@
 
   .panelcard { border:2px solid #2c3e50; border-radius:10px; background:#fff; overflow:hidden; }
 
-  @media (max-width: 760px) { #cols { grid-template-columns:1fr; } }
+  @media (max-width: 980px) {
+    #cols { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    #colThree { grid-column:1 / -1; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); align-items:start; }
+    #colThree > * { min-width:0; }
+  }
+
+  @media (max-width: 760px) {
+    body { padding:14px; }
+    #cols { grid-template-columns:1fr; }
+    #colThree { grid-column:auto; display:flex; }
+  }
+
+  @media (max-width: 480px) {
+    body { padding:10px; }
+    td { padding:7px 9px; }
+    .nav-jump { width:100%; margin-left:0; flex-wrap:wrap; }
+  }
 
   .navbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 16px; padding:10px 12px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; }
   .nav-btn { border:1px solid #cbd5e1; background:#fff; color:#2c3e50; border-radius:8px; padding:8px 13px; font-size:14px; font-weight:bold; cursor:pointer; min-height:38px; }
@@ -96,8 +112,8 @@
     <button type="button" id="pageInfoBtn" class="info-btn" aria-label="Show page information" aria-controls="pageInfo" aria-expanded="false" onclick="togglePageInfo()"><span aria-hidden="true">i</span></button>
   </div>
   <div id="pageInfo" class="info-panel" hidden>
-    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box shows the Groceries, Fuel and Julie Hair &amp; Nails spend, which is deducted in the Cash Summary. Insurances are listed under Cash Summary.</p>
-    <span class="info-build">Budget build: v35</span>
+    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box shows the Groceries, Fuel and Julie Hair &amp; Nails spend, which is deducted in the Cash Summary. Insurances are listed in the third column.</p>
+    <span class="info-build">Budget build: v36</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -119,8 +135,9 @@
     </span>
   </div>
   <div id="cols" style="display:none;">
-    <div class="col-stack" id="colLeft"></div>
-    <div class="col-stack" id="colRight"></div>
+    <div class="col-stack" id="colOne"></div>
+    <div class="col-stack" id="colTwo"></div>
+    <div class="col-stack" id="colThree"></div>
   </div>
 
 <script>
@@ -359,11 +376,23 @@
     const cash = cashSummary(avails, avgAvails, pens.total, ccParts);
     const cc = creditCardBox(d);
 
-    // two stacked columns: left = first person + pensions; right = second person + credit card + cash summary + insurances due
-    const left = (blocks[0] || '') + blocks.slice(2).join('') + pens.html + leftoverHtml;
-    const right = (blocks[1] || '') + cc + cash + insurancesDueBox(d);
-    document.getElementById('colLeft').innerHTML = left;
-    document.getElementById('colRight').innerHTML = right;
+    // Three columns: Graham | Julie + Cash Summary | Insurances + Credit Card + Pensions.
+    // Unassigned bills stay hidden unless a live unassigned row exists.
+    const used = new Set();
+    function takePerson(pattern, fallbackIndex) {
+      let index = d.names.findIndex((name, i) => !used.has(i) && pattern.test(String(name || '').trim()));
+      if (index < 0 && fallbackIndex < blocks.length && !used.has(fallbackIndex)) index = fallbackIndex;
+      if (index < 0) return '';
+      used.add(index);
+      return blocks[index] || '';
+    }
+    const graham = takePerson(/^graham$/i, 0);
+    const julie = takePerson(/^julie$/i, 1);
+    const extraPeople = blocks.filter((html, i) => !used.has(i) && html).join('');
+
+    document.getElementById('colOne').innerHTML = graham;
+    document.getElementById('colTwo').innerHTML = julie + cash;
+    document.getElementById('colThree').innerHTML = insurancesDueBox(d) + cc + pens.html + extraPeople + leftoverHtml;
     document.getElementById('cols').style.display = 'grid';
   }
 
