@@ -80,7 +80,7 @@
 </head>
 <body>
   <h1 id="pageTitle">Monthly Budget</h1>
-  <p class="note">Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box shows the Groceries and Fuel spend, which is deducted in the Cash Summary. Insurances are listed under Cash Summary. <span style="color:#94a3b8;">(budget build: v31)</span></p>
+  <p class="note">Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box shows the Groceries, Fuel and Julie Hair &amp; Nails spend, which is deducted in the Cash Summary. Insurances are listed under Cash Summary. <span style="color:#94a3b8;">(budget build: v32)</span></p>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
     <span class="period-toggle">
@@ -468,16 +468,23 @@
     return { html: html, total: total };
   }
 
-  // Groceries and Fuel drawn on the credit card. Now deducted in the Cash Summary, so they DO count toward totals.
+  // Groceries, Fuel and Julie's Hair & Nails are drawn on the credit card and deducted in Cash Summary.
+  // Hair & Nails is deliberately restricted to category Julie so similarly named household bills are not included.
   // total = amount for the current view; avg = smoothed monthly (for the monthly-mode average reference row).
   function creditCardParts(d) {
     const cardBills = (d.bills || []).filter(b => b.paid_by === 'Credit card');
     const match = re => cardBills.filter(b => re.test(b.bill_name || '') || re.test(b.category_code || ''));
-    const grocB = match(/grocer/i), fuelB = match(/fuel|petrol|diesel/i);
+    const grocB = match(/grocer/i);
+    const fuelB = match(/fuel|petrol|diesel/i);
+    const hairNailsB = cardBills.filter(b =>
+      /^julie$/i.test(String(b.category_code || '').trim()) && /hair|nail/i.test(b.bill_name || '')
+    );
     const sum = (arr, fn) => arr.reduce((s, b) => s + fn(b), 0);
-    const groc = sum(grocB, billView), fuel = sum(fuelB, billView);
-    const avg = sum(grocB, billViewAvg) + sum(fuelB, billViewAvg);
-    return { groc: groc, fuel: fuel, total: groc + fuel, avg: avg };
+    const groc = sum(grocB, billView);
+    const fuel = sum(fuelB, billView);
+    const hairNails = sum(hairNailsB, billView);
+    const avg = sum(grocB, billViewAvg) + sum(fuelB, billViewAvg) + sum(hairNailsB, billViewAvg);
+    return { groc: groc, fuel: fuel, hairNails: hairNails, total: groc + fuel + hairNails, avg: avg };
   }
 
   function creditCardBox(d) {
@@ -488,6 +495,7 @@
       '<table><tbody>' +
         '<tr><td>Groceries</td><td class="amt">' + fmt(p.groc) + '</td></tr>' +
         '<tr><td>Fuel</td><td class="amt">' + fmt(p.fuel) + '</td></tr>' +
+        '<tr><td>Hair and Nails</td><td class="amt">' + fmt(p.hairNails) + '</td></tr>' +
       '</tbody></table>' +
     '</div>';
   }
@@ -510,7 +518,7 @@
         availRows +
         '<tr class="total"><td>Sum of available</td><td class="amt">' + fmt(sumAvail) + '</td></tr>' +
         '<tr class="total"><td>Less pensions</td><td class="amt neg">\u2212' + fmt(pens) + '</td></tr>' +
-        '<tr class="total"><td>Less credit card (Groceries + Fuel)</td><td class="amt neg">\u2212' + fmt(cardT) + '</td></tr>' +
+        '<tr class="total"><td>Less credit card (Groceries + Fuel + Hair &amp; Nails)</td><td class="amt neg">\u2212' + fmt(cardT) + '</td></tr>' +
         '<tr class="avail"><td>Total cash available ' + (isAnnual() ? '(annual)' : 'in ' + monthLabelShort()) + '</td><td class="amt">' + fmt(totalCash) + '</td></tr>' +
         avgRow +
       '</tbody></table>' +
