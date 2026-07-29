@@ -581,7 +581,7 @@
 
 
 /* ============================================================
-   LC-420 — Overview dashboard chart scale fix
+   LC-421 — Overview retirement path chart fill fix
    Navy + aqua visual hierarchy, responsive touch layouts,
    automatic dark mode, and a white high-contrast chart canvas.
    Loaded by common.js only in the top-level app shell.
@@ -953,10 +953,10 @@ body.mpr-dashboard .mpr-timeline #ovVerdictTl svg {
 }
 
 /* ---- Main two-column area ---- */
-/* LC-420: give the retirement path chart visual priority; current pensions becomes the supporting panel. */
+/* LC-421: retirement path chart is the focal panel; keep it wide and give the SVG enough vertical aspect so it does not letterbox. */
 body.mpr-dashboard .mpr-main-grid {
   display:grid;
-  grid-template-columns:minmax(0,2.45fr) minmax(340px,.78fr);
+  grid-template-columns:minmax(0,3.1fr) minmax(300px,.62fr);
   gap:18px;
   align-items:stretch;
 }
@@ -997,13 +997,13 @@ body.mpr-dashboard .mpr-chart-key.projected::before {
 }
 
 body.mpr-dashboard .mpr-chart-canvas {
-  min-height:430px;
+  min-height:500px;
   display:flex;
   align-items:stretch;
 }
 body.mpr-dashboard .mpr-chart-canvas #ovTrajHost {
   width:100%;
-  min-height:410px;
+  min-height:480px;
   display:flex;
   align-items:stretch;
 }
@@ -1011,7 +1011,7 @@ body.mpr-dashboard .mpr-chart-canvas #ovTrajHost svg {
   display:block;
   width:100% !important;
   height:100% !important;
-  min-height:410px;
+  min-height:480px;
 }
 
 /* ---- Current pensions ---- */
@@ -1261,15 +1261,15 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
   }
   body.mpr-dashboard .mpr-ready-intro { grid-row:1 / span 2; }
   body.mpr-dashboard .mpr-ready-metric:nth-child(5) { border-left:1px solid rgba(255,255,255,.23); }
-  body.mpr-dashboard .mpr-main-grid { grid-template-columns:minmax(0,1.7fr) minmax(320px,.9fr); }
+  body.mpr-dashboard .mpr-main-grid { grid-template-columns:minmax(0,2.2fr) minmax(290px,.8fr); }
   body.mpr-dashboard .mpr-current-panel { min-width:0; }
 }
 
 @media (max-width:1040px) {
   body.mpr-dashboard .mpr-main-grid { grid-template-columns:1fr; }
-  body.mpr-dashboard .mpr-chart-canvas { min-height:390px; }
-  body.mpr-dashboard .mpr-chart-canvas #ovTrajHost { min-height:370px; }
-  body.mpr-dashboard .mpr-chart-canvas #ovTrajHost svg { min-height:370px; }
+  body.mpr-dashboard .mpr-chart-canvas { min-height:470px; }
+  body.mpr-dashboard .mpr-chart-canvas #ovTrajHost { min-height:445px; }
+  body.mpr-dashboard .mpr-chart-canvas #ovTrajHost svg { min-height:445px; }
   body.mpr-dashboard .mpr-current-cards { grid-template-columns:repeat(3,minmax(0,1fr)); }
 }
 
@@ -1339,9 +1339,9 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
   body.mpr-dashboard .mpr-section-head { align-items:flex-start; margin-bottom:13px; }
   body.mpr-dashboard .mpr-section-head h2 { font-size:17px; }
   body.mpr-dashboard .mpr-chart-legend { gap:13px; font-size:10.5px; }
-  body.mpr-dashboard .mpr-chart-canvas { min-height:310px; overflow:visible; }
-  body.mpr-dashboard .mpr-chart-canvas #ovTrajHost { min-width:0; width:100%; min-height:295px; }
-  body.mpr-dashboard .mpr-chart-canvas #ovTrajHost svg { min-height:295px; }
+  body.mpr-dashboard .mpr-chart-canvas { min-height:380px; overflow:visible; }
+  body.mpr-dashboard .mpr-chart-canvas #ovTrajHost { min-width:0; width:100%; min-height:360px; }
+  body.mpr-dashboard .mpr-chart-canvas #ovTrajHost svg { min-height:360px; }
 
   body.mpr-dashboard .mpr-current-cards {
     display:flex;
@@ -1432,7 +1432,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-420</span>
+      <span class="build-stamp">LC-421</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -3576,27 +3576,27 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       const ys = actual.map(p => p[1]).concat(proj.map(p => p[1])).concat([0]);
       const xmin = Math.min.apply(null, xs), xmax = Math.max.apply(null, xs), rawMax = (Math.max.apply(null, ys)) || 1;
       const yStep = ovNiceStep(rawMax, 4), ymax = Math.max(yStep, Math.ceil(rawMax / yStep) * yStep);
-      const W = 1100, H = 360, padL = 74, padR = 26, padT = 30, padB = 44;
+      const W = 1100, H = 560, padL = 90, padR = 38, padT = 58, padB = 74;
       const px = x => (xmax === xmin) ? padL : padL + (x - xmin) / (xmax - xmin) * (W - padL - padR);
       const py = y => H - padB - (y / ymax) * (H - padT - padB);
       const path = arr => arr.map((p, i) => (i ? 'L' : 'M') + px(p[0]).toFixed(1) + ' ' + py(p[1]).toFixed(1)).join(' ');
       let grid = '';
       for (let gv = 0; gv <= ymax + 1; gv += yStep){ const Y = py(gv); grid +=
         '<line x1="' + padL + '" y1="' + Y + '" x2="' + (W - padR) + '" y2="' + Y + '" stroke="' + ovTrack() + '" stroke-width="1"/>' +
-        '<text x="' + (padL - 8) + '" y="' + (Y + 4) + '" text-anchor="end" font-size="14" fill="' + ovInkSoft() + '">' + ovShortMoney(gv) + '</text>'; }
+        '<text x="' + (padL - 8) + '" y="' + (Y + 4) + '" text-anchor="end" font-size="17" font-weight="650" fill="' + ovInkSoft() + '">' + ovShortMoney(gv) + '</text>'; }
       let xl = ''; const stepY = Math.max(1, Math.round((xmax - xmin) / 5));
-      for (let y = xmin; y <= xmax; y += stepY) xl += '<text x="' + px(y) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="14" fill="' + ovInkSoft() + '">' + y + '</text>';
+      for (let y = xmin; y <= xmax; y += stepY) xl += '<text x="' + px(y) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="17" font-weight="650" fill="' + ovInkSoft() + '">' + y + '</text>';
       const accent = ovAccent();
-      let markers = '<circle cx="' + px(nowYear) + '" cy="' + py(now) + '" r="6.5" fill="' + accent + '"/>' +
-        '<text x="' + px(nowYear) + '" y="' + (py(now) - 12) + '" text-anchor="middle" font-size="14" font-weight="800" fill="' + accent + '">now</text>';
+      let markers = '<circle cx="' + px(nowYear) + '" cy="' + py(now) + '" r="8" fill="' + accent + '"/>' +
+        '<text x="' + px(nowYear) + '" y="' + (py(now) - 12) + '" text-anchor="middle" font-size="18" font-weight="850" fill="' + accent + '">now</text>';
       if (retYear && retYear > nowYear) markers +=
         '<line x1="' + px(retYear) + '" y1="' + padT + '" x2="' + px(retYear) + '" y2="' + (H - padB) + '" stroke="' + ovTrack() + '" stroke-dasharray="3 4"/>' +
-        '<circle cx="' + px(retYear) + '" cy="' + py(target) + '" r="6.5" fill="' + accent + '"/>' +
-        '<text x="' + (px(retYear) - 4) + '" y="' + (py(target) - 12) + '" text-anchor="end" font-size="14" font-weight="800" fill="' + accent + '">retire</text>';
-      host.innerHTML = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" style="display:block">' +
+        '<circle cx="' + px(retYear) + '" cy="' + py(target) + '" r="8" fill="' + accent + '"/>' +
+        '<text x="' + (px(retYear) - 4) + '" y="' + (py(target) - 12) + '" text-anchor="end" font-size="18" font-weight="850" fill="' + accent + '">retire</text>';
+      host.innerHTML = '<svg width="100%" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMin meet" style="display:block">' +
         grid + xl +
-        (proj.length ? '<path d="' + path(proj) + '" fill="none" stroke="#5bb8c4" stroke-width="3.25" stroke-dasharray="8 7" stroke-linecap="round"/>' : '') +
-        '<path d="' + path(actual) + '" fill="none" stroke="' + accent + '" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>' +
+        (proj.length ? '<path d="' + path(proj) + '" fill="none" stroke="#5bb8c4" stroke-width="4.25" stroke-dasharray="8 7" stroke-linecap="round"/>' : '') +
+        '<path d="' + path(actual) + '" fill="none" stroke="' + accent + '" stroke-width="5.25" stroke-linecap="round" stroke-linejoin="round"/>' +
         markers + '</svg>';
     }
 
@@ -4612,7 +4612,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       return '<circle cx="' + x.toFixed(1) + '" cy="' + y + '" r="' + r + '" fill="' + colour + '" style="stroke:var(--surface);stroke-width:2"/>';
     }
     function biasLink(x1, x2, y) {
-      return '<line x1="' + x1.toFixed(1) + '" y1="' + y + '" x2="' + x2.toFixed(1) + '" y2="' + y + '" stroke="#1d3a63" stroke-width="4" stroke-linecap="round" opacity="0.5"/>';
+      return '<line x1="' + x1.toFixed(1) + '" y1="' + y + '" x2="' + x2.toFixed(1) + '" y2="' + y + '" stroke="#1d3a63" stroke-width="5.25" stroke-linecap="round" opacity="0.5"/>';
     }
     function computeBias() {
       const rows = drawdownRows || [];
@@ -5514,7 +5514,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
 </script>
 <script>
 /* ============================================================
-   LC-420 — Overview dashboard chart scale fix
+   LC-421 — Overview retirement path chart fill fix
 
    This file deliberately leaves the pension calculations untouched.
    It rearranges the existing Overview DOM, keeps all original IDs used
@@ -5635,7 +5635,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-420';
+    if (stamp) stamp.textContent = 'LC-421';
   }
 
   function buildSubnav() {
@@ -5935,6 +5935,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     Array.from(host.querySelectorAll('text')).forEach((el) => {
       const isStrong = String(el.getAttribute('font-weight') || '') === '700';
       el.setAttribute('fill', isStrong ? '#112d4e' : '#52667e');
+      if (!compact) el.setAttribute('font-size', isStrong ? '18' : '17');
       if (compact) el.setAttribute('font-size', isStrong ? '25' : '21');
     });
     if (compact) {
