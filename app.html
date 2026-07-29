@@ -581,7 +581,7 @@
 
 
 /* ============================================================
-   LC-419 — Overview dashboard chart scale fix
+   LC-420 — Overview dashboard chart scale fix
    Navy + aqua visual hierarchy, responsive touch layouts,
    automatic dark mode, and a white high-contrast chart canvas.
    Loaded by common.js only in the top-level app shell.
@@ -937,13 +937,13 @@ body.mpr-dashboard .mpr-ready-metric #ovProgPct {
 }
 
 body.mpr-dashboard .mpr-timeline {
-  margin-top:18px;
-  padding-top:10px;
-  border-top:1px solid rgba(255,255,255,.10);
+  margin-top:24px;
+  padding-top:18px;
+  border-top:1px solid rgba(255,255,255,.12);
 }
 body.mpr-dashboard .mpr-timeline #ovVerdictTl {
   width:100%;
-  min-height:86px;
+  min-height:150px;
 }
 body.mpr-dashboard .mpr-timeline #ovVerdictTl svg {
   display:block;
@@ -953,7 +953,7 @@ body.mpr-dashboard .mpr-timeline #ovVerdictTl svg {
 }
 
 /* ---- Main two-column area ---- */
-/* LC-419: give the retirement path chart visual priority; current pensions becomes the supporting panel. */
+/* LC-420: give the retirement path chart visual priority; current pensions becomes the supporting panel. */
 body.mpr-dashboard .mpr-main-grid {
   display:grid;
   grid-template-columns:minmax(0,2.45fr) minmax(340px,.78fr);
@@ -1328,8 +1328,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
   body.mpr-dashboard .mpr-ready-metric #ovProgPct { font-size:20px !important; }
   body.mpr-dashboard .mpr-ready-sub,
   body.mpr-dashboard .mpr-ready-value .csub { font-size:9.5px !important; }
-  body.mpr-dashboard .mpr-timeline { overflow:visible; }
-  body.mpr-dashboard .mpr-timeline #ovVerdictTl { min-width:0; width:100%; }
+  body.mpr-dashboard .mpr-timeline { margin-top:18px; padding-top:14px; overflow:visible; }
+  body.mpr-dashboard .mpr-timeline #ovVerdictTl { min-width:0; width:100%; min-height:132px; }
 
   body.mpr-dashboard .mpr-main-grid { gap:13px; }
   body.mpr-dashboard .mpr-chart-panel,
@@ -1432,7 +1432,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-419</span>
+      <span class="build-stamp">LC-420</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -3698,26 +3698,33 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       ovVerdictRoomAsync(c.spendRed);
       // timeline SVG — sized from the real container width so label text stays at its intended size
       const host = document.getElementById('ovVerdictTl');
-      const W = Math.max(360, Math.round(host.clientWidth) || 880);
-      const H = 104, x0 = 14, x1 = W - 14, yBand = 40, hBand = 22, FS = 11;
+      const W = Math.max(360, Math.round(host.clientWidth) || 960);
+      const compactTl = W < 560;
+      const H = compactTl ? 134 : 150;
+      const x0 = compactTl ? 16 : 22;
+      const x1 = W - (compactTl ? 16 : 22);
+      const yBand = compactTl ? 55 : 66;
+      const hBand = compactTl ? 28 : 34;
+      const FS = compactTl ? 12 : 14;
+      const labelFS = compactTl ? 11 : 13;
       const span = Math.max(1, endYr - nowYr);
       const px = (y) => x0 + (Math.min(Math.max(y, nowYr), endYr) - nowYr) / span * (x1 - x0);
       const rx = px(retYr);
       const acc = ovAccent(), soft = ovInkSoft();
-      const est = (t) => t.length * FS * 0.55;   // rough text width, to decide if a label fits
-      let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">';
+      const est = (t, fs = labelFS) => t.length * fs * 0.58;   // rough text width, to decide if a label fits
+      let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" role="img" aria-label="Retirement timeline from ' + nowYr + ' to ' + endYr + '">';
       // year ticks along the bottom
       const nice = [1, 2, 5, 10, 20, 25, 50];
-      let stepY = Math.max(1, Math.round(span / Math.max(3, Math.floor(W / 110))));
+      let stepY = Math.max(1, Math.round(span / Math.max(3, Math.floor(W / (compactTl ? 104 : 125)))));
       stepY = nice.find(v => v >= stepY) || stepY;
       for (let y = nowYr; y <= endYr; y += stepY)
-        svg += '<text x="' + px(y).toFixed(1) + '" y="' + (H - 5) + '" text-anchor="middle" font-size="' + FS + '" fill="' + soft + '">' + y + '</text>';
-      svg += '<text x="' + x1 + '" y="' + (H - 5) + '" text-anchor="end" font-size="' + FS + '" fill="' + soft + '">' + endYr + '</text>';
+        svg += '<text x="' + px(y).toFixed(1) + '" y="' + (H - 7) + '" text-anchor="middle" font-size="' + FS + '" fill="' + soft + '" font-weight="650">' + y + '</text>';
+      svg += '<text x="' + x1 + '" y="' + (H - 7) + '" text-anchor="end" font-size="' + FS + '" fill="' + soft + '" font-weight="650">' + endYr + '</text>';
       // working band
       if (rx > x0 + 4) {
         svg += '<rect x="' + x0 + '" y="' + yBand + '" width="' + (rx - x0).toFixed(1) + '" height="' + hBand + '" rx="6" fill="' + acc + '" opacity="0.85"/>';
         const wl = 'working';
-        if (rx - x0 > est(wl) + 14) svg += '<text x="' + ((x0 + rx) / 2).toFixed(1) + '" y="' + (yBand + 15) + '" text-anchor="middle" font-size="' + FS + '" fill="#fff" font-weight="700">' + wl + '</text>';
+        if (rx - x0 > est(wl) + 18) svg += '<text x="' + ((x0 + rx) / 2).toFixed(1) + '" y="' + (yBand + Math.round(hBand / 2) + 5) + '" text-anchor="middle" font-size="' + labelFS + '" fill="#fff" font-weight="800">' + wl + '</text>';
       }
       // drawdown band, coloured by health: green, amber over a genuine lean dip, red past dry
       const leanCap = Math.max(trough.val * 1.25, trough.val + 1);
@@ -3735,14 +3742,14 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       }
       if (dryRow) svg += '<rect x="' + gEnd.toFixed(1) + '" y="' + yBand + '" width="' + Math.max(0, x1 - gEnd).toFixed(1) + '" height="' + hBand + '" rx="6" fill="#ef4444" opacity="0.6"/>';
       const bandLabel = holds ? ('plan holds to ' + endYr) : ('pot empties in ' + dryRow.year);
-      if (x1 - rx > est(bandLabel) + 18) svg += '<text x="' + ((rx + x1) / 2).toFixed(1) + '" y="' + (yBand + 15) + '" text-anchor="middle" font-size="' + FS + '" fill="#fff" font-weight="700">' + bandLabel + '</text>';
+      if (x1 - rx > est(bandLabel) + 22) svg += '<text x="' + ((rx + x1) / 2).toFixed(1) + '" y="' + (yBand + Math.round(hBand / 2) + 5) + '" text-anchor="middle" font-size="' + labelFS + '" fill="#fff" font-weight="800">' + bandLabel + '</text>';
       // retire marker + label above the band
-      svg += '<line x1="' + rx.toFixed(1) + '" y1="20" x2="' + rx.toFixed(1) + '" y2="' + (yBand + hBand + 6) + '" stroke="' + acc + '" stroke-width="2.5"/>'
-           + '<circle cx="' + rx.toFixed(1) + '" cy="20" r="4" fill="' + acc + '"/>';
+      svg += '<line x1="' + rx.toFixed(1) + '" y1="25" x2="' + rx.toFixed(1) + '" y2="' + (yBand + hBand + 8) + '" stroke="' + acc + '" stroke-width="3"/>'
+           + '<circle cx="' + rx.toFixed(1) + '" cy="25" r="5" fill="' + acc + '"/>';
       if (retD) {
         const rl = 'retire ' + ovMon[retD.getMonth()] + ' ' + retD.getFullYear() + ' \u00B7 spend ' + Math.round(c.spendRed * 100) + '%';
         const anchor = (rx + est(rl) + 12 > x1) ? 'end' : 'start';
-        svg += '<text x="' + (anchor === 'end' ? rx - 8 : rx + 8).toFixed(1) + '" y="24" text-anchor="' + anchor + '" font-size="' + FS + '" fill="' + acc + '" font-weight="700">' + rl + '</text>';
+        svg += '<text x="' + (anchor === 'end' ? rx - 10 : rx + 10).toFixed(1) + '" y="30" text-anchor="' + anchor + '" font-size="' + labelFS + '" fill="' + acc + '" font-weight="800">' + rl + '</text>';
       }
       // trough flag — sits between the band and the year row, so it never collides with the ticks
       if (trough.year > nowYr && trough.year < endYr) {
@@ -3751,7 +3758,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         const tAnchor = (tx + est(tl) / 2 > x1) ? 'end' : ((tx - est(tl) / 2 < x0) ? 'start' : 'middle');
         const tlx = tAnchor === 'end' ? x1 : (tAnchor === 'start' ? x0 : tx);
         svg += '<line x1="' + tx.toFixed(1) + '" y1="' + (yBand + hBand) + '" x2="' + tx.toFixed(1) + '" y2="' + (yBand + hBand + 8) + '" stroke="' + tCol + '" stroke-width="2"/>'
-             + '<text x="' + tlx.toFixed(1) + '" y="' + (yBand + hBand + 20) + '" text-anchor="' + tAnchor + '" font-size="' + FS + '" fill="' + tCol + '" font-weight="700">' + tl + '</text>';
+             + '<text x="' + tlx.toFixed(1) + '" y="' + (yBand + hBand + 26) + '" text-anchor="' + tAnchor + '" font-size="' + labelFS + '" fill="' + tCol + '" font-weight="800">' + tl + '</text>';
       }
       svg += '</svg>';
       host.innerHTML = svg;
@@ -5507,7 +5514,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
 </script>
 <script>
 /* ============================================================
-   LC-419 — Overview dashboard chart scale fix
+   LC-420 — Overview dashboard chart scale fix
 
    This file deliberately leaves the pension calculations untouched.
    It rearranges the existing Overview DOM, keeps all original IDs used
@@ -5628,7 +5635,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-419';
+    if (stamp) stamp.textContent = 'LC-420';
   }
 
   function buildSubnav() {
