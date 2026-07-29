@@ -97,7 +97,7 @@
   </div>
   <div id="pageInfo" class="info-panel" hidden>
     <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box shows the Groceries, Fuel and Julie Hair &amp; Nails spend, which is deducted in the Cash Summary. Insurances are listed under Cash Summary.</p>
-    <span class="info-build">Budget build: v34</span>
+    <span class="info-build">Budget build: v35</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -465,7 +465,6 @@
         boxesHtml +
         '<table><tbody>' +
           '<tr class="total"><td>Total bills' + billsAvgNote + '</td><td class="amt">' + fmt(totalBills) + '</td></tr>' +
-          '<tr class="avail"><td>' + esc(name) + ' available ' + (isAnnual() ? '(annual)' : 'in ' + monthLabelShort()) + '</td><td class="amt">' + fmt(avail) + '</td></tr>' +
         '</tbody></table>' +
       '</div>';
     return { html: html, avail: avail, availAvg: availAvg };
