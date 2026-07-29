@@ -90,8 +90,12 @@
   .strip-leg { font-size:12px; color:#64748b; display:flex; gap:12px; flex-wrap:wrap; }
   .strip-leg span { display:inline-flex; align-items:center; gap:5px; }
   .leg-sw { width:12px; height:12px; border-radius:3px; display:inline-block; overflow:hidden; }
-  .strip { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
-  .sc { width:20px; height:20px; border-radius:4px; cursor:pointer; overflow:hidden; border:1px solid transparent; box-sizing:border-box; }
+  .strip { display:flex; flex-wrap:nowrap; gap:12px; margin-top:8px; overflow-x:auto; overflow-y:hidden; padding-bottom:4px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .strip::-webkit-scrollbar { display:none; }
+  .mgroup { display:flex; flex-direction:column; gap:4px; flex:0 0 auto; }
+  .mlabel { font-size:11px; color:#64748b; text-align:center; font-weight:bold; letter-spacing:0.02em; }
+  .mcells { display:flex; gap:3px; }
+  .sc { width:22px; height:22px; border-radius:4px; cursor:pointer; overflow:hidden; border:1px solid transparent; box-sizing:border-box; }
   .sc-none { background:#fff; border-color:#e2e8f0; }
   .sc-din { background:#17b5c4; }
   .sc-hol { background:#f59e0b; }
@@ -139,12 +143,13 @@
     .strip-title { color:#f1f5f9 !important; }
     .strip-leg { color:#94a3b8 !important; }
     .sc-none { background:#0f172a !important; border-color:#475569 !important; }
+    .mlabel { color:#94a3b8 !important; }
   }
 </style>
 </head>
 <body>
   <h1>Weekly Plan <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(52-week dining &amp; holidays)</span></h1>
-  <p class="note">Both planners in one place: each week shows home dining and the holiday side by side, and the year strip flags where they overlap. Dining and holiday costs feed the retirement model exactly as before. <span style="color:#94a3b8;">(weekly build: v1)</span></p>
+  <p class="note">Both planners in one place: each week shows home dining and the holiday side by side, and the year strip flags where they overlap. Dining and holiday costs feed the retirement model exactly as before. <span style="color:#94a3b8;">(weekly build: v2)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div class="taper-card" id="taperCard" style="display:none;">
@@ -452,9 +457,17 @@
     return '<div class="' + cls + '" id="sc_' + no + '" title="Week ' + no + ' \u00b7 ' + monthFor(no) + '" onclick="jumpToWeek(' + no + ')">' + inner + '</div>';
   }
   function buildStrip() {
-    let h = '';
-    for (let no = 1; no <= WEEKS; no++) h += cellHtml(no);
-    document.getElementById('strip').innerHTML = h;
+    let html = '', curMonth = null, cells = '';
+    for (let no = 1; no <= WEEKS; no++) {
+      const m = monthFor(no);
+      if (m !== curMonth) {
+        if (curMonth !== null) html += '<div class="mgroup"><div class="mlabel">' + curMonth + '</div><div class="mcells">' + cells + '</div></div>';
+        curMonth = m; cells = '';
+      }
+      cells += cellHtml(no);
+    }
+    if (curMonth !== null) html += '<div class="mgroup"><div class="mlabel">' + curMonth + '</div><div class="mcells">' + cells + '</div></div>';
+    document.getElementById('strip').innerHTML = html;
   }
   function updateStripCell(no) {
     const el = document.getElementById('sc_' + no);
@@ -681,7 +694,7 @@
 <script>
 /* LC-383: deploy stamp (this page does not load the engine). */
 (function () {
-  var TAG = 'weekly v1';
+  var TAG = 'weekly v2';
   function go() {
     var s = document.createElement('div');
     s.style.cssText = 'text-align:right;padding:2px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
