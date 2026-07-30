@@ -112,8 +112,8 @@
     <button type="button" id="pageInfoBtn" class="info-btn" aria-label="Show page information" aria-controls="pageInfo" aria-expanded="false" onclick="togglePageInfo()"><span aria-hidden="true">i</span></button>
   </div>
   <div id="pageInfo" class="info-panel" hidden>
-    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box shows the Groceries, Fuel and Julie Hair &amp; Nails spend, which is deducted in the Cash Summary. Insurances are listed in the third column.</p>
-    <span class="info-build">Budget build: v36</span>
+    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box shows the Groceries, Fuel and Julie Hair &amp; Nails spend, which is deducted in the Cash Summary. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from.</p>
+    <span class="info-build">Budget build: v37</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -223,6 +223,41 @@
   function billView(b) { return isAnnual() ? annualToMonthly(b.premium, b.frequency) * 12 : monthCharge(b, viewM); }
   // a bill's smoothed amount for the current view (drives the monthly avg note; equals billView in annual)
   function billViewAvg(b) { return annualToMonthly(b.premium, b.frequency) * periodScale(); }
+
+  // ---- Loans (read-only on Budget): amortising payment shown against its paid_account ----
+  function loanStartIdxB(d) { if (!d) return null; const s = String(d).split('T')[0].split('-'); if (s.length < 2) return null; return Number(s[0]) * 12 + (Number(s[1]) - 1); }
+  // Prep each loan once: level payment + an overpayment-aware per-month schedule (payByIdx keyed by
+  // absolute month index), plus the active window [firstIdx, payoffIdx]. Independent of the view.
+  function prepLoans(raw) {
+    return (raw || []).map(l => {
+      const principal = Math.max(0, (Number(l.total_cost) || 0) - (Number(l.deposit) || 0));
+      const n = Math.round(Number(l.term_months) || 0);
+      const r = (Number(l.apr) || 0) / 100 / 12;
+      const level = n > 0 ? (r === 0 ? principal / n : principal * r / (1 - Math.pow(1 + r, -n))) : 0;
+      const startIdx = loanStartIdxB(l.start_date);
+      const payByIdx = {}; let firstIdx = startIdx, payoffIdx = startIdx;
+      if (startIdx != null && level > 0) {
+        const ov = {}; const src = l.overpayments || {};
+        Object.keys(src).forEach(k => { const p = String(k).split('-'); if (p.length >= 2) { const mi = Number(p[0]) * 12 + (Number(p[1]) - 1); if (Number.isFinite(mi)) ov[mi] = (ov[mi] || 0) + (Number(src[k]) || 0); } });
+        let bal = principal, i = 0; const CAP = n * 4 + 600;
+        for (; i < CAP && bal > 1e-6; i++) { const mi = startIdx + i; const int = bal * r; const pay = Math.min(level + (ov[mi] || 0), bal + int); bal += int - pay; payByIdx[mi] = pay; }
+        payoffIdx = startIdx + i - 1;
+      }
+      return { account: (l.paid_account || '').trim(), name: l.loan_name || 'Loan', level: level, firstIdx: firstIdx, payoffIdx: payoffIdx, payByIdx: payByIdx };
+    }).filter(l => l.level > 0 && l.firstIdx != null);
+  }
+  function loanActiveIdx(l, idx) { return l.firstIdx != null && idx >= l.firstIdx && idx <= l.payoffIdx; }
+  // actual cash this loan takes in the current view: monthly = the viewed month (overpayment included);
+  // annual = sum of this calendar year's payments.
+  function loanView(l) {
+    if (isAnnual()) { let s = 0; const base = CUR_Y * 12; for (let mm = 0; mm < 12; mm++) s += (l.payByIdx[base + mm] || 0); return s; }
+    return l.payByIdx[viewY * 12 + (viewM - 1)] || 0;
+  }
+  // smoothed level payment for the current view (drives the avg note; ignores one-off overpayment spikes)
+  function loanViewAvg(l) {
+    if (isAnnual()) { const base = CUR_Y * 12, from = Math.max(l.firstIdx, base), to = Math.min(l.payoffIdx, base + 11); return to >= from ? l.level * (to - from + 1) : 0; }
+    return loanActiveIdx(l, viewY * 12 + (viewM - 1)) ? l.level : 0;
+  }
   function setMode(m) {
     viewMode = (m === 'annual') ? 'annual' : 'monthly';
     document.getElementById('perMonthly').classList.toggle('on', !isAnnual());
@@ -257,7 +292,7 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, tiers, incAmts, otherInc, pensContribs, bankAccts, billCats, diningRota, mealCost, holidayPlan, holidayCost, holidaySettings, diningSettings] = await Promise.all([
+      const [members, bills, tiers, incAmts, otherInc, pensContribs, bankAccts, billCats, diningRota, mealCost, holidayPlan, holidayCost, holidaySettings, diningSettings, loansRaw] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_working_tiers?order=from_date.asc'),
@@ -271,7 +306,8 @@
         App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
         App.rest('bd_holiday_cost'),
         App.rest('bd_holiday_settings?id=eq.1'),
-        App.rest('bd_dining_settings?id=eq.1')
+        App.rest('bd_dining_settings?id=eq.1'),
+        App.rest('bd_loans?order=start_date.asc')
       ]);
       const names = (members || []).map(m => m.name).filter(Boolean);
       if (!names.length) { status.textContent = 'No members found.'; return; }
@@ -299,7 +335,7 @@
         diningFundingAcct = (dPotAcct && dPotAcct.funded_from != null && String(dPotAcct.funded_from).trim() !== '')
           ? String(dPotAcct.funded_from).trim() : dPotId;   // funding account, or the pot itself if not funded-from
       }
-      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct, diningMonthly: diningMonthly, diningFundingAcct: diningFundingAcct, holidayPotId: potId, diningPotId: dPotId };
+      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct, diningMonthly: diningMonthly, diningFundingAcct: diningFundingAcct, holidayPotId: potId, diningPotId: dPotId, loans: prepLoans(loansRaw) };
       names.forEach(n => { selectedTier[n] = currentTierDays(n, DATA.tiers); });
       status.style.display = 'none';
       initNav();
@@ -463,6 +499,13 @@
           boxTotal += dinV; boxAvg += dinV;
         }
       }
+      // loans paid from this account — a line per loan, shown while active in the viewed period
+      (d.loans || []).forEach(l => {
+        if (l.account !== acctId) return;
+        const m = loanView(l), av = loanViewAvg(l);
+        boxAvg += av;
+        if (m > 0) { rows += '<tr class="pot-line"><td>Loan \u00b7 ' + esc(l.name) + '</td><td class="amt">' + fmt(m) + '</td></tr>'; boxTotal += m; }
+      });
       totalBillsAvg += boxAvg;     // count the average even if nothing is charged this particular month
       if (!rows) return;           // nothing actually leaves this account this month → no box
       totalBills += boxTotal;
