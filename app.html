@@ -1438,7 +1438,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-431</span>
+      <span class="build-stamp">LC-432</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -2001,6 +2001,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       <button id="subbtn-CardEntry" class="subtab-link" onclick="showSub(event,'CardEntry')">Card Entry</button>
       <button id="subbtn-CardStatements" class="subtab-link" onclick="showSub(event,'CardStatements')">Card Statements</button>
       <button id="subbtn-CardCats" class="subtab-link" onclick="showSub(event,'CardCats')">Card Categories</button>
+      <button id="subbtn-CostAnalysis" class="subtab-link" onclick="showSub(event,'CostAnalysis')">Cost Analysis</button>
       <button id="subbtn-PayPal" class="subtab-link" onclick="showSub(event,'PayPal')">PayPal</button>
       </div>
     </div>
@@ -2011,6 +2012,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div id="sub-CardEntry" class="subtabcontent"><iframe id="frame-CardEntry" class="app-frame" title="Card Entry"></iframe></div>
     <div id="sub-CardStatements" class="subtabcontent"><iframe id="frame-CardStatements" class="app-frame" title="Card Statements"></iframe></div>
     <div id="sub-CardCats" class="subtabcontent"><iframe id="frame-CardCats" class="app-frame" title="Card Categories"></iframe></div>
+    <div id="sub-CostAnalysis" class="subtabcontent"><iframe id="frame-CostAnalysis" class="app-frame" title="Cost Analysis"></iframe></div>
     <div id="sub-PayPal" class="subtabcontent"><iframe id="frame-PayPal" class="app-frame" title="PayPal"></iframe></div>
     <div id="sub-InsSavings" class="subtabcontent"><iframe id="frame-InsSavings" class="app-frame" title="Insurance Savings"></iframe></div>
     <div id="sub-WeeklyPlan" class="subtabcontent"><iframe id="frame-WeeklyPlan" class="app-frame" title="Weekly Plan"></iframe></div>
@@ -4862,8 +4864,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front109';   // frame-file cache-buster: bump when any framed page changes
-    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html', Backup:'backup.html' };
+    const FV = '?v=front110';   // frame-file cache-buster: bump when any framed page changes
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
@@ -5645,7 +5647,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-431';
+    if (stamp) stamp.textContent = 'LC-432';
   }
 
   function buildSubnav() {
