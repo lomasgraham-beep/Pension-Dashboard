@@ -89,7 +89,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Loans <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(loans build: v1)</span></h2>
+  <h2>Loans <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(loans build: v2)</span></h2>
   <p class="note">Loans and financed purchases. Each row amortises from its start date over the number of payment periods at the interest rate, and the monthly payment is worked out for you. Set the account it&rsquo;s paid from (that&rsquo;s where it shows on Bills). Overpay in any month to clear it sooner &mdash; the payoff date updates live. A pure loan has no deposit; for a financed purchase, enter the price as the amount and the deposit separately (amount financed = amount &minus; deposit). Loans finishing before your retirement date don&rsquo;t affect the model; only payments falling on or after retirement do.</p>
 
   <div class="bar">
@@ -200,7 +200,7 @@
     const pay = monthlyPayment(l.total_cost, l.deposit, l.apr, l.term_months);
     const oc = ovCount(l);
     return '<tr data-i="' + i + '">' +
-      '<td data-label="Name"><input type="text" class="f-name" value="' + esc(l.loan_name) + '" oninput="mark()"></td>' +
+      '<td data-label="Name"><input type="text" class="f-name" value="' + esc(l.loan_name) + '" oninput="nameEdit(this)"></td>' +
       '<td data-label="Start date"><input type="date" class="f-date" value="' + (l.start_date ? String(l.start_date).split('T')[0] : '') + '" onchange="mark()"></td>' +
       '<td data-label="Amount"><input type="number" class="f-total" step="1" value="' + (l.total_cost != null ? l.total_cost : 0) + '" oninput="rowCalc(this)" onfocus="blankZero(this)" onblur="restoreZero(this)"></td>' +
       '<td data-label="Deposit"><input type="number" class="f-deposit" step="1" value="' + (l.deposit != null ? l.deposit : 0) + '" oninput="rowCalc(this)" onfocus="blankZero(this)" onblur="restoreZero(this)"></td>' +
@@ -236,6 +236,13 @@
   function restoreZero(el) { if (el.value.trim() === '') el.value = '0'; }
 
   function mark() { syncDom(); setDirty(); render(); }
+  // Name edits must NOT re-render (rebuilding tbody.innerHTML mid-type drops focus and closes the
+  // iPad keyboard). Update the model in place instead; name doesn't affect payment/payoff/summary.
+  function nameEdit(el) {
+    const tr = el.closest('tr'); const i = Number(tr.dataset.i);
+    if (loans[i]) loans[i].loan_name = el.value;
+    setDirty();
+  }
   function rowCalc(el) {
     const tr = el.closest('tr');
     const pay = monthlyPayment(tr.querySelector('.f-total').value, tr.querySelector('.f-deposit').value, tr.querySelector('.f-apr').value, tr.querySelector('.f-term').value);
@@ -374,7 +381,7 @@
 (function () {
   var s = document.createElement('div');
   s.style.cssText = 'text-align:right;padding:6px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
-  s.textContent = 'loans v1';
+  s.textContent = 'loans v2';
   document.body.appendChild(s);
 })();
 </script>
