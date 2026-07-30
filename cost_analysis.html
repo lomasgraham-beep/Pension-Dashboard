@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cost Analysis</title>
+<script src="https://www.gstatic.com/charts/loader.js"></script>
+<script src="common.js?v=hol1"></script>
+<style>
+  :root { --accent:#1d3a63; --accent-dark:#14294a; --aqua:#0891b2; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
+  h2 { color:var(--ink); margin:0 0 4px; }
+  .note { color:var(--ink-soft); font-size:13px; margin:0 0 14px; max-width:820px; }
+  #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
+  .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; }
+
+  .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  .seg { display:inline-flex; border:1px solid var(--line-strong); border-radius:9px; overflow:hidden; }
+  .seg button { border:none; background:#fff; color:var(--ink); font-size:14px; font-weight:bold; padding:10px 14px; cursor:pointer; }
+  .seg button.on { background:var(--accent); color:#fff; }
+  .controls label { font-size:12px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; }
+  .controls select { padding:10px; border:1px solid var(--line-strong); border-radius:8px; font-size:14px; background:#fff; color:var(--ink); }
+
+  /* zoom control, styled to match the savings chart */
+  .zoom-wrap { display:flex; align-items:center; gap:10px; flex:1 1 260px; min-width:220px; padding:6px 12px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; }
+  .zoom-readout { font-size:12px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; white-space:nowrap; }
+  .zoom-readout b { color:var(--accent-dark); font-size:14px; }
+  .zoom-wrap input[type=range] { flex:1 1 auto; }
+  .zoom-reset { flex:0 0 auto; width:34px; height:34px; border:none; border-radius:8px; background:#64748b; color:#fff; font-size:16px; line-height:1; cursor:pointer; }
+  .zoom-reset:hover { background:#475569; }
+
+  /* chart sits on a white card (Google Charts plot area is always white) */
+  .chart-card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:8px 4px 4px; box-shadow:0 2px 6px rgba(0,0,0,0.06); }
+  .chart-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  #chart { height:440px; }
+  .period-title { font-size:15px; font-weight:bold; color:var(--accent-dark); margin:2px 6px 8px; }
+
+  table { border-collapse:collapse; font-size:14px; margin-top:16px; width:auto; min-width:min(560px,100%); }
+  th,td { padding:9px 14px; border-bottom:1px solid var(--line); text-align:right; }
+  th { background:var(--surface-2); color:var(--ink); font-size:12px; text-transform:uppercase; letter-spacing:0.03em; }
+  th:first-child, td:first-child { text-align:left; }
+  td.cat { font-weight:600; }
+  .swatch { display:inline-block; width:10px; height:10px; border-radius:2px; background:var(--aqua); margin-right:8px; vertical-align:middle; }
+  tr.total-row td { font-weight:bold; border-top:2px solid var(--line-strong); background:var(--surface-2); }
+  .rank { color:var(--ink-soft); font-size:12px; margin-right:8px; }
+
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h2 { color:#f1f5f9 !important; } .note, .period-title { color:#94a3b8 !important; }
+    .seg { border-color:#334155 !important; } .seg button { background:#0f172a !important; color:#cbd5e1 !important; } .seg button.on { background:var(--accent) !important; color:#fff !important; }
+    select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    .zoom-wrap { background:#1e293b !important; border-color:#334155 !important; }
+    .chart-card { background:#fff !important; border-color:#334155 !important; }   /* keep white behind the chart */
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    tr.total-row td { background:#1e293b !important; }
+    .period-title { color:#38d6e6 !important; }
+  }
+</style>
+</head>
+<body>
+  <div id="status" class="s-load">Loading&hellip;</div>
+  <h2>Cost Analysis <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(costs v1)</span></h2>
+  <p class="note">Actual spending per category, from your card transactions. Bars run highest cost (left) to lowest (right). Switch between a single month, a calendar year, or a rolling 12 months, and drag the zoom to widen the bars. In a year view the table also shows the monthly average &mdash; handy for variable costs like groceries and fuel. Anything categorised <strong>Reimburse</strong> is excluded.</p>
+
+  <div class="controls">
+    <div class="seg" id="modeSeg">
+      <button data-mode="month" onclick="setMode('month')">Month</button>
+      <button data-mode="calendar" class="on" onclick="setMode('calendar')">Calendar year</button>
+      <button data-mode="rolling" onclick="setMode('rolling')">Rolling year</button>
+    </div>
+    <label id="periodLbl" for="periodSel">Year</label>
+    <select id="periodSel" onchange="refresh()"></select>
+    <div class="zoom-wrap">
+      <span class="zoom-readout">Zoom <b id="zoomV">1.0&times;</b></span>
+      <input type="range" id="zoom" min="100" max="400" step="10" value="100" oninput="onZoom()">
+      <button type="button" class="zoom-reset" onclick="zoomReset()" title="Reset zoom">&#8634;</button>
+    </div>
+  </div>
+
+  <div class="period-title" id="periodTitle"></div>
+  <div class="chart-card">
+    <div class="chart-scroll"><div id="chart"></div></div>
+  </div>
+
+  <table id="tbl">
+    <thead><tr id="thead"></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+<script>
+  const REIMBURSE = 'reimburse';
+  let txns = [];            // { ym:'YYYY-MM', label, amount }
+  let months = [];          // sorted distinct YYYY-MM present in data
+  let years = [];           // sorted distinct YYYY present
+  let mode = 'calendar';
+  let chartReady = false;
+  const money0 = n => '\u00a3' + Math.round(n).toLocaleString('en-GB');
+  const money2 = n => '\u00a3' + (Math.round(n * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const monthName = ym => { const [y, m] = ym.split('-'); return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(m) - 1] + ' ' + y; };
+
+  google.charts.load('current', { packages: ['corechart'] });
+  google.charts.setOnLoadCallback(() => { chartReady = true; if (txns.length) draw(); });
+
+  // ---------- load ----------
+  async function load() {
+    try {
+      const [cats, tx] = await Promise.all([
+        App.rest('bd_bill_category?order=code.asc'),
+        App.rest('bd_card_txn?order=txn_date.asc&limit=100000')
+      ]);
+      const catByCode = {}; (cats || []).forEach(c => { catByCode[c.code] = c.description || c.code; });
+      txns = [];
+      (tx || []).forEach(t => {
+        const label = t.category_code ? (catByCode[t.category_code] || t.category_code) : 'Uncategorised';
+        if (String(label).trim().toLowerCase() === REIMBURSE) return;   // exclude reimbursements
+        const d = String(t.txn_date || '').slice(0, 7);
+        if (d.length !== 7) return;
+        txns.push({ ym: d, label: label, amount: Number(t.amount) || 0 });
+      });
+      const ms = new Set(), ys = new Set();
+      txns.forEach(t => { ms.add(t.ym); ys.add(t.ym.slice(0, 4)); });
+      months = [...ms].sort(); years = [...ys].sort();
+      document.getElementById('status').style.display = 'none';
+      buildPeriodSelect();
+      if (chartReady) refresh(); else render();   // render table now; chart draws when Charts lib is ready
+    } catch (e) {
+      const s = document.getElementById('status'); s.style.display = 'block'; s.className = 's-err';
+      s.textContent = 'Could not load: ' + (e && e.message ? e.message : e);
+    }
+  }
+
+  // ---------- controls ----------
+  function setMode(m) {
+    mode = m;
+    document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+    document.getElementById('periodLbl').textContent = m === 'month' ? 'Month' : (m === 'calendar' ? 'Year' : 'Rolling 12 months to');
+    buildPeriodSelect();
+    refresh();
+  }
+  function buildPeriodSelect() {
+    const sel = document.getElementById('periodSel');
+    let opts = [];
+    if (mode === 'month')        opts = months.slice().reverse().map(m => ({ v: m, t: monthName(m) }));
+    else if (mode === 'calendar') opts = years.slice().reverse().map(y => ({ v: y, t: y }));
+    else                          opts = months.slice().reverse().map(m => ({ v: m, t: monthName(m) }));  // rolling: pick the END month
+    sel.innerHTML = opts.map(o => '<option value="' + o.v + '">' + o.t + '</option>').join('');
+    if (opts.length) sel.value = opts[0].v;   // default to the most recent
+  }
+
+  // ---------- aggregation ----------
+  function periodMonths(pv) {
+    if (mode === 'month') return [pv];
+    if (mode === 'calendar') return months.filter(m => m.slice(0, 4) === pv);
+    // rolling: 12 months ending at pv (inclusive)
+    const [y, m] = pv.split('-').map(Number);
+    const set = [];
+    for (let i = 11; i >= 0; i--) { let mm = m - i, yy = y; while (mm <= 0) { mm += 12; yy -= 1; } set.push(yy + '-' + String(mm).padStart(2, '0')); }
+    return set;
+  }
+  function aggregate() {
+    const pv = document.getElementById('periodSel').value;
+    const wanted = new Set(periodMonths(pv));
+    const rows = txns.filter(t => wanted.has(t.ym));
+    const byCat = {}; const activeMonths = new Set();
+    rows.forEach(t => { byCat[t.label] = (byCat[t.label] || 0) + t.amount; activeMonths.add(t.ym); });
+    const list = Object.keys(byCat).map(k => ({ label: k, total: byCat[k] })).sort((a, b) => b.total - a.total);
+    const divisor = Math.max(1, activeMonths.size);
+    list.forEach(r => r.avg = r.total / divisor);
+    const grand = list.reduce((s, r) => s + r.total, 0);
+    return { list: list, divisor: divisor, grand: grand, pv: pv, isYear: mode !== 'month' };
+  }
+
+  function periodLabel(a) {
+    if (mode === 'month') return monthName(a.pv);
+    if (mode === 'calendar') return 'Calendar year ' + a.pv;
+    return 'Rolling 12 months to ' + monthName(a.pv);
+  }
+
+  // ---------- render ----------
+  let lastAgg = null;
+  function refresh() { render(); if (chartReady) draw(); }
+  function render() {
+    const a = lastAgg = aggregate();
+    document.getElementById('periodTitle').textContent = periodLabel(a) + '  \u00b7  ' + money0(a.grand) + ' total';
+    const thead = document.getElementById('thead'), tbody = document.getElementById('tbody');
+    if (a.isYear) {
+      thead.innerHTML = '<th>Category</th><th>Total</th><th>Monthly avg</th>';
+    } else {
+      thead.innerHTML = '<th>Category</th><th>Total</th>';
+    }
+    let html = a.list.map((r, i) =>
+      '<tr><td class="cat"><span class="rank">' + (i + 1) + '</span><span class="swatch"></span>' + esc(r.label) + '</td>' +
+      '<td>' + money0(r.total) + '</td>' +
+      (a.isYear ? '<td>' + money2(r.avg) + '</td>' : '') + '</tr>'
+    ).join('');
+    if (!a.list.length) html = '<tr><td colspan="' + (a.isYear ? 3 : 2) + '" style="text-align:left;color:#94a3b8;">No transactions in this period.</td></tr>';
+    else html += '<tr class="total-row"><td>Total</td><td>' + money0(a.grand) + '</td>' + (a.isYear ? '<td>' + money2(a.grand / a.divisor) + '</td>' : '') + '</tr>';
+    tbody.innerHTML = html;
+  }
+
+  // ---------- chart ----------
+  let drawTimer = null;
+  function scheduleDraw() { clearTimeout(drawTimer); drawTimer = setTimeout(draw, 120); }
+  function draw() {
+    const a = lastAgg || (lastAgg = aggregate());
+    const box = document.getElementById('chart');
+    if (!a.list.length) { box.innerHTML = ''; return; }
+    const dt = new google.visualization.DataTable();
+    dt.addColumn('string', 'Category');
+    dt.addColumn('number', 'Cost');
+    dt.addColumn({ type: 'string', role: 'annotation' });
+    a.list.forEach(r => dt.addRow([r.label, Math.max(0, r.total), money0(r.total)]));
+    const zoom = Number(document.getElementById('zoom').value) / 100;
+    const perCat = 66 * zoom;
+    const width = Math.max(box.parentElement.clientWidth, Math.round(a.list.length * perCat) + 120);
+    const INK = '#334155';   // fixed dark ink: the plot area is always white
+    new google.visualization.ColumnChart(box).draw(dt, {
+      width: width, height: 440,
+      backgroundColor: 'white',
+      legend: { position: 'none' },
+      colors: ['#0891b2'],
+      chartArea: { left: 70, top: 16, right: 16, bottom: 118, width: '100%', height: '100%' },
+      vAxis: { format: '\u00a3#,###', textStyle: { color: INK, fontSize: 12 }, titleTextStyle: { color: INK }, minValue: 0, gridlines: { color: '#e2e8f0' }, baselineColor: '#cbd5e1' },
+      hAxis: { slantedText: true, slantedTextAngle: 55, textStyle: { color: INK, fontSize: 11 } },
+      annotations: { alwaysOutside: true, textStyle: { color: INK, fontSize: 10, bold: true }, stem: { color: 'transparent' } },
+      bar: { groupWidth: '68%' },
+      tooltip: { textStyle: { color: '#26333a' } }
+    });
+  }
+
+  function onZoom() { document.getElementById('zoomV').textContent = (Number(document.getElementById('zoom').value) / 100).toFixed(1) + '\u00d7'; scheduleDraw(); }
+  function zoomReset() { const z = document.getElementById('zoom'); z.value = 100; onZoom(); }
+  window.addEventListener('resize', scheduleDraw);
+
+  App.requireLogin(load, { title: 'Cost Analysis' });
+</script>
+
+<script>
+(function () {
+  var s = document.createElement('div');
+  s.style.cssText = 'text-align:right;padding:6px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
+  s.textContent = 'costs v1';
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>
