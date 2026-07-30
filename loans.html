@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loans</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=hol1"></script>
+<style>
+  :root { --accent:#1d3a63; --accent-dark:#14294a; --aqua:#0891b2; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
+  h2 { color:var(--ink); margin:0 0 4px; }
+  .note { color:var(--ink-soft); font-size:13px; margin:0 0 14px; max-width:760px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  .btn { border:none; border-radius:8px; font-weight:bold; font-size:14px; cursor:pointer; padding:11px 18px; color:#fff; }
+  .btn-save { background:var(--accent); } .btn-save:hover { background:var(--accent-dark); }
+  .btn-reload { background:#64748b; } .btn-add { background:#475569; margin-top:12px; }
+  .unsaved { display:none; background:#fef3c7; color:#92400e; font-weight:bold; font-size:13px; padding:6px 12px; border-radius:6px; }
+  .msg { font-weight:bold; font-size:14px; }
+  #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
+  .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#ecfdf5; color:#065f46; }
+  .table-wrap { overflow-x:auto; }
+  table { width:auto; border-collapse:collapse; font-size:14px; margin-top:6px; }
+  th,td { padding:8px 12px 8px 8px; border-bottom:1px solid var(--line); text-align:right; vertical-align:middle; }
+  th { background:var(--surface-2); color:var(--ink); font-size:12px; text-transform:uppercase; letter-spacing:0.03em; white-space:normal; text-align:center; vertical-align:bottom; line-height:1.2; max-width:92px; }
+  td { white-space:nowrap; }
+  th:first-child, td:first-child { text-align:left; }
+  td input, td select { padding:8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px; box-sizing:border-box; background:#fff; color:var(--ink); }
+  td input[type=text] { width:150px; text-align:left; }
+  td input[type=date] { width:150px; }
+  td input[type=number] { width:90px; text-align:right; }
+  td select.f-account { min-width:130px; text-align:left; }
+  .pay-cell { font-weight:bold; color:var(--accent-dark); }
+  .payoff-cell { font-size:12px; color:var(--ink-soft); text-align:left; white-space:normal; max-width:150px; line-height:1.35; }
+  .ov-btn { border:1px solid var(--line-strong); background:var(--surface-2); color:var(--accent-dark); border-radius:6px; padding:7px 10px; font-weight:bold; font-size:13px; cursor:pointer; white-space:nowrap; }
+  .ov-btn.has { background:#e0f2fe; border-color:#7dd3fc; }
+  .del { background:#fdecea; color:#c0392b; border:none; border-radius:6px; padding:7px 11px; font-weight:bold; cursor:pointer; }
+  .summary { margin-top:16px; font-size:14px; color:var(--ink); background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:12px 16px; display:inline-block; }
+  .summary b { color:var(--accent-dark); }
+  /* overpayment modal */
+  .ov-back { display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:50; align-items:flex-start; justify-content:center; padding:24px 12px; overflow:auto; }
+  .ov-back.show { display:flex; }
+  .ov-modal { background:#fff; border-radius:12px; padding:18px; width:100%; max-width:440px; box-shadow:0 10px 40px rgba(0,0,0,0.3); }
+  .ov-modal h3 { margin:0 0 4px; color:var(--ink); }
+  .ov-modal .sub { color:var(--ink-soft); font-size:13px; margin:0 0 12px; }
+  .ov-line { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+  .ov-line input[type=month] { flex:1 1 auto; padding:9px; border:1px solid var(--line-strong); border-radius:6px; font-size:15px; box-sizing:border-box; }
+  .ov-line input[type=number] { width:120px; padding:9px; border:1px solid var(--line-strong); border-radius:6px; font-size:15px; box-sizing:border-box; text-align:right; }
+  .ov-line .rm { background:#fdecea; color:#c0392b; border:none; border-radius:6px; padding:9px 11px; font-weight:bold; cursor:pointer; }
+  .ov-actions { display:flex; justify-content:space-between; align-items:center; margin-top:14px; gap:10px; }
+  .ov-add { background:#475569; color:#fff; border:none; border-radius:8px; padding:10px 14px; font-weight:bold; cursor:pointer; }
+  .ov-done { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:10px 18px; font-weight:bold; cursor:pointer; }
+  .ov-empty { color:var(--ink-soft); font-size:13px; margin:6px 0 10px; }
+
+  @media (max-width: 640px) {
+    body { padding:12px; }
+    #tbl thead { display:none; }
+    #tbl, #tbl tbody, #tbl tr, #tbl td { display:block; width:auto; }
+    #tbl tr { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:12px; background:var(--surface-2); }
+    #tbl td { border:none; padding:6px 0; text-align:right; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    #tbl td::before { content:attr(data-label); font-size:12px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.03em; text-align:left; }
+    #tbl td input[type=text], #tbl td select.f-account { width:170px; }
+    #tbl td.payoff-cell { text-align:right; }
+    #tbl td:last-child::before { content:""; }
+    #tbl td .del { width:100%; padding:10px; }
+  }
+
+  /* ---- Automatic dark mode (follows device setting) ---- */
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h2, h3 { color:#f1f5f9 !important; }
+    .note, .sub, .payoff-cell, .ov-empty { color:#94a3b8 !important; }
+    input, select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    tr:nth-child(even) td { background:rgba(255,255,255,0.02) !important; }
+    .pay-cell { color:#38d6e6 !important; }
+    .ov-btn { background:#1e293b !important; border-color:#334155 !important; color:#7dd3fc !important; }
+    .ov-btn.has { background:#0c4a6e !important; border-color:#0ea5e9 !important; }
+    .summary { background:#1e293b !important; border-color:#334155 !important; color:#cbd5e1 !important; }
+    .summary b { color:#38d6e6 !important; }
+    .ov-modal { background:#1e293b !important; }
+    #status.s-load, .s-load { background:#1e293b !important; color:#93c5fd !important; }
+    .s-ok { background:#064e3b !important; color:#6ee7b7 !important; }
+    tr.tier-change td { background:transparent !important; }
+    a { color:#60a5fa !important; }
+  }
+</style>
+</head>
+<body>
+  <div id="status" class="s-load">Loading&hellip;</div>
+  <h2>Loans <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(loans build: v1)</span></h2>
+  <p class="note">Loans and financed purchases. Each row amortises from its start date over the number of payment periods at the interest rate, and the monthly payment is worked out for you. Set the account it&rsquo;s paid from (that&rsquo;s where it shows on Bills). Overpay in any month to clear it sooner &mdash; the payoff date updates live. A pure loan has no deposit; for a financed purchase, enter the price as the amount and the deposit separately (amount financed = amount &minus; deposit). Loans finishing before your retirement date don&rsquo;t affect the model; only payments falling on or after retirement do.</p>
+
+  <div class="bar">
+    <button class="btn btn-save" onclick="saveAll()">Save changes</button>
+    <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
+    <span class="unsaved" id="unsaved">&#9679; Unsaved changes</span>
+    <span class="msg" id="msg"></span>
+  </div>
+
+  <div class="table-wrap">
+    <table id="tbl">
+      <thead><tr>
+        <th>Name</th><th>Start date</th><th>Amount &pound;</th><th>Deposit &pound;</th>
+        <th>Interest<br>rate %</th><th>Payment<br>periods</th><th>Monthly<br>payment</th>
+        <th>Paid from</th><th>Overpay</th><th>Payoff</th><th></th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <button class="btn btn-add" onclick="addRow()">+ Add loan</button>
+
+  <div class="summary" id="summary" style="display:none;"></div>
+
+  <!-- overpayment editor -->
+  <div class="ov-back" id="ovBack">
+    <div class="ov-modal">
+      <h3 id="ovTitle">Overpayments</h3>
+      <p class="sub">Extra amount paid on top of the normal payment in a given month. Each one lowers the balance and can clear the loan early.</p>
+      <div id="ovList"></div>
+      <p class="ov-empty" id="ovEmpty" style="display:none;">No overpayments yet.</p>
+      <div class="ov-actions">
+        <button class="ov-add" onclick="ovAddLine()">+ Add overpayment</button>
+        <button class="ov-done" onclick="ovDone()">Done</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const fmt = (n) => App.fmt(n);
+  const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
+  const esc = (s) => (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+
+  let loans = [], accounts = [], deleted = [], dirty = false, ovEditIndex = null;
+
+  const tbody = document.getElementById('tbody');
+  const statusEl = document.getElementById('status');
+  const msg = document.getElementById('msg');
+
+  function setDirty() { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; }
+  function clearDirty() { dirty = false; document.getElementById('unsaved').style.display = 'none'; }
+
+  // ---- amortisation ----
+  function monthlyPayment(total, deposit, aprPct, term) {
+    const financed = Math.max(0, num(total) - num(deposit));
+    const n = Math.round(num(term));
+    if (n <= 0) return 0;
+    const r = num(aprPct) / 100 / 12;
+    if (r === 0) return financed / n;
+    return financed * r / (1 - Math.pow(1 + r, -n));
+  }
+  // Simulate the schedule with overpayments; returns { months, payoffIdx, interest, totalPaid }.
+  function schedule(l) {
+    const principal = Math.max(0, num(l.total_cost) - num(l.deposit));
+    const n = Math.round(num(l.term_months));
+    const r = num(l.apr) / 100 / 12;
+    const basePay = n > 0 ? (r === 0 ? principal / n : principal * r / (1 - Math.pow(1 + r, -n))) : 0;
+    const startIdx = startIndexOf(l.start_date);
+    const ov = {};
+    const src = l.overpayments || {};
+    Object.keys(src).forEach(k => { const p = String(k).split('-'); if (p.length >= 2) { const mi = Number(p[0]) * 12 + (Number(p[1]) - 1); if (Number.isFinite(mi)) ov[mi] = (ov[mi] || 0) + num(src[k]); } });
+    if (startIdx == null || basePay <= 0) return { months: 0, payoffIdx: startIdx, interest: 0, totalPaid: 0 };
+    let bal = principal, months = 0, interest = 0, totalPaid = 0;
+    const CAP = n * 4 + 600;
+    for (let i = 0; i < CAP && bal > 1e-6; i++) {
+      const mi = startIdx + i;
+      const int = bal * r;
+      const pay = Math.min(basePay + (ov[mi] || 0), bal + int);
+      bal += int - pay; interest += int; totalPaid += pay; months = i + 1;
+    }
+    return { months: months, payoffIdx: startIdx + months - 1, interest: interest, totalPaid: totalPaid };
+  }
+  function startIndexOf(d) { if (!d) return null; const s = String(d).split('T')[0].split('-'); if (s.length < 2) return null; return Number(s[0]) * 12 + (Number(s[1]) - 1); }
+  function idxToLabel(idx) { if (idx == null) return '—'; const y = Math.floor(idx / 12); const m = idx % 12; return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m] + ' ' + y; }
+
+  // ---- account dropdown ----
+  function acctOptions(selected) {
+    let opts = '<option value="">&mdash; none &mdash;</option>';
+    opts += accounts.map(a => '<option' + (a === selected ? ' selected' : '') + '>' + esc(a) + '</option>').join('');
+    if (selected && accounts.indexOf(selected) < 0) opts += '<option selected>' + esc(selected) + '</option>';
+    return opts;
+  }
+  function ovCount(l) { return Object.keys(l.overpayments || {}).filter(k => num(l.overpayments[k]) !== 0).length; }
+
+  function payoffText(l) {
+    const s = schedule(l);
+    if (s.months === 0) {
+      if (Math.round(num(l.term_months)) <= 0 && num(l.total_cost) > 0) return 'Cash / deposit only';
+      return '—';
+    }
+    let t = idxToLabel(s.payoffIdx);
+    const baseMonths = Math.round(num(l.term_months));
+    if (ovCount(l) > 0 && s.months < baseMonths) t += ' \u00b7 ' + (baseMonths - s.months) + ' mo early';
+    t += ' \u00b7 ' + fmt(s.interest) + ' interest';
+    return t;
+  }
+
+  function rowHtml(l, i) {
+    const pay = monthlyPayment(l.total_cost, l.deposit, l.apr, l.term_months);
+    const oc = ovCount(l);
+    return '<tr data-i="' + i + '">' +
+      '<td data-label="Name"><input type="text" class="f-name" value="' + esc(l.loan_name) + '" oninput="mark()"></td>' +
+      '<td data-label="Start date"><input type="date" class="f-date" value="' + (l.start_date ? String(l.start_date).split('T')[0] : '') + '" onchange="mark()"></td>' +
+      '<td data-label="Amount"><input type="number" class="f-total" step="1" value="' + (l.total_cost != null ? l.total_cost : 0) + '" oninput="rowCalc(this)" onfocus="blankZero(this)" onblur="restoreZero(this)"></td>' +
+      '<td data-label="Deposit"><input type="number" class="f-deposit" step="1" value="' + (l.deposit != null ? l.deposit : 0) + '" oninput="rowCalc(this)" onfocus="blankZero(this)" onblur="restoreZero(this)"></td>' +
+      '<td data-label="Interest rate %"><input type="number" class="f-apr" step="0.1" value="' + (l.apr != null ? l.apr : 0) + '" oninput="rowCalc(this)" onfocus="blankZero(this)" onblur="restoreZero(this)"></td>' +
+      '<td data-label="Payment periods"><input type="number" class="f-term" step="1" value="' + (l.term_months != null ? l.term_months : 0) + '" oninput="rowCalc(this)" onfocus="blankZero(this)" onblur="restoreZero(this)"></td>' +
+      '<td data-label="Monthly payment" class="pay-cell">' + fmt(pay) + '</td>' +
+      '<td data-label="Paid from"><select class="f-account" onchange="mark()">' + acctOptions(l.paid_account) + '</select></td>' +
+      '<td data-label="Overpay"><button class="ov-btn' + (oc ? ' has' : '') + '" onclick="ovOpen(' + i + ')">' + (oc ? ('Overpay (' + oc + ')') : 'Overpay') + '</button></td>' +
+      '<td data-label="Payoff" class="payoff-cell">' + payoffText(l) + '</td>' +
+      '<td><button class="del" onclick="delRow(this)">Delete</button></td></tr>';
+  }
+  function render() {
+    tbody.innerHTML = loans.length ? loans.map((l, i) => rowHtml(l, i)).join('') : '<tr><td colspan="11" style="text-align:left;color:#94a3b8;">No loans yet. Use &ldquo;Add loan&rdquo;.</td></tr>';
+    renderSummary();
+  }
+  function renderSummary() {
+    let monthly = 0, active = 0;
+    const nowIdx = (() => { const d = new Date(); return d.getFullYear() * 12 + d.getMonth(); })();
+    loans.forEach(l => {
+      const s = schedule(l);
+      if (s.months > 0 && startIndexOf(l.start_date) != null && startIndexOf(l.start_date) <= nowIdx && s.payoffIdx >= nowIdx) {
+        monthly += monthlyPayment(l.total_cost, l.deposit, l.apr, l.term_months);
+        active++;
+      }
+    });
+    const el = document.getElementById('summary');
+    if (!loans.length) { el.style.display = 'none'; return; }
+    el.style.display = 'inline-block';
+    el.innerHTML = 'Currently active loan payments: <b>' + fmt(monthly) + '</b>/month across <b>' + active + '</b> loan' + (active === 1 ? '' : 's') + '.';
+  }
+
+  function blankZero(el) { if (num(el.value) === 0) el.value = ''; }
+  function restoreZero(el) { if (el.value.trim() === '') el.value = '0'; }
+
+  function mark() { syncDom(); setDirty(); render(); }
+  function rowCalc(el) {
+    const tr = el.closest('tr');
+    const pay = monthlyPayment(tr.querySelector('.f-total').value, tr.querySelector('.f-deposit').value, tr.querySelector('.f-apr').value, tr.querySelector('.f-term').value);
+    tr.querySelector('.pay-cell').textContent = fmt(pay);
+    const i = Number(tr.dataset.i);
+    if (loans[i]) {
+      loans[i].total_cost = num(tr.querySelector('.f-total').value);
+      loans[i].deposit = num(tr.querySelector('.f-deposit').value);
+      loans[i].apr = num(tr.querySelector('.f-apr').value);
+      loans[i].term_months = Math.round(num(tr.querySelector('.f-term').value));
+      const pc = tr.querySelector('.payoff-cell'); if (pc) pc.innerHTML = payoffText(loans[i]);
+    }
+    setDirty(); renderSummary();
+  }
+  function syncDom() {
+    tbody.querySelectorAll('tr[data-i]').forEach(tr => {
+      const i = Number(tr.dataset.i); if (!loans[i]) return;
+      loans[i].loan_name = tr.querySelector('.f-name').value.trim();
+      loans[i].start_date = tr.querySelector('.f-date').value || null;
+      loans[i].total_cost = num(tr.querySelector('.f-total').value);
+      loans[i].deposit = num(tr.querySelector('.f-deposit').value);
+      loans[i].apr = num(tr.querySelector('.f-apr').value);
+      loans[i].term_months = Math.round(num(tr.querySelector('.f-term').value));
+      loans[i].paid_account = tr.querySelector('.f-account').value.trim() || null;
+    });
+  }
+  function addRow() {
+    syncDom();
+    loans.push({ id: undefined, loan_name: '', start_date: null, total_cost: 0, deposit: 0, apr: 0, term_months: 0, paid_account: null, overpayments: {} });
+    render(); setDirty();
+  }
+  function delRow(btn) {
+    syncDom();
+    const tr = btn.closest('tr'); const i = Number(tr.dataset.i); const l = loans[i];
+    if (l && l.id != null) deleted.push(l.id);
+    loans.splice(i, 1); render(); setDirty();
+  }
+
+  // ---- overpayment editor ----
+  function ovOpen(i) {
+    syncDom();
+    ovEditIndex = i;
+    const l = loans[i];
+    document.getElementById('ovTitle').textContent = 'Overpayments' + (l.loan_name ? ' \u2014 ' + l.loan_name : '');
+    const list = document.getElementById('ovList');
+    list.innerHTML = '';
+    const ov = l.overpayments || {};
+    Object.keys(ov).sort().forEach(k => ovAddLine(k, ov[k]));
+    ovRefreshEmpty();
+    document.getElementById('ovBack').classList.add('show');
+  }
+  function ovAddLine(month, amount) {
+    const list = document.getElementById('ovList');
+    const row = document.createElement('div');
+    row.className = 'ov-line';
+    row.innerHTML = '<input type="month" class="ov-month" value="' + (month ? esc(month) : '') + '">' +
+      '<input type="number" class="ov-amt" step="1" placeholder="£" value="' + (amount != null ? esc(amount) : '') + '">' +
+      '<button class="rm" onclick="this.parentNode.remove(); ovRefreshEmpty();">&times;</button>';
+    list.appendChild(row);
+    ovRefreshEmpty();
+  }
+  function ovRefreshEmpty() {
+    const has = document.querySelectorAll('#ovList .ov-line').length > 0;
+    document.getElementById('ovEmpty').style.display = has ? 'none' : 'block';
+  }
+  function ovDone() {
+    if (ovEditIndex == null || !loans[ovEditIndex]) { ovClose(); return; }
+    const map = {};
+    document.querySelectorAll('#ovList .ov-line').forEach(row => {
+      const m = row.querySelector('.ov-month').value;
+      const a = num(row.querySelector('.ov-amt').value);
+      if (m && a) map[m] = a;
+    });
+    loans[ovEditIndex].overpayments = map;
+    ovClose();
+    render(); setDirty();
+  }
+  function ovClose() { document.getElementById('ovBack').classList.remove('show'); ovEditIndex = null; }
+  document.getElementById('ovBack').addEventListener('click', e => { if (e.target.id === 'ovBack') ovClose(); });
+
+  // ---- persistence ----
+  async function saveAll() {
+    syncDom();
+    for (const l of loans) if (!l.loan_name) { statusErr('Every loan needs a name.'); return; }
+    statusEl.className = 's-load'; statusEl.textContent = 'Saving\u2026'; msg.textContent = '';
+    try {
+      for (const id of deleted) await App.write('DELETE', 'bd_loans?id=eq.' + id, undefined);
+      deleted = [];
+      for (const l of loans) {
+        const payload = { loan_name: l.loan_name, start_date: l.start_date, total_cost: l.total_cost, deposit: l.deposit, term_months: l.term_months, apr: l.apr, paid_account: l.paid_account || null, overpayments: l.overpayments || {} };
+        if (l.id != null) await App.write('PATCH', 'bd_loans?id=eq.' + l.id, payload);
+        else await App.write('POST', 'bd_loans', payload);
+      }
+      clearDirty();
+      await reload(true);
+      statusEl.className = 's-ok'; statusEl.textContent = 'Saved.';
+      setTimeout(() => { statusEl.className = 's-ok'; statusEl.style.display = 'none'; }, 1500);
+    } catch (e) {
+      statusErr('Save failed: ' + (e && e.message ? e.message : e));
+    }
+  }
+  function statusErr(t) { statusEl.style.display = 'block'; statusEl.className = 's-err'; statusEl.textContent = t; }
+
+  async function reload(silent) {
+    if (!silent) { statusEl.style.display = 'block'; statusEl.className = 's-load'; statusEl.textContent = 'Loading\u2026'; }
+    try {
+      const [lRows, aRows] = await Promise.all([
+        App.rest('bd_loans?order=start_date.asc'),
+        App.rest('bd_bank_account?order=account_id.asc')
+      ]);
+      accounts = (aRows || []).map(a => a.account_id).filter(Boolean);
+      loans = (lRows || []).map(l => ({
+        id: l.id, loan_name: l.loan_name || '', start_date: l.start_date || null,
+        total_cost: l.total_cost != null ? Number(l.total_cost) : 0,
+        deposit: l.deposit != null ? Number(l.deposit) : 0,
+        apr: l.apr != null ? Number(l.apr) : 0,
+        term_months: l.term_months != null ? Number(l.term_months) : 0,
+        paid_account: l.paid_account || null,
+        overpayments: l.overpayments && typeof l.overpayments === 'object' ? l.overpayments : {}
+      }));
+      deleted = [];
+      render();
+      clearDirty();
+      if (!silent) { statusEl.style.display = 'none'; }
+    } catch (e) {
+      statusErr('Load failed: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+  App.requireLogin(() => reload(false), { title: 'Loans' });
+</script>
+
+<script>
+/* deploy stamp (no engine on this page) */
+(function () {
+  var s = document.createElement('div');
+  s.style.cssText = 'text-align:right;padding:6px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
+  s.textContent = 'loans v1';
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>
