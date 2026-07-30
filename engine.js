@@ -1,5 +1,12 @@
 /* ============================================================
    engine.js  —  Pension modelling engine (pure JavaScript)
+   build tag: ann8  (additive: optional loans / financed purchases via data.loans, behind the LOANS
+                     flag. Each loan amortises from start_date over term_months at apr (auto level
+                     payment from principal = total_cost - deposit), with per-month overpayments that
+                     shorten the term, an optional deposit, and a linked bank account carried through
+                     to loanWindows for the Bills view. When LOANS is false the engine ignores
+                     data.loans and processes data.purchases exactly as ann7 — output byte-identical,
+                     proven by regression.js. Flip on only after the bd_purchases->bd_loans migration.)
    build tag: ann7  (three gated corrections, all drawdown-side; accumulation is untouched.
                      1) INFLATE_FROM_TODAY — bills / dining / holidays inflate from TODAY rather
                         than from the first retirement date, so a retirement N years out starts
@@ -69,6 +76,12 @@
   const INFLATE_FROM_TODAY = true;      // false = ann6 behaviour (inflation starts at retirement)
   const HIGHER_RATE_TAX = true;         // false = ann6 flat 20% above the PA
   const DRAWDOWN_GROWTH_FROM_CFG = true;// false (or cfg.growthRate absent) = hard-coded 5%
+  // ann8: when true, the drawdown reads data.loans (amortising loans / financed purchases with an
+  // optional deposit, per-month overpayments and a linked bank account for the Bills view) INSTEAD
+  // of data.purchases. When false the engine ignores data.loans entirely and processes data.purchases
+  // exactly as ann7 did, so output is byte-identical (see regression.js). Flip to true only after the
+  // loans page + bd_purchases->bd_loans migration are live, to avoid double-counting.
+  const LOANS = false;
 
   // ---- Mask-aware bill costing (build ann2) ----
   // The DB's total_annual generated column is premium x 12 for Monthly bills and ignores the
@@ -480,6 +493,47 @@
       return { name: p.purchase_name, pIdx: pIdx, deposit: deposit, pay: pay, term: term, skipped: false };
     }).filter(p => p.pIdx != null);
 
+    // ann8 loans (gated by LOANS). Same amortisation as purchases, but the level payment is auto
+    // computed from principal (= total_cost - deposit), term_months and apr, then simulated month by
+    // month so that optional overpayments (l.overpayments: { "YYYY-MM": extra }) reduce the balance
+    // and end the loan early. term_months === 0 means a cash purchase (deposit only, no financing).
+    // `account` (bd_bank_account.account_id) is carried for the Bills view; the payment itself flows
+    // through the same available-cash / drawdown path as purchase finance. Empty ([]) when LOANS is off,
+    // so every downstream loans branch is a no-op in the inert build.
+    const loans = LOANS ? (data.loans || []).map(l => {
+      const d = l.start_date ? new Date(l.start_date) : null;
+      const pIdx = d ? d.getFullYear() * 12 + d.getMonth() : null;
+      const total = Number(l.total_cost) || 0, deposit = Number(l.deposit) || 0;
+      const term = Math.round(Number(l.term_months) || 0);
+      const principal = Math.max(0, total - deposit);
+      const r = (Number(l.apr) || 0) / 100 / 12;
+      const basePay = (term > 0) ? ((r === 0) ? principal / term : principal * r / (1 - Math.pow(1 + r, -term))) : 0;
+      // normalise overpayments ("YYYY-MM" -> £) to an absolute month-index map
+      const ov = {};
+      const src = l.overpayments || {};
+      for (const k of Object.keys(src)) {
+        const pt = String(k).split('-');
+        if (pt.length >= 2) { const mi = Number(pt[0]) * 12 + (Number(pt[1]) - 1); if (Number.isFinite(mi)) ov[mi] = (ov[mi] || 0) + (Number(src[k]) || 0); }
+      }
+      // simulate the schedule; record the actual payment made each absolute month index
+      const payByIdx = {};
+      let bal = principal, i = 0, lastIdx = (pIdx != null ? pIdx - 1 : -1);
+      const CAP = (term > 0) ? term * 4 + 600 : 0;   // safety bound; overpayments only shorten it
+      if (pIdx != null && basePay > 0) {
+        while (bal > 1e-6 && i < CAP) {
+          const mi = pIdx + i;
+          const interest = bal * r;
+          const pay = Math.min(basePay + (ov[mi] || 0), bal + interest);   // never overpay the balance
+          bal = bal + interest - pay;
+          payByIdx[mi] = (payByIdx[mi] || 0) + pay;
+          lastIdx = mi;
+          i++;
+        }
+      }
+      return { name: l.loan_name, account: l.paid_account || null, pIdx: pIdx, deposit: deposit,
+               term: term, payByIdx: payByIdx, firstIdx: pIdx, lastIdx: lastIdx, skipped: false };
+    }).filter(l => l.pIdx != null) : [];
+
     // ---- Annuities (DC pot -> guaranteed income) ----
     // At its purchase month, an annuity converts a lump from ONE member's DC pot into a
     // lifelong income. The lump is drawn proportionally across that member's tax-free/taxable
@@ -805,7 +859,7 @@
       // savings at its month; if not, the purchase is SKIPPED (no deposit, no finance, no drawdown
       // spill) and recorded as unaffordable.
       let depositThisMonth = 0, financeThisMonth = 0, depositShortfall = 0;
-      for (const p of purchases) {
+      for (const p of (LOANS ? loans : purchases)) {   // ann8: loans replace purchases when gated on
         if (p.pIdx === idx) {
           if (savingsFundBills) {
             depositThisMonth += p.deposit;                 // ON: as before (shortfall spills below)
@@ -823,7 +877,11 @@
             }
           }
         }
-        if (!p.skipped && idx >= p.pIdx && idx < p.pIdx + p.term) financeThisMonth += p.pay;
+        if (LOANS) {
+          if (!p.skipped && p.payByIdx[idx]) financeThisMonth += p.payByIdx[idx];   // overpayment-aware schedule
+        } else {
+          if (!p.skipped && idx >= p.pIdx && idx < p.pIdx + p.term) financeThisMonth += p.pay;
+        }
       }
       if (savingsFundBills && depositThisMonth > 0) {
         const avail = instantCash();
@@ -1058,6 +1116,7 @@
     rows.savingsAccountList = savingsAccts.map(a => ({ name: a.name, member: a.member, instant: a.instant }));
     rows.crashWindows = crashes.map(c => ({ startIdx: c.startIdx, troughIdx: c.startIdx + c.D, endIdx: c.endIdx }));
     rows.purchaseWindows = purchases.map(p => ({ name: p.name, depositIdx: p.pIdx, payoffIdx: p.pIdx + p.term, term: p.term, deposit: p.deposit, pay: p.pay, skipped: p.skipped }));
+    rows.loanWindows = loans.map(l => ({ name: l.name, account: l.account, depositIdx: l.pIdx, firstIdx: l.firstIdx, payoffIdx: l.lastIdx + 1, term: l.term, deposit: l.deposit, skipped: l.skipped }));
     rows.unaffordable = unaffordable;
     rows.annuityWindows = annuities.map(a => ({ name: a.name, member: a.member, purchaseIdx: a.pIdx, amount: a.amount, annualIncome: a.annualIncome, esc: a.esc, purchased: a.purchased, skipped: a.skipped }));
     rows.annuitySkipped = annuitySkipped;
@@ -1070,7 +1129,7 @@
   }
 
   global.PensionEngine = {
-    BUILD: 'ann7',   // LC-383: exported so framed pages can self-check the loaded engine build
+    BUILD: 'ann8',   // LC-383: exported so framed pages can self-check the loaded engine build
     INFL: INFL, GROWTH: GROWTH, PA: PA,
     latestPots: latestPots,
     forecast: forecast,
