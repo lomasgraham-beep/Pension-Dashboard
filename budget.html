@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monthly Budget</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=hol1"></script>
+<script src="common.js?v=disc1"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1500px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin:0; }
@@ -313,10 +313,13 @@
       if (!names.length) { status.textContent = 'No members found.'; return; }
       const mealCostMap = {};
       (mealCost || []).forEach(c => { mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
-      const diningAnnual = (diningRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
+      const diningPlanAnnual = (diningRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
       // holiday monthly set-aside = annual holiday cost ÷ 12, shown against the pot's funding account
       const holSettings = (holidaySettings && holidaySettings[0]) || {};
-      const holidayAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], holSettings), 'retired');
+      const holidayPlanAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], holSettings), 'retired');
+      // Budget basis: Plan (the figures above) or Actual last-12-months + adjustment, per the saved choice.
+      const _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual });
+      const diningAnnual = _eff.diningAnnual, holidayAnnual = _eff.holidayAnnual;
       const holidayMonthly = holidayAnnual / 12;
       let holidayFundingAcct = null;
       const potId = holSettings.savings_account ? String(holSettings.savings_account).trim() : '';

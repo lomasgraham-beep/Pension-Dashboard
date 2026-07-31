@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Household Bills</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=hol1"></script>
+<script src="common.js?v=disc1"></script>
 <style>
   :root { --accent:#1d3a63; --accent-dark:#14294a; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
@@ -515,12 +515,15 @@
           App.rest('bd_dining_rota')
         ]);
         const ctx = App.holidayCtx(hCost || [], hMeal || [], (hSet && hSet[0]) || {});
-        holAnnual = App.holidayAnnual(hPlan || [], ctx, 'retired');
+        const holPlanAnnual = App.holidayAnnual(hPlan || [], ctx, 'retired');
         // dining annual = Σ (each filled rota cell × its meal-cost lookup) — same as engine ann2
         const mealMap = {};
         (hMeal || []).forEach(c => { mealMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
         const DAY_COLS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-        dinAnnual = (dRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
+        const dinPlanAnnual = (dRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
+        // Budget basis: Plan (above) or Actual last-12-months + adjustment, per the saved choice.
+        const _eff = await App.resolveDiscretionary({ diningPlanAnnual: dinPlanAnnual, holidayPlanAnnual: holPlanAnnual });
+        holAnnual = _eff.holidayAnnual; dinAnnual = _eff.diningAnnual;
       } catch (e) { holAnnual = 0; dinAnnual = 0; }
       deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
       populateCatFilter(); render(); status.style.display = 'none';
