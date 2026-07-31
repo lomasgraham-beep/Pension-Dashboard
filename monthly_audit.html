@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monthly Audit</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=hol1"></script>
+<script src="common.js?v=disc1"></script>
 <script src="engine.js?v=ann7"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -52,7 +52,7 @@
 </style>
 </head>
 <body>
-  <h2>Monthly Audit <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(audit build: maudit7)</span></h2>
+  <h2>Monthly Audit <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(audit build: maudit8)</span></h2>
   <p class="note">The engine's own month-by-month workings, shown so each row's sums can be checked by eye:
   <b>Bills + Dining + Holidays = Outgoings</b>, then <b>Gross fixed income &minus; Tax = Net</b>, the
   <b>Gap</b> that's left, and the <b>pension draw</b> (with its own tax) that fills it. Each row closes with <b>Pot start &minus; Draw + Growth = Pot closing</b> exactly &mdash; growth shows red when a market crash is pulling the pot down. The reconciliation
@@ -548,7 +548,7 @@
       'This page runs the engine in Manual mode, so per-person figures reconcile exactly (no cross-partner redistribution).',
       'The "vs yearly table" rows check each year\u2019s month-sums against the engine\u2019s own yearly output.',
       '',
-      'Generated ' + new Date().toISOString().slice(0, 19).replace('T', ' ') + ' \u00b7 audit build maudit7'
+      'Generated ' + new Date().toISOString().slice(0, 19).replace('T', ' ') + ' \u00b7 audit build maudit8'
     ];
     nlines.forEach((t, i) => { notes['A' + (i + 1)] = { t: 's', v: t }; });
     notes['!ref'] = 'A1:A' + (nlines.length + 1);
@@ -594,10 +594,13 @@
       const mealCostMap = {};
       (mealCost || []).forEach(c => { mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
       const DAY_COLS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-      const diningAnnual = (diningRota || []).reduce((sum, r) =>
+      const diningPlanAnnual = (diningRota || []).reduce((sum, r) =>
         sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
-      const holidayAnnual = App.holidayAnnual(holidayPlan || [],
+      const holidayPlanAnnual = App.holidayAnnual(holidayPlan || [],
         App.holidayCtx(holidayCost || [], mealCost || [], (holidaySettings && holidaySettings[0]) || {}), 'retired');
+      // Budget basis: Plan (above) or Actual last-12-months + adjustment, per the saved choice.
+      const _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual });
+      const diningAnnual = _eff.diningAnnual, holidayAnnual = _eff.holidayAnnual;
       const _hs = (holidaySettings && holidaySettings[0]) || {}, _ds = (diningSettings && diningSettings[0]) || {};
       const data = { members, bills, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual,
         holidayTaper: { taper_at_70: _hs.taper_at_70, taper_at_80: _hs.taper_at_80, taper_at_90: _hs.taper_at_90 },
@@ -698,7 +701,7 @@
 <script>
 /* LC-384: engine build self-check + deploy stamp. */
 (function () {
-  var WANT = 'ann7', TAG = 'monthly audit maudit7';
+  var WANT = 'ann7', TAG = 'monthly audit maudit8';
   function go() {
     var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
     if (got !== WANT) {

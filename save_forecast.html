@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>What I Could Save</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=hol1"></script>
+<script src="common.js?v=disc1"></script>
 <style>
   :root { --accent:#1d3a63; --accent-dark:#14294a; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; --good:#15803d; --bad:#c0392b; --cost:#dc2626; --save:#16a34a; --grid:#e2e8f0; --axis:#94a3b8; }
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1100px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
@@ -154,7 +154,7 @@
 </head>
 <body>
   <h1>What I Could Save</h1>
-  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save after everything, including pension contributions (shown as their net cost, matching the budget). Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings), general costs each April, and each pension by its own annual increase — not at the calendar-year line. The chart shows what's left to save each month as green bars (red if a month runs short) against the red cost line; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf12)</span></p>
+  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save after everything, including pension contributions (shown as their net cost, matching the budget). Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings), general costs each April, and each pension by its own annual increase — not at the calendar-year line. The chart shows what's left to save each month as green bars (red if a month runs short) against the red cost line; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf13)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="controls" class="controls" style="display:none;">
@@ -286,10 +286,19 @@
       });
       const diningMonth = new Array(12).fill(0);
       for (let w = 1; w <= WEEKS; w++) diningMonth[monthIndexForWeek(w)] += weekTotal[w];
+      const dinPlanAnnual = diningMonth.reduce((s, v) => s + v, 0);
 
       // ---- holidays: today-based annual figure, spread evenly ----
       const holSettings = (holidaySettings && holidaySettings[0]) || {};
-      const holidayAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], holSettings), 'retired');
+      const holPlanAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], holSettings), 'retired');
+      // Budget basis: Plan (above) or Actual last-12-months + adjustment, per the saved choice.
+      // Holiday keeps its even spread; dining keeps its rota month-shape, rescaled to the chosen annual.
+      const _eff = await App.resolveDiscretionary({ diningPlanAnnual: dinPlanAnnual, holidayPlanAnnual: holPlanAnnual });
+      if (_eff.basis === 'actual') {
+        if (dinPlanAnnual > 0) { const _sc = _eff.diningAnnual / dinPlanAnnual; for (let m = 0; m < 12; m++) diningMonth[m] *= _sc; }
+        else { const _flat = _eff.diningAnnual / 12; for (let m = 0; m < 12; m++) diningMonth[m] = _flat; }
+      }
+      const holidayAnnual = _eff.holidayAnnual;
       const holidayMonth = new Array(12).fill(holidayAnnual / 12);
 
       // ---- bills -> member / card / paypal buckets, month by month ----

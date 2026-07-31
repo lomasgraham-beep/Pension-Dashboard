@@ -5,7 +5,7 @@
 <title>Cash &amp; Purchases</title>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=hol1"></script>
+<script src="common.js?v=disc1"></script>
 <script src="engine.js?v=ann7"></script>
 <style>
   :root { --accent:#1d3a63; --accent-dark:#14294a; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
@@ -145,7 +145,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v23)</span></h2>
+  <h2>Cash &amp; Purchases <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(cash build: v24)</span></h2>
   <p class="note">A cash savings pot, separate from your pensions. It starts at your balance at retirement, grows each month by your saving plus interest, and funds purchase deposits. Monthly finance payments become an outgoing the pension drawdown covers. Surplus savings (built up automatically in retirement, from the Retirement Model) are shown alongside your own accounts, both below and on the chart.</p>
 
   <div class="ctrl-row">
@@ -506,9 +506,12 @@
       const mealCostMap = {};
       (mealCost || []).forEach(c => { mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
       const DAY_COLS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-      const diningAnnual = (diningRota || []).reduce((sum, r) =>
+      const diningPlanAnnual = (diningRota || []).reduce((sum, r) =>
         sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
-      const holidayAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], (holidaySettings && holidaySettings[0]) || {}), 'retired');
+      const holidayPlanAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], (holidaySettings && holidaySettings[0]) || {}), 'retired');
+      // Budget basis: Plan (above) or Actual last-12-months + adjustment, per the saved choice.
+      const _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual });
+      const diningAnnual = _eff.diningAnnual, holidayAnnual = _eff.holidayAnnual;
       const _hs = (holidaySettings && holidaySettings[0]) || {}, _ds = (diningSettings && diningSettings[0]) || {};
       const holidayTaper = { taper_at_70: _hs.taper_at_70, taper_at_80: _hs.taper_at_80, taper_at_90: _hs.taper_at_90 };
       const diningTaper = { taper_at_70: _ds.taper_at_70, taper_at_80: _ds.taper_at_80, taper_at_90: _ds.taper_at_90 };
@@ -892,7 +895,7 @@
    copy or an engine.js that was not deployed first. In-flow (not fixed) so it is visible in
    both scrolling and overflow:hidden flex layouts inside the Safari iframe. */
 (function () {
-  var WANT = 'ann7', TAG = 'cash v23';
+  var WANT = 'ann7', TAG = 'cash v24';
   function go() {
     var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
     if (got !== WANT) {

@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Multi Modelling</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=hol1"></script>
+<script src="common.js?v=disc1"></script>
 <script src="engine.js?v=ann5"></script>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
@@ -187,7 +187,7 @@
   <div class="mm-head">
     <span class="mm-title">Multi Modelling</span>
     <span class="mm-pill" id="modelName" style="display:none;"></span>
-    <span style="font-size:11px; color:var(--sub);">(build: mm10)</span>
+    <span style="font-size:11px; color:var(--sub);">(build: mm11)</span>
     <span class="spacer"></span>
     <button class="mm-btn pri" id="btnNew" type="button">+ New multi model</button>
     <button class="mm-btn" id="btnEdit" type="button" disabled>Edit</button>
@@ -236,8 +236,11 @@
       var members=res[0], bills=res[1], dining=res[2], guaranteed=res[3], pensions=res[4], contributions=res[5], logs=res[6], purchases=res[7], crashes=res[8], savingsAccounts=res[9], contributionExceptions=res[10], workingTiers=res[11], incomeSources=res[12], incomeAmounts=res[13], diningRota=res[14], mealCost=res[15], holidayPlan=res[16], holidayCost=res[17], holidaySettings=res[18], diningSettings=res[19];
       var mealCostMap = {}; (mealCost||[]).forEach(function(c){ mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost)||0; });
       var DAY_COLS = ['mon','tue','wed','thu','fri','sat','sun'];
-      var diningAnnual = (diningRota||[]).reduce(function(sum,r){ return sum + DAY_COLS.reduce(function(s,col){ return s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]]||0) : 0); }, 0); }, 0);
-      var holidayAnnual = App.holidayAnnual(holidayPlan||[], App.holidayCtx(holidayCost||[], mealCost||[], (holidaySettings&&holidaySettings[0])||{}), 'retired');
+      var diningPlanAnnual = (diningRota||[]).reduce(function(sum,r){ return sum + DAY_COLS.reduce(function(s,col){ return s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]]||0) : 0); }, 0); }, 0);
+      var holidayPlanAnnual = App.holidayAnnual(holidayPlan||[], App.holidayCtx(holidayCost||[], mealCost||[], (holidaySettings&&holidaySettings[0])||{}), 'retired');
+      // Budget basis: Plan (above) or Actual last-12-months + adjustment, per the saved choice.
+      var _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual });
+      var diningAnnual = _eff.diningAnnual, holidayAnnual = _eff.holidayAnnual;
       var _hs = (holidaySettings&&holidaySettings[0])||{}, _ds = (diningSettings&&diningSettings[0])||{};
       var holidayTaper = { taper_at_70:_hs.taper_at_70, taper_at_80:_hs.taper_at_80, taper_at_90:_hs.taper_at_90 };
       var diningTaper = { taper_at_70:_ds.taper_at_70, taper_at_80:_ds.taper_at_80, taper_at_90:_ds.taper_at_90 };
