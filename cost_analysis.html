@@ -61,7 +61,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
-  <h2>Cost Analysis <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(costs v2)</span></h2>
+  <h2>Cost Analysis <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(costs v3)</span></h2>
   <p class="note">Actual spending per category, from your card transactions. Bars run highest cost (left) to lowest (right). Switch between a single month, a calendar year, or a rolling 12 months, and drag the zoom to widen the bars. In a year view the table also shows the monthly average &mdash; handy for variable costs like groceries and fuel. Anything categorised <strong>Reimburse</strong> is excluded.</p>
 
   <div class="controls">
@@ -104,12 +104,26 @@
   google.charts.load('current', { packages: ['corechart'] });
   google.charts.setOnLoadCallback(() => { chartReady = true; if (txns.length) draw(); });
 
+  // Fetch every transaction, paging past the PostgREST row cap (a single big limit is capped
+  // server-side; with asc order that silently drops the most recent months).
+  async function fetchAllTxns() {
+    const page = 1000; let off = 0, all = [];
+    for (let i = 0; i < 500; i++) {
+      const chunk = await App.rest('bd_card_txn?select=txn_date,amount,category_code&order=txn_date.asc&limit=' + page + '&offset=' + off);
+      if (!chunk || !chunk.length) break;
+      all = all.concat(chunk);
+      if (chunk.length < page) break;
+      off += page;
+    }
+    return all;
+  }
+
   // ---------- load ----------
   async function load() {
     try {
       const [cats, tx] = await Promise.all([
         App.rest('bd_bill_category?order=code.asc'),
-        App.rest('bd_card_txn?order=txn_date.asc&limit=100000')
+        fetchAllTxns()
       ]);
       const catByCode = {}; (cats || []).forEach(c => { catByCode[c.code] = c.description || c.code; });
       txns = [];
@@ -242,7 +256,7 @@
 (function () {
   var s = document.createElement('div');
   s.style.cssText = 'text-align:right;padding:6px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
-  s.textContent = 'costs v2';
+  s.textContent = 'costs v3';
   document.body.appendChild(s);
 })();
 </script>
