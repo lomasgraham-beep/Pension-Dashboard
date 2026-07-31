@@ -169,6 +169,128 @@
     return Math.round(total * 100) / 100;
   }
 
+  // ---- discretionary basis: Plan vs Actual last-12-months (shared) ----
+  // ONE saved choice governs the dining & holiday annual figures handed to the
+  // budget, the bills page and the whole modelling engine, so every surface agrees.
+  //
+  //   basis 'plan'   -> the planned figures (dining rota / holiday plan). This is
+  //                     today's behaviour, reproduced byte-for-byte: resolveDiscretionary
+  //                     just returns the plan numbers the caller already computed.
+  //   basis 'actual' -> the trailing-12-month spend on the card categories named
+  //                     "Dining" / "Holidays", each ± a saved MONTHLY adjustment
+  //                     (annualised ×12). Reimburse is excluded, matching Cost Analysis.
+  //
+  // Persisted in bd_discretionary_basis (single row, id=1) so the choice and the two
+  // adjustments follow the user to any device. Category resolution is by name so a
+  // rename of the category is picked up automatically; no code list is stored.
+  const DISCRETIONARY_DEFAULT = { basis: 'plan', dining_adjust: 0, holiday_adjust: 0 };
+  let _discSettingsCache = null;
+
+  async function loadDiscretionaryBasis(force) {
+    if (_discSettingsCache && !force) return _discSettingsCache;
+    let out = Object.assign({}, DISCRETIONARY_DEFAULT);
+    try {
+      const rows = await rest('bd_discretionary_basis?id=eq.1');
+      const r = (rows && rows[0]) || {};
+      out = {
+        basis: (r.basis === 'actual') ? 'actual' : 'plan',
+        dining_adjust: Number(r.dining_adjust) || 0,
+        holiday_adjust: Number(r.holiday_adjust) || 0
+      };
+    } catch (e) { /* table missing or unreadable -> safe default (plan) */ }
+    _discSettingsCache = out;
+    return out;
+  }
+
+  async function saveDiscretionaryBasis(s) {
+    const payload = {
+      basis: (s && s.basis === 'actual') ? 'actual' : 'plan',
+      dining_adjust: Number(s && s.dining_adjust) || 0,
+      holiday_adjust: Number(s && s.holiday_adjust) || 0,
+      updated_at: new Date().toISOString()
+    };
+    await write('PATCH', 'bd_discretionary_basis?id=eq.1', payload);
+    _discSettingsCache = { basis: payload.basis, dining_adjust: payload.dining_adjust, holiday_adjust: payload.holiday_adjust };
+    return _discSettingsCache;
+  }
+
+  // Resolve which bd_bill_category codes are the Dining / Holidays (and Reimburse)
+  // buckets, by name (description first, then code), case-insensitive.
+  function discretionaryCodeSets(catRows) {
+    const dining = {}, holiday = {}, reimburse = {};
+    (catRows || []).forEach(function (c) {
+      const nm = String(c.description || '').trim().toLowerCase();
+      const cd = String(c.code || '').trim().toLowerCase();
+      if (nm === 'dining' || cd === 'dining') dining[c.code] = true;
+      if (nm === 'holiday' || nm === 'holidays' || cd === 'holiday' || cd === 'holidays') holiday[c.code] = true;
+      if (nm === 'reimburse' || cd === 'reimburse') reimburse[c.code] = true;
+    });
+    return { dining: dining, holiday: holiday, reimburse: reimburse };
+  }
+
+  // Trailing-12-month actual card spend for the Dining / Holidays categories.
+  // txns:   bd_card_txn rows { txn_date, amount, category_code }
+  // catRows: bd_bill_category rows { code, description }
+  // Window = the 12 calendar months ending at the most recent txn month present
+  // (mirrors Cost Analysis' rolling year). Net of refunds (negative amounts).
+  // Returns { diningTotal, holidayTotal, endMonth, months } — totals are the
+  // 12-month figures; divide by `months` (12) for the smoothed monthly average.
+  function actualDiscretionary12mo(txns, catRows) {
+    const sets = discretionaryCodeSets(catRows);
+    const present = {};
+    (txns || []).forEach(function (t) { const ym = String(t.txn_date || '').slice(0, 7); if (ym) present[ym] = true; });
+    const keys = Object.keys(present).sort();
+    if (!keys.length) return { diningTotal: 0, holidayTotal: 0, endMonth: null, months: 12 };
+    const end = keys[keys.length - 1];
+    const ey = Number(end.slice(0, 4)), em = Number(end.slice(5, 7));
+    const wanted = {};
+    for (let i = 11; i >= 0; i--) { let mm = em - i, yy = ey; while (mm <= 0) { mm += 12; yy -= 1; } wanted[yy + '-' + ('0' + mm).slice(-2)] = true; }
+    let dTot = 0, hTot = 0;
+    (txns || []).forEach(function (t) {
+      const ym = String(t.txn_date || '').slice(0, 7);
+      if (!wanted[ym]) return;
+      const code = t.category_code;
+      if (!code || sets.reimburse[code]) return;
+      const amt = Number(t.amount) || 0;
+      if (sets.dining[code]) dTot += amt;
+      else if (sets.holiday[code]) hTot += amt;
+    });
+    return { diningTotal: Math.round(dTot * 100) / 100, holidayTotal: Math.round(hTot * 100) / 100, endMonth: end, months: 12 };
+  }
+
+  // The single figures the engine / budget / bills should consume, honouring the
+  // saved basis. Callers pass the plan figures they already compute; on 'plan' those
+  // are returned unchanged (identical to today). On 'actual' the trailing-12-month
+  // totals + monthly adjustment×12 are used. If the actual data can't be read, it
+  // falls back to plan so nothing ever breaks (degraded:true flags that).
+  async function resolveDiscretionary(opts) {
+    const planD = Number(opts && opts.diningPlanAnnual) || 0;
+    const planH = Number(opts && opts.holidayPlanAnnual) || 0;
+    let settings;
+    try { settings = await loadDiscretionaryBasis(); } catch (e) { settings = Object.assign({}, DISCRETIONARY_DEFAULT); }
+    if (settings.basis !== 'actual') {
+      return { basis: 'plan', diningAnnual: planD, holidayAnnual: planH };
+    }
+    let cats = [], txns = [];
+    try {
+      const res = await Promise.all([
+        rest('bd_bill_category?select=code,description'),
+        rest('bd_card_txn?select=txn_date,amount,category_code&order=txn_date.desc&limit=5000')
+      ]);
+      cats = res[0] || []; txns = res[1] || [];
+    } catch (e) {
+      return { basis: 'plan', diningAnnual: planD, holidayAnnual: planH, degraded: true };
+    }
+    const a = actualDiscretionary12mo(txns, cats);
+    const dAdj = Number(settings.dining_adjust) || 0;   // monthly £
+    const hAdj = Number(settings.holiday_adjust) || 0;  // monthly £
+    return {
+      basis: 'actual',
+      diningAnnual: Math.max(0, a.diningTotal + dAdj * 12),
+      holidayAnnual: Math.max(0, a.holidayTotal + hAdj * 12)
+    };
+  }
+
   // ---- login (auth) gate ----
   // Injects a login overlay if the page doesn't already have one, then
   // calls onReady(session) once the user is signed in (now or already).
@@ -322,6 +444,9 @@
     holidayCtx: holidayCtx, holidayWeekBreakdown: holidayWeekBreakdown,
     holidayWeekTotal: holidayWeekTotal, holidayAnnual: holidayAnnual,
     HOLIDAY_MEALS: HOLIDAY_MEALS,
+    loadDiscretionaryBasis: loadDiscretionaryBasis, saveDiscretionaryBasis: saveDiscretionaryBasis,
+    actualDiscretionary12mo: actualDiscretionary12mo, resolveDiscretionary: resolveDiscretionary,
+    discretionaryCodeSets: discretionaryCodeSets,
     requireLogin: requireLogin, doLogin: doLogin, doLogout: doLogout,
     token: () => authToken
   };
