@@ -67,8 +67,11 @@
     const mealCostMap = {};
     (mealCost || []).forEach(c => { mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
     const DAY_COLS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-    const diningAnnual = (diningRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
-    const holidayAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], (holidaySettings && holidaySettings[0]) || {}), 'retired');
+    const diningPlanAnnual = (diningRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
+    const holidayPlanAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], (holidaySettings && holidaySettings[0]) || {}), 'retired');
+    // Budget basis: Plan (above) or Actual last-12-months + adjustment, per the saved choice.
+    const _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual });
+    const diningAnnual = _eff.diningAnnual, holidayAnnual = _eff.holidayAnnual;
     const data = { members, bills, dining, diningAnnual, holidayAnnual, guaranteed, pensions, contributions, logs, purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [], incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
     const sortedM = (members || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const p1Name = sortedM[0] ? sortedM[0].name : 'Graham';

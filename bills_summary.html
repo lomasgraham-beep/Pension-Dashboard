@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Summary of Household Bills</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=hol1"></script>
+<script src="common.js?v=disc1"></script>
 <style>
   :root { --accent:#1d3a63; --accent-dark:#14294a; --accent-soft:#e6f5f7; --accent-border:#bfe4e9; --on-accent:#ffffff; --other:#94a3b8; }
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:980px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
@@ -315,11 +315,14 @@
           App.rest('bd_dining_rota')
         ]);
         const ctx = App.holidayCtx(hCost || [], hMeal || [], (hSet && hSet[0]) || {});
-        holAnnual = App.holidayAnnual(hPlan || [], ctx, 'retired');
+        const holPlanAnnual = App.holidayAnnual(hPlan || [], ctx, 'retired');
         const mealMap = {};
         (hMeal || []).forEach(c => { mealMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
         const DAY_COLS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-        dinAnnual = (dRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
+        const dinPlanAnnual = (dRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
+        // Budget basis: Plan (above) or Actual last-12-months + adjustment, per the saved choice.
+        const _eff = await App.resolveDiscretionary({ diningPlanAnnual: dinPlanAnnual, holidayPlanAnnual: holPlanAnnual });
+        holAnnual = _eff.holidayAnnual; dinAnnual = _eff.diningAnnual;
       } catch (e) { holAnnual = 0; dinAnnual = 0; }
       if ((!allBills || !allBills.length) && !(holAnnual > 0) && !(dinAnnual > 0)) { status.textContent = 'No bills found. Add some on the Household Bills tab.'; return; }
       allBills = allBills || [];
