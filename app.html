@@ -1438,7 +1438,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-434</span>
+      <span class="build-stamp">LC-435</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1447,17 +1447,17 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
   <select id="tabSelect" class="tab-select" onchange="showTab(null, this.value)" aria-label="Choose section">
     <option value="Overview">Overview</option>
     <option value="LogEntry">Log Entry</option>
+    <option value="LivingCosts">Living Costs</option>
     <option value="Modelling">Modelling</option>
     <option value="Intelligent">Intelligent Modelling</option>
-    <option value="LivingCosts">Living Costs</option>
     <option value="BasicData">Basic Data</option>
   </select>
   <div class="tab-buttons">
     <button class="tab-link active-btn" onclick="showTab(event,'Overview')">Overview</button>
     <button class="tab-link" onclick="showTab(event,'LogEntry')">Log Entry</button>
+    <button class="tab-link" onclick="showTab(event,'LivingCosts')">Living Costs</button>
     <button class="tab-link" onclick="showTab(event,'Modelling')">Modelling</button>
     <button class="tab-link" onclick="showTab(event,'Intelligent')">Intelligent Modelling</button>
-    <button class="tab-link" onclick="showTab(event,'LivingCosts')">Living Costs</button>
     <button class="tab-link" onclick="showTab(event,'BasicData')">Basic Data</button>
   </div>
 
@@ -2000,8 +2000,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       <div class="subtab-row">
       <button id="subbtn-CardEntry" class="subtab-link" onclick="showSub(event,'CardEntry')">Card Entry</button>
       <button id="subbtn-CardStatements" class="subtab-link" onclick="showSub(event,'CardStatements')">Card Statements</button>
-      <button id="subbtn-CardCats" class="subtab-link" onclick="showSub(event,'CardCats')">Card Categories</button>
       <button id="subbtn-CostAnalysis" class="subtab-link" onclick="showSub(event,'CostAnalysis')">Cost Analysis</button>
+      <button id="subbtn-CardCats" class="subtab-link" onclick="showSub(event,'CardCats')">Card Categories</button>
       <button id="subbtn-PayPal" class="subtab-link" onclick="showSub(event,'PayPal')">PayPal</button>
       </div>
     </div>
@@ -5647,7 +5647,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-434';
+    if (stamp) stamp.textContent = 'LC-435';
   }
 
   function buildSubnav() {
