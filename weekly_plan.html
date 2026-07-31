@@ -184,7 +184,7 @@
 </head>
 <body>
   <h1>Weekly Plan <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(52-week dining &amp; holidays)</span></h1>
-  <p class="note">Both planners in one place: each week shows home dining and the holiday side by side, and the year strip flags where they overlap. Dining and holiday costs feed the retirement model &mdash; choose <b>Plan</b> or <b>Actual (last 12 months)</b> in the Budget basis panel below, and it applies to the budget, the bills page and the model on any device. <span style="color:#94a3b8;">(weekly build: v3)</span></p>
+  <p class="note">Both planners in one place: each week shows home dining and the holiday side by side, and the year strip flags where they overlap. Dining and holiday costs feed the retirement model &mdash; choose <b>Plan</b> or <b>Actual (last 12 months)</b> in the Budget basis panel below, and it applies to the budget, the bills page and the model on any device. <span style="color:#94a3b8;">(weekly build: v4)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div class="taper-card" id="taperCard" style="display:none;">
@@ -308,10 +308,11 @@
   function renderBasis() {
     const din12 = discActual ? (Number(discActual.diningTotal) || 0) : 0;
     const hol12 = discActual ? (Number(discActual.holidayTotal) || 0) : 0;
-    const dinAvg = din12 / 12, holAvg = hol12 / 12;
+    const dinAvg = Math.round(din12 / 12), holAvg = Math.round(hol12 / 12);
     const dAdj = Number(document.getElementById('dinAdj').value) || 0;
     const hAdj = Number(document.getElementById('holAdj').value) || 0;
-    const dinAfter = Math.max(0, dinAvg + dAdj), holAfter = Math.max(0, holAvg + hAdj);
+    // Round each monthly figure to whole pounds (matching the display) so after × 12 = the model feed.
+    const dinAfter = Math.max(0, Math.round(din12 / 12 + dAdj)), holAfter = Math.max(0, Math.round(hol12 / 12 + hAdj));
     setText('bDin12', fmt(din12)); setText('bDinAvg', fmt(dinAvg)); setText('bDinAfter', fmt(dinAfter));
     setText('bHol12', fmt(hol12)); setText('bHolAvg', fmt(holAvg)); setText('bHolAfter', fmt(holAfter));
     setText('basisWin', discActual && discActual.endMonth ? '(12 months to ' + fmtMonth(discActual.endMonth) + ')' : '(no card data yet)');
@@ -820,9 +821,9 @@
 </script>
 
 <script>
-/* LC-384: deploy stamp (this page does not load the engine). */
+/* LC-385: deploy stamp (this page does not load the engine). */
 (function () {
-  var TAG = 'weekly v3';
+  var TAG = 'weekly v4';
   function go() {
     var s = document.createElement('div');
     s.style.cssText = 'text-align:right;padding:2px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
