@@ -284,10 +284,13 @@
     const a = actualDiscretionary12mo(txns, cats);
     const dAdj = Number(settings.dining_adjust) || 0;   // monthly £
     const hAdj = Number(settings.holiday_adjust) || 0;  // monthly £
+    // Round each monthly figure to whole pounds first (matching the whole-£ display),
+    // then annualise — so the "after adjust / month" shown on Weekly Plan × 12 equals
+    // exactly what the model is fed (no few-pounds drift from hidden pence).
     return {
       basis: 'actual',
-      diningAnnual: Math.max(0, a.diningTotal + dAdj * 12),
-      holidayAnnual: Math.max(0, a.holidayTotal + hAdj * 12)
+      diningAnnual: Math.max(0, Math.round(a.diningTotal / 12 + dAdj) * 12),
+      holidayAnnual: Math.max(0, Math.round(a.holidayTotal / 12 + hAdj) * 12)
     };
   }
 
