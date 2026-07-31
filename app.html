@@ -1438,7 +1438,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-438</span>
+      <span class="build-stamp">LC-439</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -3330,6 +3330,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     function ovEnsurePerfState(){
       _perfContribs = data.contributions || [];
       _perfExceptions = data.contributionExceptions || [];
+      _perfRateHistory = data.contributionRateHistory || [];
       _perfParams = data.paramsByMember || {};
       _perfTiers = {};
       (data.workingTiers || []).forEach(t => {
@@ -3789,7 +3790,22 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     // ---- Overview pension-performance blocks ----
     // Mirrors the KPI table's per-pension calculation EXACTLY (same tier-based
     // contribution stripping fixed in kpis.html build cumgr5), so the two pages agree.
-    let _perfContribs = [], _perfExceptions = [], _perfTiers = {}, _perfParams = {};
+    let _perfContribs = [], _perfExceptions = [], _perfTiers = {}, _perfParams = {}, _perfRateHistory = [];
+    // Value in force for a standard contribution as at a given month (year*12+month index),
+    // from the effective-dated bd_contribution_rate_history series. Returns null when no dated
+    // entry applies, in which case the caller falls back to the current live contribution.
+    function perfAsOfStandardValue(member, pension, days, monthIdx) {
+      let best = null, bestIdx = -Infinity;
+      (_perfRateHistory || []).forEach(h => {
+        if (h.member_name !== member || h.pension_name !== pension) return;
+        const wd = h.working_days;
+        if (!(wd == null || wd === '' || (days != null && Number(wd) === Number(days)))) return;
+        const hd = new Date(h.effective_from); if (isNaN(hd)) return;
+        const hIdx = hd.getFullYear() * 12 + hd.getMonth();
+        if (hIdx <= monthIdx && hIdx > bestIdx) { bestIdx = hIdx; best = h; }
+      });
+      return best ? (Number(best.monthly_value) || 0) : null;
+    }
     function perfMedian(a) { const s = [...a].sort((x, y) => x - y), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
     function perfExpectedDays(log) {
       const ld = new Date(log.log_date);
@@ -3819,7 +3835,9 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         if (wd == null || wd === '') return true;
         return Number(wd) === Number(expectedDays);
       });
-      let normal = match ? (Number(match.monthly_contribution) || 0) : 0;
+      // effective-dated value in force for this log month wins; else the current live row
+      const _asOf = perfAsOfStandardValue(log.member_name, log.pension_name, expectedDays, idx);
+      let normal = (_asOf != null) ? _asOf : (match ? (Number(match.monthly_contribution) || 0) : 0);
       let override = null, oneOff = 0;
       (_perfExceptions || []).forEach(e => {
         if (e.member_name !== log.member_name || e.pension_name !== log.pension_name) return;
@@ -4864,7 +4882,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front115';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front116';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -5014,7 +5032,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     async function loadEverything() {
       const status = document.getElementById('status');
       try {
-        const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases, crashes, savingsAccounts, contributionExceptions, workingTiers, incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings, diningSettings] = await Promise.all([
+        const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases, crashes, savingsAccounts, contributionExceptions, contributionRateHistory, workingTiers, incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings, diningSettings] = await Promise.all([
           App.rest('bd_members'), App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
           App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
           App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
@@ -5022,6 +5040,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
           App.rest('bd_market_crashes?order=start_date.asc'),
           App.rest('bd_savings_accounts?order=account_name.asc'),
           App.rest('bd_contribution_exceptions?order=start_date.asc'),
+          App.rest('bd_contribution_rate_history?order=effective_from.asc'),
           App.rest('bd_working_tiers?order=from_date.asc'),
           App.rest('bd_income_sources?order=member_name.asc'),
           App.rest('bd_income_amounts?order=member_name.asc'),
@@ -5052,7 +5071,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         const diningTaper = { taper_at_70: ds.taper_at_70, taper_at_80: ds.taper_at_80, taper_at_90: ds.taper_at_90 };
         data = { members, bills, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual, holidayTaper: holidayTaper, diningTaper: diningTaper,
                  guaranteed, pensions, contributions, logs,
-                 purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [],
+                 purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: contributionExceptions || [], contributionRateHistory: contributionRateHistory || [], workingTiers: workingTiers || [],
                  incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
 
         // derive person names (alphabetical, matching the engine); p2Name null = single-person instance
@@ -5650,7 +5669,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-438';
+    if (stamp) stamp.textContent = 'LC-439';
   }
 
   function buildSubnav() {
