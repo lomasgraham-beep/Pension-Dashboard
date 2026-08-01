@@ -152,7 +152,7 @@
   let allTiers = [], tiersByMember = {};
 
   // Value in force for a standard contribution as at a given month (year*12+month index),
-  // from the effective-dated bd_contribution_rate_history series. Returns null when no dated
+  // from the effective-dated bd_contribution_schedule series. Returns null when no dated
   // entry applies, in which case the caller falls back to the current live contribution.
   function asOfStandardValue(member, pension, days, monthIdx) {
     let best = null, bestIdx = -Infinity;
@@ -592,7 +592,7 @@
         App.rest('op_modelling_parameters'),
         App.rest('bd_contribution_exceptions?order=start_date.asc'),
         App.rest('bd_working_tiers?order=from_date.asc'),
-        App.rest('bd_contribution_rate_history?order=effective_from.asc')
+        App.rest('bd_contribution_schedule?order=effective_from.asc')
       ]);
       allLogs = logs; allContributions = contribs; allExceptions = excRows || [];
       allRateHistory = rateHist || [];

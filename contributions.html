@@ -92,6 +92,23 @@
   }
 
 
+
+  /* ---- Contribution schedule table ---- */
+  .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  #schedTable { width:100%; border-collapse:collapse; font-size:13px; }
+  #schedTable th, #schedTable td { padding:7px 8px; border-bottom:1px solid #e2e8f0; text-align:left; white-space:nowrap; vertical-align:top; }
+  #schedTable th { background:#f8fafc; color:#2c3e50; font-size:12px; font-weight:bold; }
+  #schedTable input, #schedTable select { padding:7px; font-size:13px; width:auto; max-width:none; min-width:0; box-sizing:border-box; }
+  #schedTable input.num { width:92px; text-align:right; }
+  #schedTable input.dt { width:150px; }
+  #schedTable tr.dirty td { background:#fffbeb; }
+  .sched-save { background:#27ae60; color:#fff; border:none; border-radius:5px; padding:6px 11px; font-size:12px; font-weight:bold; cursor:pointer; }
+  .sched-del { background:#fff5f5; color:#c0392b; border:1px solid #f5c6cb; border-radius:5px; padding:6px 10px; font-size:12px; font-weight:bold; cursor:pointer; margin-left:5px; }
+  .sched-dirty { color:#b45309; font-weight:bold; margin-right:6px; display:none; }
+  @media (prefers-color-scheme: dark) {
+    #schedTable th { background:#0f172a !important; color:#cbd5e1 !important; }
+    #schedTable tr.dirty td { background:#3a2f14 !important; }
+  }
 </style>
 </head>
 <body>
@@ -111,23 +128,27 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: rate1)</span></h1>
+<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: sched1)</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
-<div class="panel">
-  <p class="intro">
-    The monthly amounts paid into each pension. Where a member's hours vary, contributions can differ by <strong>working-days tier</strong> (5-, 4- or 3-day week) and the model picks the row matching their current phase &mdash; so each tier is shown clearly.
-    Each row is saved <strong>separately</strong>; nothing is stored until you tap its <strong>Save</strong>, and <strong>Reload</strong> discards edits.
-    <br><br>
-    <strong>Annual increase</strong> is entered as a friendly percentage (e.g. <code>3</code> for 3%) &mdash; the model applies it once a year, in the <strong>increase month</strong> you choose per row, to grow the contribution over time.
+<div class="panel" style="margin-bottom:18px;">
+  <p class="intro" style="margin:0;">
+    Every pension contribution as a <strong>dated series</strong>. Each entry is the monthly amount <strong>from its effective date onward</strong>, until a later-dated entry takes over &mdash; so to plan a change (now or in the future) add an entry with the new amount and the date it starts. The dashboard, budget, forecast and KPI all read the value in force for the month they show. <strong>Increase %</strong> grows the amount once a year in the <strong>increase month</strong>; a planned step is flat from its date. Leave <strong>Tier</strong> as <em>All</em> unless the amount differs by working-days week. Contributions stop at retirement.
   </p>
 </div>
 
-<div class="panel" style="margin-bottom:18px;">
-  <p class="intro" style="margin:0;">These are your pension contributions, one row per working-days tier. The rows come from the tiers you set on the <strong>Defaults</strong> page — to add or remove one, tick or untick the pension on a tier there. Here you set each row's <strong>amount</strong>, its <strong>annual increase</strong>, and the <strong>month</strong> the rise applies. Contributions stop at retirement.</p>
+<div class="panel">
+  <div style="margin:0 0 12px;">
+    <button class="btn" onclick="addScheduleEntry()">+ Add entry</button>
+    <span id="schedMsg" style="font-weight:bold; font-size:14px; margin-left:10px;"></span>
+  </div>
+  <div class="table-wrap">
+    <table id="schedTable">
+      <thead><tr><th>Member</th><th>Pension</th><th>Tier</th><th>Monthly &pound;</th><th>Effective from</th><th>Increase %</th><th>Increase month</th><th>Account</th><th></th></tr></thead>
+      <tbody><tr><td colspan="9">Loading&hellip;</td></tr></tbody>
+    </table>
+  </div>
 </div>
-
-<div id="container"></div>
 
 <div class="panel" style="margin-top:28px;">
   <h2 style="margin-top:0;">Contribution Exceptions</h2>
@@ -144,19 +165,6 @@
   <div id="excContainer"></div>
 </div>
 
-<div class="panel" style="margin-top:28px;">
-  <h2 style="margin-top:0;">Contribution History <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(for growth netting)</span></h2>
-  <p class="intro">
-    Records what a standard monthly contribution has been <strong>over time</strong>, so the growth figures on the dashboard and the KPI page net the right amount for each period. Changing the amount on a card above only sets it from now on &mdash; it does <strong>not</strong> rewrite what was actually paid in the past. Add history here so past logs keep the value that was really in force.
-    <br><br>
-    Each entry sets the monthly value <strong>from its effective date onward, until the next entry</strong>. So for a contribution that changed, add <em>two</em> entries: one for the old amount (dated when it started, or any early date), and one for the new amount (dated when it changed). Months before your earliest entry fall back to the current amount on the card above. Leave <strong>tier</strong> as <em>All</em> unless the amount differs by working-days week.
-  </p>
-  <div style="margin:10px 0;">
-    <button class="btn" onclick="addRateHist()">+ Add change</button>
-    <span id="rhMsg" style="font-weight:bold; font-size:14px; margin-left:10px;"></span>
-  </div>
-  <div id="rhContainer"></div>
-</div>
 </div><!-- /appWrap -->
 
 <script>
@@ -190,6 +198,7 @@
   const SUPABASE_URL = "https://yavfcitgyyftpubqwddp.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdmZjaXRneXlmdHB1YnF3ZGRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzkwNTgsImV4cCI6MjA5NDg1NTA1OH0.sK7t0YkJlPL6_WlFHfX8JYyw4zB_nAU5iBFL07LdW9Y";
   const CONTRIB_URL = `${SUPABASE_URL}/rest/v1/bd_pension_contributions`;
+  const SCHED_URL = `${SUPABASE_URL}/rest/v1/bd_contribution_schedule`;
   const getHeaders = () => ({ "apikey": SUPABASE_KEY, "Authorization": `Bearer ${authToken || SUPABASE_KEY}`, "Content-Type": "application/json" });
   let authToken = null;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -197,9 +206,11 @@
   sb.auth.onAuthStateChange(function (_e, session) { if (session && session.access_token) authToken = session.access_token; });
 
   const fmt = (n) => "£" + Number(n || 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  let rows = [];
+  let rows = [];            // bd_pension_contributions (kept as the synced current-value mirror)
   let bankAccounts = [];
-  const dirty = {};
+  let schedule = [];        // bd_contribution_schedule — the dated series (source of truth)
+  let penNames = [];
+  const schedDirty = {};
 
   function ACCT_OPTS(sel) {
     const cur = sel || '';
@@ -209,8 +220,8 @@
     return opts;
   }
 
-  function markDirty(id) { dirty[id] = true; const f = document.getElementById('dirty_' + id); if (f) f.style.display = 'inline-block'; }
-  function clearDirty(id) { dirty[id] = false; const f = document.getElementById('dirty_' + id); if (f) f.style.display = 'none'; }
+  function schedMarkDirty(id) { schedDirty[id] = true; const tr = document.getElementById('schedrow_' + id); if (tr) tr.classList.add('dirty'); const f = document.getElementById('scheddirty_' + id); if (f) f.style.display = 'inline'; }
+  function schedClearDirty(id) { schedDirty[id] = false; const tr = document.getElementById('schedrow_' + id); if (tr) tr.classList.remove('dirty'); const f = document.getElementById('scheddirty_' + id); if (f) f.style.display = 'none'; }
 
   // stored decimal (0.03) <-> friendly percent (3)
   const toPct = (dec) => dec == null ? '' : +(Number(dec) * 100).toFixed(4);
@@ -222,131 +233,164 @@
     return MONTH_NAMES.map((nm, i) => `<option value="${i + 1}" ${(i + 1) === s ? 'selected' : ''}>${nm}</option>`).join('');
   }
 
-  function tierLabel(wd) {
-    if (wd == null) return { txt: 'All / n/a', cls: 'na' };
-    return { txt: wd + '-day week', cls: '' };
+  function schedWdOpts(sel) {
+    const cur = (sel == null || sel === '') ? '' : String(sel);
+    let opts = `<option value="" ${cur === '' ? 'selected' : ''}>All</option>`;
+    ['5', '4', '3'].forEach(d => { opts += `<option value="${d}" ${cur === d ? 'selected' : ''}>${d}-day</option>`; });
+    if (cur !== '' && ['5', '4', '3'].indexOf(cur) < 0) opts += `<option value="${cur}" selected>${cur}-day</option>`;
+    return opts;
+  }
+  const MEM_OPTS = (sel) => {
+    const list = excMembers.length ? excMembers : [...new Set(rows.map(r => r.member_name).filter(Boolean))].sort();
+    let o = list.map(m => `<option ${m === sel ? 'selected' : ''}>${String(m).replace(/</g, '&lt;')}</option>`).join('');
+    if (sel && list.indexOf(sel) < 0) o += `<option selected>${String(sel).replace(/</g, '&lt;')}</option>`;
+    return o;
+  };
+  const PEN_OPTS = (sel) => {
+    const known = [...new Set(penNames.concat(sel ? [sel] : []))].filter(Boolean).sort();
+    return known.map(p => `<option ${p === sel ? 'selected' : ''}>${String(p).replace(/</g, '&lt;')}</option>`).join('');
+  };
+  const MONTH_OPTS_OPT = (sel) => {
+    let o = `<option value="" ${(sel == null || sel === '') ? 'selected' : ''}>&mdash;</option>`;
+    o += MONTH_NAMES.map((nm, i) => `<option value="${i + 1}" ${Number(sel) === (i + 1) ? 'selected' : ''}>${nm}</option>`).join('');
+    return o;
+  };
+
+  function renderSchedule() {
+    const tb = document.querySelector('#schedTable tbody');
+    if (!schedule.length) { tb.innerHTML = '<tr><td colspan="9" style="color:#94a3b8;">No entries yet. Tap &ldquo;Add entry&rdquo; to record a contribution and the date it starts.</td></tr>'; return; }
+    const wdKey = w => (w == null || w === '') ? -1 : Number(w);
+    const sorted = schedule.slice().sort((a, b) =>
+      String(a.member_name || '').localeCompare(String(b.member_name || '')) ||
+      String(a.pension_name || '').localeCompare(String(b.pension_name || '')) ||
+      (wdKey(a.working_days) - wdKey(b.working_days)) ||
+      String(a.effective_from || '').localeCompare(String(b.effective_from || '')));
+    tb.innerHTML = sorted.map(r => {
+      const id = r.id;
+      return `<tr id="schedrow_${id}">
+        <td><select id="sm_${id}" onchange="schedMarkDirty('${id}')">${MEM_OPTS(r.member_name)}</select></td>
+        <td><select id="sp_${id}" onchange="schedMarkDirty('${id}')">${PEN_OPTS(r.pension_name)}</select></td>
+        <td><select id="sw_${id}" onchange="schedMarkDirty('${id}')">${schedWdOpts(r.working_days)}</select></td>
+        <td><input type="number" step="0.01" class="num" id="sv_${id}" value="${r.monthly_value != null ? r.monthly_value : ''}" onfocus="if(this.value==='0'){this.value='';}" oninput="schedMarkDirty('${id}')"></td>
+        <td><input type="date" class="dt" id="sf_${id}" value="${r.effective_from ? String(r.effective_from).split('T')[0] : ''}" onchange="schedMarkDirty('${id}')"></td>
+        <td><input type="number" step="0.01" class="num" id="si_${id}" value="${toPct(r.increase_pct)}" onfocus="if(this.value==='0'){this.value='';}" oninput="schedMarkDirty('${id}')"></td>
+        <td><select id="sim_${id}" onchange="schedMarkDirty('${id}')">${MONTH_OPTS_OPT(r.increase_month)}</select></td>
+        <td><select id="sa_${id}" onchange="schedMarkDirty('${id}')">${ACCT_OPTS(r.paid_account)}</select></td>
+        <td style="white-space:nowrap;"><span id="scheddirty_${id}" class="sched-dirty">&bull;</span><button class="sched-save" onclick="saveScheduleEntry('${id}')">Save</button><button class="sched-del" onclick="deleteScheduleEntry('${id}')">Del</button><div class="row-msg" id="schedmsg_${id}" style="font-size:12px;"></div></td>
+      </tr>`;
+    }).join('');
   }
 
-  function render() {
-    const c = document.getElementById('container');
-    if (!rows.length) { c.innerHTML = '<div class="panel">No contribution rows found in the database.</div>'; return; }
-
-    const owners = [...new Set(rows.map(r => r.member_name || 'Unassigned'))].sort();
-    let html = '';
-    owners.forEach(owner => {
-      html += `<div class="owner-head">${owner}</div>`;
-      const pensionsForOwner = [...new Set(rows.filter(r => (r.member_name || 'Unassigned') === owner).map(r => r.pension_name))].sort();
-      pensionsForOwner.forEach(pen => {
-        html += `<div class="pension-head">${pen}</div>`;
-        rows.filter(r => (r.member_name || 'Unassigned') === owner && r.pension_name === pen)
-            .sort((a, b) => (b.working_days || 0) - (a.working_days || 0))
-            .forEach(r => {
-          const id = r.id;
-          const tier = tierLabel(r.working_days);
-          html += `<div class="card">
-            <div class="card-top">
-              <span class="tier-badge ${tier.cls}">${tier.txt}</span>
-              <span id="dirty_${id}" class="dirty-flag">Unsaved</span>
-            </div>
-            <div class="grid">
-              <div class="field">
-                <label>Monthly contribution</label>
-                <span class="hint">Amount paid in each month (£).</span>
-                <input type="number" step="0.01" id="amt_${id}" value="${r.monthly_contribution != null ? r.monthly_contribution : ''}" oninput="markDirty('${id}')">
-              </div>
-              <div class="field">
-                <label>Annual increase (%)</label>
-                <span class="hint">Annual rise, applied once a year.</span>
-                <input type="number" step="0.01" id="aug_${id}" value="${toPct(r.august_increase_pct)}" oninput="markDirty('${id}')">
-              </div>
-              <div class="field">
-                <label>Increase month</label>
-                <span class="hint">Which month the rise is applied.</span>
-                <select id="incm_${id}" onchange="markDirty('${id}')">
-                  ${MONTH_OPTS(r.increase_month)}
-                </select>
-              </div>
-              <div class="field">
-                <label>Paid from account</label>
-                <span class="hint">Which bank account pays this in.</span>
-                <select id="acct_${id}" onchange="markDirty('${id}')">
-                  ${ACCT_OPTS(r.paid_account)}
-                </select>
-              </div>
-            </div>
-            <div class="btn-row">
-              <button class="btn btn-save" onclick="saveRow('${id}')">Save</button>
-              <button class="btn btn-ghost" onclick="reloadRow('${id}')">Reload</button>
-            </div>
-            <div class="row-msg" id="msg_${id}"></div>
-          </div>`;
-        });
-      });
-    });
-    c.innerHTML = html;
+  async function addScheduleEntry() {
+    const msg = document.getElementById('schedMsg');
+    const payload = { member_name: (excMembers[0] || (rows[0] && rows[0].member_name) || ''), pension_name: (penNames[0] || ''), working_days: null, monthly_value: 0, effective_from: new Date().toISOString().split('T')[0], increase_pct: null, increase_month: null, paid_account: null };
+    msg.style.color = '#1e3a8a'; msg.textContent = 'Adding…';
+    try {
+      const res = await fetch(SCHED_URL, { method: 'POST', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error('POST → ' + res.status);
+      const created = await res.json();
+      if (created && created.length) schedule.push(created[0]);
+      renderSchedule(); msg.style.color = '#065f46'; msg.textContent = '✓ Added — set the details and Save.';
+    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Add failed: ' + e.message; }
   }
 
-  function reloadRow(id) {
-    if (dirty[id] && !confirm('Discard unsaved edits to this row?')) return;
-    const r = rows.find(x => x.id === id);
-    document.getElementById('amt_' + id).value = r.monthly_contribution != null ? r.monthly_contribution : '';
-    document.getElementById('aug_' + id).value = toPct(r.august_increase_pct);
-    document.getElementById('incm_' + id).value = String(r.increase_month == null ? 8 : r.increase_month);
-    if (document.getElementById('acct_' + id)) document.getElementById('acct_' + id).value = r.paid_account || '';
-    clearDirty(id);
-    document.getElementById('msg_' + id).innerHTML = '';
-  }
-
-  async function saveRow(id) {
-    const msg = document.getElementById('msg_' + id);
-    const amtRaw = document.getElementById('amt_' + id).value;
-    const augRaw = document.getElementById('aug_' + id).value;
-
-    const amt = amtRaw === '' ? null : Number(amtRaw);
-    if (amt != null && (isNaN(amt) || amt < 0)) { msg.style.color = '#c0392b'; msg.innerText = 'Monthly contribution must be a positive number. Nothing saved.'; return; }
-    const augPct = augRaw === '' ? null : Number(augRaw);
-    if (augPct != null && (isNaN(augPct) || augPct < 0 || augPct > 100)) { msg.style.color = '#c0392b'; msg.innerText = 'Annual increase looks wrong — enter a percentage like 3 (not 0.03). Nothing saved.'; return; }
-
-    // working_days is fixed by the tier this row belongs to (managed on Defaults) — preserve it.
+  async function saveScheduleEntry(id) {
+    const msg = document.getElementById('schedmsg_' + id);
+    const valRaw = document.getElementById('sv_' + id).value;
+    const val = valRaw === '' ? 0 : Number(valRaw);
+    if (isNaN(val) || val < 0) { msg.style.color = '#c0392b'; msg.innerText = 'Monthly £ must be 0 or more.'; return; }
+    const fromRaw = document.getElementById('sf_' + id).value || null;
+    if (!fromRaw) { msg.style.color = '#c0392b'; msg.innerText = 'Effective-from date required.'; return; }
+    const incRaw = document.getElementById('si_' + id).value;
+    if (incRaw !== '' && (isNaN(Number(incRaw)) || Number(incRaw) < 0 || Number(incRaw) > 100)) { msg.style.color = '#c0392b'; msg.innerText = 'Increase % looks wrong — enter e.g. 3.'; return; }
+    const wdRaw = document.getElementById('sw_' + id).value;
+    const imRaw = document.getElementById('sim_' + id).value;
     const payload = {
-      monthly_contribution: amt,
-      august_increase_pct: toDec(augRaw),
-      increase_month: parseInt(document.getElementById('incm_' + id).value) || 8,
-      paid_account: document.getElementById('acct_' + id).value || null
+      member_name: document.getElementById('sm_' + id).value,
+      pension_name: document.getElementById('sp_' + id).value,
+      working_days: wdRaw === '' ? null : Number(wdRaw),
+      monthly_value: val,
+      effective_from: fromRaw,
+      increase_pct: incRaw === '' ? null : Number(incRaw) / 100,
+      increase_month: imRaw === '' ? null : Number(imRaw),
+      paid_account: document.getElementById('sa_' + id).value || null
     };
-
     msg.style.color = '#1e3a8a'; msg.innerText = 'Saving…';
     try {
-      const res = await fetch(`${CONTRIB_URL}?id=eq.${id}`,
-        { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify(payload) });
+      const res = await fetch(`${SCHED_URL}?id=eq.${id}`, { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error('PATCH → ' + res.status);
-      const check = await fetch(`${CONTRIB_URL}?id=eq.${id}`, { headers: getHeaders() });
-      const fresh = check.ok ? await check.json() : [];
-      if (fresh.length) { const i = rows.findIndex(x => x.id === id); if (i >= 0) rows[i] = fresh[0]; }
-      clearDirty(id);
-      msg.style.color = '#065f46';
-      msg.innerText = '✓ Saved. Refresh the dashboard or Scenario Lab to pick up the change.';
-    } catch (e) {
-      msg.style.color = '#c0392b';
-      msg.innerText = 'Save failed: ' + e.message + '. Nothing was changed.';
+      const fresh = await res.json();
+      if (fresh && fresh.length) { const i = schedule.findIndex(x => x.id === id); if (i >= 0) schedule[i] = fresh[0]; }
+      schedClearDirty(id);
+      await syncMirror(payload.member_name, payload.pension_name);
+      renderSchedule();
+      const m2 = document.getElementById('schedmsg_' + id); if (m2) { m2.style.color = '#065f46'; m2.innerText = '✓ Saved. Refresh the dashboard to pick up the change.'; }
+    } catch (e) { const m3 = document.getElementById('schedmsg_' + id); if (m3) { m3.style.color = '#c0392b'; m3.innerText = 'Save failed: ' + e.message; } }
+  }
+
+  async function deleteScheduleEntry(id) {
+    if (!confirm('Delete this entry?')) return;
+    const ent = schedule.find(x => x.id === id) || {};
+    try {
+      const res = await fetch(`${SCHED_URL}?id=eq.${id}`, { method: 'DELETE', headers: getHeaders() });
+      if (!res.ok) throw new Error('DELETE → ' + res.status);
+      schedule = schedule.filter(x => x.id !== id); schedClearDirty(id);
+      if (ent.member_name) await syncMirror(ent.member_name, ent.pension_name);
+      renderSchedule();
+    } catch (e) { const m = document.getElementById('schedmsg_' + id); if (m) { m.style.color = '#c0392b'; m.innerText = 'Delete failed: ' + e.message; } }
+  }
+
+  // The value in force at a date for one member/pension/tier = latest entry effective on/before it.
+  function inForceEntry(member, pension, workingDays, asOfMs) {
+    let best = null, bestT = -Infinity;
+    schedule.forEach(e => {
+      if (e.member_name !== member || e.pension_name !== pension) return;
+      const wd = e.working_days;
+      if (!(wd == null || wd === '' || (workingDays != null && Number(wd) === Number(workingDays)))) return;
+      const tt = new Date(e.effective_from).getTime(); if (isNaN(tt)) return;
+      if (tt <= asOfMs && tt > bestT) { bestT = tt; best = e; }
+    });
+    return best;
+  }
+
+  // Keep bd_pension_contributions (read by the rest of the app) equal to the value in force TODAY,
+  // so every other page shows the current level with no change needed to them.
+  async function syncMirror(member, pension) {
+    const now = Date.now();
+    const targets = rows.filter(r => r.member_name === member && r.pension_name === pension);
+    for (const r of targets) {
+      const e = inForceEntry(member, pension, r.working_days, now);
+      if (!e) continue;
+      const patch = {
+        monthly_contribution: Number(e.monthly_value) || 0,
+        august_increase_pct: (e.increase_pct == null || e.increase_pct === '') ? r.august_increase_pct : Number(e.increase_pct),
+        increase_month: (e.increase_month == null) ? r.increase_month : Number(e.increase_month),
+        paid_account: (e.paid_account == null || e.paid_account === '') ? r.paid_account : e.paid_account
+      };
+      try {
+        const res = await fetch(`${CONTRIB_URL}?id=eq.${r.id}`, { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=minimal' }, body: JSON.stringify(patch) });
+        if (res.ok) Object.assign(r, patch);
+      } catch (_e) {}
     }
   }
 
-  // ---- Add / delete contribution rows ----
   async function loadAll() {
     const status = document.getElementById('status');
     try {
-      const [r, ba] = await Promise.all([
+      const [sc, r, ba] = await Promise.all([
+        fetch(`${SCHED_URL}?order=member_name.asc,pension_name.asc,effective_from.asc`, { headers: getHeaders() }),
         fetch(`${CONTRIB_URL}?order=member_name.asc,pension_name.asc`, { headers: getHeaders() }),
         fetch(`${SUPABASE_URL}/rest/v1/bd_bank_account?order=account_id.asc`, { headers: getHeaders() })
       ]);
-      if (!r.ok) throw new Error('load → ' + r.status);
-      rows = await r.json();
+      if (!sc.ok) throw new Error('load → ' + sc.status);
+      schedule = await sc.json();
+      rows = r.ok ? await r.json() : [];
       bankAccounts = ba.ok ? (await ba.json()).map(a => a.account_id).filter(Boolean) : [];
-      render();
+      penNames = [...new Set(schedule.map(s => s.pension_name).concat(rows.map(x => x.pension_name)).filter(Boolean))].sort();
+      renderSchedule();
       loadExceptions();
       status.className = 'status-ok';
-      status.innerText = `Loaded ${rows.length} contribution row${rows.length === 1 ? '' : 's'}.`;
+      status.innerText = `Loaded ${schedule.length} schedule entr${schedule.length === 1 ? 'y' : 'ies'}.`;
     } catch (e) {
       status.className = 'status-err';
       status.innerText = 'Could not load: ' + e.message + '. Check your network settings allow access to Supabase.';
@@ -484,146 +528,13 @@
       if (!excMembers.length) excMembers = [...new Set(rows.map(r => r.member_name).filter(Boolean))].sort();
       excPensions = [...new Set(rows.map(r => r.pension_name).filter(Boolean))].sort();
       renderExceptions();
-      loadRateHistory();
     } catch (e) {
       const c = document.getElementById('excContainer');
       if (c) c.innerHTML = '<div class="panel" style="padding:14px; color:#c0392b;">Could not load exceptions: ' + e.message + '</div>';
     }
   }
 
-  // ================= Contribution History (dated rate changes) =================
-  const RATEHIST_URL = `${SUPABASE_URL}/rest/v1/bd_contribution_rate_history`;
-  let rateHist = [];
-  const rhDirty = {};
-  const WD_TIERS = ['5', '4', '3'];
-
-  function rhMarkDirty(id) { rhDirty[id] = true; const f = document.getElementById('rhdirty_' + id); if (f) f.style.display = 'inline-block'; }
-  function rhClearDirty(id) { rhDirty[id] = false; const f = document.getElementById('rhdirty_' + id); if (f) f.style.display = 'none'; }
-
-  function rhWdOpts(sel) {
-    const cur = (sel == null || sel === '') ? '' : String(sel);
-    let opts = `<option value="" ${cur === '' ? 'selected' : ''}>All tiers</option>`;
-    opts += WD_TIERS.map(d => `<option value="${d}" ${cur === d ? 'selected' : ''}>${d}-day week</option>`).join('');
-    if (cur !== '' && WD_TIERS.indexOf(cur) < 0) opts += `<option value="${cur}" selected>${cur}-day week</option>`;
-    return opts;
-  }
-
-  function renderRateHist() {
-    const c = document.getElementById('rhContainer');
-    if (!rateHist.length) { c.innerHTML = '<div class="panel" style="padding:14px;">No history yet. Use “Add change” to record what a contribution has been over time.</div>'; return; }
-    const memOpts = (sel) => excMembers.map(m => `<option ${m === sel ? 'selected' : ''}>${m}</option>`).join('');
-    const penOpts = (sel) => { const known = [...new Set(excPensions.concat(sel ? [sel] : []))].filter(Boolean).sort(); return known.map(p => `<option ${p === sel ? 'selected' : ''}>${p}</option>`).join(''); };
-    const sorted = rateHist.slice().sort((a, b) =>
-      String(a.member_name || '').localeCompare(String(b.member_name || '')) ||
-      String(a.pension_name || '').localeCompare(String(b.pension_name || '')) ||
-      String(a.effective_from || '').localeCompare(String(b.effective_from || '')));
-    let html = '';
-    sorted.forEach(r => {
-      const id = r.id;
-      html += `<div class="card">
-        <div class="card-top">
-          <span class="tier-badge">Effective ${r.effective_from ? String(r.effective_from).split('T')[0] : '—'}</span>
-          <span id="rhdirty_${id}" class="dirty-flag">Unsaved</span>
-        </div>
-        <div class="grid">
-          <div class="field">
-            <label>Member</label>
-            <span class="hint">Whose pension this applies to.</span>
-            <select id="rhmem_${id}" onchange="rhMarkDirty('${id}')">${memOpts(r.member_name)}</select>
-          </div>
-          <div class="field">
-            <label>Pension</label>
-            <span class="hint">Which pension/account.</span>
-            <select id="rhpen_${id}" onchange="rhMarkDirty('${id}')">${penOpts(r.pension_name)}</select>
-          </div>
-          <div class="field">
-            <label>Tier</label>
-            <span class="hint">Leave All unless the amount differs by week.</span>
-            <select id="rhwd_${id}" onchange="rhMarkDirty('${id}')">${rhWdOpts(r.working_days)}</select>
-          </div>
-          <div class="field">
-            <label>Monthly value (£)</label>
-            <span class="hint">Amount paid each month from the date.</span>
-            <input type="number" step="0.01" id="rhval_${id}" value="${r.monthly_value != null ? r.monthly_value : ''}" onfocus="if(this.value==='0'){this.value='';}" oninput="rhMarkDirty('${id}')">
-          </div>
-          <div class="field">
-            <label>Effective from</label>
-            <span class="hint">Applies from this month onward.</span>
-            <input type="date" id="rhfrom_${id}" value="${r.effective_from ? String(r.effective_from).split('T')[0] : ''}" onchange="rhMarkDirty('${id}')">
-          </div>
-        </div>
-        <div class="meta">id: ${id}</div>
-        <div class="btn-row">
-          <button class="btn btn-save" onclick="saveRateHist('${id}')">Save</button>
-          <button class="btn btn-ghost" onclick="deleteRateHist('${id}')">Delete</button>
-        </div>
-        <div class="row-msg" id="rhmsg_${id}"></div>
-      </div>`;
-    });
-    c.innerHTML = html;
-  }
-
-  async function addRateHist() {
-    const msg = document.getElementById('rhMsg');
-    const payload = { member_name: excMembers[0] || '', pension_name: excPensions[0] || '', working_days: null, monthly_value: 0, effective_from: new Date().toISOString().split('T')[0] };
-    msg.style.color = '#1e3a8a'; msg.textContent = 'Adding…';
-    try {
-      const res = await fetch(RATEHIST_URL, { method: 'POST', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify(payload) });
-      if (!res.ok) throw new Error('POST → ' + res.status);
-      const created = await res.json();
-      if (created && created.length) rateHist.push(created[0]);
-      renderRateHist(); msg.style.color = '#065f46'; msg.textContent = '✓ Added — set the details and Save.';
-    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Add failed: ' + e.message; }
-  }
-
-  async function saveRateHist(id) {
-    const msg = document.getElementById('rhmsg_' + id);
-    const valRaw = document.getElementById('rhval_' + id).value;
-    const val = valRaw === '' ? 0 : Number(valRaw);
-    if (isNaN(val) || val < 0) { msg.style.color = '#c0392b'; msg.innerText = 'Value must be a positive number. Nothing saved.'; return; }
-    const fromRaw = document.getElementById('rhfrom_' + id).value || null;
-    if (!fromRaw) { msg.style.color = '#c0392b'; msg.innerText = 'An effective-from date is required. Nothing saved.'; return; }
-    const wdRaw = document.getElementById('rhwd_' + id).value;
-    const payload = {
-      member_name: document.getElementById('rhmem_' + id).value,
-      pension_name: document.getElementById('rhpen_' + id).value,
-      working_days: wdRaw === '' ? null : Number(wdRaw),
-      monthly_value: val,
-      effective_from: fromRaw
-    };
-    msg.style.color = '#1e3a8a'; msg.innerText = 'Saving…';
-    try {
-      const res = await fetch(`${RATEHIST_URL}?id=eq.${id}`, { method: 'PATCH', headers: { ...getHeaders(), 'Prefer': 'return=representation' }, body: JSON.stringify(payload) });
-      if (!res.ok) throw new Error('PATCH → ' + res.status);
-      const fresh = await res.json();
-      if (fresh && fresh.length) { const i = rateHist.findIndex(x => x.id === id); if (i >= 0) rateHist[i] = fresh[0]; }
-      rhClearDirty(id); renderRateHist();
-      const m2 = document.getElementById('rhmsg_' + id); if (m2) { m2.style.color = '#065f46'; m2.innerText = '✓ Saved. Refresh the dashboard to pick up the change.'; }
-    } catch (e) { msg.style.color = '#c0392b'; msg.innerText = 'Save failed: ' + e.message + '. Nothing was changed.'; }
-  }
-
-  async function deleteRateHist(id) {
-    if (!confirm('Delete this history entry?')) return;
-    const msg = document.getElementById('rhmsg_' + id);
-    try {
-      const res = await fetch(`${RATEHIST_URL}?id=eq.${id}`, { method: 'DELETE', headers: getHeaders() });
-      if (!res.ok) throw new Error('DELETE → ' + res.status);
-      rateHist = rateHist.filter(x => x.id !== id); rhClearDirty(id); renderRateHist();
-    } catch (e) { if (msg) { msg.style.color = '#c0392b'; msg.innerText = 'Delete failed: ' + e.message; } }
-  }
-
-  async function loadRateHistory() {
-    try {
-      const r = await fetch(`${RATEHIST_URL}?order=member_name.asc,pension_name.asc,effective_from.asc`, { headers: getHeaders() });
-      rateHist = r.ok ? await r.json() : [];
-      renderRateHist();
-    } catch (e) {
-      const c = document.getElementById('rhContainer');
-      if (c) c.innerHTML = '<div class="panel" style="padding:14px; color:#c0392b;">Could not load history: ' + e.message + '</div>';
-    }
-  }
-
-  window.addEventListener('beforeunload', (e) => { if (Object.values(dirty).some(Boolean) || Object.values(excDirty).some(Boolean) || Object.values(rhDirty).some(Boolean)) { e.preventDefault(); e.returnValue = ''; } });
+  window.addEventListener('beforeunload', (e) => { if (Object.values(excDirty).some(Boolean) || Object.values(schedDirty).some(Boolean)) { e.preventDefault(); e.returnValue = ''; } });
 
   // ---------- Auth gate ----------
   let started = false;
