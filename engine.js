@@ -1,5 +1,14 @@
 /* ============================================================
    engine.js  —  Pension modelling engine (pure JavaScript)
+   build tag: ann9  (additive: optional relief-at-source gross-up of PRIVATE (non-workplace)
+                     contributions, behind the NET_PRIV_CONTRIB flag. When true, every inflow
+                     into a pot whose bd_pensions row has is_workplace === false is multiplied
+                     by 1.25 — i.e. the stored monthly_contribution / schedule value / exception /
+                     plan.privContrib is now the NET bank debit, and the engine adds the HMRC-
+                     topped-up gross (net x 1.25) to the pot. Workplace pots (Aegon etc.) are
+                     untouched. When false the multiplier is 1.0, so output is byte-identical to
+                     ann8 — proven by the field comparison in the delivery. Flip to true ONLY
+                     together with the bd contribution ÷1.25 migration, to avoid double-counting.)
    build tag: ann8  (additive: optional loans / financed purchases via data.loans, behind the LOANS
                      flag. Each loan amortises from start_date over term_months at apr (auto level
                      payment from principal = total_cost - deposit), with per-month overpayments that
@@ -22,9 +31,10 @@
                         carries through retirement). Inert when the flag is false OR cfg.growthRate
                         is absent (falls back to the hard-coded GROWTH = 5%), and numerically
                         identical when cfg.growthRate === 0.05.
-                     CONVENTION NOTE (documented, no code change): monthly_contribution values and
-                     plan.privContrib are GROSS amounts landing in the pot — any HMRC relief-at-
-                     source top-up is already included in the stored figure. Do not add relief.)
+                     CONVENTION NOTE: monthly_contribution / plan.privContrib are GROSS amounts
+                     landing in the pot while NET_PRIV_CONTRIB is false (ann8 and earlier). When
+                     that flag is true (ann9), PRIVATE-pot figures are instead NET (the bank debit)
+                     and the engine grosses them up x1.25. Workplace figures are gross either way.)
    build tag: ann6  (additive: optional per-member £/month override of PRIVATE (non-workplace)
                      pension contributions, via plan.privContrib = { <member>: <£/month>, ... }.
                      Only pots whose bd_pensions row has is_workplace === false are affected, and
@@ -82,6 +92,15 @@
   // exactly as ann7 did, so output is byte-identical (see regression.js). Flip to true only after the
   // loans page + bd_purchases->bd_loans migration are live, to avoid double-counting.
   const LOANS = false;
+
+  // ---- ann9: relief-at-source gross-up of PRIVATE contributions ----
+  // When false: private contributions are added to the pot as-is (ann8 gross convention) — the
+  // multiplier below is 1.0, so output is byte-identical to ann8.
+  // When true: stored private figures are the NET bank debit; the engine adds net x 1.25 to the
+  // pot (25% HMRC relief-at-source top-up). Only pots with is_workplace === false are affected.
+  // Flip to true ONLY together with the bd contribution ÷1.25 migration, or pots double-count.
+  const NET_PRIV_CONTRIB = false;
+  const PRIV_RELIEF = 1.25;   // net -> gross factor for relief-at-source personal pensions
 
   // ---- Mask-aware bill costing (build ann2) ----
   // The DB's total_annual generated column is premium x 12 for Monthly bills and ignores the
@@ -282,7 +301,10 @@
         if (ex.override != null) base = ex.override * contribMult;
         else if (privOv && privKeys.has(k) && privOv[member] != null) base = (Number(privOv[member]) || 0) * contribMult;
         else base = normal;
-        const added = base + ex.oneOff * contribMult;
+        // ann9: private (non-workplace) contributions are the NET bank debit → gross up x1.25
+        // into the pot. relief === 1 when NET_PRIV_CONTRIB is false, so this is inert vs ann8.
+        const relief = (NET_PRIV_CONTRIB && privKeys.has(k)) ? PRIV_RELIEF : 1;
+        const added = (base + ex.oneOff * contribMult) * relief;
         pots[k] += added;
         if (contribOut) contribOut[k] = (contribOut[k] || 0) + added;
       });
@@ -1129,7 +1151,7 @@
   }
 
   global.PensionEngine = {
-    BUILD: 'ann8',   // LC-383: exported so framed pages can self-check the loaded engine build
+    BUILD: 'ann9',   // LC-383: exported so framed pages can self-check the loaded engine build
     INFL: INFL, GROWTH: GROWTH, PA: PA,
     latestPots: latestPots,
     forecast: forecast,
