@@ -112,8 +112,8 @@
     <button type="button" id="pageInfoBtn" class="info-btn" aria-label="Show page information" aria-controls="pageInfo" aria-expanded="false" onclick="togglePageInfo()"><span aria-hidden="true">i</span></button>
   </div>
   <div id="pageInfo" class="info-panel" hidden>
-    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box shows the Groceries, Fuel and Julie Hair &amp; Nails spend, which is deducted in the Cash Summary. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from.</p>
-    <span class="info-build">Budget build: v38</span>
+    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Figures are shown in the money of the month you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr, compounded from today) as you step forward, matching the retirement model. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel and Julie Hair &amp; Nails spend, which is deducted in the Cash Summary. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from.</p>
+    <span class="info-build">Budget build: v39</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -219,10 +219,22 @@
   let viewMode = 'monthly';
   const isAnnual = () => viewMode === 'annual';
   const periodScale = () => isAnnual() ? 12 : 1;
+  // ---- inflation on the viewed month ----
+  // The budget runs from today forward. Everything that has no dated schedule of its own
+  // (bills, income, insurances, savings set-asides) is shown in the money of the month
+  // being viewed: multiply by 2.5%/yr compounded from today. Matches engine.js (INFL 0.025,
+  // inflating from today). Loans and pension contributions are excluded — they carry their
+  // own dated schedules. Annual view is a current-year total, so the factor is 1 there.
+  const INFL = 0.025;
+  function inflFactor() {
+    if (isAnnual()) return 1;
+    const yrs = ((viewY * 12 + (viewM - 1)) - (CUR_Y * 12 + (CUR_M - 1))) / 12;
+    return Math.pow(1 + INFL, Math.max(0, yrs));
+  }
   // a bill's amount for the current view: monthly = actual cash in the viewed month; annual = true yearly cost (mask-aware)
-  function billView(b) { return isAnnual() ? annualToMonthly(b.premium, b.frequency) * 12 : monthCharge(b, viewM); }
+  function billView(b) { return (isAnnual() ? annualToMonthly(b.premium, b.frequency) * 12 : monthCharge(b, viewM)) * inflFactor(); }
   // a bill's smoothed amount for the current view (drives the monthly avg note; equals billView in annual)
-  function billViewAvg(b) { return annualToMonthly(b.premium, b.frequency) * periodScale(); }
+  function billViewAvg(b) { return annualToMonthly(b.premium, b.frequency) * periodScale() * inflFactor(); }
 
   // ---- Loans (read-only on Budget): amortising payment shown against its paid_account ----
   function loanStartIdxB(d) { if (!d) return null; const s = String(d).split('T')[0].split('-'); if (s.length < 2) return null; return Number(s[0]) * 12 + (Number(s[1]) - 1); }
@@ -443,11 +455,11 @@
     const salaryRows = d.incAmts.filter(a => a.member_name === name && (days == null || Number(a.working_days) === Number(days)));
     const useRows = salaryRows.length ? salaryRows : d.incAmts.filter(a => a.member_name === name);
     useRows.forEach(a => {
-      const v = (Number(a.net_monthly) || 0) * periodScale(); totalIn += v;
+      const v = (Number(a.net_monthly) || 0) * periodScale() * inflFactor(); totalIn += v;
       inRows += '<tr><td>' + esc(a.source_name || 'Salary') + '</td><td class="amt">' + fmt(v) + '</td></tr>';
     });
     (d.otherInc || []).filter(o => o.member_name === name).forEach(o => {
-      const v = (Number(o.net_monthly) || 0) * periodScale(); totalIn += v;
+      const v = (Number(o.net_monthly) || 0) * periodScale() * inflFactor(); totalIn += v;
       inRows += '<tr><td>' + esc(o.source_name || 'Other') + '</td><td class="amt">' + fmt(v) + '</td></tr>';
     });
     if (!inRows) inRows = '<tr><td colspan="2" style="color:#94a3b8;">No income set</td></tr>';
@@ -480,14 +492,14 @@
       boxAvg += paypalAvg;
       // savings-pot set-aside: smoothed monthly regardless of which month is being viewed
       const pots = meta.fundingToPots[acctId] || [];
-      const potSum = pots.reduce((s, pid) => s + (meta.potMonthly[pid] || 0), 0) * periodScale();
+      const potSum = pots.reduce((s, pid) => s + (meta.potMonthly[pid] || 0), 0) * periodScale() * inflFactor();
       if (potSum > 0) {
         rows += '<tr class="pot-line"><td>Insurance/car savings</td><td class="amt">' + fmt(potSum) + '</td></tr>';
         boxTotal += potSum; boxAvg += potSum;
       }
       // savings set-asides against this pot's funding account.
       // When holidays & dining share the SAME pot, show one combined line; otherwise separate lines.
-      const holV = d.holidayMonthly * periodScale(), dinV = d.diningMonthly * periodScale();
+      const holV = d.holidayMonthly * periodScale() * inflFactor(), dinV = d.diningMonthly * periodScale() * inflFactor();
       const sharePot = d.holidayPotId && d.diningPotId && d.holidayPotId === d.diningPotId;
       if (sharePot && acctId === d.holidayFundingAcct && (holV + dinV) > 0) {
         const combined = holV + dinV;
@@ -658,7 +670,7 @@
   // Monthly view: a policy shows only in its renewal month, at the full annual premium.
   // Annual view: every dated policy at its yearly cost.
   function insurancesDueBox(d) {
-    const annualCost = b => annualToMonthly(b.premium, b.frequency) * 12;   // full yearly policy cost
+    const annualCost = b => annualToMonthly(b.premium, b.frequency) * 12 * inflFactor();   // full yearly policy cost
     const renMonth = b => { const m = /^\d{4}-(\d{2})-\d{2}/.exec((b.renewal_date || '').trim()); return m ? Number(m[1]) : null; };
     const ins = (d.bills || []).filter(b => /insurance/i.test(b.category_code || '') && renMonth(b) != null);
     let due;
