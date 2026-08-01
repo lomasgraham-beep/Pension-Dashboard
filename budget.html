@@ -113,7 +113,7 @@
   </div>
   <div id="pageInfo" class="info-panel" hidden>
     <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Savings set-asides, income and pension contributions stay at today's level. The Credit Card box shows the Groceries, Fuel and Julie Hair &amp; Nails spend, which is deducted in the Cash Summary. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from.</p>
-    <span class="info-build">Budget build: v37</span>
+    <span class="info-build">Budget build: v38</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -292,7 +292,7 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, tiers, incAmts, otherInc, pensContribs, bankAccts, billCats, diningRota, mealCost, holidayPlan, holidayCost, holidaySettings, diningSettings, loansRaw] = await Promise.all([
+      const [members, bills, tiers, incAmts, otherInc, pensContribs, bankAccts, billCats, diningRota, mealCost, holidayPlan, holidayCost, holidaySettings, diningSettings, loansRaw, contribSchedule] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_working_tiers?order=from_date.asc'),
@@ -307,7 +307,8 @@
         App.rest('bd_holiday_cost'),
         App.rest('bd_holiday_settings?id=eq.1'),
         App.rest('bd_dining_settings?id=eq.1'),
-        App.rest('bd_loans?order=start_date.asc')
+        App.rest('bd_loans?order=start_date.asc'),
+        App.rest('bd_contribution_schedule?order=effective_from.asc')
       ]);
       const names = (members || []).map(m => m.name).filter(Boolean);
       if (!names.length) { status.textContent = 'No members found.'; return; }
@@ -338,7 +339,7 @@
         diningFundingAcct = (dPotAcct && dPotAcct.funded_from != null && String(dPotAcct.funded_from).trim() !== '')
           ? String(dPotAcct.funded_from).trim() : dPotId;   // funding account, or the pot itself if not funded-from
       }
-      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct, diningMonthly: diningMonthly, diningFundingAcct: diningFundingAcct, holidayPotId: potId, diningPotId: dPotId, loans: prepLoans(loansRaw) };
+      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct, diningMonthly: diningMonthly, diningFundingAcct: diningFundingAcct, holidayPotId: potId, diningPotId: dPotId, loans: prepLoans(loansRaw), schedule: contribSchedule || [] };
       names.forEach(n => { selectedTier[n] = currentTierDays(n, DATA.tiers); });
       status.style.display = 'none';
       initNav();
@@ -545,6 +546,24 @@
     return { html: html, avail: avail, availAvg: availAvg };
   }
 
+  // Contribution in force for the pension in the VIEWED month, from the dated schedule
+  // (bd_contribution_schedule) — so stepping the budget to a future month reflects a planned
+  // change. Falls back to the live mirror value when no dated entry applies. Flat (no escalation),
+  // matching the schedule's "planned step is flat from its date" rule.
+  function contribForViewedMonth(p, d) {
+    const viewIdx = viewY * 12 + (viewM - 1);
+    let best = null, bestIdx = -Infinity;
+    (d.schedule || []).forEach(e => {
+      if (e.member_name !== p.member_name || e.pension_name !== p.pension_name) return;
+      const wd = e.working_days;
+      if (!(wd == null || wd === '' || (p.working_days != null && Number(wd) === Number(p.working_days)))) return;
+      const dt = new Date(e.effective_from); if (isNaN(dt)) return;
+      const idx = dt.getFullYear() * 12 + dt.getMonth();
+      if (idx <= viewIdx && idx > bestIdx) { bestIdx = idx; best = e; }
+    });
+    return best ? (Number(best.monthly_value) || 0) : (Number(p.monthly_contribution) || 0);
+  }
+
   // global pensions block — net cost (private ÷1.25; Aegon/workplace at gross), using each owner's tier
   function pensionBlock(d) {
     const heldIds = {};
@@ -557,7 +576,7 @@
       const ownerDays = (selectedTier[owner] !== undefined) ? selectedTier[owner] : currentTierDays(owner, d.tiers);
       if (p.working_days != null && ownerDays != null && Number(p.working_days) !== Number(ownerDays)) return;
       const isWorkplace = /aegon/i.test(p.pension_name || '');
-      const gross = Number(p.monthly_contribution) || 0;
+      const gross = contribForViewedMonth(p, d);
       const cost = isWorkplace ? gross : gross / 1.25;
       if (cost === 0) return;
       const costV = cost * periodScale();
