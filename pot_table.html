@@ -5,7 +5,7 @@
 <title>Pot at Retirement</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=disc2"></script>
-<script src="engine.js?v=ann9"></script>
+<script src="engine.js?v=ann10"></script>
 <style>
   :root {
     --accent:#1d3a63; --safe:#10b981; --risk:#ef4444;
@@ -78,7 +78,7 @@
 </head>
 <body>
   <div class="head">
-    <div class="h-title">Pot at Retirement <span class="build">(build: pt6)</span></div>
+    <div class="h-title">Pot at Retirement <span class="build">(build: pt7)</span></div>
     <div class="h-sub" id="hsub">Pot value for each possible retirement month, from this month onwards. <b>Safe spend %</b> is the most you could spend at that date and still have both pots last (capped by the spend lock). <b>Lowest pot</b> is the lowest the combined pot falls to during drawdown at that spend, and the year it happens (red if it empties).</div>
     <div class="ctlrow">
       <span class="ctl-label">Offset months</span>
@@ -339,7 +339,8 @@
       const holidayTaper = { taper_at_70: _hs.taper_at_70, taper_at_80: _hs.taper_at_80, taper_at_90: _hs.taper_at_90 };
       const diningTaper = { taper_at_70: _ds.taper_at_70, taper_at_80: _ds.taper_at_80, taper_at_90: _ds.taper_at_90 };
 
-      data = { members, bills, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual, holidayTaper: holidayTaper, diningTaper: diningTaper, guaranteed, pensions, contributions, logs,
+      let giftRows = []; try { giftRows = await App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc') || []; } catch (e) { giftRows = []; }
+      data = { members, bills, gifts: giftRows, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual, holidayTaper: holidayTaper, diningTaper: diningTaper, guaranteed, pensions, contributions, logs,
                purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [],
                contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [],
                incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [],

@@ -5,7 +5,7 @@
 <title>Sensitivity</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=disc2"></script>
-<script src="engine.js?v=ann9"></script>
+<script src="engine.js?v=ann10"></script>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
   :root { --accent:#1d3a63; --aqua:#0f766e; --up:#10b981; --down:#ef4444; --ink:#2c3e50; --sub:#64748b;
@@ -33,7 +33,7 @@
 </style>
 </head>
 <body>
-  <h2>Sensitivity <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(sensitivity build: sens1)</span></h2>
+  <h2>Sensitivity <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(sensitivity build: sens2)</span></h2>
   <p class="note">Your saved plan is re-run with one assumption nudged at a time, so you can see which dial actually
   moves the outcome. Bars show the change in the <b>combined pot at end of life</b> against your saved plan; the
   table adds the lowest-point ("trough") pot and the year the money would run out, if ever. Growth nudges apply to
@@ -223,7 +223,8 @@
       const _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual });
       const diningAnnual = _eff.diningAnnual, holidayAnnual = _eff.holidayAnnual;
       const _hs = (holidaySettings && holidaySettings[0]) || {}, _ds = (diningSettings && diningSettings[0]) || {};
-      data = { members, bills, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual,
+      let giftRows = []; try { giftRows = await App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc') || []; } catch (e) { giftRows = []; }
+      data = { members, bills, gifts: giftRows, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual,
                holidayTaper: { taper_at_70: _hs.taper_at_70, taper_at_80: _hs.taper_at_80, taper_at_90: _hs.taper_at_90 },
                diningTaper: { taper_at_70: _ds.taper_at_70, taper_at_80: _ds.taper_at_80, taper_at_90: _ds.taper_at_90 },
                guaranteed, pensions, contributions, logs,

@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=disc2"></script>
-  <script src="engine.js?v=ann9"></script>
+  <script src="engine.js?v=ann10"></script>
   <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
@@ -1438,7 +1438,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-452</span>
+      <span class="build-stamp">LC-453</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -4907,7 +4907,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front128';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front129';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -5094,7 +5094,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         const ds = (diningSettings && diningSettings[0]) || {};
         const holidayTaper = { taper_at_70: hs.taper_at_70, taper_at_80: hs.taper_at_80, taper_at_90: hs.taper_at_90 };
         const diningTaper = { taper_at_70: ds.taper_at_70, taper_at_80: ds.taper_at_80, taper_at_90: ds.taper_at_90 };
-        data = { members, bills, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual, holidayTaper: holidayTaper, diningTaper: diningTaper,
+        let giftRows = []; try { giftRows = await App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc') || []; } catch (e) { giftRows = []; }
+        data = { members, bills, gifts: giftRows, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual, holidayTaper: holidayTaper, diningTaper: diningTaper,
                  guaranteed, pensions, contributions, logs,
                  purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: expandFutureSteps(contributionRateHistory || []).concat(contributionExceptions || []), contributionRateHistory: contributionRateHistory || [], workingTiers: workingTiers || [],
                  incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
@@ -5694,7 +5695,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-452';
+    if (stamp) stamp.textContent = 'LC-453';
   }
 
   function buildSubnav() {

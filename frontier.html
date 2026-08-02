@@ -5,7 +5,7 @@
 <title>Retire Frontier</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=disc2"></script>
-<script src="engine.js?v=ann9"></script>
+<script src="engine.js?v=ann10"></script>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
   :root {
@@ -166,7 +166,7 @@
 
   <div class="head">
     <div class="hrow">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front25)</span></span>
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front26)</span></span>
       <div class="seg" id="seg">
         <button type="button" class="seg-btn active" data-mode="joint">Joint</button>
         <button type="button" class="seg-btn" data-mode="p1" id="segP1">Graham</button>
@@ -893,7 +893,8 @@
       const holidayTaper = { taper_at_70: _hs.taper_at_70, taper_at_80: _hs.taper_at_80, taper_at_90: _hs.taper_at_90 };
       const diningTaper = { taper_at_70: _ds.taper_at_70, taper_at_80: _ds.taper_at_80, taper_at_90: _ds.taper_at_90 };
 
-      data = { members, bills, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual, holidayTaper: holidayTaper, diningTaper: diningTaper, guaranteed, pensions, contributions, logs,
+      let giftRows = []; try { giftRows = await App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc') || []; } catch (e) { giftRows = []; }
+      data = { members, bills, gifts: giftRows, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual, holidayTaper: holidayTaper, diningTaper: diningTaper, guaranteed, pensions, contributions, logs,
                purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [],
                contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [],
                incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [],

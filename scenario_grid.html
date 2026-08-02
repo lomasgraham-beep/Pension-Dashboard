@@ -5,7 +5,7 @@
 <title>Scenario Grid</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=disc2"></script>
-<script src="engine.js?v=ann9"></script>
+<script src="engine.js?v=ann10"></script>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
   :root {
@@ -102,7 +102,7 @@
   <div class="grid-head">
     <div class="gh-left">
       <span class="gh-title">Scenario Grid</span>
-      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid9)</span></span>
+      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid10)</span></span>
       <span class="spend-ctl"><label>Spend %</label>
         <input id="sp0" type="number" min="0" max="200" step="5" value="50" inputmode="numeric">
         <input id="sp1" type="number" min="0" max="200" step="5" value="60" inputmode="numeric">
@@ -446,7 +446,8 @@
       const holidayTaper = { taper_at_70: _hs.taper_at_70, taper_at_80: _hs.taper_at_80, taper_at_90: _hs.taper_at_90 };
       const diningTaper = { taper_at_70: _ds.taper_at_70, taper_at_80: _ds.taper_at_80, taper_at_90: _ds.taper_at_90 };
 
-      data = { members, bills, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual, holidayTaper: holidayTaper, diningTaper: diningTaper,
+      let giftRows = []; try { giftRows = await App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc') || []; } catch (e) { giftRows = []; }
+      data = { members, bills, gifts: giftRows, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual, holidayTaper: holidayTaper, diningTaper: diningTaper,
                guaranteed, pensions, contributions, logs,
                purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [],
                contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [],

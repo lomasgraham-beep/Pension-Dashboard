@@ -72,7 +72,8 @@
     // Budget basis: Plan (above) or Actual last-12-months + adjustment, per the saved choice.
     const _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual });
     const diningAnnual = _eff.diningAnnual, holidayAnnual = _eff.holidayAnnual;
-    const data = { members, bills, dining, diningAnnual, holidayAnnual, guaranteed, pensions, contributions, logs, purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [], incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
+    let giftRows = []; try { giftRows = await App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc') || []; } catch (e) { giftRows = []; }
+    const data = { members, bills, gifts: giftRows, dining, diningAnnual, holidayAnnual, guaranteed, pensions, contributions, logs, purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [], incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
     const sortedM = (members || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const p1Name = sortedM[0] ? sortedM[0].name : 'Graham';
     const p2Name = sortedM[1] ? sortedM[1].name : null;

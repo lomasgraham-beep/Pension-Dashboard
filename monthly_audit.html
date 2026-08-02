@@ -5,7 +5,7 @@
 <title>Monthly Audit</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=disc2"></script>
-<script src="engine.js?v=ann9"></script>
+<script src="engine.js?v=ann10"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root { --accent:#1d3a63; --aqua:#0f766e; --ink:#2c3e50; --sub:#64748b; --line:#d3e3e3;
@@ -52,7 +52,7 @@
 </style>
 </head>
 <body>
-  <h2>Monthly Audit <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(audit build: maudit8)</span></h2>
+  <h2>Monthly Audit <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(audit build: maudit9)</span></h2>
   <p class="note">The engine's own month-by-month workings, shown so each row's sums can be checked by eye:
   <b>Bills + Dining + Holidays = Outgoings</b>, then <b>Gross fixed income &minus; Tax = Net</b>, the
   <b>Gap</b> that's left, and the <b>pension draw</b> (with its own tax) that fills it. Each row closes with <b>Pot start &minus; Draw + Growth = Pot closing</b> exactly &mdash; growth shows red when a market crash is pulling the pot down. The reconciliation
@@ -602,7 +602,8 @@
       const _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual });
       const diningAnnual = _eff.diningAnnual, holidayAnnual = _eff.holidayAnnual;
       const _hs = (holidaySettings && holidaySettings[0]) || {}, _ds = (diningSettings && diningSettings[0]) || {};
-      const data = { members, bills, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual,
+      let giftRows = []; try { giftRows = await App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc') || []; } catch (e) { giftRows = []; }
+      const data = { members, bills, gifts: giftRows, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual,
         holidayTaper: { taper_at_70: _hs.taper_at_70, taper_at_80: _hs.taper_at_80, taper_at_90: _hs.taper_at_90 },
         diningTaper: { taper_at_70: _ds.taper_at_70, taper_at_80: _ds.taper_at_80, taper_at_90: _ds.taper_at_90 },
         guaranteed, pensions, contributions, logs,
