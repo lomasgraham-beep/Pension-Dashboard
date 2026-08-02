@@ -111,7 +111,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half).<strong>Renewal</strong> is the policy renewal date for insurances &mdash; when set, that insurance shows on the Budget page only in its renewal month. The darker <strong>Holidays</strong>, <strong>Dining</strong>, <strong>Pensions</strong> and <strong>Loans</strong> lines are drawn from their pages &mdash; read-only here and counted towards the yearly total, but not saved as bills. <strong>Pensions</strong> shows this year&rsquo;s contributions at each member&rsquo;s current working-days tier, so it changes automatically when a tier changes (e.g. a 3-day week from September). <span style="color:var(--accent-dark);">(bills build: pens1)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half).<strong>Renewal</strong> is the policy renewal date for insurances &mdash; when set, that insurance shows on the Budget page only in its renewal month. The darker <strong>Holidays</strong>, <strong>Dining</strong>, <strong>Pensions</strong> and <strong>Loans</strong> lines are drawn from their pages &mdash; read-only here and counted towards the yearly total, but not saved as bills. <strong>Pensions</strong> shows this year&rsquo;s contributions at each member&rsquo;s current working-days tier, so it changes automatically when a tier changes (e.g. a 3-day week from September). <span style="color:var(--accent-dark);">(bills build: pens2)</span></p>
   <div class="bar" style="align-items:flex-start;">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -404,8 +404,8 @@
       '<td>' + cat + '</td>' +
       '<td class="d-mut">&mdash;</td>' +
       '<td class="d-mut">&mdash;</td>' +
-      '<td class="d-mut">&mdash;</td>' +
-      '<td>Annual</td>' +
+      '<td>' + fmt(annual / 12) + '</td>' +
+      '<td>Monthly</td>' +
       '<td class="d-annual">' + fmt(annual) + '</td>' +
       '<td class="sched"><span class="d-mut">All</span></td>' +
       '<td class="d-mut">&mdash;</td>' +
