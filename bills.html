@@ -111,7 +111,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half).<strong>Renewal</strong> is the policy renewal date for insurances &mdash; when set, that insurance shows on the Budget page only in its renewal month. The darker <strong>Holidays</strong>, <strong>Dining</strong>, <strong>Pensions</strong> and <strong>Loans</strong> lines are drawn from their pages &mdash; read-only here and counted towards the yearly total, but not saved as bills. <strong>Pensions</strong> shows this year&rsquo;s contributions at each member&rsquo;s current working-days tier, so it changes automatically when a tier changes (e.g. a 3-day week from September). <span style="color:var(--accent-dark);">(bills build: pens3)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half).<strong>Renewal</strong> is the policy renewal date for insurances &mdash; when set, that insurance shows on the Budget page only in its renewal month. The darker <strong>Holidays</strong>, <strong>Dining</strong>, <strong>Pensions</strong>, <strong>Loans</strong>, <strong>Xmas</strong> and <strong>Birthdays</strong> lines are drawn from their pages &mdash; read-only here and counted towards the yearly total, but not saved as bills. <strong>Pensions</strong> shows this year&rsquo;s contributions at each member&rsquo;s current working-days tier, so it changes automatically when a tier changes (e.g. a 3-day week from September). <strong>Xmas</strong> and <strong>Birthdays</strong> come from the Gift Savings page (value &times; age taper). <span style="color:var(--accent-dark);">(bills build: pens4)</span></p>
   <div class="bar" style="align-items:flex-start;">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -166,7 +166,11 @@
   const LOAN_CAT = 'Loans';    // label the derived loan lines sit under
   let loanRows = [];           // active loan payments (display-only; read from bd_loans, NEVER saved here)
   const PEN_CAT = 'Pension';   // label the derived pension line sits under
+  const XMAS_CAT = 'Xmas';     // label the derived Xmas gift line sits under
+  const BDAY_CAT = 'Birthdays';// label the derived Birthday gift line sits under
   let penAnnual = 0;           // live pension contributions yearly total at each member's current tier (display-only)
+  let xmasAnnual = 0;          // live Xmas gift yearly total from bd_gift_savings (display-only; NOT a saved bill)
+  let bdayAnnual = 0;          // live Birthday gift yearly total from bd_gift_savings (display-only; NOT a saved bill)
   const tbody = document.querySelector('#tbl tbody');
   const fmt = App.fmt;
   const MABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -343,6 +347,8 @@
     const set = new Set(rows.map(r => r.category_code).filter(c => c));
     if (dinAnnual > 0) set.add(DIN_CAT);   // derived lines are filterable even with no real bill in the category
     if (holAnnual > 0) set.add(HOL_CAT);
+    if (xmasAnnual > 0) set.add(XMAS_CAT);
+    if (bdayAnnual > 0) set.add(BDAY_CAT);
     if (loanRows.length) set.add(LOAN_CAT);
     const cats = [...set].sort();
     sel.innerHTML = '<option value="All">All categories</option>' + cats.map(c => '<option>' + c + '</option>').join('');
@@ -417,6 +423,20 @@
   function holidayInView(cat) { return holAnnual > 0 && (cat === 'All' || cat === HOL_CAT); }
   function diningInView(cat)  { return dinAnnual > 0 && (cat === 'All' || cat === DIN_CAT); }
   function pensionInView(cat) { return penAnnual > 0 && (cat === 'All' || cat === PEN_CAT); }
+  function xmasInView(cat) { return xmasAnnual > 0 && (cat === 'All' || cat === XMAS_CAT); }
+  function bdayInView(cat) { return bdayAnnual > 0 && (cat === 'All' || cat === BDAY_CAT); }
+  // Gift yearly total from bd_gift_savings: value × age taper (bills-style; below 70 = full). Today-based.
+  function giftAnnualFor(giftRows, type, age) {
+    return (giftRows || []).filter(g => g.gift_type === type).reduce((s, g) => {
+      let t = 1;
+      if (age != null) {
+        if (age >= 90) t = g.taper_at_90 != null ? Number(g.taper_at_90) : 1;
+        else if (age >= 80) t = g.taper_at_80 != null ? Number(g.taper_at_80) : 1;
+        else if (age >= 70) t = g.taper_at_70 != null ? Number(g.taper_at_70) : 1;
+      }
+      return s + (Number(g.gift_value) || 0) * t;
+    }, 0);
+  }
 
   // Current working-days tier for a member = latest dated tier on/before today (mirrors Budget/engine).
   function tierDaysNow(member, tiers) {
@@ -455,6 +475,8 @@
     if (diningInView(cat))  derived += derivedRowHtml('Dining', DIN_CAT, dinAnnual, 'from rota', 'Dining tab');
     if (holidayInView(cat)) derived += derivedRowHtml('Holidays', HOL_CAT, holAnnual, 'from planner', 'Holidays tab');
     if (pensionInView(cat)) derived += derivedRowHtml('Pensions', PEN_CAT, penAnnual, 'from contributions, current tier', 'Contributions tab');
+    if (xmasInView(cat))    derived += derivedRowHtml('Xmas', XMAS_CAT, xmasAnnual, 'from gift savings', 'Gift Savings tab');
+    if (bdayInView(cat))    derived += derivedRowHtml('Birthdays', BDAY_CAT, bdayAnnual, 'from gift savings', 'Gift Savings tab');
     if (loansInView(cat))   derived += loanRows.map(derivedLoanRowHtml).join('');
     const body = derived + html;
     tbody.innerHTML = body || '<tr><td colspan="14">No bills in this view. Use \u201cAdd bill\u201d or change the filter.</td></tr>';
@@ -484,6 +506,8 @@
     if (diningInView(cat))  { total += dinAnnual; extras.push('dining'); }
     if (holidayInView(cat)) { total += holAnnual; extras.push('holidays'); }
     if (pensionInView(cat)) { total += penAnnual; extras.push('pensions'); }
+    if (xmasInView(cat))    { total += xmasAnnual; extras.push('xmas'); }
+    if (bdayInView(cat))    { total += bdayAnnual; extras.push('birthdays'); }
     if (loansInView(cat))   { total += loanRows.reduce((s, l) => s + l.annual, 0); extras.push('loans'); }
     const shown = rows.filter(inView).length;
     const scope = cat === 'All' ? 'All categories' : cat;
@@ -532,6 +556,9 @@
     const status = document.getElementById('status');
     try {
       rows = await App.rest('bd_household_bills?order=category_code.asc,bill_name.asc');
+      // Xmas/Birthday are now driven by bd_gift_savings (Gift Savings page); drop any legacy bill rows so
+      // they neither double-count nor confuse the editor. Derived read-only lines are added below instead.
+      rows = (rows || []).filter(r => !/^(xmas|christmas|birthdays?)$/i.test((r.category_code || '').trim()));
       try { const cc = await App.rest('bd_bill_category?order=code.asc'); categoryCodes = (cc || []).map(c => c.code); categoryDefs = {}; (cc || []).forEach(c => { categoryDefs[c.code] = c.definition || ''; }); } catch (e) { categoryCodes = []; categoryDefs = {}; }
       try { const mm = await App.rest('bd_members?order=name.asc'); memberNames = (mm || []).map(m => m.name).filter(Boolean); } catch (e) { memberNames = []; }
       try { const ba = await App.rest('bd_bank_account?order=account_id.asc'); bankAccounts = (ba || []).map(a => a.account_id).filter(Boolean); } catch (e) { bankAccounts = []; }
@@ -546,6 +573,17 @@
         ]);
         penAnnual = computePensionAnnual(pc || [], wt || []);
       } catch (e) { penAnnual = 0; }
+      // Gift savings (Xmas / Birthdays) yearly totals from bd_gift_savings — display-only; never saved here.
+      try {
+        const [gs, gm] = await Promise.all([
+          App.rest('bd_gift_savings'),
+          App.rest('bd_members?order=name.asc')
+        ]);
+        const p1 = (gm || [])[0];
+        const age = (p1 && p1.dob) ? (new Date().getFullYear() - new Date(p1.dob).getFullYear()) : null;
+        xmasAnnual = giftAnnualFor(gs || [], 'Xmas', age);
+        bdayAnnual = giftAnnualFor(gs || [], 'Birthday', age);
+      } catch (e) { xmasAnnual = 0; bdayAnnual = 0; }
       // Holiday planner & dining rota yearly totals — display-only lines; never written to bd_household_bills.
       try {
         const [hPlan, hCost, hMeal, hSet, dRota] = await Promise.all([

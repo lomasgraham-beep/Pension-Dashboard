@@ -85,7 +85,7 @@
 </head>
 <body>
   <h1>Summary of Household Bills</h1>
-  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. The <strong>Holiday</strong> and <strong>Dining</strong> categories include their planner totals (flat &mdash; neither is age-tapered). <span style="color:#94a3b8;">(summary build: v13)</span></p>
+  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. The <strong>Holiday</strong> and <strong>Dining</strong> categories include their planner totals (flat &mdash; neither is age-tapered); <strong>Xmas</strong> and <strong>Birthdays</strong> come from the Gift Savings page and do taper with age. <span style="color:#94a3b8;">(summary build: v14)</span></p>
   <div id="status">Loading…</div>
 
   <div id="ageRow" class="agebar-row" style="display:none;">
@@ -135,6 +135,7 @@
   let holAnnual = 0;           // holiday-planner yearly total (flat across ages; not age-tapered)
   let dinAnnual = 0;           // dining-rota yearly total (flat across ages; not age-tapered)
   let allBills = [];
+  let giftRows = [];           // bd_gift_savings (Xmas / Birthdays), value × age taper
   let sel = 0;
   const expanded = new Set();   // category codes currently drilled open (persists across age changes)
 
@@ -161,10 +162,27 @@
     const map = {};
     allBills.forEach(b => {
       const cat = b.category_code || 'Uncategorised';
+      if (/^(xmas|christmas|birthdays?)$/i.test(String(cat).trim())) return;   // superseded by bd_gift_savings, added below
       const annual = annualOf(b.premium, b.frequency, b.pay_months) * taperFor(b, ageKey);
       if (!map[cat]) map[cat] = { code: cat, total: 0, bills: [] };
       map[cat].total += annual;
       map[cat].bills.push({ name: b.bill_name || '(unnamed)', frequency: b.frequency, month: Number(b.bill_month), annual: annual });
+    });
+    // Gift savings (Xmas / Birthdays) — value × taper at the selected age, from bd_gift_savings.
+    [['Xmas', 'Xmas'], ['Birthday', 'Birthdays']].forEach(pair => {
+      const type = pair[0], catCode = pair[1];
+      const tot = (giftRows || []).filter(g => g.gift_type === type).reduce((s, g) => {
+        let t = 1;
+        if (ageKey >= 90) t = g.taper_at_90 != null ? Number(g.taper_at_90) : 1;
+        else if (ageKey >= 80) t = g.taper_at_80 != null ? Number(g.taper_at_80) : 1;
+        else if (ageKey >= 70) t = g.taper_at_70 != null ? Number(g.taper_at_70) : 1;
+        return s + (Number(g.gift_value) || 0) * t;
+      }, 0);
+      if (tot > 0) {
+        if (!map[catCode]) map[catCode] = { code: catCode, total: 0, bills: [] };
+        map[catCode].total += tot;
+        map[catCode].bills.push({ name: catCode + ' (from gift savings)', frequency: 'Annual', month: 0, annual: tot });
+      }
     });
     // Dining rota total — flat across ages (not age-tapered), added to the Dining category.
     if (dinAnnual > 0) {
@@ -305,6 +323,7 @@
     try {
       status.textContent = 'Loading… (fetching bills)';
       allBills = await App.rest('bd_household_bills?order=bill_name.asc');
+      try { giftRows = await App.rest('bd_gift_savings') || []; } catch (e) { giftRows = []; }
       // Holiday planner & dining rota yearly totals (display-only; merge into their categories).
       try {
         const [hPlan, hCost, hMeal, hSet, dRota] = await Promise.all([
