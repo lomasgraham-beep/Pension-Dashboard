@@ -112,8 +112,8 @@
     <button type="button" id="pageInfoBtn" class="info-btn" aria-label="Show page information" aria-controls="pageInfo" aria-expanded="false" onclick="togglePageInfo()"><span aria-hidden="true">i</span></button>
   </div>
   <div id="pageInfo" class="info-panel" hidden>
-    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Figures are shown in the money of the month you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr, compounded from today) as you step forward, matching the retirement model. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel and Julie Hair &amp; Nails spend, which is deducted in the Cash Summary. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from.</p>
-    <span class="info-build">Budget build: v40</span>
+    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Figures are shown in the money of the month you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr, compounded from today) as you step forward, matching the retirement model. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel, Julie Hair &amp; Nails, Dogs, Xmas and Birthdays spend, which is deducted in the Cash Summary. Groceries, Fuel, Hair &amp; Nails and Dogs come straight from Bills; Xmas and Birthdays are age-banded gift set-asides (managed on the Gift Savings page), inflated 0.5%/yr. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from.</p>
+    <span class="info-build">Budget build: v41</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -304,7 +304,7 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, tiers, incAmts, otherInc, pensContribs, bankAccts, billCats, diningRota, mealCost, holidayPlan, holidayCost, holidaySettings, diningSettings, loansRaw, contribSchedule] = await Promise.all([
+      const [members, bills, tiers, incAmts, otherInc, pensContribs, bankAccts, billCats, diningRota, mealCost, holidayPlan, holidayCost, holidaySettings, diningSettings, loansRaw, contribSchedule, gifts] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_working_tiers?order=from_date.asc'),
@@ -320,7 +320,8 @@
         App.rest('bd_holiday_settings?id=eq.1'),
         App.rest('bd_dining_settings?id=eq.1'),
         App.rest('bd_loans?order=start_date.asc'),
-        App.rest('bd_contribution_schedule?order=effective_from.asc')
+        App.rest('bd_contribution_schedule?order=effective_from.asc'),
+        App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc')
       ]);
       const names = (members || []).map(m => m.name).filter(Boolean);
       if (!names.length) { status.textContent = 'No members found.'; return; }
@@ -351,7 +352,7 @@
         diningFundingAcct = (dPotAcct && dPotAcct.funded_from != null && String(dPotAcct.funded_from).trim() !== '')
           ? String(dPotAcct.funded_from).trim() : dPotId;   // funding account, or the pot itself if not funded-from
       }
-      DATA = { names, bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct, diningMonthly: diningMonthly, diningFundingAcct: diningFundingAcct, holidayPotId: potId, diningPotId: dPotId, loans: prepLoans(loansRaw), schedule: contribSchedule || [] };
+      DATA = { names, members: members || [], gifts: gifts || [], bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct, diningMonthly: diningMonthly, diningFundingAcct: diningFundingAcct, holidayPotId: potId, diningPotId: dPotId, loans: prepLoans(loansRaw), schedule: contribSchedule || [] };
       names.forEach(n => { selectedTier[n] = currentTierDays(n, DATA.tiers); });
       status.style.display = 'none';
       initNav();
@@ -606,8 +607,27 @@
     return { html: html, total: total };
   }
 
-  // Groceries, Fuel and Julie's Hair & Nails are drawn on the credit card and deducted in Cash Summary.
-  // Hair & Nails is deliberately restricted to category Julie so similarly named household bills are not included.
+  // ---- Gift savings (Xmas / Birthdays) ----
+  // Age-banded annual amount (at 70 / 80 / 90, by the first member's age in the viewed year) ÷ 12,
+  // inflated 0.5%/yr from the current year. Shown as credit-card additions; the money is earmarked to
+  // a savings account (managed on the Gift Savings page). These come ONLY from bd_gift_savings — the old
+  // Xmas/Birthday bill rows are not summed here, so there is no double count.
+  function giftRefAge(d, Y) {
+    const p1 = (d.members || [])[0];
+    if (!p1 || !p1.dob) return null;
+    return Y - new Date(p1.dob).getFullYear();
+  }
+  function giftBandKey(age) { if (age == null) return 'amt_70'; if (age >= 90) return 'amt_90'; if (age >= 80) return 'amt_80'; return 'amt_70'; }
+  function giftFactor(Y) { return Math.pow(1.005, Math.max(0, Y - CUR_Y)); }
+  function giftMonthlyBase(d, type) {   // smoothed monthly set-aside for a type in the viewed year (pre period/inflation)
+    const key = giftBandKey(giftRefAge(d, viewY));
+    return (d.gifts || []).filter(g => g.gift_type === type).reduce((s, g) => s + (Number(g[key]) || 0), 0) / 12;
+  }
+  function giftView(d, type) { return giftMonthlyBase(d, type) * periodScale() * giftFactor(viewY); }
+
+  // Groceries, Fuel, Julie's Hair & Nails and Dogs are drawn on the credit card and deducted in Cash Summary.
+  // Hair & Nails is deliberately restricted to category Julie; Dogs to category Dogs. Xmas and Birthdays are
+  // age-banded gift set-asides from bd_gift_savings (not bills).
   // total = amount for the current view; avg = smoothed monthly (for the monthly-mode average reference row).
   function creditCardParts(d) {
     const cardBills = (d.bills || []).filter(b => b.paid_by === 'Credit card');
@@ -617,12 +637,18 @@
     const hairNailsB = cardBills.filter(b =>
       /^julie$/i.test(String(b.category_code || '').trim()) && /hair|nail/i.test(b.bill_name || '')
     );
+    const dogsB = cardBills.filter(b => /^dogs?$/i.test(String(b.category_code || '').trim()));
     const sum = (arr, fn) => arr.reduce((s, b) => s + fn(b), 0);
     const groc = sum(grocB, billView);
     const fuel = sum(fuelB, billView);
     const hairNails = sum(hairNailsB, billView);
-    const avg = sum(grocB, billViewAvg) + sum(fuelB, billViewAvg) + sum(hairNailsB, billViewAvg);
-    return { groc: groc, fuel: fuel, hairNails: hairNails, total: groc + fuel + hairNails, avg: avg };
+    const dogs = sum(dogsB, billView);
+    const xmas = giftView(d, 'Xmas');
+    const birthday = giftView(d, 'Birthday');
+    const avg = sum(grocB, billViewAvg) + sum(fuelB, billViewAvg) + sum(hairNailsB, billViewAvg) + sum(dogsB, billViewAvg)
+              + (giftMonthlyBase(d, 'Xmas') + giftMonthlyBase(d, 'Birthday')) * giftFactor(viewY);
+    return { groc: groc, fuel: fuel, hairNails: hairNails, dogs: dogs, xmas: xmas, birthday: birthday,
+             total: groc + fuel + hairNails + dogs + xmas + birthday, avg: avg };
   }
 
   function creditCardBox(d) {
@@ -634,6 +660,9 @@
         '<tr><td>Groceries</td><td class="amt">' + fmt(p.groc) + '</td></tr>' +
         '<tr><td>Fuel</td><td class="amt">' + fmt(p.fuel) + '</td></tr>' +
         '<tr><td>Hair and Nails</td><td class="amt">' + fmt(p.hairNails) + '</td></tr>' +
+        '<tr><td>Dogs</td><td class="amt">' + fmt(p.dogs) + '</td></tr>' +
+        '<tr><td>Xmas</td><td class="amt">' + fmt(p.xmas) + '</td></tr>' +
+        '<tr><td>Birthdays</td><td class="amt">' + fmt(p.birthday) + '</td></tr>' +
         '<tr class="total"><td>Total</td><td class="amt">' + fmt(p.total) + '</td></tr>' +
       '</tbody></table>' +
     '</div>';
@@ -657,7 +686,7 @@
         availRows +
         '<tr class="total"><td>Sum of available</td><td class="amt">' + fmt(sumAvail) + '</td></tr>' +
         '<tr class="total"><td>Less pensions</td><td class="amt neg">\u2212' + fmt(pens) + '</td></tr>' +
-        '<tr class="total"><td>Less credit card (Groceries + Fuel + Hair &amp; Nails)</td><td class="amt neg">\u2212' + fmt(cardT) + '</td></tr>' +
+        '<tr class="total"><td>Less credit card (Groceries, Fuel, Hair &amp; Nails, Dogs, Xmas, Birthdays)</td><td class="amt neg">\u2212' + fmt(cardT) + '</td></tr>' +
         '<tr class="avail"><td>Total cash available ' + (isAnnual() ? '(annual)' : 'in ' + monthLabelShort()) + '</td><td class="amt">' + fmt(totalCash) + '</td></tr>' +
         avgRow +
       '</tbody></table>' +
