@@ -21,7 +21,7 @@
   th { background:var(--surface-2); color:var(--ink); font-size:12px; text-transform:uppercase; letter-spacing:0.03em; }
   input, select { padding:8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px; font-family:inherit; box-sizing:border-box; }
   input[type=text] { width:100%; min-width:120px; } input[type=number] { width:90px; text-align:right; }
-  .taper { width:64px; }
+  input[type="number"].taper { width:56px; }
   .del { background:#fdecea; color:#c0392b; border:none; border-radius:6px; padding:7px 11px; font-weight:bold; cursor:pointer; }
   #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
   .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
@@ -111,7 +111,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half).<strong>Renewal</strong> is the policy renewal date for insurances &mdash; when set, that insurance shows on the Budget page only in its renewal month. The darker <strong>Holidays</strong>, <strong>Dining</strong>, <strong>Pensions</strong> and <strong>Loans</strong> lines are drawn from their pages &mdash; read-only here and counted towards the yearly total, but not saved as bills. <strong>Pensions</strong> shows this year&rsquo;s contributions at each member&rsquo;s current working-days tier, so it changes automatically when a tier changes (e.g. a 3-day week from September). <span style="color:var(--accent-dark);">(bills build: pens2)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half).<strong>Renewal</strong> is the policy renewal date for insurances &mdash; when set, that insurance shows on the Budget page only in its renewal month. The darker <strong>Holidays</strong>, <strong>Dining</strong>, <strong>Pensions</strong> and <strong>Loans</strong> lines are drawn from their pages &mdash; read-only here and counted towards the yearly total, but not saved as bills. <strong>Pensions</strong> shows this year&rsquo;s contributions at each member&rsquo;s current working-days tier, so it changes automatically when a tier changes (e.g. a 3-day week from September). <span style="color:var(--accent-dark);">(bills build: pens3)</span></p>
   <div class="bar" style="align-items:flex-start;">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -126,7 +126,7 @@
   </div>
   <div class="catdef" id="catDef" style="display:none;"></div>
   <table id="tbl">
-    <thead><tr><th>Bill Name</th><th>Category</th><th>Paid by</th><th>Account</th><th>Premium &pound;</th><th>Frequency</th><th>Annual &pound;</th><th class="sched">Paid in<br><span style="font-weight:normal;font-size:11px;">(months)</span></th><th>Renewal<br><span style="font-weight:normal;font-size:11px;">(insurances)</span></th><th>Reduce?</th><th>Taper 70</th><th>Taper 80</th><th>Taper 90</th><th></th></tr></thead>
+    <thead><tr><th>Bill Name</th><th>Category</th><th>Paid by</th><th>Account</th><th>Premium &pound;</th><th>Frequency</th><th>Annual &pound;</th><th class="sched">Paid in<br><span style="font-weight:normal;font-size:11px;">(months)</span></th><th>Renewal<br><span style="font-weight:normal;font-size:11px;">(insurances)</span></th><th>Reduce?</th><th>Taper<br>70</th><th>Taper<br>80</th><th>Taper<br>90</th><th></th></tr></thead>
     <tbody><tr><td colspan="14">Loading&hellip;</td></tr></tbody>
   </table>
 
