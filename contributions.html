@@ -128,12 +128,15 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: sched1)</span></h1>
+<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: sched2)</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel" style="margin-bottom:18px;">
   <p class="intro" style="margin:0;">
     Every pension contribution as a <strong>dated series</strong>. Each entry is the monthly amount <strong>from its effective date onward</strong>, until a later-dated entry takes over &mdash; so to plan a change (now or in the future) add an entry with the new amount and the date it starts. The dashboard, budget, forecast and KPI all read the value in force for the month they show. <strong>Increase %</strong> grows the amount once a year in the <strong>increase month</strong>; a planned step is flat from its date. Leave <strong>Tier</strong> as <em>All</em> unless the amount differs by working-days week. Contributions stop at retirement.
+  </p>
+  <p class="intro" style="margin:8px 0 0;">
+    <strong>Enter what leaves your bank.</strong> For a <strong>private</strong> pension the monthly &pound; is your actual bank debit; the model adds HMRC relief-at-source (&times;1.25), so the pot receives 25% more than you pay. For a <strong>workplace</strong> pension enter the amount deducted (no top-up applied). This lets you reconcile straight against your bank statements.
   </p>
 </div>
 
@@ -436,7 +439,7 @@
           </div>
           <div class="field">
             <label>Value (£)</label>
-            <span class="hint">Monthly amount (override) or lump sum (one-off).</span>
+            <span class="hint">Monthly amount (override) or lump sum (one-off). Private pensions: enter the bank debit; the pot gets &times;1.25.</span>
             <input type="number" step="0.01" id="excval_${id}" value="${r.contribution_value != null ? r.contribution_value : ''}" oninput="excMarkDirty('${id}')">
           </div>
           <div class="field">

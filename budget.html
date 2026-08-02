@@ -113,7 +113,7 @@
   </div>
   <div id="pageInfo" class="info-panel" hidden>
     <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Figures are shown in the money of the month you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr, compounded from today) as you step forward, matching the retirement model. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel and Julie Hair &amp; Nails spend, which is deducted in the Cash Summary. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from.</p>
-    <span class="info-build">Budget build: v39</span>
+    <span class="info-build">Budget build: v40</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -576,7 +576,8 @@
     return best ? (Number(best.monthly_value) || 0) : (Number(p.monthly_contribution) || 0);
   }
 
-  // global pensions block — net cost (private ÷1.25; Aegon/workplace at gross), using each owner's tier
+  // global pensions block — bank debit taken from each account. After the ann9 migration the
+  // stored value IS the debit for every pension (private = net you pay; workplace = salary deduction).
   function pensionBlock(d) {
     const heldIds = {};
     (d.bankAccts || []).forEach(a => { if (a.account_id) heldIds[a.account_id] = a.account_holder || ''; });
@@ -587,9 +588,7 @@
       const owner = p.member_name;
       const ownerDays = (selectedTier[owner] !== undefined) ? selectedTier[owner] : currentTierDays(owner, d.tiers);
       if (p.working_days != null && ownerDays != null && Number(p.working_days) !== Number(ownerDays)) return;
-      const isWorkplace = /aegon/i.test(p.pension_name || '');
-      const gross = contribForViewedMonth(p, d);
-      const cost = isWorkplace ? gross : gross / 1.25;
+      const cost = contribForViewedMonth(p, d);
       if (cost === 0) return;
       const costV = cost * periodScale();
       total += costV;
