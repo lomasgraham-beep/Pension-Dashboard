@@ -142,7 +142,7 @@
   // Inertness: when GIFT_SAVINGS is false the exclusion test is never reached and the gift term is 0, so
   // billsM reduces to the exact ann9 expression — byte-identical, proven by the field comparison in the
   // delivery. Flip to true ONLY once every engine caller passes data.gifts, else Xmas/Birthday drop out.
-  const GIFT_SAVINGS = false;
+  const GIFT_SAVINGS = true;
   const GIFT_INFL = 0.005;              // 0.5%/yr, gifts only
 
   function billEffectiveAnnual(b) {
