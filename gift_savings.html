@@ -13,7 +13,7 @@
   .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
   h2 { color:#2c3e50; font-size:18px; margin:0 0 12px; }
   .tablewrap { overflow-x:auto; }
-  table { border-collapse:collapse; width:100%; min-width:640px; }
+  table { border-collapse:collapse; width:100%; min-width:680px; }
   th, td { padding:8px 10px; border-bottom:1px solid #e2e8f0; text-align:right; }
   th:first-child, td:first-child { text-align:left; }
   th { background:#f8fafc; color:#475569; font-size:13px; white-space:nowrap; }
@@ -21,8 +21,9 @@
   td.del { text-align:center; }
   input[type=text], input[type=number], select { width:100%; box-sizing:border-box; padding:7px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px; background:#fff; color:#333; }
   input[type=number] { text-align:right; }
-  th.num, td.num { width:110px; }
-  th.acct, td.acct { min-width:200px; text-align:left; }
+  th.val, td.val { width:120px; }
+  th.tap, td.tap { width:82px; }
+  th.acct, td.acct { min-width:190px; text-align:left; }
   td.del button { border:1px solid #e2b3ae; background:#fdecec; color:#c0392b; border-radius:6px; padding:5px 9px; cursor:pointer; font-size:13px; }
   .tot { margin-top:10px; font-size:14px; color:#334155; }
   .grand { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px; font-size:14px; color:#334155; margin-bottom:18px; }
@@ -52,7 +53,7 @@
 </head>
 <body>
   <h1>Gift Savings</h1>
-  <p class="note">Xmas and birthday gift budgets, saved into a savings account and spent on the credit card. Each line holds three planned annual amounts &mdash; <b>at 70</b>, <b>at 80</b>, <b>at 90</b> &mdash; and the one matching the reference person&rsquo;s age is used, then inflated 0.5% a year from this year. The lines are summed, divided by 12, and that monthly set-aside shows as the <b>Xmas</b> and <b>Birthdays</b> rows in the Budget&rsquo;s Credit Card box (and in the other bill views). <span style="color:#94a3b8;">(gift savings build: v1)</span></p>
+  <p class="note">Xmas and birthday gift budgets, saved into a savings account. Enter the <b>value</b> of each gift line and a <b>taper</b> for ages 70 / 80 / 90 &mdash; a fraction from <b>1</b> (full, 100%) down to <b>0</b> (none), exactly like the Bills taper. Below 70 the full value applies; from 70 the matching taper is used. The tapered values are summed, inflated 0.5%/yr from this year, divided by 12, and that monthly set-aside is what the Budget draws from the savings account. <span style="color:#94a3b8;">(gift savings build: v2)</span></p>
 
   <div id="status">Loading&hellip;</div>
   <div class="refnote" id="refNote" style="display:none;"></div>
@@ -64,7 +65,7 @@
       <table>
         <thead><tr>
           <th>Line</th><th class="acct">Savings account</th>
-          <th class="num">At 70 (&pound;/yr)</th><th class="num">At 80 (&pound;/yr)</th><th class="num">At 90 (&pound;/yr)</th><th></th>
+          <th class="val">Value (&pound;/yr)</th><th class="tap">Taper 70</th><th class="tap">Taper 80</th><th class="tap">Taper 90</th><th></th>
         </tr></thead>
         <tbody id="xmasBody"></tbody>
       </table>
@@ -79,7 +80,7 @@
       <table>
         <thead><tr>
           <th>Line</th><th class="acct">Savings account</th>
-          <th class="num">At 70 (&pound;/yr)</th><th class="num">At 80 (&pound;/yr)</th><th class="num">At 90 (&pound;/yr)</th><th></th>
+          <th class="val">Value (&pound;/yr)</th><th class="tap">Taper 70</th><th class="tap">Taper 80</th><th class="tap">Taper 90</th><th></th>
         </tr></thead>
         <tbody id="birthdayBody"></tbody>
       </table>
@@ -100,9 +101,9 @@
 
   let accounts = [];
   let members = [];
-  let rows = [];            // working copy: { _k, _new, _dirty, _del, id, gift_type, label, savings_account, amt_70, amt_80, amt_90, sort_order }
-  let deleted = [];         // ids to DELETE on save
-  let refAge = null;        // reference person's age this year
+  let rows = [];            // { _k, _new, _dirty, _del, id, gift_type, label, savings_account, gift_value, taper_at_70, taper_at_80, taper_at_90, sort_order }
+  let deleted = [];
+  let refAge = null;
   let refName = '';
   let nextK = 1;
 
@@ -130,7 +131,10 @@
       rows = (gifts || []).map(g => ({
         _k: 'g' + (nextK++), _new: false, _dirty: false, _del: false,
         id: g.id, gift_type: g.gift_type, label: g.label || '', savings_account: g.savings_account || '',
-        amt_70: Number(g.amt_70) || 0, amt_80: Number(g.amt_80) || 0, amt_90: Number(g.amt_90) || 0,
+        gift_value: Number(g.gift_value) || 0,
+        taper_at_70: g.taper_at_70 != null ? Number(g.taper_at_70) : 1,
+        taper_at_80: g.taper_at_80 != null ? Number(g.taper_at_80) : 1,
+        taper_at_90: g.taper_at_90 != null ? Number(g.taper_at_90) : 1,
         sort_order: Number(g.sort_order) || 0
       }));
       status.style.display = 'none';
@@ -142,11 +146,22 @@
     }
   }
 
-  // which age band applies: 70-79 (and below 70) -> at 70, 80-89 -> at 80, 90+ -> at 90
-  function bandKey(age) { if (age == null) return 'amt_70'; if (age >= 90) return 'amt_90'; if (age >= 80) return 'amt_80'; return 'amt_70'; }
-  function bandLabel(age) { if (age == null) return 'at 70'; if (age >= 90) return 'at 90'; if (age >= 80) return 'at 80'; return 'at 70'; }
-  // annual for the current year = active band amount (0.5% factor is 1 in the current year)
-  function annualNow(r) { return Number(r[bandKey(refAge)]) || 0; }
+  // taper fraction for a row at a given age — mirrors the Bills taperFor: below 70 = full (1.0)
+  function taperForRow(r, age) {
+    if (age == null) return 1;
+    if (age >= 90) return r.taper_at_90 != null ? Number(r.taper_at_90) : 1;
+    if (age >= 80) return r.taper_at_80 != null ? Number(r.taper_at_80) : 1;
+    if (age >= 70) return r.taper_at_70 != null ? Number(r.taper_at_70) : 1;
+    return 1;
+  }
+  function bandLabel(age) {
+    if (age == null || age < 70) return 'full value (no taper yet)';
+    if (age >= 90) return 'taper 90';
+    if (age >= 80) return 'taper 80';
+    return 'taper 70';
+  }
+  // effective annual for the current year = value × taper (0.5% factor is 1 in the current year)
+  function annualNow(r) { return (Number(r.gift_value) || 0) * taperForRow(r, refAge); }
 
   function acctLabel(id) {
     const a = accounts.find(x => (x.account_id || '').trim() === (id || '').trim());
@@ -167,9 +182,10 @@
     return '<tr>' +
       '<td><input type="text" value="' + esc(r.label) + '" oninput="edit(\'' + r._k + '\',\'label\',this.value)"></td>' +
       '<td class="acct"><select onchange="edit(\'' + r._k + '\',\'savings_account\',this.value)">' + acctOptions(r.savings_account) + '</select></td>' +
-      '<td class="num"><input type="number" inputmode="decimal" value="' + (r.amt_70 || 0) + '" onfocus="gf(this)" onblur="gb(this)" oninput="edit(\'' + r._k + '\',\'amt_70\',this.value)"></td>' +
-      '<td class="num"><input type="number" inputmode="decimal" value="' + (r.amt_80 || 0) + '" onfocus="gf(this)" onblur="gb(this)" oninput="edit(\'' + r._k + '\',\'amt_80\',this.value)"></td>' +
-      '<td class="num"><input type="number" inputmode="decimal" value="' + (r.amt_90 || 0) + '" onfocus="gf(this)" onblur="gb(this)" oninput="edit(\'' + r._k + '\',\'amt_90\',this.value)"></td>' +
+      '<td class="val"><input type="number" inputmode="decimal" value="' + (r.gift_value || 0) + '" onfocus="gf(this)" onblur="gb(this)" oninput="edit(\'' + r._k + '\',\'gift_value\',this.value)"></td>' +
+      '<td class="tap"><input type="number" step="0.05" min="0" max="1" value="' + (r.taper_at_70 != null ? r.taper_at_70 : 1) + '" onfocus="gf(this)" onblur="gb(this)" oninput="edit(\'' + r._k + '\',\'taper_at_70\',this.value)"></td>' +
+      '<td class="tap"><input type="number" step="0.05" min="0" max="1" value="' + (r.taper_at_80 != null ? r.taper_at_80 : 1) + '" onfocus="gf(this)" onblur="gb(this)" oninput="edit(\'' + r._k + '\',\'taper_at_80\',this.value)"></td>' +
+      '<td class="tap"><input type="number" step="0.05" min="0" max="1" value="' + (r.taper_at_90 != null ? r.taper_at_90 : 1) + '" onfocus="gf(this)" onblur="gb(this)" oninput="edit(\'' + r._k + '\',\'taper_at_90\',this.value)"></td>' +
       '<td class="del"><button type="button" onclick="removeRow(\'' + r._k + '\')" title="Remove line">\u2715</button></td>' +
     '</tr>';
   }
@@ -178,13 +194,13 @@
     const mine = rows.filter(r => !r._del && r.gift_type === type);
     document.getElementById(bodyId).innerHTML = mine.length
       ? mine.map(rowHtml).join('')
-      : '<tr><td class="empty" colspan="6">No ' + esc(type) + ' lines yet. Use \u201cAdd line\u201d.</td></tr>';
+      : '<tr><td class="empty" colspan="7">No ' + esc(type) + ' lines yet. Use \u201cAdd line\u201d.</td></tr>';
   }
 
   function totLine(type) {
     let annual = 0;
     rows.filter(r => !r._del && r.gift_type === type).forEach(r => annual += annualNow(r));
-    return 'Active band <b>' + esc(bandLabel(refAge)) + '</b> &middot; annual <b>' + fmt(annual) + '</b> &middot; monthly set-aside <b>' + fmt(annual / 12) + '</b>';
+    return 'Applied <b>' + esc(bandLabel(refAge)) + '</b> &middot; annual <b>' + fmt(annual) + '</b> &middot; monthly set-aside <b>' + fmt(annual / 12) + '</b>';
   }
 
   function grandMonthly() {
@@ -198,14 +214,14 @@
     document.getElementById('birthdayTot').innerHTML = totLine('Birthday');
     const gm = grandMonthly();
     document.getElementById('grandNote').innerHTML =
-      'Combined monthly set-aside landing on the Budget (Credit Card box): ' +
+      'Combined monthly set-aside drawn from the savings account: ' +
       '<b>Xmas ' + fmt(gm.xmas) + '</b> + <b>Birthdays ' + fmt(gm.birthday) + '</b> = <b>' + fmt(gm.xmas + gm.birthday) + '</b>/mo.';
   }
 
   function render() {
     document.getElementById('refNote').innerHTML = (refAge != null)
-      ? esc(refName) + ' is <b>' + refAge + '</b> this year, so the <b>' + esc(bandLabel(refAge)) + '</b> band is active. Amounts inflate 0.5%/yr from ' + NOW_YEAR + ' in the projection pages.'
-      : 'No date of birth on the primary member \u2014 defaulting to the \u201cat 70\u201d band. Set a date of birth on the Members page for age-based banding.';
+      ? esc(refName) + ' is <b>' + refAge + '</b> this year, so <b>' + esc(bandLabel(refAge)) + '</b> is applied. Values inflate 0.5%/yr from ' + NOW_YEAR + ' in the projection pages.'
+      : 'No date of birth on the primary member \u2014 full value applied (no taper). Set a date of birth on the Members page for age-based tapering.';
     renderSection('Xmas', 'xmasBody');
     renderSection('Birthday', 'birthdayBody');
     updateTotals();
@@ -213,16 +229,16 @@
 
   function edit(k, field, val) {
     const r = rows.find(x => x._k === k); if (!r) return;
-    if (field === 'amt_70' || field === 'amt_80' || field === 'amt_90') r[field] = Number(val) || 0;
+    if (field === 'gift_value' || field === 'taper_at_70' || field === 'taper_at_80' || field === 'taper_at_90') r[field] = Number(val) || 0;
     else r[field] = val;
     r._dirty = true;
-    if (field.indexOf('amt_') === 0) updateTotals();   // refresh totals without rebuilding inputs (keeps focus)
+    if (field === 'gift_value' || field.indexOf('taper_') === 0) updateTotals();   // refresh totals without rebuilding inputs
   }
 
   function addRow(type) {
     const maxSort = rows.filter(r => r.gift_type === type).reduce((m, r) => Math.max(m, r.sort_order || 0), 0);
     rows.push({ _k: 'g' + (nextK++), _new: true, _dirty: true, _del: false, id: null, gift_type: type,
-      label: '', savings_account: '', amt_70: 0, amt_80: 0, amt_90: 0, sort_order: maxSort + 1 });
+      label: '', savings_account: '', gift_value: 0, taper_at_70: 1, taper_at_80: 1, taper_at_90: 1, sort_order: maxSort + 1 });
     renderSection(type, type === 'Xmas' ? 'xmasBody' : 'birthdayBody');
     updateTotals();
   }
@@ -248,7 +264,8 @@
         if (r._del) continue;
         const payload = {
           gift_type: r.gift_type, label: r.label || '', savings_account: r.savings_account || null,
-          amt_70: Number(r.amt_70) || 0, amt_80: Number(r.amt_80) || 0, amt_90: Number(r.amt_90) || 0,
+          gift_value: Number(r.gift_value) || 0,
+          taper_at_70: Number(r.taper_at_70) || 0, taper_at_80: Number(r.taper_at_80) || 0, taper_at_90: Number(r.taper_at_90) || 0,
           sort_order: Number(r.sort_order) || 0
         };
         if (r._new || !r.id) await App.write('POST', 'bd_gift_savings', payload);
@@ -256,7 +273,7 @@
       }
       msg.style.color = '#15803d'; msg.textContent = 'Saved.';
       notify();
-      await load();   // reload to pick up new ids and clear dirty flags
+      await load();
     } catch (e) {
       msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + (e && e.message ? e.message : e);
     }
