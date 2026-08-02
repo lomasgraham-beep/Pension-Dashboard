@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gift Savings</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=err85"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1040px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:14px; }
+  .refnote { background:#eef6ff; border:1px solid #cfe4fb; color:#1e3a8a; border-radius:8px; padding:10px 14px; font-size:14px; margin-bottom:16px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  h2 { color:#2c3e50; font-size:18px; margin:0 0 12px; }
+  .tablewrap { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; min-width:640px; }
+  th, td { padding:8px 10px; border-bottom:1px solid #e2e8f0; text-align:right; }
+  th:first-child, td:first-child { text-align:left; }
+  th { background:#f8fafc; color:#475569; font-size:13px; white-space:nowrap; }
+  td.empty { text-align:left; color:#94a3b8; font-style:italic; }
+  td.del { text-align:center; }
+  input[type=text], input[type=number], select { width:100%; box-sizing:border-box; padding:7px 8px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px; background:#fff; color:#333; }
+  input[type=number] { text-align:right; }
+  th.num, td.num { width:110px; }
+  th.acct, td.acct { min-width:200px; text-align:left; }
+  td.del button { border:1px solid #e2b3ae; background:#fdecec; color:#c0392b; border-radius:6px; padding:5px 9px; cursor:pointer; font-size:13px; }
+  .tot { margin-top:10px; font-size:14px; color:#334155; }
+  .grand { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px; font-size:14px; color:#334155; margin-bottom:18px; }
+  .btn { background:#14294a; color:#fff; border:none; border-radius:8px; padding:9px 16px; font-size:14px; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .btn.add { background:#0e7490; margin-top:12px; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+  #saveMsg { margin-left:12px; font-size:14px; }
+
+  /* ---- Automatic dark mode (follows device setting) ---- */
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1, h2 { color:#f1f5f9 !important; }
+    .panel { background:#1e293b !important; border-color:#334155 !important; box-shadow:0 2px 4px rgba(0,0,0,0.4) !important; }
+    .note { color:#94a3b8 !important; }
+    .refnote { background:#0b2545 !important; border-color:#1e3a5f !important; color:#93c5fd !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    td.empty { color:#94a3b8 !important; }
+    input[type=text], input[type=number], select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#334155 !important; }
+    .tot { color:#cbd5e1 !important; }
+    .grand { background:#0f172a !important; border-color:#334155 !important; color:#cbd5e1 !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Gift Savings</h1>
+  <p class="note">Xmas and birthday gift budgets, saved into a savings account and spent on the credit card. Each line holds three planned annual amounts &mdash; <b>at 70</b>, <b>at 80</b>, <b>at 90</b> &mdash; and the one matching the reference person&rsquo;s age is used, then inflated 0.5% a year from this year. The lines are summed, divided by 12, and that monthly set-aside shows as the <b>Xmas</b> and <b>Birthdays</b> rows in the Budget&rsquo;s Credit Card box (and in the other bill views). <span style="color:#94a3b8;">(gift savings build: v1)</span></p>
+
+  <div id="status">Loading&hellip;</div>
+  <div class="refnote" id="refNote" style="display:none;"></div>
+  <div class="grand" id="grandNote" style="display:none;"></div>
+
+  <div class="panel" id="xmasPanel" style="display:none;">
+    <h2>Xmas</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>Line</th><th class="acct">Savings account</th>
+          <th class="num">At 70 (&pound;/yr)</th><th class="num">At 80 (&pound;/yr)</th><th class="num">At 90 (&pound;/yr)</th><th></th>
+        </tr></thead>
+        <tbody id="xmasBody"></tbody>
+      </table>
+    </div>
+    <div class="tot" id="xmasTot"></div>
+    <button type="button" class="btn add" onclick="addRow('Xmas')">Add line</button>
+  </div>
+
+  <div class="panel" id="birthdayPanel" style="display:none;">
+    <h2>Birthdays</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>Line</th><th class="acct">Savings account</th>
+          <th class="num">At 70 (&pound;/yr)</th><th class="num">At 80 (&pound;/yr)</th><th class="num">At 90 (&pound;/yr)</th><th></th>
+        </tr></thead>
+        <tbody id="birthdayBody"></tbody>
+      </table>
+    </div>
+    <div class="tot" id="birthdayTot"></div>
+    <button type="button" class="btn add" onclick="addRow('Birthday')">Add line</button>
+  </div>
+
+  <div class="panel" id="savePanel" style="display:none;">
+    <button type="button" class="btn" onclick="saveAll()">Save changes</button>
+    <span id="saveMsg"></span>
+  </div>
+
+<script>
+  const fmt = App.fmt;
+  const NOW_YEAR = new Date().getFullYear();
+  const GIFT_INFL = 0.005;   // 0.5%/yr, compounded from the current year (used by the consumer pages for future years)
+
+  let accounts = [];
+  let members = [];
+  let rows = [];            // working copy: { _k, _new, _dirty, _del, id, gift_type, label, savings_account, amt_70, amt_80, amt_90, sort_order }
+  let deleted = [];         // ids to DELETE on save
+  let refAge = null;        // reference person's age this year
+  let refName = '';
+  let nextK = 1;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function notify() { try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {} }
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      status.className = ''; status.style.display = 'block'; status.textContent = 'Loading\u2026';
+      const [gifts, accts, mem] = await Promise.all([
+        App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc'),
+        App.rest('bd_bank_account?order=account_id.asc'),
+        App.rest('bd_members')
+      ]);
+      accounts = accts || [];
+      members = (mem || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+      const p1 = members[0];
+      refName = p1 ? (p1.name || '') : '';
+      refAge = (p1 && p1.dob) ? (NOW_YEAR - new Date(p1.dob).getFullYear()) : null;
+      deleted = [];
+      nextK = 1;
+      rows = (gifts || []).map(g => ({
+        _k: 'g' + (nextK++), _new: false, _dirty: false, _del: false,
+        id: g.id, gift_type: g.gift_type, label: g.label || '', savings_account: g.savings_account || '',
+        amt_70: Number(g.amt_70) || 0, amt_80: Number(g.amt_80) || 0, amt_90: Number(g.amt_90) || 0,
+        sort_order: Number(g.sort_order) || 0
+      }));
+      status.style.display = 'none';
+      ['refNote', 'grandNote', 'xmasPanel', 'birthdayPanel', 'savePanel'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'block'; });
+      render();
+    } catch (e) {
+      status.className = 's-err'; status.style.display = 'block';
+      status.textContent = 'Could not load: ' + (e && e.message ? e.message : e);
+    }
+  }
+
+  // which age band applies: 70-79 (and below 70) -> at 70, 80-89 -> at 80, 90+ -> at 90
+  function bandKey(age) { if (age == null) return 'amt_70'; if (age >= 90) return 'amt_90'; if (age >= 80) return 'amt_80'; return 'amt_70'; }
+  function bandLabel(age) { if (age == null) return 'at 70'; if (age >= 90) return 'at 90'; if (age >= 80) return 'at 80'; return 'at 70'; }
+  // annual for the current year = active band amount (0.5% factor is 1 in the current year)
+  function annualNow(r) { return Number(r[bandKey(refAge)]) || 0; }
+
+  function acctLabel(id) {
+    const a = accounts.find(x => (x.account_id || '').trim() === (id || '').trim());
+    if (!a) return id || '\u2014';
+    const bits = [a.bank_name, a.account_holder].filter(Boolean).join(' \u00b7 ');
+    return bits ? (a.account_id + ' (' + bits + ')') : a.account_id;
+  }
+  function acctOptions(sel) {
+    let o = '<option value="">\u2014 none \u2014</option>';
+    accounts.forEach(a => {
+      const id = (a.account_id || '').trim(); if (!id) return;
+      o += '<option value="' + esc(id) + '"' + (id === (sel || '').trim() ? ' selected' : '') + '>' + esc(acctLabel(id)) + '</option>';
+    });
+    return o;
+  }
+
+  function rowHtml(r) {
+    return '<tr>' +
+      '<td><input type="text" value="' + esc(r.label) + '" oninput="edit(\'' + r._k + '\',\'label\',this.value)"></td>' +
+      '<td class="acct"><select onchange="edit(\'' + r._k + '\',\'savings_account\',this.value)">' + acctOptions(r.savings_account) + '</select></td>' +
+      '<td class="num"><input type="number" inputmode="decimal" value="' + (r.amt_70 || 0) + '" onfocus="gf(this)" onblur="gb(this)" oninput="edit(\'' + r._k + '\',\'amt_70\',this.value)"></td>' +
+      '<td class="num"><input type="number" inputmode="decimal" value="' + (r.amt_80 || 0) + '" onfocus="gf(this)" onblur="gb(this)" oninput="edit(\'' + r._k + '\',\'amt_80\',this.value)"></td>' +
+      '<td class="num"><input type="number" inputmode="decimal" value="' + (r.amt_90 || 0) + '" onfocus="gf(this)" onblur="gb(this)" oninput="edit(\'' + r._k + '\',\'amt_90\',this.value)"></td>' +
+      '<td class="del"><button type="button" onclick="removeRow(\'' + r._k + '\')" title="Remove line">\u2715</button></td>' +
+    '</tr>';
+  }
+
+  function renderSection(type, bodyId) {
+    const mine = rows.filter(r => !r._del && r.gift_type === type);
+    document.getElementById(bodyId).innerHTML = mine.length
+      ? mine.map(rowHtml).join('')
+      : '<tr><td class="empty" colspan="6">No ' + esc(type) + ' lines yet. Use \u201cAdd line\u201d.</td></tr>';
+  }
+
+  function totLine(type) {
+    let annual = 0;
+    rows.filter(r => !r._del && r.gift_type === type).forEach(r => annual += annualNow(r));
+    return 'Active band <b>' + esc(bandLabel(refAge)) + '</b> &middot; annual <b>' + fmt(annual) + '</b> &middot; monthly set-aside <b>' + fmt(annual / 12) + '</b>';
+  }
+
+  function grandMonthly() {
+    let x = 0, b = 0;
+    rows.filter(r => !r._del).forEach(r => { const a = annualNow(r) / 12; if (r.gift_type === 'Xmas') x += a; else b += a; });
+    return { xmas: x, birthday: b };
+  }
+
+  function updateTotals() {
+    document.getElementById('xmasTot').innerHTML = totLine('Xmas');
+    document.getElementById('birthdayTot').innerHTML = totLine('Birthday');
+    const gm = grandMonthly();
+    document.getElementById('grandNote').innerHTML =
+      'Combined monthly set-aside landing on the Budget (Credit Card box): ' +
+      '<b>Xmas ' + fmt(gm.xmas) + '</b> + <b>Birthdays ' + fmt(gm.birthday) + '</b> = <b>' + fmt(gm.xmas + gm.birthday) + '</b>/mo.';
+  }
+
+  function render() {
+    document.getElementById('refNote').innerHTML = (refAge != null)
+      ? esc(refName) + ' is <b>' + refAge + '</b> this year, so the <b>' + esc(bandLabel(refAge)) + '</b> band is active. Amounts inflate 0.5%/yr from ' + NOW_YEAR + ' in the projection pages.'
+      : 'No date of birth on the primary member \u2014 defaulting to the \u201cat 70\u201d band. Set a date of birth on the Members page for age-based banding.';
+    renderSection('Xmas', 'xmasBody');
+    renderSection('Birthday', 'birthdayBody');
+    updateTotals();
+  }
+
+  function edit(k, field, val) {
+    const r = rows.find(x => x._k === k); if (!r) return;
+    if (field === 'amt_70' || field === 'amt_80' || field === 'amt_90') r[field] = Number(val) || 0;
+    else r[field] = val;
+    r._dirty = true;
+    if (field.indexOf('amt_') === 0) updateTotals();   // refresh totals without rebuilding inputs (keeps focus)
+  }
+
+  function addRow(type) {
+    const maxSort = rows.filter(r => r.gift_type === type).reduce((m, r) => Math.max(m, r.sort_order || 0), 0);
+    rows.push({ _k: 'g' + (nextK++), _new: true, _dirty: true, _del: false, id: null, gift_type: type,
+      label: '', savings_account: '', amt_70: 0, amt_80: 0, amt_90: 0, sort_order: maxSort + 1 });
+    renderSection(type, type === 'Xmas' ? 'xmasBody' : 'birthdayBody');
+    updateTotals();
+  }
+
+  function removeRow(k) {
+    const r = rows.find(x => x._k === k); if (!r) return;
+    r._del = true;
+    if (r.id) deleted.push(r.id);
+    renderSection(r.gift_type, r.gift_type === 'Xmas' ? 'xmasBody' : 'birthdayBody');
+    updateTotals();
+  }
+
+  // blank the field on focus so a new value can be typed without deleting; restore if left empty
+  function gf(el) { el.dataset.prev = el.value; el.value = ''; }
+  function gb(el) { if (String(el.value).trim() === '') el.value = el.dataset.prev || '0'; }
+
+  async function saveAll() {
+    const msg = document.getElementById('saveMsg');
+    msg.style.color = ''; msg.textContent = 'Saving\u2026';
+    try {
+      for (const id of deleted) { await App.write('DELETE', 'bd_gift_savings?id=eq.' + id); }
+      for (const r of rows) {
+        if (r._del) continue;
+        const payload = {
+          gift_type: r.gift_type, label: r.label || '', savings_account: r.savings_account || null,
+          amt_70: Number(r.amt_70) || 0, amt_80: Number(r.amt_80) || 0, amt_90: Number(r.amt_90) || 0,
+          sort_order: Number(r.sort_order) || 0
+        };
+        if (r._new || !r.id) await App.write('POST', 'bd_gift_savings', payload);
+        else if (r._dirty) await App.write('PATCH', 'bd_gift_savings?id=eq.' + r.id, payload);
+      }
+      msg.style.color = '#15803d'; msg.textContent = 'Saved.';
+      notify();
+      await load();   // reload to pick up new ids and clear dirty flags
+    } catch (e) {
+      msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + (e && e.message ? e.message : e);
+    }
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  if (typeof App === 'undefined' || !App.requireLogin) {
+    document.getElementById('status').textContent = 'Error: common.js did not load (App is undefined).';
+  } else {
+    try {
+      App.requireLogin(load, { title: 'Gift Savings' });
+    } catch (err) {
+      document.getElementById('status').textContent = 'Error during startup: ' + (err && err.message ? err.message : err);
+    }
+  }
+</script>
+</body>
+</html>
