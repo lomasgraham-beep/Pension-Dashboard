@@ -6,7 +6,7 @@
 <title>Contributions</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; color: #333; max-width: 880px; margin: 0 auto; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; color: #333; max-width: 1200px; margin: 0 auto; }
   h1 { color: #2c3e50; }
   .owner-head { color:#2c3e50; font-size:16px; font-weight:bold; margin:24px 0 6px; padding-bottom:6px; border-bottom:2px solid #cbd5e1; }
   .pension-head { color:#475569; font-size:14px; font-weight:bold; margin:14px 0 8px; }
@@ -128,7 +128,7 @@
 
 <div id="appWrap">
 <div class="logout-bar"><span id="whoami"></span><a onclick="doLogout()">Log out</a></div>
-<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: sched2)</span></h1>
+<h1>Contributions <span style="font-size:12px;color:#94a3b8;font-weight:normal;">(contrib build: sched3)</span></h1>
 <div id="status" class="status-load">Connecting to your database…</div>
 
 <div class="panel" style="margin-bottom:18px;">
@@ -264,10 +264,10 @@
     if (!schedule.length) { tb.innerHTML = '<tr><td colspan="9" style="color:#94a3b8;">No entries yet. Tap &ldquo;Add entry&rdquo; to record a contribution and the date it starts.</td></tr>'; return; }
     const wdKey = w => (w == null || w === '') ? -1 : Number(w);
     const sorted = schedule.slice().sort((a, b) =>
+      String(b.effective_from || '').localeCompare(String(a.effective_from || '')) ||   // Effective From: newest first
       String(a.member_name || '').localeCompare(String(b.member_name || '')) ||
       String(a.pension_name || '').localeCompare(String(b.pension_name || '')) ||
-      (wdKey(a.working_days) - wdKey(b.working_days)) ||
-      String(a.effective_from || '').localeCompare(String(b.effective_from || '')));
+      (wdKey(a.working_days) - wdKey(b.working_days)));
     tb.innerHTML = sorted.map(r => {
       const id = r.id;
       return `<tr id="schedrow_${id}">

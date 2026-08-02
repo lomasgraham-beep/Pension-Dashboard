@@ -111,7 +111,7 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Household Bills</h2>
-  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half).<strong>Renewal</strong> is the policy renewal date for insurances &mdash; when set, that insurance shows on the Budget page only in its renewal month. The darker <strong>Holidays</strong>, <strong>Dining</strong> and <strong>Loans</strong> lines are drawn from their pages &mdash; read-only here and counted towards the yearly total, but not saved as bills. <span style="color:var(--accent-dark);">(bills build: loans1)</span></p>
+  <p class="note">Add, edit or delete bills. <strong>Annual &pound;</strong> is the yearly cost today &mdash; for Monthly bills it now counts only the months the bill is actually charged. <strong>Paid in</strong> sets which months that is &mdash; tap it to pick (e.g. council tax over 10 months, off in Feb &amp; Mar), and the Annual figure updates to match. <strong>Reduce?</strong> ties the bill to the retirement spending slider. <strong>Taper 70/80/90</strong> is the % of the cost retained at each age (1 = full, 0.5 = half).<strong>Renewal</strong> is the policy renewal date for insurances &mdash; when set, that insurance shows on the Budget page only in its renewal month. The darker <strong>Holidays</strong>, <strong>Dining</strong>, <strong>Pensions</strong> and <strong>Loans</strong> lines are drawn from their pages &mdash; read-only here and counted towards the yearly total, but not saved as bills. <strong>Pensions</strong> shows this year&rsquo;s contributions at each member&rsquo;s current working-days tier, so it changes automatically when a tier changes (e.g. a 3-day week from September). <span style="color:var(--accent-dark);">(bills build: pens1)</span></p>
   <div class="bar" style="align-items:flex-start;">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
@@ -165,6 +165,8 @@
   let dinAnnual = 0;           // live dining-rota yearly total (display-only; NOT a saved bill)
   const LOAN_CAT = 'Loans';    // label the derived loan lines sit under
   let loanRows = [];           // active loan payments (display-only; read from bd_loans, NEVER saved here)
+  const PEN_CAT = 'Pension';   // label the derived pension line sits under
+  let penAnnual = 0;           // live pension contributions yearly total at each member's current tier (display-only)
   const tbody = document.querySelector('#tbl tbody');
   const fmt = App.fmt;
   const MABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -414,6 +416,34 @@
   }
   function holidayInView(cat) { return holAnnual > 0 && (cat === 'All' || cat === HOL_CAT); }
   function diningInView(cat)  { return dinAnnual > 0 && (cat === 'All' || cat === DIN_CAT); }
+  function pensionInView(cat) { return penAnnual > 0 && (cat === 'All' || cat === PEN_CAT); }
+
+  // Current working-days tier for a member = latest dated tier on/before today (mirrors Budget/engine).
+  function tierDaysNow(member, tiers) {
+    const now = new Date(); let best = null;
+    (tiers || []).forEach(t => {
+      if (t.member_name !== member || !t.from_date) return;
+      const from = new Date(t.from_date);
+      if (from <= now && (!best || from > new Date(best.from_date))) best = t;
+    });
+    return best ? Number(best.days) : null;
+  }
+  // Annual pension contributions at each member's CURRENT tier, counting only pensions paid from a
+  // held bank account — so this matches the Budget page's pension figure. After the ann9 migration
+  // monthly_contribution IS the bank debit, so this is the real annual cash cost. Dynamic: the tier is
+  // date-driven, so when a member moves to (e.g.) a 3-day week from September, currentTier flips on that
+  // date and this figure switches to the 3-day contribution automatically.
+  function computePensionAnnual(contribs, tiers) {
+    let monthly = 0;
+    (contribs || []).forEach(c => {
+      const acct = (c.paid_account || '').trim();
+      if (!acct || bankAccounts.indexOf(acct) < 0) return;   // only pensions paid from a known account
+      const days = tierDaysNow(c.member_name, tiers);
+      if (c.working_days != null && days != null && Number(c.working_days) !== Number(days)) return;
+      monthly += Number(c.monthly_contribution) || 0;
+    });
+    return monthly * 12;
+  }
 
   function render() {
     const cat = document.getElementById('filterCat').value;
@@ -424,6 +454,7 @@
     let derived = '';
     if (diningInView(cat))  derived += derivedRowHtml('Dining', DIN_CAT, dinAnnual, 'from rota', 'Dining tab');
     if (holidayInView(cat)) derived += derivedRowHtml('Holidays', HOL_CAT, holAnnual, 'from planner', 'Holidays tab');
+    if (pensionInView(cat)) derived += derivedRowHtml('Pensions', PEN_CAT, penAnnual, 'from contributions, current tier', 'Contributions tab');
     if (loansInView(cat))   derived += loanRows.map(derivedLoanRowHtml).join('');
     const body = derived + html;
     tbody.innerHTML = body || '<tr><td colspan="14">No bills in this view. Use \u201cAdd bill\u201d or change the filter.</td></tr>';
@@ -452,6 +483,7 @@
     const extras = [];
     if (diningInView(cat))  { total += dinAnnual; extras.push('dining'); }
     if (holidayInView(cat)) { total += holAnnual; extras.push('holidays'); }
+    if (pensionInView(cat)) { total += penAnnual; extras.push('pensions'); }
     if (loansInView(cat))   { total += loanRows.reduce((s, l) => s + l.annual, 0); extras.push('loans'); }
     const shown = rows.filter(inView).length;
     const scope = cat === 'All' ? 'All categories' : cat;
@@ -505,6 +537,15 @@
       try { const ba = await App.rest('bd_bank_account?order=account_id.asc'); bankAccounts = (ba || []).map(a => a.account_id).filter(Boolean); } catch (e) { bankAccounts = []; }
       // Loan payments — display-only lines drawn from bd_loans; never written to bd_household_bills.
       try { const lr = await App.rest('bd_loans?order=start_date.asc'); loanRows = computeLoanRows(lr || []); } catch (e) { loanRows = []; }
+      // Pension contributions — display-only line drawn from bd_pension_contributions at the current
+      // working-days tier; never written to bd_household_bills.
+      try {
+        const [pc, wt] = await Promise.all([
+          App.rest('bd_pension_contributions'),
+          App.rest('bd_working_tiers?order=from_date.asc')
+        ]);
+        penAnnual = computePensionAnnual(pc || [], wt || []);
+      } catch (e) { penAnnual = 0; }
       // Holiday planner & dining rota yearly totals — display-only lines; never written to bd_household_bills.
       try {
         const [hPlan, hCost, hMeal, hSet, dRota] = await Promise.all([
