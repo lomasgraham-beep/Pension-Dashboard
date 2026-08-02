@@ -1,5 +1,13 @@
 /* ============================================================
    engine.js  —  Pension modelling engine (pure JavaScript)
+   build tag: ann10 (additive: optional Xmas / birthday gift savings via data.gifts, behind the
+                     GIFT_SAVINGS flag. Each gift row (gift_value + taper_at_70/80/90) is tapered on
+                     person-1's age and inflated at 0.5%/yr, and replaces the legacy Xmas/Birthday bill
+                     rows in the outgoings (those bills are excluded from billsM while the flag is on) —
+                     matching the Budget / Bills / What-Could-I-Save pages. When GIFT_SAVINGS is false
+                     the exclusion never fires and the gift term is 0, so billsM is byte-identical to
+                     ann9 — proven by the field comparison in the delivery. Flip on only once every engine
+                     caller passes data.gifts.)
    build tag: ann9  (additive: optional relief-at-source gross-up of PRIVATE (non-workplace)
                      contributions, behind the NET_PRIV_CONTRIB flag. When true, every inflow
                      into a pot whose bd_pensions row has is_workplace === false is multiplied
@@ -124,6 +132,18 @@
   // supplied — so any caller that hasn't been updated to pass a holiday figure behaves exactly as
   // before. Only when the flag is true AND a holidayAnnual is supplied does spend rise.
   const HOLIDAY_COSTS = true;
+
+  // ann10 flag: when GIFT_SAVINGS is true, Xmas / birthday costs come from data.gifts (each row a
+  // { gift_type:'Xmas'|'Birthday', gift_value, taper_at_70/80/90 }) instead of their legacy household-bill
+  // rows. The gift value is tapered on PERSON-1's age (the same reference the Budget / Bills / What-Could-
+  // I-Save pages use) via the existing taperFor helper, and inflates at GIFT_INFL (0.5%/yr) from the same
+  // year offset as the general cost inflation. To avoid double counting, any bill whose category is
+  // Xmas / Christmas / Birthday is excluded from billsM while this flag is on.
+  // Inertness: when GIFT_SAVINGS is false the exclusion test is never reached and the gift term is 0, so
+  // billsM reduces to the exact ann9 expression — byte-identical, proven by the field comparison in the
+  // delivery. Flip to true ONLY once every engine caller passes data.gifts, else Xmas/Birthday drop out.
+  const GIFT_SAVINGS = false;
+  const GIFT_INFL = 0.005;              // 0.5%/yr, gifts only
 
   function billEffectiveAnnual(b) {
     const full = Number(b.total_annual) || 0;
@@ -819,7 +839,16 @@
       }
 
       const inflFactor = Math.pow(1 + INFL, Math.floor(preInflYears + elapsed));   // annual step; preInflYears = 0 gives the ann6 basis (flat within each year since retirement)
-      const billsM = bills.reduce((s, b) => s + billEffectiveAnnual(b) * (b.spend_reduction ? spendRed : 1.0) * taperFor(b, oldest), 0) / 12 * inflFactor;
+      // ann10: with GIFT_SAVINGS off, the reduce excludes nothing and giftM is 0, so billsM is exactly ann9.
+      const billsAnnual = bills.reduce((s, b) => {
+        if (GIFT_SAVINGS && /^(xmas|christmas|birthdays?)$/i.test(String(b.category_code || '').trim())) return s;
+        return s + billEffectiveAnnual(b) * (b.spend_reduction ? spendRed : 1.0) * taperFor(b, oldest);
+      }, 0);
+      const giftM = GIFT_SAVINGS
+        ? (data.gifts || []).reduce((s, g) => s + (Number(g.gift_value) || 0) * taperFor(g, gAge), 0)
+            / 12 * Math.pow(1 + GIFT_INFL, Math.floor(preInflYears + elapsed))
+        : 0;
+      const billsM = billsAnnual / 12 * inflFactor + giftM;
       // Dining: new model uses a single annual figure (rota × meal costs), subject to the
       // spending-reduction slider AND an optional household age-taper (data.diningTaper, a single
       // { taper_at_70/80/90 } object applied via the same taperFor helper the bills use, keyed on the
