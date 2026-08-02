@@ -99,7 +99,7 @@
   // When true: stored private figures are the NET bank debit; the engine adds net x 1.25 to the
   // pot (25% HMRC relief-at-source top-up). Only pots with is_workplace === false are affected.
   // Flip to true ONLY together with the bd contribution ÷1.25 migration, or pots double-count.
-  const NET_PRIV_CONTRIB = false;
+  const NET_PRIV_CONTRIB = true;
   const PRIV_RELIEF = 1.25;   // net -> gross factor for relief-at-source personal pensions
 
   // ---- Mask-aware bill costing (build ann2) ----
