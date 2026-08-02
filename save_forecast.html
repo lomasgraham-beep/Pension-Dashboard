@@ -154,7 +154,7 @@
 </head>
 <body>
   <h1>What I Could Save</h1>
-  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save after everything, including pension contributions (shown as their net cost, matching the budget). Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings) and general costs each April — not at the calendar-year line. Pension contributions follow their own dated schedule: a planned change (e.g. a September step) takes effect in its month and then stays flat, and is not inflated on top — exactly matching the Budget. The chart shows what's left to save each month as green bars (red if a month runs short) against the red cost line; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf16)</span></p>
+  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months, as do Xmas and birthday gifts (age-tapered gift values inflated 0.5%/yr, from the Gift Savings page), sitting in the paying account's column. The last column is what's left to save after everything, including pension contributions (shown as their net cost, matching the budget). Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings) and general costs each April — not at the calendar-year line. Pension contributions follow their own dated schedule: a planned change (e.g. a September step) takes effect in its month and then stays flat, and is not inflated on top — exactly matching the Budget. The chart shows what's left to save each month as green bars (red if a month runs short) against the red cost line; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf17)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="controls" class="controls" style="display:none;">
@@ -247,7 +247,7 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, incAmts, otherInc, bankAccts, mealCost, diningRota, holidayPlan, holidayCost, holidaySettings, params, contribs, catRows, contribSchedule] = await Promise.all([
+      const [members, bills, incAmts, otherInc, bankAccts, mealCost, diningRota, holidayPlan, holidayCost, holidaySettings, params, contribs, catRows, contribSchedule, gifts] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_income_amounts?order=member_name.asc'),
@@ -261,7 +261,8 @@
         App.rest('op_modelling_parameters?select=member_name,retirement_date'),
         App.rest('bd_pension_contributions?select=member_name,pension_name,monthly_contribution,working_days,august_increase_pct,increase_month,paid_account'),
         App.rest('bd_bill_category?select=code,description'),
-        App.rest('bd_contribution_schedule?order=effective_from.asc')
+        App.rest('bd_contribution_schedule?order=effective_from.asc'),
+        App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc')
       ]);
 
       const names = (members || []).map(m => m.name).filter(Boolean);
@@ -326,6 +327,8 @@
       }
 
       (bills || []).forEach(b => {
+        const cc = (b.category_code || '').trim();
+        if (/^(xmas|christmas|birthdays?)$/i.test(cc)) return;   // superseded by bd_gift_savings (Gift Savings page); carried as a set-aside below
         const pb = (b.paid_by || '').trim();
         const nm = b.bill_name || '\u2014';
         const acctId = (b.paid_account || '').trim();
@@ -403,7 +406,7 @@
       DATA = { cols, acctHolder, acctBank, memberMonth, memberAcct, cardMonth, cardBills,
                paypalMonth, paypalBills, diningMonth, holidayMonth, salaryByMemberDays, otherByMember,
                daysWithSalary, jointRetYear, salaryMonth, catMonth, catLabel, cardCat, paypalCat, pensRows, pensTierDays,
-               schedule: contribSchedule || [] };
+               schedule: contribSchedule || [], membersRaw: members || [], bankAcctsRaw: bankAccts || [], gifts: gifts || [] };
 
       selYear = CUR_Y;
       initSlider();
@@ -475,10 +478,44 @@
   function pensionMonth(m) { return activePensRows().reduce((s, r) => s + pensRowCost(r, m), 0); }
   function incomeTotal(days) { return DATA.cols.reduce((s, n) => s + incomeForMember(n, days), 0); }
 
+  // ---- Gift savings (Xmas / Birthdays): bills-style taper on a gift value, inflated 0.5%/yr from now.
+  // Bought on the card but funded from a savings account, so carried as a smoothed monthly set-aside
+  // against that account's paying-account owner (like the insurance pot set-asides) — not on the card.
+  function giftRefAge(Y) {
+    const p1 = (DATA.membersRaw || [])[0];
+    if (!p1 || !p1.dob) return null;
+    return Y - new Date(p1.dob).getFullYear();
+  }
+  function giftTaper(g, age) {
+    if (age == null) return 1;
+    if (age >= 90) return g.taper_at_90 != null ? Number(g.taper_at_90) : 1;
+    if (age >= 80) return g.taper_at_80 != null ? Number(g.taper_at_80) : 1;
+    if (age >= 70) return g.taper_at_70 != null ? Number(g.taper_at_70) : 1;
+    return 1;
+  }
+  function giftFactor(Y) { return Math.pow(1.005, Math.max(0, Y - CUR_Y)); }
+  // owner (paying-account holder) -> smoothed monthly gift set-aside for the selected year (0.5%-inflated)
+  function giftByOwner() {
+    const d = DATA, out = {};
+    const age = giftRefAge(selYear), f = giftFactor(selYear);
+    (d.gifts || []).forEach(g => {
+      const sav = (g.savings_account || '').trim(); if (!sav) return;
+      const savAcct = (d.bankAcctsRaw || []).find(a => (a.account_id || '').trim() === sav);
+      const paying = (savAcct && savAcct.funded_from != null && String(savAcct.funded_from).trim() !== '')
+        ? String(savAcct.funded_from).trim() : sav;
+      let owner = d.acctHolder[paying];
+      if (owner === undefined || d.cols.indexOf(owner) < 0) owner = d.cols[0];   // fallback keeps the total honest
+      const monthly = ((Number(g.gift_value) || 0) * giftTaper(g, age)) / 12 * f;
+      if (monthly) out[owner] = (out[owner] || 0) + monthly;
+    });
+    return out;
+  }
+
   function monthValues(m) {
     const d = DATA, cf = costFactor(selYear, m);
+    const gbo = giftByOwner();   // owner -> gift set-aside (0.5%-inflated), constant across the year
     const incCols = d.cols.map(n => incomeForMember(n, selDays) * incomeFactor(n, selYear, m));   // steps up in each person's review month
-    const cols = d.cols.map(n => d.memberMonth[n][m] * cf);
+    const cols = d.cols.map(n => d.memberMonth[n][m] * cf + (gbo[n] || 0));
     const dining = d.diningMonth[m] * cf;
     const holiday = d.holidayMonth[m] * cf;
     const card = d.cardMonth[m] * cf;
@@ -656,6 +693,7 @@
 
   function acctCards(m, f, byCat) {
     const d = DATA; let cards = '';
+    const gbo = giftByOwner();   // owner -> gift set-aside (already 0.5%-inflated for the selected year)
     d.cols.forEach(name => {
       const accts = d.memberAcct[name] || {};
       const acctIds = Object.keys(accts).sort();
@@ -668,6 +706,11 @@
         inner += '<div class="drow acct-sub"><span class="nm">' + esc(bank + aid) + '</span><span class="vl">' + fmt(sub) + '</span></div>';
         inner += innerRows(byCat ? a.cat : a.bills, m, f, byCat) || '<div class="empty">\u2014</div>';
       });
+      const gv = gbo[name] || 0;
+      if (gv > 0.005) {
+        inner += '<div class="drow"><span class="nm">Gift savings <span class="dnote">(Xmas &amp; birthdays)</span></span><span class="vl">' + fmt(gv) + '</span></div>';
+        total += gv;
+      }
       cards += '<div class="dcard"><div class="dhead"><span>' + esc(name) + '</span><span>' + fmt(total) + '</span></div>' + inner + '</div>';
     });
     cards += costCard('Credit card', byCat ? d.cardCat : d.cardBills, d.cardMonth[m] * f, m, f, byCat);
