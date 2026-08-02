@@ -112,8 +112,8 @@
     <button type="button" id="pageInfoBtn" class="info-btn" aria-label="Show page information" aria-controls="pageInfo" aria-expanded="false" onclick="togglePageInfo()"><span aria-hidden="true">i</span></button>
   </div>
   <div id="pageInfo" class="info-panel" hidden>
-    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Figures are shown in the money of the month you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr, compounded from today) as you step forward, matching the retirement model. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel, Julie Hair &amp; Nails, Dogs, Xmas and Birthdays spend, which is deducted in the Cash Summary. Groceries, Fuel, Hair &amp; Nails and Dogs come straight from Bills; Xmas and Birthdays are age-banded gift set-asides (managed on the Gift Savings page), inflated 0.5%/yr. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from.</p>
-    <span class="info-build">Budget build: v41</span>
+    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Figures are shown in the money of the month you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr, compounded from today) as you step forward, matching the retirement model. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel, Julie Hair &amp; Nails and Dogs spend, which is deducted in the Cash Summary. Xmas and Birthdays are not on the card here &mdash; they are saved monthly into a savings account (age-tapered gift values, inflated 0.5%/yr, managed on the Gift Savings page) and appear as a <em>Gift savings</em> set-aside against that account&rsquo;s paying account, smoothing the December peak. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from.</p>
+    <span class="info-build">Budget build: v42</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -471,6 +471,7 @@
       .sort((a, b) => a.account_id.localeCompare(b.account_id));
 
     let boxesHtml = '', totalBills = 0, totalBillsAvg = 0;
+    const giftMap = giftFundingMap(d);   // paying account -> smoothed monthly gift set-aside (pre period/inflation)
     held.forEach(a => {
       const acctId = a.account_id;
       let rows = '', boxTotal = 0, boxAvg = 0, paypalSum = 0, paypalAvg = 0;
@@ -515,6 +516,14 @@
           rows += '<tr class="pot-line"><td>Dining savings</td><td class="amt">' + fmt(dinV) + '</td></tr>';
           boxTotal += dinV; boxAvg += dinV;
         }
+      }
+      // gift savings set-aside (Xmas & birthdays): smoothed monthly against the paying account behind
+      // the gift's savings account — gifts are bought on the card but funded from savings, so this line
+      // (not the card) carries the cost and flattens the December peak.
+      const giftV = (giftMap[acctId] || 0) * periodScale() * giftFactor(viewY);
+      if (giftV > 0) {
+        rows += '<tr class="pot-line"><td>Gift savings (Xmas &amp; birthdays)</td><td class="amt">' + fmt(giftV) + '</td></tr>';
+        boxTotal += giftV; boxAvg += giftV;
       }
       // loans paid from this account — a line per loan, shown while active in the viewed period
       (d.loans || []).forEach(l => {
@@ -608,26 +617,41 @@
   }
 
   // ---- Gift savings (Xmas / Birthdays) ----
-  // Age-banded annual amount (at 70 / 80 / 90, by the first member's age in the viewed year) ÷ 12,
-  // inflated 0.5%/yr from the current year. Shown as credit-card additions; the money is earmarked to
-  // a savings account (managed on the Gift Savings page). These come ONLY from bd_gift_savings — the old
-  // Xmas/Birthday bill rows are not summed here, so there is no double count.
+  // Bills-style taper: a gift value scaled by taper_at_70/80/90 (1=full … 0=none), below 70 = full.
+  // Inflated 0.5%/yr from the current year. Bought on the card but funded from a savings account, so the
+  // cost is carried as a smoothed set-aside against that account's paying account — never on the card here.
   function giftRefAge(d, Y) {
     const p1 = (d.members || [])[0];
     if (!p1 || !p1.dob) return null;
     return Y - new Date(p1.dob).getFullYear();
   }
-  function giftBandKey(age) { if (age == null) return 'amt_70'; if (age >= 90) return 'amt_90'; if (age >= 80) return 'amt_80'; return 'amt_70'; }
-  function giftFactor(Y) { return Math.pow(1.005, Math.max(0, Y - CUR_Y)); }
-  function giftMonthlyBase(d, type) {   // smoothed monthly set-aside for a type in the viewed year (pre period/inflation)
-    const key = giftBandKey(giftRefAge(d, viewY));
-    return (d.gifts || []).filter(g => g.gift_type === type).reduce((s, g) => s + (Number(g[key]) || 0), 0) / 12;
+  function giftTaper(g, age) {
+    if (age == null) return 1;
+    if (age >= 90) return g.taper_at_90 != null ? Number(g.taper_at_90) : 1;
+    if (age >= 80) return g.taper_at_80 != null ? Number(g.taper_at_80) : 1;
+    if (age >= 70) return g.taper_at_70 != null ? Number(g.taper_at_70) : 1;
+    return 1;
   }
-  function giftView(d, type) { return giftMonthlyBase(d, type) * periodScale() * giftFactor(viewY); }
+  function giftFactor(Y) { return Math.pow(1.005, Math.max(0, Y - CUR_Y)); }
+  // paying account (savings account's funded_from, or the savings account itself) -> smoothed monthly base
+  function giftFundingMap(d) {
+    const map = {};
+    const age = giftRefAge(d, viewY);
+    (d.gifts || []).forEach(g => {
+      const sav = (g.savings_account || '').trim();
+      if (!sav) return;   // no savings account set -> cannot place it against a paying account
+      const savAcct = (d.bankAccts || []).find(a => (a.account_id || '').trim() === sav);
+      const funding = (savAcct && savAcct.funded_from != null && String(savAcct.funded_from).trim() !== '')
+        ? String(savAcct.funded_from).trim() : sav;   // funding account, or the savings account itself
+      const monthly = ((Number(g.gift_value) || 0) * giftTaper(g, age)) / 12;
+      if (monthly) map[funding] = (map[funding] || 0) + monthly;
+    });
+    return map;
+  }
 
   // Groceries, Fuel, Julie's Hair & Nails and Dogs are drawn on the credit card and deducted in Cash Summary.
-  // Hair & Nails is deliberately restricted to category Julie; Dogs to category Dogs. Xmas and Birthdays are
-  // age-banded gift set-asides from bd_gift_savings (not bills).
+  // Hair & Nails is restricted to category Julie; Dogs to category Dogs. Xmas/Birthdays are NOT here — they
+  // are a savings set-aside against a paying account (see giftFundingMap / the account boxes).
   // total = amount for the current view; avg = smoothed monthly (for the monthly-mode average reference row).
   function creditCardParts(d) {
     const cardBills = (d.bills || []).filter(b => b.paid_by === 'Credit card');
@@ -643,12 +667,8 @@
     const fuel = sum(fuelB, billView);
     const hairNails = sum(hairNailsB, billView);
     const dogs = sum(dogsB, billView);
-    const xmas = giftView(d, 'Xmas');
-    const birthday = giftView(d, 'Birthday');
-    const avg = sum(grocB, billViewAvg) + sum(fuelB, billViewAvg) + sum(hairNailsB, billViewAvg) + sum(dogsB, billViewAvg)
-              + (giftMonthlyBase(d, 'Xmas') + giftMonthlyBase(d, 'Birthday')) * giftFactor(viewY);
-    return { groc: groc, fuel: fuel, hairNails: hairNails, dogs: dogs, xmas: xmas, birthday: birthday,
-             total: groc + fuel + hairNails + dogs + xmas + birthday, avg: avg };
+    const avg = sum(grocB, billViewAvg) + sum(fuelB, billViewAvg) + sum(hairNailsB, billViewAvg) + sum(dogsB, billViewAvg);
+    return { groc: groc, fuel: fuel, hairNails: hairNails, dogs: dogs, total: groc + fuel + hairNails + dogs, avg: avg };
   }
 
   function creditCardBox(d) {
@@ -661,8 +681,6 @@
         '<tr><td>Fuel</td><td class="amt">' + fmt(p.fuel) + '</td></tr>' +
         '<tr><td>Hair and Nails</td><td class="amt">' + fmt(p.hairNails) + '</td></tr>' +
         '<tr><td>Dogs</td><td class="amt">' + fmt(p.dogs) + '</td></tr>' +
-        '<tr><td>Xmas</td><td class="amt">' + fmt(p.xmas) + '</td></tr>' +
-        '<tr><td>Birthdays</td><td class="amt">' + fmt(p.birthday) + '</td></tr>' +
         '<tr class="total"><td>Total</td><td class="amt">' + fmt(p.total) + '</td></tr>' +
       '</tbody></table>' +
     '</div>';
@@ -686,7 +704,7 @@
         availRows +
         '<tr class="total"><td>Sum of available</td><td class="amt">' + fmt(sumAvail) + '</td></tr>' +
         '<tr class="total"><td>Less pensions</td><td class="amt neg">\u2212' + fmt(pens) + '</td></tr>' +
-        '<tr class="total"><td>Less credit card (Groceries, Fuel, Hair &amp; Nails, Dogs, Xmas, Birthdays)</td><td class="amt neg">\u2212' + fmt(cardT) + '</td></tr>' +
+        '<tr class="total"><td>Less credit card (Groceries, Fuel, Hair &amp; Nails, Dogs)</td><td class="amt neg">\u2212' + fmt(cardT) + '</td></tr>' +
         '<tr class="avail"><td>Total cash available ' + (isAnnual() ? '(annual)' : 'in ' + monthLabelShort()) + '</td><td class="amt">' + fmt(totalCash) + '</td></tr>' +
         avgRow +
       '</tbody></table>' +
