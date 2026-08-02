@@ -154,7 +154,7 @@
 </head>
 <body>
   <h1>What I Could Save</h1>
-  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save after everything, including pension contributions (shown as their net cost, matching the budget). Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings), general costs each April, and each pension by its own annual increase — not at the calendar-year line. The chart shows what's left to save each month as green bars (red if a month runs short) against the red cost line; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf14)</span></p>
+  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months. The last column is what's left to save after everything, including pension contributions (shown as their net cost, matching the budget). Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings) and general costs each April — not at the calendar-year line. Pension contributions follow their own dated schedule: a planned change (e.g. a September step) takes effect in its month and then stays flat, and is not inflated on top — exactly matching the Budget. The chart shows what's left to save each month as green bars (red if a month runs short) against the red cost line; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf15)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="controls" class="controls" style="display:none;">
@@ -247,7 +247,7 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, incAmts, otherInc, bankAccts, mealCost, diningRota, holidayPlan, holidayCost, holidaySettings, params, contribs, catRows] = await Promise.all([
+      const [members, bills, incAmts, otherInc, bankAccts, mealCost, diningRota, holidayPlan, holidayCost, holidaySettings, params, contribs, catRows, contribSchedule] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_income_amounts?order=member_name.asc'),
@@ -260,7 +260,8 @@
         App.rest('bd_holiday_settings?id=eq.1'),
         App.rest('op_modelling_parameters?select=member_name,retirement_date'),
         App.rest('bd_pension_contributions?select=member_name,pension_name,monthly_contribution,working_days,august_increase_pct,increase_month,paid_account'),
-        App.rest('bd_bill_category?select=code,description')
+        App.rest('bd_bill_category?select=code,description'),
+        App.rest('bd_contribution_schedule?order=effective_from.asc')
       ]);
 
       const names = (members || []).map(m => m.name).filter(Boolean);
@@ -383,7 +384,8 @@
 
       // pension contributions: the stored value is the bank debit after the ann9 migration
       // (private = net you pay; workplace = salary deduction), only if paid from a held account.
-      // Kept as rows so each grows by its own annual increase in its own month.
+      // Kept as rows so each can be matched to the dated contribution schedule (flat from its date),
+      // exactly as the Budget does — no annual escalation on top.
       const pensRows = [];
       const pensTierDays = {};
       cols.forEach(n => { pensTierDays[n] = {}; });
@@ -394,14 +396,14 @@
         const netToday = Number(p.monthly_contribution) || 0;
         if (netToday === 0) return;
         const days = (p.working_days == null) ? null : Number(p.working_days);
-        pensRows.push({ member: member, name: p.pension_name || 'Pension', netToday: netToday, days: days,
-          incPct: Number(p.august_increase_pct) || 0, incMonth: Number(p.increase_month) || 8 });
+        pensRows.push({ member: member, name: p.pension_name || 'Pension', pname: p.pension_name, netToday: netToday, days: days });
         if (days != null) pensTierDays[member][days] = 1;
       });
 
       DATA = { cols, acctHolder, acctBank, memberMonth, memberAcct, cardMonth, cardBills,
                paypalMonth, paypalBills, diningMonth, holidayMonth, salaryByMemberDays, otherByMember,
-               daysWithSalary, jointRetYear, salaryMonth, catMonth, catLabel, cardCat, paypalCat, pensRows, pensTierDays };
+               daysWithSalary, jointRetYear, salaryMonth, catMonth, catLabel, cardCat, paypalCat, pensRows, pensTierDays,
+               schedule: contribSchedule || [] };
 
       selYear = CUR_Y;
       initSlider();
@@ -450,9 +452,22 @@
     const keys = Object.keys(tiers).map(Number);
     return keys.length ? Math.max.apply(null, keys) : null;
   }
+  // Contribution in force for a pension row in the given month, from the dated schedule
+  // (bd_contribution_schedule) — mirrors budget.html contribForViewedMonth. Latest entry whose
+  // effective_from <= (selYear, m) wins; schedule working_days blank matches any tier. Flat (no
+  // escalation), falling back to the live mirror value (netToday) when no dated entry applies.
   function pensRowCost(r, m) {
-    const grow = Math.pow(1 + r.incPct, upliftsAt(r.incMonth, selYear, m));   // grows by its own annual increase in its own month
-    return r.netToday * grow;
+    const viewIdx = selYear * 12 + m;
+    let best = null, bestIdx = -Infinity;
+    (DATA.schedule || []).forEach(e => {
+      if (e.member_name !== r.member || e.pension_name !== r.pname) return;
+      const wd = e.working_days;
+      if (!(wd == null || wd === '' || (r.days != null && Number(wd) === Number(r.days)))) return;
+      const dt = new Date(e.effective_from); if (isNaN(dt)) return;
+      const idx = dt.getFullYear() * 12 + dt.getMonth();
+      if (idx <= viewIdx && idx > bestIdx) { bestIdx = idx; best = e; }
+    });
+    return best ? (Number(best.monthly_value) || 0) : r.netToday;
   }
   function activePensRows() {
     return DATA.pensRows.filter(r => { const ed = effectivePensDays(r.member); return r.days == null || r.days === ed; });
@@ -468,7 +483,7 @@
     const holiday = d.holidayMonth[m] * cf;
     const card = d.cardMonth[m] * cf;
     const paypal = d.paypalMonth[m] * cf;
-    const pension = pensionMonth(m);   // grown by each contribution's own increase; not inflation-scaled
+    const pension = pensionMonth(m);   // dated-schedule value in force for the month; flat, not inflation-scaled (matches Budget)
     const total = cols.reduce((s, v) => s + v, 0) + dining + holiday + card + paypal + pension;
     const income = incCols.reduce((s, v) => s + v, 0);
     return { incCols, cols, dining, holiday, card, paypal, pension, total, income, available: income - total };
