@@ -787,9 +787,14 @@ body.mpr-dashboard .subtab-link {
 }
 
 body.mpr-dashboard #Overview {
-  padding:12px 14px 18px;
+  padding:4px 10px 10px;
   background:var(--mpr-card);
 }
+
+/* LC-456: the Overview sub-tabs sit directly on top of the framed page — no dead band. */
+body.mpr-dashboard #Overview > .subtab-buttons { margin-bottom:4px; }
+body.mpr-dashboard #sub-PerfKPIs { margin-top:0; }
+body.mpr-dashboard #sub-PerfKPIs > .app-frame { display:block; margin:0; border-radius:0 0 14px 14px; }
 
 body.mpr-dashboard #sub-OverviewDash > .mpr-source-hidden,
 body.mpr-dashboard #sub-OverviewDash > #ovPerf.mpr-source-hidden {
@@ -812,7 +817,10 @@ body.mpr-dashboard .subtab-buttons.mpr-subnav {
   display:flex;
   align-items:center;
   gap:8px;
-  min-height:54px;
+  min-height:44px;
+  margin-bottom:4px;
+  padding-top:4px;
+  padding-bottom:5px;
   overflow-x:auto;
   flex-wrap:nowrap;
   padding-right:8px;
@@ -1526,7 +1534,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-455</span>
+      <span class="build-stamp">LC-456</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -5949,7 +5957,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-455';
+    if (stamp) stamp.textContent = 'LC-456';
   }
 
   function buildSubnav() {

@@ -7,10 +7,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=auth01"></script>
 <style>
-  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#e9eef3; color:#1e293b; }
-  h2 { color:#2c3e50; margin-top:0; }
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:6px 12px 12px; background:#e9eef3; color:#1e293b; }
+  h2 { color:#2c3e50; margin:0 0 8px; font-size:19px; }
   .note { color:#64748b; font-size:13px; margin-top:-4px; }
-  .card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:15px; margin:18px 0; }
+  .card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin:0 0 12px; }
+  .card .sub { display:block; margin-top:5px; font-size:11.5px; font-weight:600; color:#64748b; letter-spacing:0; }
   .card { background:#fff; border:1px solid #cbd5e1; border-radius:10px; padding:16px; text-align:center; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); }
   .card.hl { background:#e8f1ff; border-color:#93c5fd; }
   .card h3 { margin:0 0 8px; font-size:12px; color:#475569; text-transform:uppercase; letter-spacing:0.03em; }
@@ -37,10 +38,8 @@
   .chart-wrap.fs .chart-fs-btn { position:fixed; top:14px; right:18px; width:44px; height:44px; opacity:1; }
   .table-card { background:#fff; border:1px solid #cbd5e1; border-radius:10px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); overflow-x:auto; margin:18px 0 24px; }
 
-  /* ---- cumgr13: per-pension KPI cards (replaces the old KPI table) ---- */
-  .kpi-member { margin:22px 0 10px; font-size:15px; font-weight:800; color:#2c3e50; text-transform:uppercase; letter-spacing:0.05em; display:flex; align-items:center; gap:9px; }
-  .kpi-member::before { content:""; width:4px; height:17px; border-radius:3px; background:#1d3a63; }
-  .kpi-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(255px,1fr)); gap:14px; margin:0 0 6px; }
+  /* ---- cumgr14: per-pension KPI cards, one flowing grid across both members ---- */
+  .kpi-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; margin:0; }
   .kpi-pcard { background:#fff; border:1px solid #cbd5e1; border-radius:12px; padding:14px 15px 12px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); min-width:0; }
   .kpi-pcard .pname { display:flex; align-items:flex-start; justify-content:space-between; gap:9px; }
   .kpi-pcard .pname b { font-size:14px; font-weight:800; color:#1e293b; line-height:1.3; word-break:break-word; }
@@ -116,8 +115,7 @@
     [style*="color:#e67e22"] { color:#fbbf24 !important; }
     [style*="color:#27ae60"], [style*="color:#16a34a"] { color:#4ade80 !important; }
     #status.s-load, .s-load { background:#1e293b !important; color:#93c5fd !important; }
-    .kpi-member { color:#e2e8f0 !important; }
-    .kpi-member::before { background:#38d6e6 !important; }
+    .card .sub { color:#94a3b8 !important; }
     .kpi-pcard { background:#1e293b !important; border-color:#334155 !important; box-shadow:0 1px 3px rgba(0,0,0,0.45) !important; }
     .kpi-pcard .pname b { color:#f1f5f9 !important; }
     .kpi-pcard .pcur { color:#f8fafc !important; }
@@ -139,12 +137,11 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading…</div>
-  <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr13)</span></p>
+  <h2>Overview <span style="font-size:11px; font-weight:600; color:#94a3b8; letter-spacing:0;">cumgr14</span></h2>
   <div class="card-grid">
-    <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
-    <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span> expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
-    <div class="card" id="kpiCardP2"><h3><span class="nm-p2">Julie</span> expected monthly growth</h3><div id="kpiJ" class="value">£0</div></div>
+    <div class="card hl"><h3>Expected growth / month</h3><div id="kpiTot" class="value">£0</div><span class="sub" id="kpiSubTot">&mdash;</span></div>
+    <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span></h3><div id="kpiG" class="value">£0</div><span class="sub" id="kpiSubG">&mdash;</span></div>
+    <div class="card" id="kpiCardP2"><h3><span class="nm-p2">Julie</span></h3><div id="kpiJ" class="value">£0</div><span class="sub" id="kpiSubJ">&mdash;</span></div>
   </div>
   <div id="kpiCardHost"><div class="kpi-empty">Crunching…</div></div>
   <div class="filter-bar">
@@ -341,7 +338,7 @@
     return md;
   }
 
-  // cumgr13: tiny inline sparkline of a pension's logged pot history.
+  // cumgr14: tiny inline sparkline of a pension's logged pot history.
   // Colour follows the median monthly % so a shrinking pot reads red at a glance.
   function kpiSparkSvg(vals, positive) {
     if (!vals || vals.length < 2) return '';
@@ -404,40 +401,44 @@
       });
     });
 
-    // Group the cards by member (person 1 first, then person 2, then anyone else),
-    // biggest pot first within each group.
+    // cumgr14: ONE flowing grid — every pot on the same run of lines regardless of owner,
+    // so Julie's pensions continue on the same row as Graham's instead of starting a new block.
+    // The member is shown on each card; the per-member totals sit on the headline cards above.
     const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const cls = v => v >= 0 ? 'pos-growth' : 'neg-growth';
     const pctTxt = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
     const rank = m => m === p1Name ? 0 : (p2Name && m === p2Name ? 1 : 2);
-    const members = [];
-    cards.forEach(c => { if (members.indexOf(c.member) < 0) members.push(c.member); });
-    members.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+    cards.sort((a, b) => rank(a.member) - rank(b.member) || b.current - a.current);
 
-    let html = '';
-    members.forEach(m => {
-      const mine = cards.filter(c => c.member === m).sort((a, b) => b.current - a.current);
-      if (!mine.length) return;
-      const mTot = mine.reduce((s, c) => s + c.current, 0);
-      html += '<div class="kpi-member">' + esc(m) + ' <span style="font-weight:600; letter-spacing:0; text-transform:none; color:#64748b;">' +
-              mine.length + (mine.length === 1 ? ' pension \u00b7 ' : ' pensions \u00b7 ') + fmt(mTot) + '</span></div>';
-      html += '<div class="kpi-cards">' + mine.map(c =>
-        '<div class="kpi-pcard">' +
-          '<div class="pname"><b>' + esc(c.name) + '</b>' +
-            '<span class="kpi-pill ' + (c.avgPct >= 0 ? 'up' : 'down') + '">' + (c.avgPct >= 0 ? '\u25B2' : '\u25BC') + ' ' + pctTxt(c.avgPct) + '</span>' +
-          '</div>' +
-          '<div class="pcur">' + fmt(c.current) + '</div>' +
-          '<div class="pcursub">current value \u00b7 ' + c.vals.length + ' logs</div>' +
-          kpiSparkSvg(c.vals, c.avgPct >= 0) +
-          '<div class="rows">' +
-            '<div class="r"><span>Latest monthly growth</span><b class="' + cls(c.latest) + '">' + fmtDiff(c.latest) + '</b></div>' +
-            '<div class="r"><span>Expected (median)</span><b class="' + cls(c.medAmt) + '">' + fmtDiff(c.medAmt) + '</b></div>' +
-            '<div class="r"><span>Avg monthly \u00a3</span><b class="' + cls(c.avgAmt) + '">' + fmtDiff(c.avgAmt) + '</b></div>' +
-            '<div class="r"><span>Median monthly %</span><b class="' + cls(c.avgPct) + '">' + pctTxt(c.avgPct) + '</b></div>' +
-          '</div>' +
-        '</div>').join('') + '</div>';
-    });
-    host.innerHTML = html || '<div class="kpi-empty">Need at least two logs per pension.</div>';
+    host.innerHTML = cards.length
+      ? '<div class="kpi-cards">' + cards.map(c =>
+          '<div class="kpi-pcard">' +
+            '<div class="pname"><b>' + esc(c.name) + '</b>' +
+              '<span class="kpi-pill ' + (c.avgPct >= 0 ? 'up' : 'down') + '">' + (c.avgPct >= 0 ? '\u25B2' : '\u25BC') + ' ' + pctTxt(c.avgPct) + '</span>' +
+            '</div>' +
+            '<div class="pcur">' + fmt(c.current) + '</div>' +
+            '<div class="pcursub">' + esc(c.member) + '</div>' +
+            kpiSparkSvg(c.vals, c.avgPct >= 0) +
+            '<div class="rows">' +
+              '<div class="r"><span>Latest</span><b class="' + cls(c.latest) + '">' + fmtDiff(c.latest) + '</b></div>' +
+              '<div class="r"><span>Expected (median)</span><b class="' + cls(c.medAmt) + '">' + fmtDiff(c.medAmt) + '</b></div>' +
+              '<div class="r"><span>Avg \u00a3/mo</span><b class="' + cls(c.avgAmt) + '">' + fmtDiff(c.avgAmt) + '</b></div>' +
+              '<div class="r"><span>Median %/mo</span><b class="' + cls(c.avgPct) + '">' + pctTxt(c.avgPct) + '</b></div>' +
+            '</div>' +
+          '</div>').join('') + '</div>'
+      : '<div class="kpi-empty">Need at least two logs per pension.</div>';
+
+    // headline sublines: pot count and total per member
+    const potLine = who => {
+      const mine = who ? cards.filter(c => c.member === who) : cards;
+      if (!mine.length) return '\u2014';
+      const tot = mine.reduce((s, c) => s + c.current, 0);
+      return mine.length + (mine.length === 1 ? ' pot \u00b7 ' : ' pots \u00b7 ') + fmt(tot);
+    };
+    const setSub = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    setSub('kpiSubTot', potLine(null));
+    setSub('kpiSubG', potLine(p1Name));
+    setSub('kpiSubJ', p2Name ? potLine(p2Name) : '\u2014');
 
     const setCard = (id, v) => { const el = document.getElementById(id); el.textContent = fmtDiff(v); el.className = 'value ' + (v >= 0 ? 'pos-growth' : 'neg-growth'); };
     setCard('kpiTot', eTot); setCard('kpiG', eG); setCard('kpiJ', eJ);
