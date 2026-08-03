@@ -1526,7 +1526,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-454</span>
+      <span class="build-stamp">LC-455</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1551,11 +1551,11 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
 
   <div id="Overview" class="tabcontent active">
     <div class="subtab-buttons">
-      <button id="subbtn-OverviewDash" class="subtab-link active-sub" onclick="showSub(event,'OverviewDash')">Dashboard</button>
-      <button id="subbtn-PerfKPIs" class="subtab-link" onclick="showSub(event,'PerfKPIs')">Performance KPIs</button>
+      <button id="subbtn-PerfKPIs" class="subtab-link active-sub" onclick="showSub(event,'PerfKPIs')">Overview</button>
+      <button id="subbtn-OverviewDash" class="subtab-link" onclick="showSub(event,'OverviewDash')">Old dashboard</button>
       <button id="subbtn-MonForecast" class="subtab-link" onclick="showSub(event,'MonForecast')">Monthly Forecast</button>
     </div>
-    <div id="sub-OverviewDash" class="subtabcontent" style="display:block;">
+    <div id="sub-OverviewDash" class="subtabcontent">
     <div id="status" class="s-load">Loading…</div>
 
     <!-- ===== Verdict: the one-glance answer ===== -->
@@ -1682,7 +1682,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <!-- ===== Section 3: per-pension detail ===== -->
     <div id="ovPerf"></div>
     </div><!-- /sub-OverviewDash -->
-    <div id="sub-PerfKPIs" class="subtabcontent"><iframe id="frame-PerfKPIs" class="app-frame" title="Performance KPIs"></iframe></div>
+    <div id="sub-PerfKPIs" class="subtabcontent" style="display:block;"><iframe id="frame-PerfKPIs" class="app-frame" title="Overview"></iframe></div>
     <div id="sub-MonForecast" class="subtabcontent"><iframe id="frame-MonForecast" class="app-frame" title="Monthly Forecast"></iframe></div>
   </div>
 
@@ -5854,6 +5854,18 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
 })();
 </script>
+
+<script>
+/* LC-455: the Overview tab opens on the KPI page. The previous dashboard is parked as a
+   second sub-tab while the compact overview is built out on kpis.html. */
+(function () {
+  function openKpiOverview() {
+    if (typeof showSub === 'function') showSub(null, 'PerfKPIs');
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', openKpiOverview, { once:true });
+  else openKpiOverview();
+})();
+</script>
 <script>
 /* ============================================================
    LC-421 — Overview retirement path chart fill fix
@@ -5937,7 +5949,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-454';
+    if (stamp) stamp.textContent = 'LC-455';
   }
 
   function buildSubnav() {
