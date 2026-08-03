@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=auth01"></script>
 <style>
-  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:6px 12px 12px; background:#e9eef3; color:#1e293b; }
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:10px 12px 12px; background:#e9eef3; color:#1e293b; }
   h2 { color:#2c3e50; margin:0 0 8px; font-size:19px; }
   .note { color:#64748b; font-size:13px; margin-top:-4px; }
   .card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin:0 0 12px; }
@@ -38,7 +38,7 @@
   .chart-wrap.fs .chart-fs-btn { position:fixed; top:14px; right:18px; width:44px; height:44px; opacity:1; }
   .table-card { background:#fff; border:1px solid #cbd5e1; border-radius:10px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); overflow-x:auto; margin:18px 0 24px; }
 
-  /* ---- cumgr14: per-pension KPI cards, one flowing grid across both members ---- */
+  /* ---- cumgr15: per-pension KPI cards, one flowing grid across both members ---- */
   .kpi-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; margin:0; }
   .kpi-pcard { background:#fff; border:1px solid #cbd5e1; border-radius:12px; padding:14px 15px 12px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); min-width:0; }
   .kpi-pcard .pname { display:flex; align-items:flex-start; justify-content:space-between; gap:9px; }
@@ -137,7 +137,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading…</div>
-  <h2>Overview <span style="font-size:11px; font-weight:600; color:#94a3b8; letter-spacing:0;">cumgr14</span></h2>
+  <h2 style="display:none;">Overview <span style="font-size:11px; font-weight:600; color:#94a3b8; letter-spacing:0;">cumgr15</span></h2>
   <div class="card-grid">
     <div class="card hl"><h3>Expected growth / month</h3><div id="kpiTot" class="value">£0</div><span class="sub" id="kpiSubTot">&mdash;</span></div>
     <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span></h3><div id="kpiG" class="value">£0</div><span class="sub" id="kpiSubG">&mdash;</span></div>
@@ -338,7 +338,7 @@
     return md;
   }
 
-  // cumgr14: tiny inline sparkline of a pension's logged pot history.
+  // cumgr15: tiny inline sparkline of a pension's logged pot history.
   // Colour follows the median monthly % so a shrinking pot reads red at a glance.
   function kpiSparkSvg(vals, positive) {
     if (!vals || vals.length < 2) return '';
@@ -401,7 +401,7 @@
       });
     });
 
-    // cumgr14: ONE flowing grid — every pot on the same run of lines regardless of owner,
+    // cumgr15: ONE flowing grid — every pot on the same run of lines regardless of owner,
     // so Julie's pensions continue on the same row as Graham's instead of starting a new block.
     // The member is shown on each card; the per-member totals sit on the headline cards above.
     const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

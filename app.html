@@ -56,6 +56,7 @@
     .tab-buttons button { background:var(--accent-soft); border:1px solid var(--accent-border); cursor:pointer; padding:11px 18px; font-size:15px; font-weight:600; color:var(--accent-dark); border-radius:999px; box-shadow:var(--shadow); transition:background .12s,color .12s,border-color .12s,box-shadow .12s; }
     .tab-buttons button:hover { background:var(--accent-border); color:var(--accent-dark); }
     .tab-buttons button.active-btn { background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 2px 5px rgba(20,40,50,0.20), 0 6px 16px rgba(20,40,50,0.14); }
+    #Overview.tabcontent { padding:0 10px 10px; }   /* LC-457: Overview is a single frame — no page padding */
     .tabcontent { display:none; padding:22px; background:var(--surface); border:1px solid var(--line); border-top:none; border-radius:0 0 var(--radius) var(--radius); box-shadow:var(--shadow); }
     .tabcontent.active { display:block; }
     h2 { color:var(--ink); margin-top:0; padding-bottom:6px; border-bottom:2px solid var(--line); font-weight:700; }
@@ -787,13 +788,26 @@ body.mpr-dashboard .subtab-link {
 }
 
 body.mpr-dashboard #Overview {
-  padding:4px 10px 10px;
+  padding:0 10px 10px;
   background:var(--mpr-card);
 }
 
-/* LC-456: the Overview sub-tabs sit directly on top of the framed page — no dead band. */
-body.mpr-dashboard #Overview > .subtab-buttons { margin-bottom:4px; }
-body.mpr-dashboard #sub-PerfKPIs { margin-top:0; }
+/* LC-457: the Overview sub-tab bar is NOT sticky. The tab holds one tall iframe, so a
+   pinned bar leaves a dead band under the top nav and the framed page scrolls underneath
+   it. Static bar, flush against both the nav above and the frame below. */
+#Overview > .subtab-buttons,
+body.mpr-dashboard #Overview > .subtab-buttons {
+  position:static;
+  top:auto;
+  margin:0;
+  padding-top:0;
+  padding-bottom:6px;
+  border-bottom:none;
+  box-shadow:none;
+  min-height:0;
+  z-index:auto;
+}
+body.mpr-dashboard #sub-PerfKPIs { margin:0; }
 body.mpr-dashboard #sub-PerfKPIs > .app-frame { display:block; margin:0; border-radius:0 0 14px 14px; }
 
 body.mpr-dashboard #sub-OverviewDash > .mpr-source-hidden,
@@ -817,10 +831,7 @@ body.mpr-dashboard .subtab-buttons.mpr-subnav {
   display:flex;
   align-items:center;
   gap:8px;
-  min-height:44px;
-  margin-bottom:4px;
-  padding-top:4px;
-  padding-bottom:5px;
+  min-height:0;
   overflow-x:auto;
   flex-wrap:nowrap;
   padding-right:8px;
@@ -1534,7 +1545,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-456</span>
+      <span class="build-stamp">LC-457</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -5957,7 +5968,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-456';
+    if (stamp) stamp.textContent = 'LC-457';
   }
 
   function buildSubnav() {
