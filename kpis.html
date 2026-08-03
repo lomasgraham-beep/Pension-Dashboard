@@ -38,7 +38,7 @@
   .chart-wrap.fs .chart-fs-btn { position:fixed; top:14px; right:18px; width:44px; height:44px; opacity:1; }
   .table-card { background:#fff; border:1px solid #cbd5e1; border-radius:10px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); overflow-x:auto; margin:18px 0 24px; }
 
-  /* ---- cumgr15: per-pension KPI cards, one flowing grid across both members ---- */
+  /* ---- cumgr16: per-pension KPI cards, one flowing grid across both members ---- */
   .kpi-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; margin:0; }
   .kpi-pcard { background:#fff; border:1px solid #cbd5e1; border-radius:12px; padding:14px 15px 12px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); min-width:0; }
   .kpi-pcard .pname { display:flex; align-items:flex-start; justify-content:space-between; gap:9px; }
@@ -54,6 +54,13 @@
   .kpi-pcard .r b { font-size:13.5px; font-weight:800; font-variant-numeric:tabular-nums; }
   .kpi-pcard .r b.pos-growth { color:#1b7a48; }
   .kpi-pcard .r b.neg-growth { color:#b03a2e; }
+  /* cumgr16: readiness metric cards, pushed in by the shell. Same chrome and same grid
+     cell as the pension cards so every card in a row matches; accent-coloured value to
+     separate "plan" figures from "pot" figures at a glance. */
+  .kpi-mcard { display:flex; flex-direction:column; }
+  .kpi-mcard .mlab { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:#64748b; line-height:1.3; }
+  .kpi-mcard .mval { margin-top:auto; padding-top:10px; font-size:27px; font-weight:800; letter-spacing:-.02em; color:#1d3a63; line-height:1.05; word-break:break-word; }
+  .kpi-mcard .msub { margin-top:4px; font-size:11px; color:#64748b; line-height:1.35; }
   .kpi-empty { background:#fff; border:1px dashed #cbd5e1; border-radius:12px; padding:18px; color:#64748b; font-size:14px; }
   @media (max-width: 600px) {
     .kpi-cards { grid-template-columns:1fr; }
@@ -125,6 +132,8 @@
     .kpi-pill.down { background:#4c1d1d !important; color:#fca5a5 !important; }
     .kpi-pcard .r b.pos-growth { color:#4ade80 !important; }
     .kpi-pcard .r b.neg-growth { color:#f87171 !important; }
+    .kpi-mcard .mlab, .kpi-mcard .msub { color:#94a3b8 !important; }
+    .kpi-mcard .mval { color:#38d6e6 !important; }
     .kpi-empty { background:#1e293b !important; border-color:#334155 !important; color:#94a3b8 !important; }
     #crashTip { background:#020617 !important; }
     .crash-info { background:#dc2626 !important; color:#fff !important; }
@@ -137,7 +146,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading…</div>
-  <h2 style="display:none;">Overview <span style="font-size:11px; font-weight:600; color:#94a3b8; letter-spacing:0;">cumgr15</span></h2>
+  <h2 style="display:none;">Overview <span style="font-size:11px; font-weight:600; color:#94a3b8; letter-spacing:0;">cumgr16</span></h2>
   <div class="card-grid">
     <div class="card hl"><h3>Expected growth / month</h3><div id="kpiTot" class="value">£0</div><span class="sub" id="kpiSubTot">&mdash;</span></div>
     <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span></h3><div id="kpiG" class="value">£0</div><span class="sub" id="kpiSubG">&mdash;</span></div>
@@ -338,7 +347,7 @@
     return md;
   }
 
-  // cumgr15: tiny inline sparkline of a pension's logged pot history.
+  // cumgr16: tiny inline sparkline of a pension's logged pot history.
   // Colour follows the median monthly % so a shrinking pot reads red at a glance.
   function kpiSparkSvg(vals, positive) {
     if (!vals || vals.length < 2) return '';
@@ -357,6 +366,27 @@
       '<path d="' + d + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z" fill="' + col + '" opacity="0.10"/>' +
       '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="2" vector-effect="non-scaling-stroke" ' +
       'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+
+  // cumgr16: readiness metrics pushed in by the shell (single source of truth — the shell's
+  // hero computes them, this page only lays them out).
+  let planMetrics = [];
+  window.addEventListener('message', e => {
+    const d = e && e.data;
+    if (d && d.type === 'mpr-metrics' && Array.isArray(d.metrics)) {
+      planMetrics = d.metrics;
+      if (allLogs.length) renderKPIs();
+    }
+  });
+  function planCardsHtml() {
+    if (!planMetrics.length) return '';
+    const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return planMetrics.map(m =>
+      '<div class="kpi-pcard kpi-mcard">' +
+        '<span class="mlab">' + esc(m.label) + '</span>' +
+        '<span class="mval">' + esc(m.value) + '</span>' +
+        (m.sub ? '<span class="msub">' + esc(m.sub) + '</span>' : '') +
+      '</div>').join('');
   }
 
   function renderKPIs() {
@@ -401,7 +431,7 @@
       });
     });
 
-    // cumgr15: ONE flowing grid — every pot on the same run of lines regardless of owner,
+    // cumgr16: ONE flowing grid — every pot on the same run of lines regardless of owner,
     // so Julie's pensions continue on the same row as Graham's instead of starting a new block.
     // The member is shown on each card; the per-member totals sit on the headline cards above.
     const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -425,8 +455,8 @@
               '<div class="r"><span>Avg \u00a3/mo</span><b class="' + cls(c.avgAmt) + '">' + fmtDiff(c.avgAmt) + '</b></div>' +
               '<div class="r"><span>Median %/mo</span><b class="' + cls(c.avgPct) + '">' + pctTxt(c.avgPct) + '</b></div>' +
             '</div>' +
-          '</div>').join('') + '</div>'
-      : '<div class="kpi-empty">Need at least two logs per pension.</div>';
+          '</div>').join('') + planCardsHtml() + '</div>'
+      : '<div class="kpi-cards">' + planCardsHtml() + '</div>';
 
     // headline sublines: pot count and total per member
     const potLine = who => {
@@ -708,6 +738,7 @@
   App.requireLogin(load, { title: 'Performance KPIs' });
   // Re-fetch whenever the dashboard re-shows this tab (frames otherwise keep their first fetch).
   window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  try { if (window.parent && window.parent !== window) window.parent.postMessage({ type:'kpi-ready' }, '*'); } catch (e) {}
   window.addEventListener('resize', () => { clearTimeout(window.__r); window.__r = setTimeout(drawCharts, 150); });
 </script>
 </body>
