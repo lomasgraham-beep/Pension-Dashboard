@@ -36,6 +36,30 @@
   .chart-wrap.fs .chart-box { height:calc(var(--fs-h, 100vh) - 28px) !important; width:100%; }
   .chart-wrap.fs .chart-fs-btn { position:fixed; top:14px; right:18px; width:44px; height:44px; opacity:1; }
   .table-card { background:#fff; border:1px solid #cbd5e1; border-radius:10px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); overflow-x:auto; margin:18px 0 24px; }
+
+  /* ---- cumgr13: per-pension KPI cards (replaces the old KPI table) ---- */
+  .kpi-member { margin:22px 0 10px; font-size:15px; font-weight:800; color:#2c3e50; text-transform:uppercase; letter-spacing:0.05em; display:flex; align-items:center; gap:9px; }
+  .kpi-member::before { content:""; width:4px; height:17px; border-radius:3px; background:#1d3a63; }
+  .kpi-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(255px,1fr)); gap:14px; margin:0 0 6px; }
+  .kpi-pcard { background:#fff; border:1px solid #cbd5e1; border-radius:12px; padding:14px 15px 12px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); min-width:0; }
+  .kpi-pcard .pname { display:flex; align-items:flex-start; justify-content:space-between; gap:9px; }
+  .kpi-pcard .pname b { font-size:14px; font-weight:800; color:#1e293b; line-height:1.3; word-break:break-word; }
+  .kpi-pill { flex:0 0 auto; font-size:11.5px; font-weight:800; padding:3px 8px; border-radius:999px; white-space:nowrap; }
+  .kpi-pill.up { background:#e7f7ee; color:#1b7a48; }
+  .kpi-pill.down { background:#fdecea; color:#b03a2e; }
+  .kpi-pcard .pcur { margin-top:7px; font-size:27px; font-weight:800; letter-spacing:-0.02em; color:#0f172a; line-height:1.05; }
+  .kpi-pcard .pcursub { margin-top:2px; font-size:11px; color:#64748b; }
+  .kpi-spark { display:block; width:100%; height:34px; margin:9px 0 4px; }
+  .kpi-pcard .rows { border-top:1px solid #e2e8f0; padding-top:8px; margin-top:4px; }
+  .kpi-pcard .r { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:3px 0; font-size:12.5px; color:#64748b; }
+  .kpi-pcard .r b { font-size:13.5px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .kpi-pcard .r b.pos-growth { color:#1b7a48; }
+  .kpi-pcard .r b.neg-growth { color:#b03a2e; }
+  .kpi-empty { background:#fff; border:1px dashed #cbd5e1; border-radius:12px; padding:18px; color:#64748b; font-size:14px; }
+  @media (max-width: 600px) {
+    .kpi-cards { grid-template-columns:1fr; }
+    .kpi-pcard .pcur { font-size:24px; }
+  }
   table { width:100%; border-collapse:collapse; font-size:22px; }
   th,td { padding:14px 18px; border-bottom:1px solid #d5dde5; text-align:right; }
   th { white-space:normal; text-align:center; vertical-align:bottom; line-height:1.2; font-size:19px; text-transform:uppercase; letter-spacing:0.03em; }
@@ -92,6 +116,18 @@
     [style*="color:#e67e22"] { color:#fbbf24 !important; }
     [style*="color:#27ae60"], [style*="color:#16a34a"] { color:#4ade80 !important; }
     #status.s-load, .s-load { background:#1e293b !important; color:#93c5fd !important; }
+    .kpi-member { color:#e2e8f0 !important; }
+    .kpi-member::before { background:#38d6e6 !important; }
+    .kpi-pcard { background:#1e293b !important; border-color:#334155 !important; box-shadow:0 1px 3px rgba(0,0,0,0.45) !important; }
+    .kpi-pcard .pname b { color:#f1f5f9 !important; }
+    .kpi-pcard .pcur { color:#f8fafc !important; }
+    .kpi-pcard .pcursub, .kpi-pcard .r { color:#94a3b8 !important; }
+    .kpi-pcard .rows { border-top-color:#334155 !important; }
+    .kpi-pill.up { background:#14532d !important; color:#86efac !important; }
+    .kpi-pill.down { background:#4c1d1d !important; color:#fca5a5 !important; }
+    .kpi-pcard .r b.pos-growth { color:#4ade80 !important; }
+    .kpi-pcard .r b.neg-growth { color:#f87171 !important; }
+    .kpi-empty { background:#1e293b !important; border-color:#334155 !important; color:#94a3b8 !important; }
     #crashTip { background:#020617 !important; }
     .crash-info { background:#dc2626 !important; color:#fff !important; }
     .topbar { color:#94a3b8 !important; }
@@ -104,18 +140,13 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pension Performance Metrics</h2>
-  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr12)</span></p>
+  <p class="note"><em>"Expected Growth" uses the median of historical monthly organic growth, filtering out anomalous spikes and normalising gaps between logging dates.</em> <span style="color:#94a3b8;">(kpi build: cumgr13)</span></p>
   <div class="card-grid">
     <div class="card hl"><h3>Overall expected monthly growth</h3><div id="kpiTot" class="value">£0</div></div>
     <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span> expected monthly growth</h3><div id="kpiG" class="value">£0</div></div>
     <div class="card" id="kpiCardP2"><h3><span class="nm-p2">Julie</span> expected monthly growth</h3><div id="kpiJ" class="value">£0</div></div>
   </div>
-  <div class="table-card">
-    <table id="kpiTable">
-      <thead><tr><th>Member</th><th>Pension</th><th>Current Value</th><th>Latest Monthly Growth</th><th>Expected (Median)</th><th>Avg Monthly £</th><th>Median Monthly %</th></tr></thead>
-      <tbody><tr><td colspan="7">Crunching…</td></tr></tbody>
-    </table>
-  </div>
+  <div id="kpiCardHost"><div class="kpi-empty">Crunching…</div></div>
   <div class="filter-bar">
     <div><label>Filter Member</label><select id="fMember" onchange="updatePensionFilter()"><option value="All">All Members</option></select></div>
     <div><label>Filter Pension</label><select id="fPension" onchange="drawCharts()"><option value="All">All Pensions</option></select></div>
@@ -310,12 +341,33 @@
     return md;
   }
 
+  // cumgr13: tiny inline sparkline of a pension's logged pot history.
+  // Colour follows the median monthly % so a shrinking pot reads red at a glance.
+  function kpiSparkSvg(vals, positive) {
+    if (!vals || vals.length < 2) return '';
+    const W = 240, H = 34, pad = 3;
+    const lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    const latest = Math.abs(vals[vals.length - 1]) || 1;
+    let span = hi - lo;
+    const floor = latest * 0.04;          // damp tiny wiggles so a small move isn't a cliff
+    if (span < floor) span = floor;
+    const bottom = (hi + lo) / 2 - span / 2;
+    const step = W / (vals.length - 1);
+    const pts = vals.map((v, i) => [i * step, H - pad - ((v - bottom) / span) * (H - 2 * pad)]);
+    const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+    const col = positive ? '#1b7a48' : '#b03a2e';
+    return '<svg class="kpi-spark" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">' +
+      '<path d="' + d + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z" fill="' + col + '" opacity="0.10"/>' +
+      '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="2" vector-effect="non-scaling-stroke" ' +
+      'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+
   function renderKPIs() {
-    const tbody = document.querySelector('#kpiTable tbody');
-    if (!allLogs.length) { tbody.innerHTML = '<tr><td colspan="7">No log data.</td></tr>'; return; }
+    const host = document.getElementById('kpiCardHost');
+    if (!allLogs.length) { host.innerHTML = '<div class="kpi-empty">No log data.</div>'; return; }
     const dict = {};
     allLogs.forEach(l => { const k = l.member_name + '|' + l.pension_name; (dict[k] = dict[k] || []).push(l); });
-    let html = '', eTot = 0, eG = 0, eJ = 0;
+    const cards = []; let eTot = 0, eG = 0, eJ = 0;
     const median = a => { const s = [...a].sort((x, y) => x - y), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
     Object.keys(dict).forEach(key => {
       const logs = dict[key].sort((a, b) => new Date(a.log_date) - new Date(b.log_date));
@@ -344,12 +396,49 @@
       // can't drag it), matching the median approach used for the amount column.
       const avgPct = pcts.length ? median(pcts) : 0;
       eTot += medAmt; if (member === p1Name) eG += medAmt; if (p2Name && member === p2Name) eJ += medAmt;
-      const cls = v => v >= 0 ? 'pos-growth' : 'neg-growth';
-      html += `<tr><td>${member}</td><td>${name}</td><td style="font-weight:bold;">${fmt(Number(logs[logs.length - 1].pot_value))}</td>
-        <td class="${cls(latest)}">${fmtDiff(latest)}</td><td class="${cls(medAmt)}">${fmtDiff(medAmt)}</td>
-        <td class="${cls(avgAmt)}">${fmtDiff(avgAmt)}</td><td class="${cls(avgPct)}">${avgPct >= 0 ? '+' : ''}${avgPct.toFixed(2)}%</td></tr>`;
+      cards.push({
+        member: member, name: name,
+        current: Number(logs[logs.length - 1].pot_value),
+        latest: latest, medAmt: medAmt, avgAmt: avgAmt, avgPct: avgPct,
+        vals: logs.map(l => Number(l.pot_value)).filter(v => !isNaN(v))
+      });
     });
-    tbody.innerHTML = html || '<tr><td colspan="7">Need at least two logs per pension.</td></tr>';
+
+    // Group the cards by member (person 1 first, then person 2, then anyone else),
+    // biggest pot first within each group.
+    const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const cls = v => v >= 0 ? 'pos-growth' : 'neg-growth';
+    const pctTxt = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+    const rank = m => m === p1Name ? 0 : (p2Name && m === p2Name ? 1 : 2);
+    const members = [];
+    cards.forEach(c => { if (members.indexOf(c.member) < 0) members.push(c.member); });
+    members.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+
+    let html = '';
+    members.forEach(m => {
+      const mine = cards.filter(c => c.member === m).sort((a, b) => b.current - a.current);
+      if (!mine.length) return;
+      const mTot = mine.reduce((s, c) => s + c.current, 0);
+      html += '<div class="kpi-member">' + esc(m) + ' <span style="font-weight:600; letter-spacing:0; text-transform:none; color:#64748b;">' +
+              mine.length + (mine.length === 1 ? ' pension \u00b7 ' : ' pensions \u00b7 ') + fmt(mTot) + '</span></div>';
+      html += '<div class="kpi-cards">' + mine.map(c =>
+        '<div class="kpi-pcard">' +
+          '<div class="pname"><b>' + esc(c.name) + '</b>' +
+            '<span class="kpi-pill ' + (c.avgPct >= 0 ? 'up' : 'down') + '">' + (c.avgPct >= 0 ? '\u25B2' : '\u25BC') + ' ' + pctTxt(c.avgPct) + '</span>' +
+          '</div>' +
+          '<div class="pcur">' + fmt(c.current) + '</div>' +
+          '<div class="pcursub">current value \u00b7 ' + c.vals.length + ' logs</div>' +
+          kpiSparkSvg(c.vals, c.avgPct >= 0) +
+          '<div class="rows">' +
+            '<div class="r"><span>Latest monthly growth</span><b class="' + cls(c.latest) + '">' + fmtDiff(c.latest) + '</b></div>' +
+            '<div class="r"><span>Expected (median)</span><b class="' + cls(c.medAmt) + '">' + fmtDiff(c.medAmt) + '</b></div>' +
+            '<div class="r"><span>Avg monthly \u00a3</span><b class="' + cls(c.avgAmt) + '">' + fmtDiff(c.avgAmt) + '</b></div>' +
+            '<div class="r"><span>Median monthly %</span><b class="' + cls(c.avgPct) + '">' + pctTxt(c.avgPct) + '</b></div>' +
+          '</div>' +
+        '</div>').join('') + '</div>';
+    });
+    host.innerHTML = html || '<div class="kpi-empty">Need at least two logs per pension.</div>';
+
     const setCard = (id, v) => { const el = document.getElementById(id); el.textContent = fmtDiff(v); el.className = 'value ' + (v >= 0 ? 'pos-growth' : 'neg-growth'); };
     setCard('kpiTot', eTot); setCard('kpiG', eG); setCard('kpiJ', eJ);
   }
