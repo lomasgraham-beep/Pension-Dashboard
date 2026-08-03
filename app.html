@@ -92,6 +92,55 @@
     .ov-stamp { font-size:11px; color:#94a3b8; }
     .ov-sub { font-size:12px; color:var(--ink-soft); margin:0 0 12px; }
 
+    /* ===== LC-454: pots at the planned retirement date ===== */
+    .ov-rp-top { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin:0 0 12px; }
+    .ov-rp-total { font-size:30px; font-weight:800; letter-spacing:-.02em; color:var(--ink); line-height:1; }
+    .ov-rp-when { font-size:12.5px; color:var(--ink-soft); }
+    .ov-rp-members { display:flex; gap:9px; flex-wrap:wrap; margin:0 0 14px; }
+    .ov-rp-mpill { display:flex; flex-direction:column; gap:2px; padding:8px 13px; border:1px solid var(--line);
+                   border-radius:10px; background:var(--surface-2); min-width:0; }
+    .ov-rp-mpill .mn { font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); }
+    .ov-rp-mpill .mv { font-size:17px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; }
+    .ov-rp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:11px; }
+    .ov-rp-card { min-width:0; padding:12px 13px 11px; border:1px solid var(--line); border-radius:11px; background:var(--surface); }
+    .ov-rp-card .rpn { display:block; font-size:12.5px; font-weight:800; color:var(--ink); line-height:1.3; word-break:break-word; }
+    .ov-rp-card .rpm { display:block; margin-top:2px; font-size:10.5px; color:var(--ink-soft); }
+    .ov-rp-card .rpv { display:block; margin-top:8px; font-size:22px; font-weight:800; letter-spacing:-.02em;
+                       color:var(--ink); line-height:1; font-variant-numeric:tabular-nums; }
+    .ov-rp-card .rpd { display:block; margin-top:6px; font-size:11px; color:var(--ink-soft); }
+    .ov-rp-card .rpd b { color:#16a34a; font-weight:800; }
+    .ov-rp-card .rpd b.neg { color:#c0392b; }
+    .ov-rp-track { height:6px; margin-top:9px; border-radius:4px; background:var(--surface-2); overflow:hidden; }
+    .ov-rp-track span { display:block; height:100%; border-radius:4px; background:var(--accent); }
+    .ov-rp-note { margin:11px 0 0; font-size:11.5px; color:var(--ink-soft); line-height:1.45; }
+
+    /* ===== LC-454: bills this month / next month ===== */
+    .ov-bl-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .ov-bl-card { min-width:0; padding:14px 15px 12px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
+    .ov-bl-card.is-now { border-color:var(--accent); background:var(--surface-2); }
+    .ov-bl-when { display:flex; align-items:center; justify-content:space-between; gap:8px;
+                  font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); }
+    .ov-bl-tag { font-size:9.5px; font-weight:800; letter-spacing:.04em; padding:2px 7px; border-radius:999px;
+                 background:var(--accent); color:#fff; }
+    .ov-bl-total { margin-top:7px; font-size:28px; font-weight:800; letter-spacing:-.02em; color:var(--ink);
+                   line-height:1; font-variant-numeric:tabular-nums; }
+    .ov-bl-rows { margin-top:10px; border-top:1px solid var(--line); padding-top:7px; }
+    .ov-bl-rows .r { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:3px 0;
+                     font-size:12px; color:var(--ink-soft); }
+    .ov-bl-rows .r b { font-size:12.5px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; }
+    .ov-bl-delta { margin:12px 0 0; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2); }
+    .ov-bl-delta h4 { margin:0 0 7px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); }
+    .ov-bl-delta .d { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:3px 0; font-size:12.5px; color:var(--ink); }
+    .ov-bl-delta .d b { font-variant-numeric:tabular-nums; font-weight:800; color:#c0392b; }
+    .ov-bl-delta .d b.down { color:#16a34a; }
+    .ov-bl-note { margin:10px 0 0; font-size:11.5px; color:var(--ink-soft); line-height:1.45; }
+    @media (max-width:620px) {
+      .ov-bl-pair { grid-template-columns:1fr; }
+      .ov-rp-grid { grid-template-columns:1fr; }
+      .ov-rp-total { font-size:26px; }
+      .ov-bl-total { font-size:24px; }
+    }
+
     .ov-spark { width:100%; height:34px; margin:8px 0 4px; display:block; }
     .ov-delta { font-size:12.5px; font-weight:600; }
     .ov-microsub { font-size:11px; color:var(--ink-soft); }
@@ -958,17 +1007,54 @@ body.mpr-dashboard .mpr-timeline #ovVerdictTl svg {
   overflow:visible;
 }
 
-/* ---- Main two-column area ---- */
-/* LC-421: retirement path chart is the focal panel; keep it wide and give the SVG enough vertical aspect so it does not letterbox. */
+/* ---- Main area ---- */
+/* LC-454: the retirement path chart is now the only panel on this row, so it runs full width. */
 body.mpr-dashboard .mpr-main-grid {
   display:grid;
-  grid-template-columns:minmax(0,3.1fr) minmax(300px,.62fr);
+  grid-template-columns:minmax(0,1fr);
   gap:18px;
   align-items:stretch;
 }
 
 body.mpr-dashboard .mpr-main-grid > *,
 body.mpr-dashboard .mpr-lower-grid > * { min-width:0; }
+
+/* ---- LC-454: pots at retirement / bills / pension performance panels ---- */
+body.mpr-dashboard .mpr-retpots-panel,
+body.mpr-dashboard .mpr-bills-panel,
+body.mpr-dashboard .mpr-perfdetail-panel {
+  padding:19px 20px;
+}
+body.mpr-dashboard .mpr-retpots-panel .ov-rp-total,
+body.mpr-dashboard .mpr-bills-panel .ov-bl-total { color:var(--mpr-text); }
+body.mpr-dashboard .mpr-retpots-panel .ov-rp-when,
+body.mpr-dashboard .mpr-retpots-panel .ov-rp-note,
+body.mpr-dashboard .mpr-bills-panel .ov-bl-note { color:var(--mpr-muted); }
+body.mpr-dashboard .mpr-retpots-panel .ov-rp-card,
+body.mpr-dashboard .mpr-retpots-panel .ov-rp-mpill,
+body.mpr-dashboard .mpr-bills-panel .ov-bl-card,
+body.mpr-dashboard .mpr-bills-panel .ov-bl-delta { border-color:var(--mpr-line); }
+body.mpr-dashboard .mpr-retpots-panel .ov-rp-mpill,
+body.mpr-dashboard .mpr-bills-panel .ov-bl-card.is-now,
+body.mpr-dashboard .mpr-bills-panel .ov-bl-delta { background:var(--mpr-card-soft); }
+body.mpr-dashboard .mpr-bills-panel .ov-bl-card.is-now { border-color:rgba(32,196,207,.55); }
+body.mpr-dashboard .mpr-bills-panel .ov-bl-tag { background:var(--mpr-aqua-deep); }
+
+/* the panel supplies its own heading, so hide the one the source block renders */
+body.mpr-dashboard .mpr-perfdetail-panel #ovPerf > .ov-head { display:none; }
+body.mpr-dashboard .mpr-perfdetail-panel .perf-member {
+  margin:2px 0 10px;
+  color:var(--mpr-text);
+  font-size:13px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+body.mpr-dashboard .mpr-perfdetail-panel .ov-perf-grid + .perf-member { margin-top:20px; }
+body.mpr-dashboard .mpr-perfdetail-panel .ov-perf-card {
+  border-color:var(--mpr-line);
+  background:var(--mpr-card-soft);
+}
 
 body.mpr-dashboard .mpr-chart-panel {
   padding:22px 24px 24px;
@@ -1267,8 +1353,6 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
   }
   body.mpr-dashboard .mpr-ready-intro { grid-row:1 / span 2; }
   body.mpr-dashboard .mpr-ready-metric:nth-child(5) { border-left:1px solid rgba(255,255,255,.23); }
-  body.mpr-dashboard .mpr-main-grid { grid-template-columns:minmax(0,2.2fr) minmax(290px,.8fr); }
-  body.mpr-dashboard .mpr-current-panel { min-width:0; }
 }
 
 @media (max-width:1040px) {
@@ -1340,6 +1424,9 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
   body.mpr-dashboard .mpr-main-grid { gap:13px; }
   body.mpr-dashboard .mpr-chart-panel,
   body.mpr-dashboard .mpr-current-panel,
+  body.mpr-dashboard .mpr-retpots-panel,
+  body.mpr-dashboard .mpr-bills-panel,
+  body.mpr-dashboard .mpr-perfdetail-panel,
   body.mpr-dashboard .mpr-resilience-panel,
   body.mpr-dashboard .mpr-performance-panel { padding:16px 14px; }
   body.mpr-dashboard .mpr-section-head { align-items:flex-start; margin-bottom:13px; }
@@ -1362,7 +1449,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     scroll-snap-align:start;
   }
   body.mpr-dashboard .mpr-resilience-cards { grid-template-columns:1fr; }
-  body.mpr-dashboard .mpr-performance-panel .mpr-section-head {
+  body.mpr-dashboard .mpr-performance-panel .mpr-section-head,
+  body.mpr-dashboard .mpr-perfdetail-panel .mpr-section-head {
     flex-direction:column;
     align-items:flex-start;
     gap:4px;
@@ -1438,7 +1526,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-453</span>
+      <span class="build-stamp">LC-454</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1577,6 +1665,18 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       </div>
 
       <p class="ov-sub" id="ovNote" style="margin-top:8px;"></p>
+    </div>
+
+    <!-- ===== Section 2b (LC-454): every pot valued at the planned retirement date ===== -->
+    <div class="ov-section" id="ovRetPotsSection">
+      <div class="ov-head"><div class="ttl"><span class="bar4"></span> Pots at retirement</div></div>
+      <div id="ovRetPots"></div>
+    </div>
+
+    <!-- ===== Section 2c (LC-454): bills falling due this month and next ===== -->
+    <div class="ov-section" id="ovBillsSection">
+      <div class="ov-head"><div class="ttl"><span class="bar4"></span> Bills</div></div>
+      <div id="ovBills"></div>
     </div>
 
     <!-- ===== Section 3: per-pension detail ===== -->
@@ -2063,6 +2163,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     let lastDrawdownCfg = null; // exact cfg last passed to drawdown — reused by the optimiser
     let calib = { g: 1, j: 1 };   // calibrates the JS forecast to the server's figure
     let livePots = { graham: 0, julie: 0 }; // pots at retirement for the current controls
+    let liveForecast = null;                // LC-454: the accumulation run behind livePots (per-pension detail)
     let currentView = 'Joint';
     let p1Name = 'Graham', p2Name = 'Julie';   // real member names (alphabetical), set on load; p2Name null = single
     function displayName(view) { return view === 'Joint' ? 'Joint' : view; }
@@ -3615,6 +3716,183 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         markers + '</svg>';
     }
 
+    // ---- LC-454: every pot valued at the planned retirement date ----------------
+    // The accumulation forecast already records per-pension detail for every month it
+    // walks (series[].pots). The final month is the end of accumulation — the planned
+    // retirement date — so the per-pension figures come straight from the run that
+    // produced livePots. Each member's pots are then scaled so their subtotal equals
+    // the calibrated member figure the rest of the Overview shows, which means the
+    // cards always add up to the headline. No engine change.
+    function ovRetPotRows() {
+      const js = liveForecast;
+      const nowPots = PensionEngine.latestPots(data) || {};
+      const raw = {};
+      const last = (js && js.series && js.series.length) ? js.series[js.series.length - 1] : null;
+      if (last && last.pots) Object.keys(last.pots).forEach(k => { raw[k] = Number(last.pots[k].value) || 0; });
+      else Object.keys(nowPots).forEach(k => { raw[k] = Number(nowPots[k]) || 0; });   // retired mode: no accumulation
+
+      const sums = {};
+      Object.keys(raw).forEach(k => { const m = k.split('|')[0]; sums[m] = (sums[m] || 0) + raw[k]; });
+      const targetFor = m => (m === p1Name) ? (Number(livePots.graham) || 0)
+        : ((p2Name && m === p2Name) ? (Number(livePots.julie) || 0) : (sums[m] || 0));
+      const scaleFor = m => (sums[m] > 0 ? targetFor(m) / sums[m] : 1);
+
+      return Object.keys(raw).map(k => {
+        const m = k.split('|')[0], name = k.split('|').slice(1).join('|');
+        return { member: m, name: name, v: raw[k] * scaleFor(m), now: Number(nowPots[k]) || 0 };
+      }).filter(r => r.v > 0.5).sort((a, b) => b.v - a.v);
+    }
+    function ovRenderRetPots() {
+      const host = document.getElementById('ovRetPots'); if (!host) return;
+      const rows = ovRetPotRows();
+      if (!rows.length) { host.innerHTML = '<p class="ov-sub">No pension pots to project yet.</p>'; return; }
+      const c = readControls();
+      const retD = c.retirementDate;
+      const when = retD ? (ovMon[retD.getMonth()] + ' ' + retD.getFullYear()) : 'your retirement date';
+      const total = rows.reduce((s, r) => s + r.v, 0);
+      const top = Math.max.apply(null, rows.map(r => r.v)) || 1;
+      const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      const members = [];
+      rows.forEach(r => { if (members.indexOf(r.member) < 0) members.push(r.member); });
+      const rank = m => m === p1Name ? 0 : (p2Name && m === p2Name ? 1 : 2);
+      members.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+      const pills = members.map(m => {
+        const v = rows.filter(r => r.member === m).reduce((s, r) => s + r.v, 0);
+        return '<div class="ov-rp-mpill"><span class="mn">' + esc(m) + '</span><span class="mv">' + fmt(v) + '</span></div>';
+      }).join('');
+
+      const cards = rows.map(r => {
+        const grow = r.v - r.now;
+        const pc = Math.max(2, Math.round(r.v / top * 100));
+        return '<div class="ov-rp-card">' +
+            '<span class="rpn">' + esc(r.name) + '</span>' +
+            '<span class="rpm">' + esc(r.member) + '</span>' +
+            '<span class="rpv">' + fmt(r.v) + '</span>' +
+            '<span class="rpd">now ' + fmt(r.now) + ' \u00b7 <b' + (grow < 0 ? ' class="neg"' : '') + '>' +
+              ovSignMoney(grow) + '</b></span>' +
+            '<div class="ov-rp-track"><span style="width:' + pc + '%;"></span></div>' +
+          '</div>';
+      }).join('');
+
+      host.innerHTML =
+        '<div class="ov-rp-top"><div class="ov-rp-total">' + fmt(total) + '</div>' +
+          '<div class="ov-rp-when">across ' + rows.length + (rows.length === 1 ? ' pot' : ' pots') + ' at ' + esc(when) + '</div></div>' +
+        '<div class="ov-rp-members">' + pills + '</div>' +
+        '<div class="ov-rp-grid">' + cards + '</div>' +
+        '<p class="ov-rp-note">Each pot grown at the rate, contributions and working pattern set on the Modelling tab, ' +
+          'to the end of accumulation. Member subtotals match the projected figures above.</p>';
+    }
+
+    // ---- LC-454: bills falling due this month and next --------------------------
+    // Month-accurate charge, mirroring budget.html / bills.html: a bill only takes cash
+    // in the months its frequency and pay-month mask allow. Xmas / Christmas / Birthday
+    // bill rows are excluded and the gift table's set-aside is added instead, exactly as
+    // the Budget and the engine (ann10) do, so there is no double count.
+    const OV_GIFT_CAT = /^(xmas|christmas|birthdays?)$/i;
+    const OV_INFL = 0.025;
+    function ovActiveMonths(b) {
+      if (b.frequency === 'Annual') {
+        let m = Number(b.bill_month);
+        if ((!m || m < 1 || m > 12) && b.pay_months) { const i = b.pay_months.indexOf('1'); if (i >= 0) m = i + 1; }
+        const a = new Array(12).fill(false); if (m >= 1 && m <= 12) a[m - 1] = true; return a;
+      }
+      if (b.frequency === 'Weekly') return new Array(12).fill(true);
+      if (!b.pay_months || !/^[01]{12}$/.test(b.pay_months)) return new Array(12).fill(true);
+      return b.pay_months.split('').map(ch => ch === '1');
+    }
+    function ovMonthCharge(b, month) {
+      const p = Number(b.premium) || 0;
+      if (b.frequency === 'Weekly') return p * 52 / 12;
+      if (!ovActiveMonths(b)[month - 1]) return 0;
+      return p;   // Annual = the whole premium in its month; Monthly = the monthly premium
+    }
+    function ovGiftTaper(g, age) {
+      if (age == null) return 1;
+      if (age >= 90) return g.taper_at_90 != null ? Number(g.taper_at_90) : 1;
+      if (age >= 80) return g.taper_at_80 != null ? Number(g.taper_at_80) : 1;
+      if (age >= 70) return g.taper_at_70 != null ? Number(g.taper_at_70) : 1;
+      return 1;
+    }
+    function ovGiftRefAge(year) {   // person 1 (alphabetically first member), matching Budget + engine
+      const sorted = (data.members || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+      const p1 = sorted[0];
+      if (!p1 || !p1.dob) return null;
+      return year - new Date(p1.dob).getFullYear();
+    }
+    function ovIsCardSpend(b) {   // the four card lines the Budget deducts in its Cash Summary
+      if (b.paid_by !== 'Credit card') return false;
+      const nm = String(b.bill_name || ''), cat = String(b.category_code || '').trim();
+      if (/grocer/i.test(nm) || /grocer/i.test(cat)) return true;
+      if (/fuel|petrol|diesel/i.test(nm) || /fuel|petrol|diesel/i.test(cat)) return true;
+      if (/^julie$/i.test(cat) && /hair|nail/i.test(nm)) return true;
+      if (/^dogs?$/i.test(cat)) return true;
+      return false;
+    }
+    function ovBillsFor(y, m) {
+      const now = new Date();
+      const yrs = Math.max(0, ((y * 12 + (m - 1)) - (now.getFullYear() * 12 + now.getMonth())) / 12);
+      const inf = Math.pow(1 + OV_INFL, yrs);
+      let bank = 0, card = 0;
+      const lines = {};
+      (data.bills || []).forEach(b => {
+        if (OV_GIFT_CAT.test(String(b.category_code || '').trim())) return;   // covered by the gift table
+        const amt = ovMonthCharge(b, m) * inf;
+        if (!(amt > 0)) return;
+        if (b.paid_by === 'Credit card') { if (ovIsCardSpend(b)) card += amt; return; }
+        bank += amt;
+        const nm = String(b.bill_name || 'Bill');
+        lines[nm] = (lines[nm] || 0) + amt;
+      });
+      const age = ovGiftRefAge(y);
+      const gift = (data.gifts || []).reduce((s, g) => s + (Number(g.gift_value) || 0) * ovGiftTaper(g, age), 0)
+        / 12 * Math.pow(1.005, Math.max(0, y - now.getFullYear()));
+      return { y: y, m: m, bank: bank, card: card, gift: gift, total: bank + gift, lines: lines };
+    }
+    function ovRenderBills() {
+      const host = document.getElementById('ovBills'); if (!host) return;
+      if (!(data.bills || []).length) { host.innerHTML = '<p class="ov-sub">No household bills loaded.</p>'; return; }
+      const now = new Date();
+      const a = ovBillsFor(now.getFullYear(), now.getMonth() + 1);
+      const nx = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const b = ovBillsFor(nx.getFullYear(), nx.getMonth() + 1);
+      const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const label = x => ovMon[x.m - 1] + ' ' + x.y;
+
+      const card = (x, isNow) =>
+        '<div class="ov-bl-card' + (isNow ? ' is-now' : '') + '">' +
+          '<div class="ov-bl-when"><span>' + label(x) + '</span>' + (isNow ? '<span class="ov-bl-tag">THIS MONTH</span>' : '') + '</div>' +
+          '<div class="ov-bl-total">' + fmt(x.total) + '</div>' +
+          '<div class="ov-bl-rows">' +
+            '<div class="r"><span>Out of your accounts</span><b>' + fmt(x.bank) + '</b></div>' +
+            '<div class="r"><span>Gift set-aside</span><b>' + fmt(x.gift) + '</b></div>' +
+            '<div class="r"><span>On the credit card</span><b>' + fmt(x.card) + '</b></div>' +
+          '</div>' +
+        '</div>';
+
+      // what actually moves between the two months (annual renewals landing or dropping out)
+      const names = {};
+      Object.keys(a.lines).forEach(k => { names[k] = true; });
+      Object.keys(b.lines).forEach(k => { names[k] = true; });
+      const moves = Object.keys(names)
+        .map(k => ({ name: k, d: (b.lines[k] || 0) - (a.lines[k] || 0) }))
+        .filter(x => Math.abs(x.d) > 1)
+        .sort((x, y) => Math.abs(y.d) - Math.abs(x.d))
+        .slice(0, 5);
+      const diff = b.total - a.total;
+      let deltaHtml = '';
+      if (moves.length) {
+        deltaHtml = '<div class="ov-bl-delta"><h4>What changes next month &middot; ' + ovSignMoney(diff) + '</h4>' +
+          moves.map(x => '<div class="d"><span>' + esc(x.name) + '</span><b' + (x.d < 0 ? ' class="down"' : '') + '>' +
+            ovSignMoney(x.d) + '</b></div>').join('') + '</div>';
+      }
+
+      host.innerHTML = '<div class="ov-bl-pair">' + card(a, true) + card(b, false) + '</div>' + deltaHtml +
+        '<p class="ov-bl-note">Household bills charged in each calendar month, on the same basis as the Budget page ' +
+        '(2.5%/yr inflation from today). Xmas and birthdays come from the gift table as a monthly set-aside. ' +
+        'Loans and pension contributions follow their own schedules and are not included.</p>';
+    }
+
     function renderOverview() {
       const pots = PensionEngine.latestPots(data);
       let g = 0, j = 0;
@@ -3645,6 +3923,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       ovRenderSurvive();
       ovRenderCoverage();
       ovRenderVerdict();
+      ovRenderRetPots();
+      ovRenderBills();
 
       renderPerfBlocks();
     }
@@ -3954,7 +4234,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
                 '<div class="rows">' +
                   '<div class="r"><span>Latest monthly growth</span><b class="' + cls(s.latest) + '">' + App.fmtDiff(s.latest) + '</b></div>' +
                   '<div class="r"><span>Expected growth</span><b class="' + cls(s.expected) + '">' + App.fmtDiff(s.expected) + '</b></div>' +
-                  '<div class="r"><span>Avg monthly %</span><b class="' + cls(s.avgPct) + '">' + fmtPct(s.avgPct) + '</b></div>' +
+                  '<div class="r"><span>Avg monthly \u00a3</span><b class="' + cls(s.avgAmt) + '">' + App.fmtDiff(s.avgAmt) + '</b></div>' +
+                  '<div class="r"><span>Median monthly %</span><b class="' + cls(s.avgPct) + '">' + fmtPct(s.avgPct) + '</b></div>' +
                 '</div>' +
               '</div>';
           });
@@ -4499,6 +4780,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     function buildDrawdownCfg(plan) {
       const stateNames = new Set((data.guaranteed || []).map(x => x.income_name).filter(n => n && n.toLowerCase().indexOf('state') >= 0));
       const js = PensionEngine.forecast(data, plan, 1);
+      liveForecast = js;   // LC-454: keep the run so the Overview can show each pot at retirement
       const pots = { graham: js.graham * calib.g, julie: js.julie * calib.j };
       // Retired mode: the projection runs from THIS month off the latest logged pots, and both
       // members are treated as already retired (no staggered gap). The saved retirement date is
@@ -4907,7 +5189,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front129';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front130';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -5617,13 +5899,6 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     return el;
   }
 
-  function memberLabel(className, fallback) {
-    const span = document.createElement('span');
-    span.className = className;
-    span.textContent = firstText('.' + className, fallback);
-    return span;
-  }
-
   function makeMetric(label, valueId, subId) {
     const metric = make('div', 'mpr-ready-metric');
     const lbl = make('span', 'mpr-ready-label');
@@ -5638,39 +5913,6 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       metric.appendChild(sub);
     }
     return { metric, value };
-  }
-
-  function makeCurrentCard(labelNode, valueId, sparkId, deltaId, featured) {
-    const card = make('article', 'mpr-current-card' + (featured ? ' is-featured' : ''));
-    const label = make('span', 'mpr-current-name');
-    if (typeof labelNode === 'string') label.textContent = labelNode;
-    else if (labelNode) label.appendChild(labelNode);
-    card.appendChild(label);
-    move(valueId, card);
-    move(deltaId, card);
-    move(sparkId, card);
-    return card;
-  }
-
-  function makePerformanceCard(labelNode, key) {
-    const card = make('article', 'mpr-performance-card');
-    const label = make('span', 'mpr-performance-name');
-    if (typeof labelNode === 'string') label.textContent = labelNode;
-    else if (labelNode) label.appendChild(labelNode);
-    const pct = make('span', 'mpr-performance-pct');
-    pct.id = 'mprPerf' + key + 'Pct';
-    pct.textContent = '—';
-    const period = make('span', 'mpr-performance-period');
-    period.id = 'mprPerf' + key + 'Period';
-    period.textContent = 'growth over 12m';
-    const spark = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    spark.id = 'mprPerf' + key + 'Spark';
-    spark.setAttribute('class', 'mpr-performance-spark');
-    spark.setAttribute('viewBox', '0 0 240 40');
-    spark.setAttribute('preserveAspectRatio', 'none');
-    spark.setAttribute('aria-hidden', 'true');
-    card.append(label, pct, period, spark);
-    return card;
   }
 
   function buildBrandAndConnection() {
@@ -5695,7 +5937,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-453';
+    if (stamp) stamp.textContent = 'LC-454';
   }
 
   function buildSubnav() {
@@ -5779,9 +6021,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     top.appendChild(minimum.metric);
 
     hero.appendChild(top);
-    const timeline = make('div', 'mpr-timeline');
-    move('ovVerdictTl', timeline);
-    hero.appendChild(timeline);
+    // LC-454: the verdict timeline is retired — the hero metrics already carry the answer.
     root.appendChild(hero);
 
     // ---- chart + current pensions ----
@@ -5794,46 +6034,35 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     move('ovTrajHost', chartCanvas);
     chartPanel.append(chartHead, chartCanvas);
 
-    const currentPanel = make('section', 'mpr-panel mpr-current-panel');
-    const currentHead = make('div', 'mpr-section-head');
-    currentHead.innerHTML = '<h2>Current pensions</h2><span class="mpr-section-note">Growth excludes contributions</span>';
-    const currentCards = make('div', 'mpr-current-cards');
-    currentCards.append(
-      makeCurrentCard('Combined', 'ovCombined', 'ovSparkCombined', 'ovDeltaCombined', true),
-      makeCurrentCard(memberLabel('nm-p1', 'Graham'), 'ovGraham', 'ovSparkGraham', 'ovDeltaGraham', false),
-      makeCurrentCard(memberLabel('nm-p2', 'Julie'), 'ovJulie', 'ovSparkJulie', 'ovDeltaJulie', false)
-    );
-    currentCards.children[2].id = 'mprP2CurrentCard';
-    const breakdownTitle = make('h3', 'mpr-breakdown-title');
-    breakdownTitle.textContent = 'By pension';
-    const byPension = byId('ovByPension');
-    const breakdownMount = make('div');
-    if (byPension) breakdownMount.appendChild(byPension);
-    const strip = byId('ovStrip');
-    currentPanel.append(currentHead, currentCards, breakdownTitle, breakdownMount);
-    if (strip) currentPanel.appendChild(strip);
-
-    main.append(chartPanel, currentPanel);
+    // LC-454: "Current position", the by-pension bars and the plan-resilience tiles are
+    // retired from the dashboard — the hero already carries the current pot and the
+    // minimum projected pot, and the detail now lives in the panels below.
+    main.append(chartPanel);
     root.appendChild(main);
 
-    // ---- resilience + compact performance ----
-    const lower = make('div', 'mpr-lower-grid');
+    // ---- pots at the planned retirement date ----
+    const retPots = make('section', 'mpr-panel mpr-retpots-panel');
+    const retPotsHead = make('div', 'mpr-section-head');
+    retPotsHead.innerHTML = '<h2>Pots at retirement</h2><span class="mpr-section-note">Every pot, valued at your planned date</span>';
+    const retPotsMount = make('div');
+    move('ovRetPots', retPotsMount);
+    retPots.append(retPotsHead, retPotsMount);
+    root.appendChild(retPots);
 
-    const resilience = make('section', 'mpr-panel mpr-resilience-panel');
-    resilience.innerHTML = '<div class="mpr-section-head"><h2>Plan resilience</h2><span class="mpr-section-note">Across the full retirement</span></div>';
-    const resilienceCards = make('div', 'mpr-resilience-cards');
-    const surviveTile = move('ovSurvive', resilienceCards);
-    const coverageTile = move('ovCoverage', resilienceCards);
-    const surviveIcon = surviveTile ? surviveTile.querySelector('svg') : null;
-    const coverageIcon = coverageTile ? coverageTile.querySelector('svg') : null;
-    if (surviveIcon) surviveIcon.innerHTML = '<path d="M20 4 L33 9 V18 C33 27 27 33 20 36 C13 33 7 27 7 18 V9 Z M20 9 L12 12 V18 C12 24 15 28 20 31 C25 28 28 24 28 18 V12 Z" fill="currentColor"/>';
-    if (coverageIcon) coverageIcon.innerHTML = '<path d="M20 5 C12 5 6 11 5 19 H18 V30 C18 33 20 35 23 35 C26 35 28 33 28 30 H24 C24 31 24 32 23 32 C22 32 22 31 22 30 V19 H35 C34 11 28 5 20 5 Z M9 16 C11 11 15 9 20 9 C25 9 29 11 31 16 Z" fill="currentColor"/>';
-    resilience.appendChild(resilienceCards);
+    // ---- bills this month and next ----
+    const billsPanel = make('section', 'mpr-panel mpr-bills-panel');
+    const billsHead = make('div', 'mpr-section-head');
+    billsHead.innerHTML = '<h2>Bills</h2><span class="mpr-section-note">This month and next</span>';
+    const billsMount = make('div');
+    move('ovBills', billsMount);
+    billsPanel.append(billsHead, billsMount);
+    root.appendChild(billsPanel);
 
-    const performance = make('section', 'mpr-panel mpr-performance-panel');
+    // ---- full per-pension performance detail (the KPI figures, as cards) ----
+    const performance = make('section', 'mpr-panel mpr-perfdetail-panel');
     const performanceHead = make('div', 'mpr-section-head');
     const performanceTitle = make('h2');
-    performanceTitle.textContent = '12-month performance summary';
+    performanceTitle.textContent = 'Pension performance';
     const performanceLink = make('button', 'mpr-performance-link');
     performanceLink.type = 'button';
     performanceLink.textContent = 'View full performance KPIs';
@@ -5842,17 +6071,10 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       if (target) target.click();
     });
     performanceHead.append(performanceTitle, performanceLink);
-    const performanceCards = make('div', 'mpr-performance-cards');
-    performanceCards.append(
-      makePerformanceCard('Combined', 'Combined'),
-      makePerformanceCard(memberLabel('nm-p1', 'Graham'), 'Graham'),
-      makePerformanceCard(memberLabel('nm-p2', 'Julie'), 'Julie')
-    );
-    performanceCards.children[2].id = 'mprP2PerformanceCard';
-    performance.append(performanceHead, performanceCards);
-
-    lower.append(resilience, performance);
-    root.appendChild(lower);
+    const performanceMount = make('div');
+    move('ovPerf', performanceMount);
+    performance.append(performanceHead, performanceMount);
+    root.appendChild(performance);
 
     const disclaimer = make('div', 'mpr-disclaimer');
     disclaimer.appendChild(document.createTextNode('Projections are estimates, not guarantees. '));
@@ -5936,58 +6158,6 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     if (updated) updated.textContent = stampText || 'Waiting for latest log…';
   }
 
-  function performanceFrom(sourceId, key, sparkSourceId) {
-    const source = byId(sourceId);
-    const pctTarget = byId('mprPerf' + key + 'Pct');
-    const periodTarget = byId('mprPerf' + key + 'Period');
-    const sparkTarget = byId('mprPerf' + key + 'Spark');
-    if (!pctTarget || !periodTarget || !sparkTarget) return;
-
-    const pctSource = source ? source.querySelector('.pos, .neg') : null;
-    const rawPct = pctSource ? String(pctSource.textContent || '').replace(/[▲▼]/g, '').trim() : '';
-    pctTarget.textContent = rawPct || '—';
-    pctTarget.classList.toggle('is-negative', !!(pctSource && pctSource.classList.contains('neg')));
-    const sourceText = source ? String(source.textContent || '') : '';
-    const period = sourceText.match(/over\s+\d+m/i);
-    periodTarget.textContent = 'growth ' + (period ? period[0].toLowerCase() : 'over 12m');
-
-    const sparkSource = byId(sparkSourceId);
-    if (sparkSource) {
-      sparkTarget.innerHTML = sparkSource.innerHTML;
-      const vb = sparkSource.getAttribute('viewBox');
-      if (vb) sparkTarget.setAttribute('viewBox', vb);
-      const colour = pctTarget.classList.contains('is-negative') ? '#c0392b' : '#219653';
-      Array.from(sparkTarget.querySelectorAll('path')).forEach((path, index) => {
-        if (index === 0) {
-          path.setAttribute('fill', colour);
-          path.setAttribute('opacity', '.10');
-        } else {
-          path.setAttribute('stroke', colour);
-        }
-      });
-    }
-  }
-
-  function fixTimelineContrast() {
-    const host = byId('ovVerdictTl');
-    if (!host) return;
-    const svg = host.querySelector('svg');
-    if (!svg) return;
-    Array.from(svg.querySelectorAll('rect')).forEach((el) => {
-      const fill = String(el.getAttribute('fill') || '').toLowerCase();
-      if (!/10b981|f59e0b|ef4444/.test(fill)) el.setAttribute('fill', '#20c4cf');
-    });
-    Array.from(svg.querySelectorAll('circle')).forEach((el) => el.setAttribute('fill', '#20c4cf'));
-    Array.from(svg.querySelectorAll('line')).forEach((el) => {
-      const stroke = String(el.getAttribute('stroke') || '').toLowerCase();
-      if (!/f59e0b|ef4444/.test(stroke)) el.setAttribute('stroke', '#20c4cf');
-    });
-    Array.from(svg.querySelectorAll('text')).forEach((el) => {
-      const fill = String(el.getAttribute('fill') || '').toLowerCase();
-      if (!/#fff|white|f59e0b|ef4444/.test(fill)) el.setAttribute('fill', '#d8e6f2');
-    });
-  }
-
   function fixChartContrast() {
     const host = byId('ovTrajHost');
     if (!host) return;
@@ -6006,23 +6176,9 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
   }
 
-  function syncSecondaryMemberVisibility() {
-    const source = byId('cardP2Now');
-    const hide = !source || source.style.display === 'none';
-    const current = byId('mprP2CurrentCard');
-    const performance = byId('mprP2PerformanceCard');
-    if (current) current.style.display = hide ? 'none' : '';
-    if (performance) performance.style.display = hide ? 'none' : '';
-  }
-
   function syncAll() {
     syncConnection();
     syncHero();
-    performanceFrom('ovDeltaCombined', 'Combined', 'ovSparkCombined');
-    performanceFrom('ovDeltaGraham', 'Graham', 'ovSparkGraham');
-    performanceFrom('ovDeltaJulie', 'Julie', 'ovSparkJulie');
-    syncSecondaryMemberVisibility();
-    fixTimelineContrast();
     fixChartContrast();
   }
 
