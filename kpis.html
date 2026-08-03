@@ -10,8 +10,18 @@
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:10px 12px 12px; background:#e9eef3; color:#1e293b; }
   h2 { color:#2c3e50; margin:0 0 8px; font-size:19px; }
   .note { color:#64748b; font-size:13px; margin-top:-4px; }
-  .card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin:0 0 12px; }
-  .card .sub { display:block; margin-top:5px; font-size:11.5px; font-weight:600; color:#64748b; letter-spacing:0; }
+  /* cumgr17: plan figures are slim tiles, not full cards — one label, one number.
+     Fixed column count so the row never re-flows as values change width. */
+  .kpi-tiles { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:8px; margin:0 0 9px; }
+  .kpi-tile { min-width:0; background:#fff; border:1px solid #cbd5e1; border-radius:9px; padding:9px 11px; }
+  .kpi-tile .tl { font-size:11px; color:#64748b; letter-spacing:.03em; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .kpi-tile .tv { margin-top:3px; font-size:21px; font-weight:800; letter-spacing:-.02em; color:#0f172a; line-height:1.05;
+                  font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .kpi-tile .tv.good { color:#16a34a; }
+  .kpi-tile .tv.bad { color:#c0392b; }
+  .kpi-tile .ts { margin-top:2px; font-size:10.5px; color:#94a3b8; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  @media (max-width:1100px) { .kpi-tiles { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+  @media (max-width:640px)  { .kpi-tiles { grid-template-columns:repeat(2,minmax(0,1fr)); } }
   .card { background:#fff; border:1px solid #cbd5e1; border-radius:10px; padding:16px; text-align:center; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); }
   .card.hl { background:#e8f1ff; border-color:#93c5fd; }
   .card h3 { margin:0 0 8px; font-size:12px; color:#475569; text-transform:uppercase; letter-spacing:0.03em; }
@@ -38,8 +48,10 @@
   .chart-wrap.fs .chart-fs-btn { position:fixed; top:14px; right:18px; width:44px; height:44px; opacity:1; }
   .table-card { background:#fff; border:1px solid #cbd5e1; border-radius:10px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); overflow-x:auto; margin:18px 0 24px; }
 
-  /* ---- cumgr16: per-pension KPI cards, one flowing grid across both members ---- */
-  .kpi-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; margin:0; }
+  /* ---- cumgr17: per-pension KPI cards, one fixed row ---- */
+  .kpi-cards { display:grid; grid-template-columns:repeat(var(--kpi-cols,3),minmax(0,1fr)); gap:8px; margin:0; }
+  @media (max-width:900px) { .kpi-cards { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:560px) { .kpi-cards { grid-template-columns:1fr; } }
   .kpi-pcard { background:#fff; border:1px solid #cbd5e1; border-radius:12px; padding:14px 15px 12px; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); min-width:0; }
   .kpi-pcard .pname { display:flex; align-items:flex-start; justify-content:space-between; gap:9px; }
   .kpi-pcard .pname b { font-size:14px; font-weight:800; color:#1e293b; line-height:1.3; word-break:break-word; }
@@ -54,13 +66,6 @@
   .kpi-pcard .r b { font-size:13.5px; font-weight:800; font-variant-numeric:tabular-nums; }
   .kpi-pcard .r b.pos-growth { color:#1b7a48; }
   .kpi-pcard .r b.neg-growth { color:#b03a2e; }
-  /* cumgr16: readiness metric cards, pushed in by the shell. Same chrome and same grid
-     cell as the pension cards so every card in a row matches; accent-coloured value to
-     separate "plan" figures from "pot" figures at a glance. */
-  .kpi-mcard { display:flex; flex-direction:column; }
-  .kpi-mcard .mlab { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:#64748b; line-height:1.3; }
-  .kpi-mcard .mval { margin-top:auto; padding-top:10px; font-size:27px; font-weight:800; letter-spacing:-.02em; color:#1d3a63; line-height:1.05; word-break:break-word; }
-  .kpi-mcard .msub { margin-top:4px; font-size:11px; color:#64748b; line-height:1.35; }
   .kpi-empty { background:#fff; border:1px dashed #cbd5e1; border-radius:12px; padding:18px; color:#64748b; font-size:14px; }
   @media (max-width: 600px) {
     .kpi-cards { grid-template-columns:1fr; }
@@ -132,8 +137,12 @@
     .kpi-pill.down { background:#4c1d1d !important; color:#fca5a5 !important; }
     .kpi-pcard .r b.pos-growth { color:#4ade80 !important; }
     .kpi-pcard .r b.neg-growth { color:#f87171 !important; }
-    .kpi-mcard .mlab, .kpi-mcard .msub { color:#94a3b8 !important; }
-    .kpi-mcard .mval { color:#38d6e6 !important; }
+    .kpi-tile { background:#1e293b !important; border-color:#334155 !important; }
+    .kpi-tile .tl { color:#94a3b8 !important; }
+    .kpi-tile .tv { color:#f1f5f9 !important; }
+    .kpi-tile .tv.good { color:#4ade80 !important; }
+    .kpi-tile .tv.bad { color:#f87171 !important; }
+    .kpi-tile .ts { color:#94a3b8 !important; }
     .kpi-empty { background:#1e293b !important; border-color:#334155 !important; color:#94a3b8 !important; }
     #crashTip { background:#020617 !important; }
     .crash-info { background:#dc2626 !important; color:#fff !important; }
@@ -146,12 +155,8 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading…</div>
-  <h2 style="display:none;">Overview <span style="font-size:11px; font-weight:600; color:#94a3b8; letter-spacing:0;">cumgr16</span></h2>
-  <div class="card-grid">
-    <div class="card hl"><h3>Expected growth / month</h3><div id="kpiTot" class="value">£0</div><span class="sub" id="kpiSubTot">&mdash;</span></div>
-    <div class="card" id="kpiCardP1"><h3><span class="nm-p1">Graham</span></h3><div id="kpiG" class="value">£0</div><span class="sub" id="kpiSubG">&mdash;</span></div>
-    <div class="card" id="kpiCardP2"><h3><span class="nm-p2">Julie</span></h3><div id="kpiJ" class="value">£0</div><span class="sub" id="kpiSubJ">&mdash;</span></div>
-  </div>
+  <h2 style="display:none;">Overview <span style="font-size:11px; font-weight:600; color:#94a3b8; letter-spacing:0;">cumgr17</span></h2>
+  <div id="kpiTiles" class="kpi-tiles"></div>
   <div id="kpiCardHost"><div class="kpi-empty">Crunching…</div></div>
   <div class="filter-bar">
     <div><label>Filter Member</label><select id="fMember" onchange="updatePensionFilter()"><option value="All">All Members</option></select></div>
@@ -347,7 +352,7 @@
     return md;
   }
 
-  // cumgr16: tiny inline sparkline of a pension's logged pot history.
+  // cumgr17: tiny inline sparkline of a pension's logged pot history.
   // Colour follows the median monthly % so a shrinking pot reads red at a glance.
   function kpiSparkSvg(vals, positive) {
     if (!vals || vals.length < 2) return '';
@@ -368,7 +373,7 @@
       'stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 
-  // cumgr16: readiness metrics pushed in by the shell (single source of truth — the shell's
+  // cumgr17: readiness metrics pushed in by the shell (single source of truth — the shell's
   // hero computes them, this page only lays them out).
   let planMetrics = [];
   window.addEventListener('message', e => {
@@ -378,15 +383,39 @@
       if (allLogs.length) renderKPIs();
     }
   });
-  function planCardsHtml() {
-    if (!planMetrics.length) return '';
+  // cumgr17: seven tiles on one row. Two come from the logs on this page, five are pushed
+  // in by the shell. Green marks growth and plan-positive figures; plain ink for the neutral
+  // facts (pot totals, dates) so the colour still means something.
+  const TILE_ORDER = ['Projected pot at retirement', 'Target funded', 'Retirement date',
+                      'Time remaining', 'Minimum projected pot'];
+  const TILE_LABEL = {
+    'Projected pot at retirement': 'Pot at retirement',
+    'Target funded': 'Target funded',
+    'Retirement date': 'Retirement date',
+    'Time remaining': 'Time remaining',
+    'Minimum projected pot': 'Minimum pot'
+  };
+  const TILE_GOOD = { 'Projected pot at retirement': true, 'Target funded': true };
+
+  function renderTiles(expected, currentTotal) {
+    const host = document.getElementById('kpiTiles');
+    if (!host) return;
     const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    return planMetrics.map(m =>
-      '<div class="kpi-pcard kpi-mcard">' +
-        '<span class="mlab">' + esc(m.label) + '</span>' +
-        '<span class="mval">' + esc(m.value) + '</span>' +
-        (m.sub ? '<span class="msub">' + esc(m.sub) + '</span>' : '') +
-      '</div>').join('');
+    const tile = (label, value, sub, tone) =>
+      '<div class="kpi-tile"><div class="tl">' + esc(label) + '</div>' +
+      '<div class="tv' + (tone ? ' ' + tone : '') + '">' + esc(value) + '</div>' +
+      '<div class="ts">' + (sub ? esc(sub) : '&nbsp;') + '</div></div>';
+
+    let html = tile('Expected growth / mo', fmtDiff(expected), '', expected >= 0 ? 'good' : 'bad');
+    html += tile('Current pot', fmt(currentTotal), '', '');
+    const by = {};
+    planMetrics.forEach(m => { by[m.label] = m; });
+    TILE_ORDER.forEach(key => {
+      const m = by[key];
+      if (!m) return;
+      html += tile(TILE_LABEL[key] || key, m.value, m.sub, TILE_GOOD[key] ? 'good' : '');
+    });
+    host.innerHTML = html;
   }
 
   function renderKPIs() {
@@ -431,9 +460,9 @@
       });
     });
 
-    // cumgr16: ONE flowing grid — every pot on the same run of lines regardless of owner,
-    // so Julie's pensions continue on the same row as Graham's instead of starting a new block.
-    // The member is shown on each card; the per-member totals sit on the headline cards above.
+    // cumgr17: one row of pension cards, column count fixed from the card count so the
+    // row never re-flows as values change width. Median %/mo lives in the pill at the top,
+    // so it is not repeated in the stat rows.
     const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const cls = v => v >= 0 ? 'pos-growth' : 'neg-growth';
     const pctTxt = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
@@ -441,7 +470,7 @@
     cards.sort((a, b) => rank(a.member) - rank(b.member) || b.current - a.current);
 
     host.innerHTML = cards.length
-      ? '<div class="kpi-cards">' + cards.map(c =>
+      ? '<div class="kpi-cards" style="--kpi-cols:' + Math.min(cards.length, 5) + ';">' + cards.map(c =>
           '<div class="kpi-pcard">' +
             '<div class="pname"><b>' + esc(c.name) + '</b>' +
               '<span class="kpi-pill ' + (c.avgPct >= 0 ? 'up' : 'down') + '">' + (c.avgPct >= 0 ? '\u25B2' : '\u25BC') + ' ' + pctTxt(c.avgPct) + '</span>' +
@@ -451,27 +480,13 @@
             kpiSparkSvg(c.vals, c.avgPct >= 0) +
             '<div class="rows">' +
               '<div class="r"><span>Latest</span><b class="' + cls(c.latest) + '">' + fmtDiff(c.latest) + '</b></div>' +
-              '<div class="r"><span>Expected (median)</span><b class="' + cls(c.medAmt) + '">' + fmtDiff(c.medAmt) + '</b></div>' +
+              '<div class="r"><span>Expected</span><b class="' + cls(c.medAmt) + '">' + fmtDiff(c.medAmt) + '</b></div>' +
               '<div class="r"><span>Avg \u00a3/mo</span><b class="' + cls(c.avgAmt) + '">' + fmtDiff(c.avgAmt) + '</b></div>' +
-              '<div class="r"><span>Median %/mo</span><b class="' + cls(c.avgPct) + '">' + pctTxt(c.avgPct) + '</b></div>' +
             '</div>' +
-          '</div>').join('') + planCardsHtml() + '</div>'
-      : '<div class="kpi-cards">' + planCardsHtml() + '</div>';
+          '</div>').join('') + '</div>'
+      : '<div class="kpi-empty">Need at least two logs per pension.</div>';
 
-    // headline sublines: pot count and total per member
-    const potLine = who => {
-      const mine = who ? cards.filter(c => c.member === who) : cards;
-      if (!mine.length) return '\u2014';
-      const tot = mine.reduce((s, c) => s + c.current, 0);
-      return mine.length + (mine.length === 1 ? ' pot \u00b7 ' : ' pots \u00b7 ') + fmt(tot);
-    };
-    const setSub = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
-    setSub('kpiSubTot', potLine(null));
-    setSub('kpiSubG', potLine(p1Name));
-    setSub('kpiSubJ', p2Name ? potLine(p2Name) : '\u2014');
-
-    const setCard = (id, v) => { const el = document.getElementById(id); el.textContent = fmtDiff(v); el.className = 'value ' + (v >= 0 ? 'pos-growth' : 'neg-growth'); };
-    setCard('kpiTot', eTot); setCard('kpiG', eG); setCard('kpiJ', eJ);
+    renderTiles(eTot, cards.reduce((s, c) => s + c.current, 0));
   }
 
   function filteredLogs() {
@@ -730,7 +745,6 @@
       document.getElementById('fMember').innerHTML = '<option value="All">All Members</option>' + mn.all.map(n => `<option>${n}</option>`).join('');
       document.querySelectorAll('.nm-p1').forEach(el => el.textContent = p1Name);
       document.querySelectorAll('.nm-p2').forEach(el => el.textContent = p2Name || '');
-      const c2 = document.getElementById('kpiCardP2'); if (c2) c2.style.display = p2Name ? '' : 'none';
       updatePensionFilter(); renderKPIs(); drawCharts();
       status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
