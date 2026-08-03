@@ -416,9 +416,10 @@
     }
     .opt-toggle { display:inline-flex; align-items:center; gap:8px; margin:0 0 14px; padding:10px 16px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); color:var(--ink); font-weight:bold; font-size:15px; cursor:pointer; }
     .retired-badge { display:inline-block; margin-left:10px; padding:4px 10px; border-radius:6px; background:var(--accent); color:#fff; font-size:11px; font-weight:bold; letter-spacing:0.06em; vertical-align:middle; }
-    body.retired #subbtn-MonForecast,
     body.retired #subbtn-Contributions, body.retired #subbtn-Income,
     body.retired #ctrl_retire { display:none !important; }
+    /* LC-457: forecast is meaningless once retired — hide the tab and its dropdown entry */
+    body.retired .tab-link[onclick*="'Forecast'"] { display:none !important; }
     .opt-toggle:hover { border-color:var(--accent-border); background:var(--accent-soft); }
     .opt-caret { display:inline-block; font-size:11px; color:var(--accent); transition:transform .12s; }
     .opt-toggle[aria-expanded="true"] .opt-caret { transform:rotate(90deg); }
@@ -1554,6 +1555,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
   <select id="tabSelect" class="tab-select" onchange="showTab(null, this.value)" aria-label="Choose section">
     <option value="Overview">Overview</option>
     <option value="LogEntry">Log Entry</option>
+    <option value="Forecast">Forecast</option>
     <option value="LivingCosts">Living Costs</option>
     <option value="Modelling">Modelling</option>
     <option value="Intelligent">Intelligent Modelling</option>
@@ -1562,6 +1564,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
   <div class="tab-buttons">
     <button class="tab-link active-btn" onclick="showTab(event,'Overview')">Overview</button>
     <button class="tab-link" onclick="showTab(event,'LogEntry')">Log Entry</button>
+    <button class="tab-link" onclick="showTab(event,'Forecast')">Forecast</button>
     <button class="tab-link" onclick="showTab(event,'LivingCosts')">Living Costs</button>
     <button class="tab-link" onclick="showTab(event,'Modelling')">Modelling</button>
     <button class="tab-link" onclick="showTab(event,'Intelligent')">Intelligent Modelling</button>
@@ -1572,7 +1575,6 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="subtab-buttons">
       <button id="subbtn-PerfKPIs" class="subtab-link active-sub" onclick="showSub(event,'PerfKPIs')">Overview</button>
       <button id="subbtn-OverviewDash" class="subtab-link" onclick="showSub(event,'OverviewDash')">Old dashboard</button>
-      <button id="subbtn-MonForecast" class="subtab-link" onclick="showSub(event,'MonForecast')">Monthly Forecast</button>
     </div>
     <div id="sub-OverviewDash" class="subtabcontent">
     <div id="status" class="s-load">Loading…</div>
@@ -1702,7 +1704,6 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div id="ovPerf"></div>
     </div><!-- /sub-OverviewDash -->
     <div id="sub-PerfKPIs" class="subtabcontent" style="display:block;"><iframe id="frame-PerfKPIs" class="app-frame" title="Overview"></iframe></div>
-    <div id="sub-MonForecast" class="subtabcontent"><iframe id="frame-MonForecast" class="app-frame" title="Monthly Forecast"></iframe></div>
   </div>
 
   <div id="Cash" class="tabcontent">
@@ -2098,6 +2099,11 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
   <div id="LogEntry" class="tabcontent">
     <iframe id="frame-LogEntry" class="app-frame" title="Log Entry and Recent Logs"></iframe>
   </div>
+  <!-- LC-457: Monthly Forecast promoted from an Overview sub-tab to its own top-level tab. -->
+  <div id="Forecast" class="tabcontent">
+    <iframe id="frame-Forecast" class="app-frame" title="Forecast"></iframe>
+  </div>
+
   <div id="LivingCosts" class="tabcontent">
     <div class="subtab-buttons lc-nav">
       <span class="subtab-group-label">Planned costs</span>
@@ -5208,8 +5214,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front130';   // frame-file cache-buster: bump when any framed page changes
-    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', MonForecast:'forecast.html', Backup:'backup.html' };
+    const FV = '?v=front131';   // frame-file cache-buster: bump when any framed page changes
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
@@ -5313,6 +5319,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       if (id === 'Intelligent') { ensureFrame('frame-Intelligent', 'intelligent_modelling.html' + FV); pingFrame('frame-Intelligent'); }
       if (id === 'Modelling' || id === 'Retirement') placeRail(id);
       if (id === 'Cash') { ensureFrame('frame-Cash', 'cash.html' + FV); pingFrame('frame-Cash'); }
+      if (id === 'Forecast') { ensureFrame('frame-Forecast', 'forecast.html' + FV); pingFrame('frame-Forecast'); }
       if (id === 'LogEntry') { ensureFrame('frame-LogEntry', 'logs.html' + FV); pingFrame('frame-LogEntry'); }
       if (id === 'Crashes') ensureFrame('frame-Crashes', 'crashes.html' + FV);
       if (id === 'Annuities') ensureFrame('frame-Annuities', 'annuities.html' + FV);
