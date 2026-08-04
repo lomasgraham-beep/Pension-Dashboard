@@ -57,9 +57,9 @@
     .navwrap { flex:0 0 auto; }
     .tab-buttons button:hover { background:var(--accent-border); color:var(--accent-dark); }
     .tab-buttons button.active-btn { background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 2px 5px rgba(20,40,50,0.20), 0 6px 16px rgba(20,40,50,0.14); }
-    /* LC-464: dropdown-flyout nav — one menu level on screen at a time, no pill buttons */
+    /* LC-465: dropdown-flyout nav — one menu level on screen at a time, no pill buttons */
     .navwrap { position:relative; display:inline-flex; }
-    /* LC-464: the toolbar has overflow-x:auto (mpr-dashboard), which CLIPS absolutely
+    /* LC-465: the toolbar has overflow-x:auto (mpr-dashboard), which CLIPS absolutely
        positioned children — no z-index can defeat that. position:fixed escapes the clip;
        coordinates are set in navToggle from the button's rect. Do NOT add a transform
        here: it would create a containing block and break the fixed positioning. */
@@ -796,7 +796,7 @@ body.mpr-dashboard .tab-buttons {
   gap:8px;
   padding:8px 10px;
   border-radius:14px 14px 0 0;
-  /* LC-464: overflow is now handled by the trailing "…" dropdown rather than by
+  /* LC-465: overflow is now handled by the trailing "…" dropdown rather than by
      sideways scrolling, so clip instead of scroll — navFitRow() measures against this */
   overflow-x:hidden;
   flex-wrap:nowrap;
@@ -1570,7 +1570,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-464</span>
+      <span class="build-stamp">LC-465</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1585,7 +1585,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <option value="Intelligent">Intelligent Modelling</option>
     <option value="BasicData">Basic Data</option>
   </select>
-  <div class="tab-buttons" id="navBar"><!-- LC-464: rendered by renderNav() --></div>
+  <div class="tab-buttons" id="navBar"><!-- LC-465: rendered by renderNav() --></div>
 
   <div id="Overview" class="tabcontent active">
     <div class="subtab-buttons">
@@ -5290,7 +5290,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       // the frame may already be loaded (re-showing a hidden sub-tab) → re-measure now it's visible
       const f = document.getElementById('frame-' + name);
       if (f && f.getAttribute('src')) { setTimeout(() => sizeFrame(f), 50); }
-      if (typeof navSyncSub === 'function') navSyncSub(name);   // LC-464: refresh contextual row
+      if (typeof navSyncSub === 'function') navSyncSub(name);   // LC-465: refresh contextual row
     }
 
     // ---- Shared modelling rail: one control set, shown on Modelling and Retirement ----
@@ -5364,15 +5364,15 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       if (id === 'MonthlyAudit') { ensureFrame('frame-MonthlyAudit', 'monthly_audit.html' + FV); pingFrame('frame-MonthlyAudit'); }
       if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Budget'); }
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
-      if (typeof navSyncTab === 'function') navSyncTab(id);   // LC-464: refresh contextual row
+      if (typeof navSyncTab === 'function') navSyncTab(id);   // LC-465: refresh contextual row
     }
 
-    // ---- LC-464: contextual toolbar ----------------------------------------
+    // ---- LC-465: contextual toolbar ----------------------------------------
     // Home (Overview) shows the top-level categories, each with a dropdown.
     // Once you are inside a section the row becomes that section's own pages;
     // the house button returns home. Buttons that do not fit collapse into a
     // trailing "…" dropdown, recomputed on resize.
-    // Dropdowns are position:fixed because .tab-buttons has overflow (LC-464).
+    // Dropdowns are position:fixed because .tab-buttons has overflow (LC-465).
     const NAV_ORDER = ['Overview', 'LogEntry', 'Forecast', 'LivingCosts', 'Modelling', 'Intelligent', 'BasicData'];
     const NAV = {
       Overview: {
@@ -5501,6 +5501,21 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       return o;
     }
 
+    // split a section's item list on its { g: '...' } group markers.
+    // Sections with no markers come back as a single unnamed group.
+    function navGroupsOf(sectionKey) {
+      const sec = NAV[sectionKey];
+      if (!sec || !sec.items) return [];
+      const out = [];
+      let cur = null;
+      sec.items.forEach(raw => {
+        if (raw.g) { cur = { name: raw.g, items: [] }; out.push(cur); return; }
+        if (!cur) { cur = { name: sec.label, items: [] }; out.push(cur); }
+        cur.items.push(raw);
+      });
+      return out;
+    }
+
     function renderNav() {
       const bar = document.getElementById('navBar');
       if (!bar) return;
@@ -5527,12 +5542,32 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       const items = [];   // measurable flex children, in order, that may collapse
 
       if (inSection) {
-        // section mode: this section's own pages
-        sec.items.forEach(raw => {
-          if (raw.g) return;                       // group headings only appear in dropdowns
-          const it = navPrep(navSection, raw);
-          items.push(navBtn(it.l, it.__go, it.__id === navCurrent));
-        });
+        // section mode: this section's own pages.
+        // LC-465: where a section is split into groups (Living Costs → Planned /
+        // Actual), show only the group the current page belongs to, and lead with
+        // a group-selector dropdown so the other group is still one tap away.
+        const groups = navGroupsOf(navSection);
+        if (groups.length > 1) {
+          let g = groups.find(gr => gr.items.some(i => (i.t || i.s) === navCurrent)) || groups[0];
+          const all = [];
+          groups.forEach(gr => {
+            all.push({ g: gr.name });
+            gr.items.forEach(raw => all.push(navPrep(navSection, raw)));
+          });
+          const gBtn = navBtn(g.name + ' \u25BE', () => navToggle('Group'), false);
+          gBtn.setAttribute('aria-label', 'Switch cost group');
+          bar.appendChild(navWrap(gBtn, navDropdownFor('Group', all, navCurrent)));
+          g.items.forEach(raw => {
+            const it = navPrep(navSection, raw);
+            items.push(navBtn(it.l, it.__go, it.__id === navCurrent));
+          });
+        } else {
+          sec.items.forEach(raw => {
+            if (raw.g) return;
+            const it = navPrep(navSection, raw);
+            items.push(navBtn(it.l, it.__go, it.__id === navCurrent));
+          });
+        }
       } else {
         // home mode: the top-level categories, each with its own dropdown
         NAV_ORDER.forEach(key => {
@@ -6238,7 +6273,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-464';
+    if (stamp) stamp.textContent = 'LC-465';
   }
 
   function buildSubnav() {
@@ -6550,7 +6585,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     document.body.classList.add('mpr-dashboard');
     buildBrandAndConnection();
     buildSubnav();
-    // LC-464: the row measures itself against the toolbar width, which changes when
+    // LC-465: the row measures itself against the toolbar width, which changes when
     // mpr-dashboard styling lands — re-render once now and again after layout settles
     if (typeof renderNav === 'function') { renderNav(); setTimeout(renderNav, 200); }
     buildDashboard();
