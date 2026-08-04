@@ -1546,7 +1546,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-459</span>
+      <span class="build-stamp">LC-460</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -3856,8 +3856,9 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
     function ovBillsFor(y, m) {
       const now = new Date();
-      const yrs = Math.max(0, ((y * 12 + (m - 1)) - (now.getFullYear() * 12 + now.getMonth())) / 12);
-      const inf = Math.pow(1 + OV_INFL, yrs);
+      // LC-460: inflation steps once per calendar year, matching budget.html v43 — a figure
+      // that crept every month could not be checked against a statement.
+      const inf = Math.pow(1 + OV_INFL, Math.max(0, y - now.getFullYear()));
       let bank = 0, card = 0;
       const lines = {};
       (data.bills || []).forEach(b => {
@@ -3914,7 +3915,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
 
       host.innerHTML = '<div class="ov-bl-pair">' + card(a, true) + card(b, false) + '</div>' + deltaHtml +
         '<p class="ov-bl-note">Household bills charged in each calendar month, on the same basis as the Budget page ' +
-        '(2.5%/yr inflation from today). Xmas and birthdays come from the gift table as a monthly set-aside. ' +
+        '(2.5%/yr inflation, stepping each January). Xmas and birthdays come from the gift table as a monthly set-aside. ' +
         'Loans and pension contributions follow their own schedules and are not included.</p>';
     }
 
@@ -5214,7 +5215,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front133';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front134';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -5975,7 +5976,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-459';
+    if (stamp) stamp.textContent = 'LC-460';
   }
 
   function buildSubnav() {
