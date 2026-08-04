@@ -112,8 +112,8 @@
     <button type="button" id="pageInfoBtn" class="info-btn" aria-label="Show page information" aria-controls="pageInfo" aria-expanded="false" onclick="togglePageInfo()"><span aria-hidden="true">i</span></button>
   </div>
   <div id="pageInfo" class="info-panel" hidden>
-    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Figures are shown in the money of the month you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr, compounded from today) as you step forward, matching the retirement model. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel, Julie Hair &amp; Nails and Dogs spend, which is deducted in the Cash Summary. Xmas and Birthdays are not on the card here &mdash; they are saved monthly into a savings account (age-tapered gift values, inflated 0.5%/yr, managed on the Gift Savings page) and appear as a <em>Gift savings</em> set-aside against that account&rsquo;s paying account, smoothing the December peak. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from.</p>
-    <span class="info-build">Budget build: v43</span>
+    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Figures are shown in the money of the year you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr), stepping once each January rather than creeping every month, so amounts hold steady across a year. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel, Julie Hair &amp; Nails and Dogs spend, which is deducted in the Cash Summary. Xmas and Birthdays are not on the card here &mdash; they are saved monthly into a savings account (age-tapered gift values, inflated 0.5%/yr, managed on the Gift Savings page) and appear as a <em>Gift savings</em> set-aside against that account&rsquo;s paying account, smoothing the December peak. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from, and the <b>Loans</b> card lists what is still owed on each &mdash; the balance outstanding at the start of the viewed month and how many payments remain, counting that month. Settled loans drop off the card.</p>
+    <span class="info-build">Budget build: v44</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -249,15 +249,16 @@
       const r = (Number(l.apr) || 0) / 100 / 12;
       const level = n > 0 ? (r === 0 ? principal / n : principal * r / (1 - Math.pow(1 + r, -n))) : 0;
       const startIdx = loanStartIdxB(l.start_date);
-      const payByIdx = {}; let firstIdx = startIdx, payoffIdx = startIdx;
+      const payByIdx = {}, balStart = {}; let firstIdx = startIdx, payoffIdx = startIdx;
       if (startIdx != null && level > 0) {
         const ov = {}; const src = l.overpayments || {};
         Object.keys(src).forEach(k => { const p = String(k).split('-'); if (p.length >= 2) { const mi = Number(p[0]) * 12 + (Number(p[1]) - 1); if (Number.isFinite(mi)) ov[mi] = (ov[mi] || 0) + (Number(src[k]) || 0); } });
         let bal = principal, i = 0; const CAP = n * 4 + 600;
-        for (; i < CAP && bal > 1e-6; i++) { const mi = startIdx + i; const int = bal * r; const pay = Math.min(level + (ov[mi] || 0), bal + int); bal += int - pay; payByIdx[mi] = pay; }
+        for (; i < CAP && bal > 1e-6; i++) { const mi = startIdx + i; balStart[mi] = bal; const int = bal * r; const pay = Math.min(level + (ov[mi] || 0), bal + int); bal += int - pay; payByIdx[mi] = pay; }
         payoffIdx = startIdx + i - 1;
       }
-      return { account: (l.paid_account || '').trim(), name: l.loan_name || 'Loan', level: level, firstIdx: firstIdx, payoffIdx: payoffIdx, payByIdx: payByIdx };
+      return { account: (l.paid_account || '').trim(), name: l.loan_name || 'Loan', level: level, principal: principal,
+               firstIdx: firstIdx, payoffIdx: payoffIdx, payByIdx: payByIdx, balStart: balStart };
     }).filter(l => l.level > 0 && l.firstIdx != null);
   }
   function loanActiveIdx(l, idx) { return l.firstIdx != null && idx >= l.firstIdx && idx <= l.payoffIdx; }
@@ -431,7 +432,7 @@
     const cash = cashSummary(avails, avgAvails, pens.total, ccParts);
     const cc = creditCardBox(d);
 
-    // Three columns: Graham | Julie + Cash Summary | Insurances + Credit Card + Pensions.
+    // Three columns: Graham | Julie + Cash Summary | Insurances + Credit Card + Pensions + Loans.
     // Unassigned bills stay hidden unless a live unassigned row exists.
     const used = new Set();
     function takePerson(pattern, fallbackIndex) {
@@ -447,7 +448,7 @@
 
     document.getElementById('colOne').innerHTML = graham;
     document.getElementById('colTwo').innerHTML = julie + cash;
-    document.getElementById('colThree').innerHTML = insurancesDueBox(d) + cc + pens.html + extraPeople + leftoverHtml;
+    document.getElementById('colThree').innerHTML = insurancesDueBox(d) + cc + pens.html + loansBlock(d.loans) + extraPeople + leftoverHtml;
     document.getElementById('cols').style.display = 'grid';
   }
 
@@ -616,6 +617,36 @@
           '<tr class="total"><td>Total pensions</td><td class="amt">' + fmt(total) + '</td></tr></tbody></table>' +
       '</div>';
     return { html: html, total: total };
+  }
+
+  // ---- Loans card (v44) ----
+  // What is still owed, as at the month being viewed. Balance is the amount outstanding at the
+  // START of the viewed month (what it would take to settle), and remaining payments counts the
+  // viewed month itself, so the two read together. Loans already paid off drop out; loans that
+  // have not started yet show their full principal and full term.
+  function loansBlock(loans) {
+    const idx = isAnnual() ? (CUR_Y * 12 + (CUR_M - 1)) : (viewY * 12 + (viewM - 1));
+    let rows = '', totBal = 0, any = false;
+    (loans || []).forEach(l => {
+      if (l.firstIdx == null || idx > l.payoffIdx) return;          // settled before this month
+      const started = idx >= l.firstIdx;
+      const bal = started ? (l.balStart[idx] || 0) : l.principal;
+      let left = 0;
+      for (let mi = Math.max(idx, l.firstIdx); mi <= l.payoffIdx; mi++) if (l.payByIdx[mi] > 0) left++;
+      if (bal <= 0 && left === 0) return;
+      any = true; totBal += bal;
+      rows += '<tr><td>' + esc(l.name) +
+                (started ? '' : ' <span class="muted">(not started)</span>') +
+                '<span class="muted"> \u00b7 ' + left + (left === 1 ? ' payment left' : ' payments left') + '</span></td>' +
+              '<td class="amt">' + fmt(bal) + '</td></tr>';
+    });
+    if (!any) return '';                                            // no card at all when nothing is owed
+    return '<div class="panelcard">' +
+      '<div class="blocktitle">Loans</div>' +
+      '<div class="subtitle">Outstanding at ' + (isAnnual() ? MABBR[CUR_M - 1] + ' ' + CUR_Y : monthLabelShort()) + '</div>' +
+      '<table><tbody>' + rows +
+        '<tr class="total"><td>Total outstanding</td><td class="amt">' + fmt(totBal) + '</td></tr></tbody></table>' +
+      '</div>';
   }
 
   // ---- Gift savings (Xmas / Birthdays) ----
