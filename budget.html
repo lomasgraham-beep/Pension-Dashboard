@@ -113,7 +113,7 @@
   </div>
   <div id="pageInfo" class="info-panel" hidden>
     <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Figures are shown in the money of the month you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr, compounded from today) as you step forward, matching the retirement model. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel, Julie Hair &amp; Nails and Dogs spend, which is deducted in the Cash Summary. Xmas and Birthdays are not on the card here &mdash; they are saved monthly into a savings account (age-tapered gift values, inflated 0.5%/yr, managed on the Gift Savings page) and appear as a <em>Gift savings</em> set-aside against that account&rsquo;s paying account, smoothing the December peak. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from.</p>
-    <span class="info-build">Budget build: v42</span>
+    <span class="info-build">Budget build: v43</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -220,16 +220,18 @@
   const isAnnual = () => viewMode === 'annual';
   const periodScale = () => isAnnual() ? 12 : 1;
   // ---- inflation on the viewed month ----
-  // The budget runs from today forward. Everything that has no dated schedule of its own
-  // (bills, income, insurances, savings set-asides) is shown in the money of the month
-  // being viewed: multiply by 2.5%/yr compounded from today. Matches engine.js (INFL 0.025,
-  // inflating from today). Loans and pension contributions are excluded — they carry their
-  // own dated schedules. Annual view is a current-year total, so the factor is 1 there.
+  // v43: inflation steps ONCE PER CALENDAR YEAR, not every month. Bills are repriced at
+  // renewal, so a figure that crept ~0.2% with every month you stepped forward could never
+  // be checked against a real statement. Values now hold flat across a year and step at
+  // January, which also matches giftFactor below (already year-stepped) and means the annual
+  // view reconciles with the monthly views inside the same year.
+  // Applies to anything without a dated schedule of its own (bills, income, insurances,
+  // savings set-asides). Loans and pension contributions are excluded — they carry real
+  // schedules. Annual view is a current-year total, so the factor is 1 there.
   const INFL = 0.025;
   function inflFactor() {
     if (isAnnual()) return 1;
-    const yrs = ((viewY * 12 + (viewM - 1)) - (CUR_Y * 12 + (CUR_M - 1))) / 12;
-    return Math.pow(1 + INFL, Math.max(0, yrs));
+    return Math.pow(1 + INFL, Math.max(0, viewY - CUR_Y));
   }
   // a bill's amount for the current view: monthly = actual cash in the viewed month; annual = true yearly cost (mask-aware)
   function billView(b) { return (isAnnual() ? annualToMonthly(b.premium, b.frequency) * 12 : monthCharge(b, viewM)) * inflFactor(); }
