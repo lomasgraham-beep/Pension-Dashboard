@@ -66,6 +66,13 @@
   #shotMsg { margin-top:10px; font-size:14px; font-weight:bold; min-height:18px; }
   #ocrProg { min-height:16px; }
   #ocrText { min-height:170px; }
+  .tblwrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  #previewTable { min-width:660px; }
+  input.ed { padding:7px 8px; border:1px solid #cbd5e1; border-radius:5px; font-family:inherit; font-size:14px; box-sizing:border-box; background:#fff; color:#333; min-height:38px; }
+  input.ed-date { width:140px; }
+  input.ed-desc { width:100%; min-width:170px; }
+  input.ed-amt { width:92px; text-align:right; }
+  tr.err input.ed { border-color:#e6a29c; }
 
   @media (prefers-color-scheme: dark) {
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
@@ -90,12 +97,14 @@
     #lastDayHead { color:#cbd5e1 !important; }
     .g-warn { color:#fbbf24 !important; } .g-ok { color:#94a3b8 !important; }
     .thumbs img { border-color:#475569 !important; }
+    input.ed { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    tr.err input.ed { border-color:#7f1d1d !important; }
   }
 </style>
 </head>
 <body>
   <h1>Card Entry</h1>
-  <p class="note">Import a CSV, read a screenshot, or key a line in by hand. Either way the saved transactions appear on the Card Statements page. <span class="mini">(card entry build: v4)</span></p>
+  <p class="note">Import a CSV, read a screenshot, or key a line in by hand. Either way the saved transactions appear on the Card Statements page. <span class="mini">(card entry build: v5)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="importPanel" class="panel" style="display:none;">
@@ -238,6 +247,7 @@
   <div id="previewPanel" class="panel" style="display:none;">
     <h2>Review &amp; save</h2>
     <p class="hint" id="previewSummary"></p>
+    <div class="tblwrap">
     <table id="previewTable">
       <thead><tr>
         <th class="l"><input type="checkbox" id="chkAll" checked></th>
@@ -246,6 +256,7 @@
       </tr></thead>
       <tbody></tbody>
     </table>
+    </div>
     <div class="row" style="margin-top:14px;">
       <div>
         <label for="payerIn">Paid by (all selected rows)</label>
@@ -720,7 +731,21 @@
   // demanding columns, this walks the text keeping track of the date last seen and pairs
   // merchant lines with the next amount it finds.
   const MONTH_RE = '(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*';
-  const NOISE_RE = /^(pending|posted|completed|processing|balance|available|statement|transactions?|recent|search|filter|all|done|cancel|card|account|total|show more|see all|new|£?\s*$)/i;
+  const DAY_RE = /\b(mon|tue|tues|wed|weds|thu|thur|thurs|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b\.?,?/gi;
+  // Lines that are app furniture rather than transactions. Kept deliberately broad —
+  // a screenshot almost always catches the header and the bottom navigation bar.
+  const NOISE_RE = /^(pending|posted|completed|processing|balance|available|available credit|statements?|statements? & documents|documents|transactions?|recent|search|filter|all|done|cancel|card|cards|account|account management|accounts?|total|show more|see all|new|since last statement|make .{0,4}payment|payments?|manage|help|home|more|settings|rewards|clubcard credit card|credit card|minimum payment|direct debit|£?\s*$)/i;
+  // A real merchant line has a run of letters in it. This filters the single-letter
+  // avatar initials, battery/percentage junk and stray symbols the screen grab picks up.
+  function looksLikeMerchant(s) {
+    const t = String(s || '').trim();
+    if (t.length < 3) return false;
+    if (!/[A-Za-z]{3}/.test(t)) return false;
+    return !NOISE_RE.test(t);
+  }
+  function stripDayNames(s) {
+    return String(s || '').replace(DAY_RE, ' ');
+  }
 
   // Pull the last money-looking token off a line. Requires 2 decimal places, which is
   // what keeps it from swallowing card numbers, reference numbers and dates.
@@ -776,7 +801,7 @@
       .replace(/(?:[*•·]{2,}|x{4,})\s*\d{2,4}\b/gi, ' ')         // masked card numbers
       .replace(/[|•·–—]+/g, ' ')
       .replace(/\s{2,}/g, ' ')
-      .replace(/^[\s,.;:-]+|[\s,.;:-]+$/g, '')
+      .replace(/^[\s,.;:&+*·•\-–—]+|[\s,.;:&+*·•\-–—]+$/g, '')
       .trim();
   }
   function parseStatementText(text, opts) {
@@ -787,24 +812,29 @@
     let curDate = null, pendingDesc = '';
     const lines = String(text || '').replace(/\r/g, '').split('\n').map(l => l.trim()).filter(Boolean);
     lines.forEach(line => {
+      // Status-bar lines ("21:43 Tue 4 Aug") are never transactions.
+      if (/^\d{1,2}:\d{2}\b/.test(line)) return;
       if (NOISE_RE.test(line) && !/\d\.\d{2}/.test(line)) {
         const dOnly = grabDate(line, yearHint);
-        if (dOnly && dOnly.iso && !dOnly.rest) curDate = dOnly.iso;
+        if (dOnly && dOnly.iso && !cleanDesc(stripDayNames(dOnly.rest))) curDate = dOnly.iso;
         return;
       }
       const amt = grabAmount(line);
       const body = amt ? amt.rest : line;
       const dt = grabDate(body, yearHint);
-      const desc = cleanDesc(dt ? dt.rest : body);
+      // Day names ("Fri, 10th Jul") are only stripped from a line that held a date, so a
+      // merchant genuinely called SUNDAY TIMES keeps its name.
+      const desc = cleanDesc(dt ? stripDayNames(dt.rest) : body);
 
       if (!amt) {
-        // A line that is nothing but a date is a day heading.
-        if (dt && dt.iso && !desc) { curDate = dt.iso; pendingDesc = ''; }
-        else if (desc) pendingDesc = desc;
+        // Some apps put the date line BETWEEN the merchant and the amount, so a date
+        // line must never discard the merchant we are holding.
+        if (dt && dt.iso) curDate = dt.iso;
+        if (looksLikeMerchant(desc)) pendingDesc = desc;
         return;
       }
       const useDate = (dt && dt.iso) ? dt.iso : curDate;
-      const useDesc = desc || pendingDesc;
+      const useDesc = looksLikeMerchant(desc) ? desc : pendingDesc;
       pendingDesc = '';
       if (dt && dt.iso) curDate = dt.iso;
       // "Available £1,204.55", "Balance 512.00" and friends look like transactions but
@@ -905,11 +935,24 @@
   }
 
   // ---------- preview ----------
-  function renderPreview() {
+  // v5: Date, Description and Amount are editable here. OCR gets a digit wrong often
+  // enough that correcting a row in place beats discarding the whole read.
+  function recomputeRows() {
+    const occ = {};
+    preview.forEach(p => {
+      p.err = (!p.date) || (p.amount == null) || (!String(p.desc || '').trim());
+      if (p.err) { p.hash = ''; p.dup = false; p.include = false; return; }
+      const base = p.date + '|' + p.amount.toFixed(2) + '|' + normDesc(p.desc);
+      const k = (occ[base] = (occ[base] || 0)); occ[base] = k + 1;
+      p.hash = base + '|' + k;
+      p.dup = existingHashes.has(p.hash);
+      if (p.dup) p.include = false;
+    });
+  }
+  function renderPreview(noScroll) {
     const panel = document.getElementById('previewPanel');
     const tb = document.querySelector('#previewTable tbody');
     if (!preview.length) { panel.style.display = 'none'; return; }
-    const fmt2 = v => (v < 0 ? '\u2212£' : '£') + Math.abs(v).toFixed(2);
     tb.innerHTML = preview.map((p, i) => {
       const cls = p.err ? 'err' : (p.dup ? 'dup' : '');
       const chk = (p.include && !p.err && !p.dup) ? ' checked' : '';
@@ -917,25 +960,40 @@
       const tag = p.err ? '<span class="tag tag-err">check</span>'
                 : p.dup ? '<span class="tag tag-dup">already saved</span>'
                 : '<span class="tag tag-new">new</span>';
-      const cat = p.err ? '\u2014'
-        : '<select class="cat" data-i="' + i + '" onchange="onCat(this)">' + catOptions(p.code) + '</select>' +
+      const cat = '<select class="cat" data-i="' + i + '" onchange="onCat(this)">' + catOptions(p.code) + '</select>' +
           '<div class="mini">' + (p.src ? 'via ' + escapeHtml(p.src) : 'no match') + '</div>';
       return '<tr class="' + cls + '">' +
         '<td class="l"><input type="checkbox" data-i="' + i + '" onchange="onInc(this)"' + chk + dis + '></td>' +
-        '<td class="l">' + escapeHtml(p.date || '?') + '</td>' +
-        '<td class="l desc" title="' + escapeHtml(p.desc) + '">' + escapeHtml(p.desc) + '</td>' +
-        '<td>' + (p.amount == null ? '?' : fmt2(p.amount)) + '</td>' +
+        '<td class="l"><input type="date" class="ed ed-date" data-i="' + i + '" data-f="date" value="' + escapeHtml(p.date || '') + '" onchange="onEdit(this)"></td>' +
+        '<td class="l"><input type="text" class="ed ed-desc" data-i="' + i + '" data-f="desc" value="' + escapeHtml(p.desc || '') + '" onchange="onEdit(this)"></td>' +
+        '<td><input type="text" class="ed ed-amt" inputmode="decimal" data-i="' + i + '" data-f="amount" value="' + (p.amount == null ? '' : p.amount.toFixed(2)) + '" onchange="onEdit(this)"></td>' +
         '<td class="l">' + cat + '</td>' +
         '<td class="l">' + tag + '</td></tr>';
     }).join('');
+    // corrections should replace on typing, not force manual deletion first
+    tb.querySelectorAll('input.ed-desc, input.ed-amt').forEach(el => {
+      el.addEventListener('focus', function () { const x = this; setTimeout(() => { try { x.setSelectionRange(0, x.value.length); } catch (e) {} }, 0); });
+    });
     const nNew = preview.filter(p => !p.err && !p.dup).length;
     const nDup = preview.filter(p => p.dup).length;
     const nErr = preview.filter(p => p.err).length;
     document.getElementById('previewSummary').textContent =
-      preview.length + ' rows: ' + nNew + ' new, ' + nDup + ' already saved' + (nErr ? ', ' + nErr + ' need attention' : '') + '.';
-    document.getElementById('chkAll').checked = true;
+      preview.length + ' rows: ' + nNew + ' new, ' + nDup + ' already saved' + (nErr ? ', ' + nErr + ' need attention' : '') + '. Anything the reader got wrong can be corrected here before saving.';
     panel.style.display = 'block';
-    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!noScroll) { document.getElementById('chkAll').checked = true; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  }
+  function onEdit(el) {
+    const p = preview[+el.dataset.i];
+    if (!p) return;
+    const f = el.dataset.f;
+    if (f === 'amount') { const v = parseAmount(el.value); p.amount = (v == null) ? null : v; }
+    else if (f === 'date') { p.date = parseDate(el.value) || null; }
+    else { p.desc = el.value; if (!p.code) { const s = suggestCategory(p.desc); p.code = s.code; p.src = s.source; } }
+    const wasIncluded = p.include;
+    recomputeRows();
+    // A row that was broken and has just been fixed should tick itself back on.
+    if (!p.err && !p.dup) p.include = (wasIncluded !== false) || true;
+    renderPreview(true);
   }
   function onInc(el) { preview[+el.dataset.i].include = el.checked; }
   function onCat(el) { preview[+el.dataset.i].code = el.value; }
