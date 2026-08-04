@@ -112,8 +112,8 @@
     <button type="button" id="pageInfoBtn" class="info-btn" aria-label="Show page information" aria-controls="pageInfo" aria-expanded="false" onclick="togglePageInfo()"><span aria-hidden="true">i</span></button>
   </div>
   <div id="pageInfo" class="info-panel" hidden>
-    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. Figures are shown in the money of the year you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr), stepping once each January rather than creeping every month, so amounts hold steady across a year. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel, Julie Hair &amp; Nails and Dogs spend, which is deducted in the Cash Summary. Xmas and Birthdays are not on the card here &mdash; they are saved monthly into a savings account (age-tapered gift values, inflated 0.5%/yr, managed on the Gift Savings page) and appear as a <em>Gift savings</em> set-aside against that account&rsquo;s paying account, smoothing the December peak. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from, and the <b>Loans</b> card lists what is still owed on each &mdash; the balance outstanding at the start of the viewed month and how many payments remain, counting that month. Settled loans drop off the card.</p>
-    <span class="info-build">Budget build: v44</span>
+    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. The working-days chip at the top of each person&rsquo;s card is read-only and follows the schedule in Basic Data against the month you&rsquo;re viewing &mdash; so a 3-day week starting in September shows 5-day in August and 3-day from September, and salary and pension contributions switch with it. Figures are shown in the money of the year you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr), stepping once each January rather than creeping every month, so amounts hold steady across a year. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel, Julie Hair &amp; Nails and Dogs spend, which is deducted in the Cash Summary. Xmas and Birthdays are not on the card here &mdash; they are saved monthly into a savings account (age-tapered gift values, inflated 0.5%/yr, managed on the Gift Savings page) and appear as a <em>Gift savings</em> set-aside against that account&rsquo;s paying account, smoothing the December peak. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from, and the <b>Loans</b> card lists what is still owed on each &mdash; the balance outstanding at the start of the viewed month and how many payments remain, counting that month. Settled loans drop off the card.</p>
+    <span class="info-build">Budget build: v45</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -187,15 +187,30 @@
     return p;   // Annual = full annual amount in its month; Monthly = the monthly premium
   }
 
-  function currentTierDays(member, tiers) {
-    const now = new Date(); let best = null;
-    (tiers || []).forEach(t => {
-      if (t.member_name !== member || !t.from_date) return;
-      const from = new Date(t.from_date);
-      if (from <= now && (!best || from > new Date(best.from_date))) best = t;
-    });
-    return best ? Number(best.days) : null;
+  // v45: the working-days tier follows the month being VIEWED, not today. A tier applies from
+  // the month its from_date falls in, so a 3-day week starting 1 Sep makes September onward
+  // 3-day while August stays 5-day. Before the earliest tier, the earliest one is used.
+  function tierMonthIdx(d) {
+    if (!d) return null;
+    const p = String(d).split('T')[0].split('-');
+    if (p.length < 2) return null;
+    const y = Number(p[0]), m = Number(p[1]);
+    return (Number.isFinite(y) && Number.isFinite(m)) ? y * 12 + (m - 1) : null;
   }
+  function tierDaysAt(member, tiers, idx) {
+    let best = null, bestIdx = -Infinity, first = null, firstIdx = Infinity;
+    (tiers || []).forEach(t => {
+      if (t.member_name !== member || t.days == null) return;
+      const ti = tierMonthIdx(t.from_date);
+      if (ti == null) return;
+      if (ti < firstIdx) { firstIdx = ti; first = t; }
+      if (ti <= idx && ti > bestIdx) { bestIdx = ti; best = t; }
+    });
+    const use = best || first;
+    return use ? Number(use.days) : null;
+  }
+  function viewMonthIdx() { return isAnnual() ? (CUR_Y * 12 + (CUR_M - 1)) : (viewY * 12 + (viewM - 1)); }
+  function currentTierDays(member, tiers) { return tierDaysAt(member, tiers, viewMonthIdx()); }
 
   function tiersFor(member, tiers) {
     const set = {};
@@ -204,7 +219,6 @@
   }
 
   let DATA = null;
-  const selectedTier = {};
 
   // ---- month navigation ----
   const TODAY = new Date();
@@ -356,16 +370,10 @@
           ? String(dPotAcct.funded_from).trim() : dPotId;   // funding account, or the pot itself if not funded-from
       }
       DATA = { names, members: members || [], gifts: gifts || [], bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct, diningMonthly: diningMonthly, diningFundingAcct: diningFundingAcct, holidayPotId: potId, diningPotId: dPotId, loans: prepLoans(loansRaw), schedule: contribSchedule || [] };
-      names.forEach(n => { selectedTier[n] = currentTierDays(n, DATA.tiers); });
       status.style.display = 'none';
       initNav();
       rebuild();
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
-  }
-
-  function setTier(member, days) {
-    selectedTier[member] = (days === '' || days == null) ? null : Number(days);
-    rebuild();
   }
 
   // ---- helpers shared across people ----
@@ -454,7 +462,7 @@
 
   function personBlock(name, d, meta, shown) {
     // --- IN: salary at selected tier + other income ---
-    const days = (selectedTier[name] !== undefined) ? selectedTier[name] : currentTierDays(name, d.tiers);
+    const days = currentTierDays(name, d.tiers);
     let inRows = '', totalIn = 0;
     const salaryRows = d.incAmts.filter(a => a.member_name === name && (days == null || Number(a.working_days) === Number(days)));
     const useRows = salaryRows.length ? salaryRows : d.incAmts.filter(a => a.member_name === name);
@@ -599,7 +607,7 @@
       const acct = (p.paid_account || '').trim();
       if (!acct || !(acct in heldIds)) return;   // only pensions paid from a known account
       const owner = p.member_name;
-      const ownerDays = (selectedTier[owner] !== undefined) ? selectedTier[owner] : currentTierDays(owner, d.tiers);
+      const ownerDays = currentTierDays(owner, d.tiers);
       if (p.working_days != null && ownerDays != null && Number(p.working_days) !== Number(ownerDays)) return;
       const cost = contribForViewedMonth(p, d);
       if (cost === 0) return;
@@ -782,15 +790,15 @@
     return Object.keys(byMember).some(m => Object.keys(byMember[m]).length >= 2);
   }
 
+  // v45: read-only. The tier is decided by the working-days schedule in Basic Data against the
+  // month being viewed, so only the tier that actually applies is shown — no longer a choice.
   function tierSelectorHtml(name, tiers) {
     const opts = tiersFor(name, tiers);
-    // no selector for this person: reserve the same height as a selector so the "In" headers stay aligned
+    // nobody with a schedule: reserve the same height so the "In" headers stay aligned
     if (opts.length < 2) return anyMultiTier(tiers) ? '<div class="tier-sel" aria-hidden="true"></div>' : '';
-    const sel = selectedTier[name];
-    const btns = opts.map(dd =>
-      '<button type="button" class="tier-btn' + (Number(sel) === dd ? ' on' : '') + '" onclick="setTier(\'' + name.replace(/'/g, "\\'") + '\',' + dd + ')">' + dd + '-day</button>'
-    ).join('');
-    return '<div class="tier-sel">' + btns + '</div>';
+    const days = currentTierDays(name, tiers);
+    if (days == null) return '<div class="tier-sel" aria-hidden="true"></div>';
+    return '<div class="tier-sel"><span class="tier-btn on">' + days + '-day week</span></div>';
   }
 
   function esc(s) {
