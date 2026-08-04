@@ -56,9 +56,9 @@
     .tab-buttons button { background:var(--accent-soft); border:1px solid var(--accent-border); cursor:pointer; padding:11px 18px; font-size:15px; font-weight:600; color:var(--accent-dark); border-radius:var(--radius); box-shadow:var(--shadow); transition:background .12s,color .12s,border-color .12s,box-shadow .12s; }
     .tab-buttons button:hover { background:var(--accent-border); color:var(--accent-dark); }
     .tab-buttons button.active-btn { background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 2px 5px rgba(20,40,50,0.20), 0 6px 16px rgba(20,40,50,0.14); }
-    /* LC-461: dropdown-flyout nav — one menu level on screen at a time, no pill buttons */
+    /* LC-462: dropdown-flyout nav — one menu level on screen at a time, no pill buttons */
     .navwrap { position:relative; display:inline-flex; }
-    .navdrop { display:none; position:absolute; top:calc(100% + 4px); left:0; min-width:210px; max-height:min(70vh,420px); overflow-y:auto; background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius); box-shadow:0 8px 24px rgba(20,40,50,0.18),0 2px 6px rgba(20,40,50,0.10); padding:6px; z-index:70; }
+    .navdrop { display:none; position:absolute; top:calc(100% + 4px); left:0; min-width:210px; max-height:min(70vh,420px); overflow-y:auto; background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius); box-shadow:0 8px 24px rgba(20,40,50,0.18),0 2px 6px rgba(20,40,50,0.10); padding:6px; z-index:70; -webkit-transform:translateZ(0); transform:translateZ(0); }
     .navdrop-item { display:block; width:100%; text-align:left; background:transparent; border:none; padding:9px 12px; font-size:14px; font-weight:600; color:var(--ink); border-radius:6px; cursor:pointer; }
     .navdrop-item:hover { background:var(--accent-soft); color:var(--accent-dark); }
     .navdrop-group { font-size:11px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-soft); padding:8px 12px 4px; }
@@ -1563,7 +1563,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-461</span>
+      <span class="build-stamp">LC-462</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -5424,7 +5424,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
     }
 
-    // ---- LC-461: dropdown-flyout toolbar — thin wrappers over the untouched showTab/showSub ----
+    // ---- LC-462: dropdown-flyout toolbar — thin wrappers over the untouched showTab/showSub ----
     function navToggle(id) {
       const cur = document.getElementById('navdrop-' + id);
       const wasOpen = cur && cur.style.display === 'block';
@@ -6071,7 +6071,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-461';
+    if (stamp) stamp.textContent = 'LC-462';
   }
 
   function buildSubnav() {
