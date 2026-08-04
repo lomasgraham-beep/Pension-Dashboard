@@ -52,13 +52,14 @@
     /* responsive shell: horizontal top-bar nav at all widths above phone (sticky on scroll);
        phone (<=600px) swaps the strip for the dropdown selector further down. */
     .shell { display:block; }
-    .tab-buttons { display:flex; flex-wrap:wrap; gap:6px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius) var(--radius) 0 0; padding:8px; box-shadow:var(--shadow); position:sticky; top:0; z-index:60; }
-    .tab-buttons button { background:var(--accent-soft); border:1px solid var(--accent-border); cursor:pointer; padding:11px 18px; font-size:15px; font-weight:600; color:var(--accent-dark); border-radius:var(--radius); box-shadow:var(--shadow); transition:background .12s,color .12s,border-color .12s,box-shadow .12s; }
+    .tab-buttons { display:flex; flex-wrap:nowrap; overflow:hidden; gap:6px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius) var(--radius) 0 0; padding:8px; box-shadow:var(--shadow); position:sticky; top:0; z-index:60; }
+    .tab-buttons button { flex:0 0 auto; white-space:nowrap; background:var(--accent-soft); border:1px solid var(--accent-border); cursor:pointer; padding:11px 18px; font-size:15px; font-weight:600; color:var(--accent-dark); border-radius:var(--radius); box-shadow:var(--shadow); transition:background .12s,color .12s,border-color .12s,box-shadow .12s; }
+    .navwrap { flex:0 0 auto; }
     .tab-buttons button:hover { background:var(--accent-border); color:var(--accent-dark); }
     .tab-buttons button.active-btn { background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 2px 5px rgba(20,40,50,0.20), 0 6px 16px rgba(20,40,50,0.14); }
-    /* LC-463: dropdown-flyout nav — one menu level on screen at a time, no pill buttons */
+    /* LC-464: dropdown-flyout nav — one menu level on screen at a time, no pill buttons */
     .navwrap { position:relative; display:inline-flex; }
-    /* LC-463: the toolbar has overflow-x:auto (mpr-dashboard), which CLIPS absolutely
+    /* LC-464: the toolbar has overflow-x:auto (mpr-dashboard), which CLIPS absolutely
        positioned children — no z-index can defeat that. position:fixed escapes the clip;
        coordinates are set in navToggle from the button's rect. Do NOT add a transform
        here: it would create a containing block and break the fixed positioning. */
@@ -795,7 +796,9 @@ body.mpr-dashboard .tab-buttons {
   gap:8px;
   padding:8px 10px;
   border-radius:14px 14px 0 0;
-  overflow-x:auto;
+  /* LC-464: overflow is now handled by the trailing "…" dropdown rather than by
+     sideways scrolling, so clip instead of scroll — navFitRow() measures against this */
+  overflow-x:hidden;
   flex-wrap:nowrap;
   scrollbar-width:none;
   -webkit-overflow-scrolling:touch;
@@ -1567,7 +1570,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-463</span>
+      <span class="build-stamp">LC-464</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1582,73 +1585,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <option value="Intelligent">Intelligent Modelling</option>
     <option value="BasicData">Basic Data</option>
   </select>
-  <div class="tab-buttons">
-    <button class="tab-link active-btn" onclick="navGoSub('Overview','PerfKPIs')" aria-label="Overview (home)" title="Overview" style="padding:11px 14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:block"><path d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3l9-8z"/></svg></button>
-    <div class="navwrap">
-      <button onclick="navToggle('OverviewMenu')" aria-label="Overview options" style="padding:11px 8px">&#9662;</button>
-      <div class="navdrop" id="navdrop-OverviewMenu">
-        <button class="navdrop-item" onclick="navGoSub('Overview','PerfKPIs')">Overview</button>
-        <button class="navdrop-item" onclick="navGoSub('Overview','OverviewDash')">Old dashboard</button>
-      </div>
-    </div>
-    <button class="tab-link" onclick="showTab(event,'LogEntry')">Log Entry</button>
-    <button class="tab-link" onclick="showTab(event,'Forecast')">Forecast</button>
-    <div class="navwrap">
-      <button class="tab-link" onclick="navToggle('LivingCosts')">Living Costs &#9662;</button>
-      <div class="navdrop" id="navdrop-LivingCosts">
-        <div class="navdrop-group">Planned costs</div>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','Budget')">Budget</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','Bills')">Bills</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','Loans')">Loans</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','BillsSummary')">Bills Summary</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','SaveForecast')">What I Could Save</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','BillCats')">Bill Categories</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','MealCosts')">Meal Costs</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','WeeklyPlan')">Weekly Plan</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','HolidayCosts')">Holiday Costs</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','HolidaySummary')">Holiday Summary</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','InsSavings')">Insurance Savings</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','GiftSavings')">Gift Savings</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','CreditCard')">Credit Card</button>
-        <div class="navdrop-group">Actual costs</div>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','CardEntry')">Card Entry</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','CardStatements')">Card Statements</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','CostAnalysis')">Cost Analysis</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','CardCats')">Card Categories</button>
-        <button class="navdrop-item" onclick="navGoSub('LivingCosts','PayPal')">PayPal</button>
-      </div>
-    </div>
-    <div class="navwrap">
-      <button class="tab-link" onclick="navToggle('Modelling')">Modelling &#9662;</button>
-      <div class="navdrop" id="navdrop-Modelling">
-        <button class="navdrop-item" onclick="navGoTab('Modelling')">Retirement Model</button>
-        <button class="navdrop-item" onclick="navGoTab('Retirement')">Retirement</button>
-        <button class="navdrop-item" onclick="navGoTab('Cash')">Cash &amp; Purchases</button>
-        <button class="navdrop-item" onclick="navGoTab('Crashes')">Market Crashes</button>
-        <button class="navdrop-item" onclick="navGoTab('Annuities')">Annuities</button>
-        <button class="navdrop-item" onclick="navGoTab('ScenarioGrid')">Scenario Grid</button>
-        <button class="navdrop-item" onclick="navGoTab('Frontier')">Frontier</button>
-        <button class="navdrop-item" onclick="navGoTab('MultiModel')">Multi Modelling</button>
-        <button class="navdrop-item" onclick="navGoTab('PotTable')">Pot Table</button>
-        <button class="navdrop-item" onclick="navGoTab('Sensitivity')">Sensitivity</button>
-        <button class="navdrop-item" onclick="navGoTab('MonthlyAudit')">Monthly Audit</button>
-      </div>
-    </div>
-    <button class="tab-link" onclick="showTab(event,'Intelligent')">Intelligent Modelling</button>
-    <div class="navwrap">
-      <button class="tab-link" onclick="navToggle('BasicData')">Basic Data &#9662;</button>
-      <div class="navdrop" id="navdrop-BasicData">
-        <button class="navdrop-item" onclick="navGoSub('BasicData','Members')">Members</button>
-        <button class="navdrop-item" onclick="navGoSub('BasicData','Pensions')">Pensions</button>
-        <button class="navdrop-item" onclick="navGoSub('BasicData','Contributions')">Contributions</button>
-        <button class="navdrop-item" onclick="navGoSub('BasicData','Income')">Workplace Income</button>
-        <button class="navdrop-item" onclick="navGoSub('BasicData','Guaranteed')">Guaranteed Incomes</button>
-        <button class="navdrop-item" onclick="navGoSub('BasicData','Defaults')">Defaults</button>
-        <button class="navdrop-item" onclick="navGoSub('BasicData','BankAccts')">Bank Accounts</button>
-        <button class="navdrop-item" onclick="navGoSub('BasicData','Backup')">Backup</button>
-      </div>
-    </div>
-  </div>
+  <div class="tab-buttons" id="navBar"><!-- LC-464: rendered by renderNav() --></div>
 
   <div id="Overview" class="tabcontent active">
     <div class="subtab-buttons">
@@ -5353,6 +5290,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       // the frame may already be loaded (re-showing a hidden sub-tab) → re-measure now it's visible
       const f = document.getElementById('frame-' + name);
       if (f && f.getAttribute('src')) { setTimeout(() => sizeFrame(f), 50); }
+      if (typeof navSyncSub === 'function') navSyncSub(name);   // LC-464: refresh contextual row
     }
 
     // ---- Shared modelling rail: one control set, shown on Modelling and Retirement ----
@@ -5426,46 +5364,252 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       if (id === 'MonthlyAudit') { ensureFrame('frame-MonthlyAudit', 'monthly_audit.html' + FV); pingFrame('frame-MonthlyAudit'); }
       if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Budget'); }
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
+      if (typeof navSyncTab === 'function') navSyncTab(id);   // LC-464: refresh contextual row
     }
 
-    // ---- LC-463: dropdown-flyout toolbar — thin wrappers over the untouched showTab/showSub ----
+    // ---- LC-464: contextual toolbar ----------------------------------------
+    // Home (Overview) shows the top-level categories, each with a dropdown.
+    // Once you are inside a section the row becomes that section's own pages;
+    // the house button returns home. Buttons that do not fit collapse into a
+    // trailing "…" dropdown, recomputed on resize.
+    // Dropdowns are position:fixed because .tab-buttons has overflow (LC-464).
+    const NAV_ORDER = ['Overview', 'LogEntry', 'Forecast', 'LivingCosts', 'Modelling', 'Intelligent', 'BasicData'];
+    const NAV = {
+      Overview: {
+        label: 'Overview', top: 'Overview', kind: 'sub',
+        items: [ { l: 'Overview', s: 'PerfKPIs' }, { l: 'Old Dashboard', s: 'OverviewDash' } ]
+      },
+      LogEntry: { label: 'Log Entry', top: 'LogEntry', kind: 'leaf' },
+      Forecast: { label: 'Forecast', top: 'Forecast', kind: 'leaf' },
+      LivingCosts: {
+        label: 'Living Costs', top: 'LivingCosts', kind: 'sub',
+        items: [
+          { g: 'Planned costs' },
+          { l: 'Budget', s: 'Budget' }, { l: 'Bills', s: 'Bills' }, { l: 'Loans', s: 'Loans' },
+          { l: 'Bills Summary', s: 'BillsSummary' }, { l: 'What I Could Save', s: 'SaveForecast' },
+          { l: 'Bill Categories', s: 'BillCats' }, { l: 'Meal Costs', s: 'MealCosts' },
+          { l: 'Weekly Plan', s: 'WeeklyPlan' }, { l: 'Holiday Costs', s: 'HolidayCosts' },
+          { l: 'Holiday Summary', s: 'HolidaySummary' }, { l: 'Insurance Savings', s: 'InsSavings' },
+          { l: 'Gift Savings', s: 'GiftSavings' }, { l: 'Credit Card', s: 'CreditCard' },
+          { g: 'Actual costs' },
+          { l: 'Card Entry', s: 'CardEntry' }, { l: 'Card Statements', s: 'CardStatements' },
+          { l: 'Cost Analysis', s: 'CostAnalysis' }, { l: 'Card Categories', s: 'CardCats' },
+          { l: 'PayPal', s: 'PayPal' }
+        ]
+      },
+      Modelling: {
+        label: 'Modelling', top: 'Modelling', kind: 'tabs',
+        items: [
+          { l: 'Retirement Model', t: 'Modelling' }, { l: 'Retirement', t: 'Retirement' },
+          { l: 'Cash & Purchases', t: 'Cash' }, { l: 'Market Crashes', t: 'Crashes' },
+          { l: 'Annuities', t: 'Annuities' }, { l: 'Scenario Grid', t: 'ScenarioGrid' },
+          { l: 'Frontier', t: 'Frontier' }, { l: 'Multi Modelling', t: 'MultiModel' },
+          { l: 'Pot Table', t: 'PotTable' }, { l: 'Sensitivity', t: 'Sensitivity' },
+          { l: 'Monthly Audit', t: 'MonthlyAudit' }
+        ]
+      },
+      Intelligent: { label: 'Intelligent Modelling', top: 'Intelligent', kind: 'leaf' },
+      BasicData: {
+        label: 'Basic Data', top: 'BasicData', kind: 'sub',
+        items: [
+          { l: 'Members', s: 'Members' }, { l: 'Pensions', s: 'Pensions' },
+          { l: 'Contributions', s: 'Contributions' }, { l: 'Workplace Income', s: 'Income' },
+          { l: 'Guaranteed Incomes', s: 'Guaranteed' }, { l: 'Defaults', s: 'Defaults' },
+          { l: 'Bank Accounts', s: 'BankAccts' }, { l: 'Backup', s: 'Backup' }
+        ]
+      }
+    };
+    // the eleven Modelling pages are separate top-level tabs in the DOM, not sub-tabs
+    const NAV_MODEL_TABS = NAV.Modelling.items.map(i => i.t);
+    function navSectionOf(tabId) { return NAV_MODEL_TABS.indexOf(tabId) >= 0 ? 'Modelling' : tabId; }
+
+    let navSection = 'Overview';   // which section's row is on screen
+    let navCurrent = 'PerfKPIs';   // active page (sub name, or tab id for Modelling)
+
+    function navCloseAll() {
+      document.querySelectorAll('.navdrop').forEach(d => d.style.display = 'none');
+    }
     function navToggle(id) {
       const cur = document.getElementById('navdrop-' + id);
       const wasOpen = cur && cur.style.display === 'block';
       navCloseAll();
-      if (cur && !wasOpen) {
-        const wrap = cur.closest('.navwrap');
-        const btn = wrap ? wrap.querySelector('button') : null;
-        const r = btn ? btn.getBoundingClientRect() : { left: 8, bottom: 56 };
-        cur.style.display = 'block';
-        // clamp into the viewport: flip left if it would overflow the right edge,
-        // and cap the height to the space actually left below the button
-        const w = cur.offsetWidth || 210;
-        let left = r.left;
-        if (left + w > window.innerWidth - 8) left = Math.max(8, window.innerWidth - w - 8);
-        cur.style.left = left + 'px';
-        cur.style.top = (r.bottom + 4) + 'px';
-        cur.style.maxHeight = Math.max(160, window.innerHeight - r.bottom - 16) + 'px';
+      if (!cur || wasOpen) return;
+      const wrap = cur.closest('.navwrap');
+      const btn = wrap ? wrap.querySelector('button') : null;
+      let r = btn ? btn.getBoundingClientRect() : null;
+      // if the owning button is collapsed into the "…" overflow it has no box —
+      // anchor to the ellipsis button instead so the flyout still lands on screen
+      if (!r || (!r.width && !r.height)) {
+        const mb = document.querySelector('#navdrop-More');
+        const mbtn = mb ? mb.closest('.navwrap').querySelector('button') : null;
+        r = mbtn ? mbtn.getBoundingClientRect() : { left: 8, right: 218, bottom: 56 };
       }
+      cur.style.display = 'block';
+      const w = cur.offsetWidth || 210;
+      let left = r.left;
+      if (left + w > window.innerWidth - 8) left = Math.max(8, window.innerWidth - w - 8);
+      cur.style.left = left + 'px';
+      cur.style.top = (r.bottom + 4) + 'px';
+      cur.style.maxHeight = Math.max(160, window.innerHeight - r.bottom - 16) + 'px';
     }
-    function navCloseAll() {
-      document.querySelectorAll('.navdrop').forEach(d => d.style.display = 'none');
+    function navGoTab(id) { navCloseAll(); showTab(null, id); }
+    function navGoSub(topId, subId) { navCloseAll(); showTab(null, topId); showSub(null, subId); }
+
+    // --- rendering -------------------------------------------------------
+    function navBtn(label, onClick, active, extraStyle) {
+      const b = document.createElement('button');
+      b.className = 'tab-link' + (active ? ' active-btn' : '');
+      b.textContent = label;
+      if (extraStyle) b.setAttribute('style', extraStyle);
+      b.addEventListener('click', onClick);
+      return b;
     }
-    function navGoTab(id) {
+    function navDropdownFor(key, items, activeId) {
+      const d = document.createElement('div');
+      d.className = 'navdrop';
+      d.id = 'navdrop-' + key;
+      items.forEach(it => {
+        if (it.g) {
+          const g = document.createElement('div');
+          g.className = 'navdrop-group';
+          g.textContent = it.g;
+          d.appendChild(g);
+          return;
+        }
+        const b = document.createElement('button');
+        b.className = 'navdrop-item';
+        b.textContent = it.l;
+        if (it.__id === activeId) b.style.color = 'var(--accent-dark)';
+        b.addEventListener('click', it.__go);
+        d.appendChild(b);
+      });
+      return d;
+    }
+    function navWrap(buttonEl, dropdownEl) {
+      const w = document.createElement('div');
+      w.className = 'navwrap';
+      w.appendChild(buttonEl);
+      w.appendChild(dropdownEl);
+      return w;
+    }
+    // decorate a NAV item with its id + navigation action
+    function navPrep(sectionKey, it) {
+      if (it.g) return it;
+      const sec = NAV[sectionKey];
+      const o = { l: it.l, __id: it.t || it.s };
+      o.__go = it.t ? (() => navGoTab(it.t)) : (() => navGoSub(sec.top, it.s));
+      return o;
+    }
+
+    function renderNav() {
+      const bar = document.getElementById('navBar');
+      if (!bar) return;
       navCloseAll();
-      showTab(null, id);
+      bar.innerHTML = '';
+
+      // house — always first; one tap returns to Overview
+      const home = navBtn('', () => navGoSub('Overview', 'PerfKPIs'), navSection === 'Overview', 'padding:11px 14px');
+      home.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:block;pointer-events:none"><path d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3l9-8z"/></svg>';
+      home.setAttribute('aria-label', 'Overview (home)');
+      home.setAttribute('title', 'Overview');
+      bar.appendChild(home);
+
+      // house companion "▾" — Overview's own pages, reachable from anywhere.
+      // Without this, Old Dashboard has no home: the row shows categories when
+      // on Overview, and Overview is skipped in NAV_ORDER because it IS the house.
+      const ovPrepped = NAV.Overview.items.map(raw => navPrep('Overview', raw));
+      const ovBtn = navBtn('\u25BE', () => navToggle('Overview'), false, 'padding:11px 8px');
+      ovBtn.setAttribute('aria-label', 'Overview pages');
+      bar.appendChild(navWrap(ovBtn, navDropdownFor('Overview', ovPrepped, navCurrent)));
+
+      const sec = NAV[navSection];
+      const inSection = sec && sec.kind !== 'leaf' && navSection !== 'Overview';
+      const items = [];   // measurable flex children, in order, that may collapse
+
+      if (inSection) {
+        // section mode: this section's own pages
+        sec.items.forEach(raw => {
+          if (raw.g) return;                       // group headings only appear in dropdowns
+          const it = navPrep(navSection, raw);
+          items.push(navBtn(it.l, it.__go, it.__id === navCurrent));
+        });
+      } else {
+        // home mode: the top-level categories, each with its own dropdown
+        NAV_ORDER.forEach(key => {
+          const s = NAV[key];
+          if (key === 'Overview') return;          // Overview is the house button
+          if (s.kind === 'leaf') {
+            items.push(navBtn(s.label, () => navGoTab(s.top), navSection === key));
+            return;
+          }
+          const prepped = s.items.map(raw => navPrep(key, raw));
+          const btn = navBtn(s.label + ' \u25BE', () => navToggle(key), navSection === key);
+          items.push(navWrap(btn, navDropdownFor(key, prepped, navCurrent)));
+        });
+      }
+      items.forEach(el => bar.appendChild(el));
+
+      // trailing "…" — holds whatever does not fit
+      const moreBtn = navBtn('\u22EF', () => navToggle('More'), false, 'padding:11px 14px;font-weight:700');
+      moreBtn.setAttribute('aria-label', 'More pages');
+      moreBtn.setAttribute('title', 'More pages');
+      const moreDrop = document.createElement('div');
+      moreDrop.className = 'navdrop';
+      moreDrop.id = 'navdrop-More';
+      const moreWrap = navWrap(moreBtn, moreDrop);
+      moreWrap.style.display = 'none';
+      moreWrap.style.marginLeft = 'auto';
+      bar.appendChild(moreWrap);
+
+      navFitRow(bar, items, moreWrap, moreDrop);
     }
-    function navGoSub(topId, subId) {
-      navCloseAll();
-      showTab(null, topId);
-      showSub(null, subId);
+
+    // Hide trailing buttons until the row fits, moving them into the "…" dropdown.
+    function navFitRow(bar, items, moreWrap, moreDrop) {
+      items.forEach(el => el.style.display = '');
+      moreWrap.style.display = 'none';
+      moreDrop.innerHTML = '';
+      if (bar.scrollWidth <= bar.clientWidth + 1) return;
+
+      moreWrap.style.display = '';
+      const hidden = [];
+      for (let i = items.length - 1; i >= 0; i--) {
+        if (bar.scrollWidth <= bar.clientWidth + 1) break;
+        items[i].style.display = 'none';
+        hidden.unshift(items[i]);
+      }
+      hidden.forEach(el => {
+        // a wrapped category keeps its dropdown; re-open it from the overflow list
+        const isWrap = el.classList.contains('navwrap');
+        const src = isWrap ? el.querySelector('button') : el;
+        const b = document.createElement('button');
+        b.className = 'navdrop-item';
+        b.textContent = (src.textContent || '').replace('\u25BE', '').trim();
+        b.addEventListener('click', function () {
+          navCloseAll();
+          src.click();
+        });
+        moreDrop.appendChild(b);
+      });
     }
+
+    // called from showTab / showSub so the row always reflects where you are
+    function navSyncTab(tabId) {
+      const s = navSectionOf(tabId);
+      if (!NAV[s]) return;
+      navSection = s;
+      if (NAV[s].kind === 'tabs') navCurrent = tabId;
+      else if (NAV[s].kind === 'leaf') navCurrent = tabId;
+      renderNav();
+    }
+    function navSyncSub(name) { navCurrent = name; renderNav(); }
+
     document.addEventListener('click', function (e) {
       if (!e.target.closest('.navwrap')) navCloseAll();
     });
-    // a fixed dropdown can't follow the button, so close it if the page moves under it
+    // a fixed dropdown cannot follow its button, so close it if the page moves
     window.addEventListener('scroll', navCloseAll, { passive: true });
-    window.addEventListener('resize', navCloseAll);
+    window.addEventListener('resize', function () { navCloseAll(); renderNav(); });
 
     window.addEventListener('resize', () => { clearTimeout(window.__rt); window.__rt = setTimeout(() => { if (document.getElementById('Modelling').style.display === 'block') drawCharts(); }, 150); });
     window.addEventListener('resize', () => {
@@ -6094,7 +6238,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-463';
+    if (stamp) stamp.textContent = 'LC-464';
   }
 
   function buildSubnav() {
@@ -6406,6 +6550,9 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     document.body.classList.add('mpr-dashboard');
     buildBrandAndConnection();
     buildSubnav();
+    // LC-464: the row measures itself against the toolbar width, which changes when
+    // mpr-dashboard styling lands — re-render once now and again after layout settles
+    if (typeof renderNav === 'function') { renderNav(); setTimeout(renderNav, 200); }
     buildDashboard();
     observeSources();
     syncAll();
