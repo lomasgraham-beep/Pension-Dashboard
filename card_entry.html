@@ -39,6 +39,19 @@
   .s-ok { background:#d1fae5 !important; color:#065f46 !important; }
   .hint { font-size:13px; color:#64748b; margin:4px 0 0; }
 
+  /* ---- v2: manual line entry card ---- */
+  .mgrid { display:grid; grid-template-columns:repeat(12, 1fr); gap:12px; }
+  .fld { display:flex; flex-direction:column; }
+  .fld input, .fld select { padding:11px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:16px; box-sizing:border-box; background:#fff; color:#333; width:100%; min-height:46px; }
+  .c3 { grid-column:span 3; } .c4 { grid-column:span 4; } .c5 { grid-column:span 5; }
+  .c6 { grid-column:span 6; } .c12 { grid-column:span 12; }
+  @media (max-width:640px) { .c3, .c4, .c5, .c6 { grid-column:span 12; } }
+  #mCatWhy { min-height:16px; }
+  #addedWrap { margin-top:18px; border-top:1px solid #e2e8f0; padding-top:12px; }
+  .btn-del { background:#fff; color:#c0392b; border:1px solid #f5c6c2; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:bold; cursor:pointer; min-height:34px; }
+  #mMsg { margin-top:10px; font-size:14px; font-weight:bold; min-height:18px; }
+  .m-ok { color:#166534; } .m-err { color:#c0392b; }
+
   @media (prefers-color-scheme: dark) {
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
     h1, h2, h3, h4 { color:#f1f5f9 !important; }
@@ -53,12 +66,16 @@
     .btn-ghost { background:#0f172a !important; color:#93c5fd !important; border-color:#1e3a8a !important; }
     .tag-dup { background:#334155 !important; color:#cbd5e1 !important; }
     #status { background:#1e293b !important; color:#93c5fd !important; }
+    .fld input, .fld select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    #addedWrap { border-color:#334155 !important; }
+    .btn-del { background:#0f172a !important; color:#f87171 !important; border-color:#7f1d1d !important; }
+    .m-ok { color:#4ade80 !important; } .m-err { color:#f87171 !important; }
   }
 </style>
 </head>
 <body>
   <h1>Card Entry</h1>
-  <p class="note">Import a credit-card statement CSV: review the rows, adjust any categories, and save them. Saved transactions appear on the Card Statements page. <span class="mini">(card entry build: v1)</span></p>
+  <p class="note">Import a credit-card statement CSV, or key a line in by hand. Either way the saved transactions appear on the Card Statements page. <span class="mini">(card entry build: v2)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="importPanel" class="panel" style="display:none;">
@@ -92,6 +109,60 @@
     </div>
   </div>
 
+  <div id="manualPanel" class="panel" style="display:none;">
+    <h2>Add a line manually</h2>
+    <p class="hint" style="margin-bottom:14px;">Type a single statement line and save it straight to Card Statements. Handy for paper statements or a transaction the CSV missed.</p>
+    <div class="mgrid">
+      <div class="fld c4">
+        <label for="mDate">Date</label>
+        <input type="date" id="mDate">
+      </div>
+      <div class="fld c4">
+        <label for="mPayer">Paid by</label>
+        <select id="mPayer"></select>
+      </div>
+      <div class="fld c4">
+        <label for="mType">Type</label>
+        <select id="mType">
+          <option value="P">Purchase</option>
+          <option value="R">Refund / credit</option>
+        </select>
+      </div>
+      <div class="fld c12">
+        <label for="mDesc">Description</label>
+        <input type="text" id="mDesc" placeholder="e.g. TESCO STORES 2843" autocomplete="off" autocapitalize="characters">
+      </div>
+      <div class="fld c4">
+        <label for="mAmt">Amount (&pound;)</label>
+        <input type="text" id="mAmt" inputmode="decimal" placeholder="0.00" autocomplete="off">
+      </div>
+      <div class="fld c5">
+        <label for="mCat">Category</label>
+        <select id="mCat"></select>
+      </div>
+      <div class="fld c3" style="justify-content:flex-end;">
+        <label>&nbsp;</label>
+        <button class="btn btn-save" id="mSave" type="button">Save line</button>
+      </div>
+    </div>
+    <div class="mini" id="mCatWhy"></div>
+    <div class="row" style="margin-top:12px;">
+      <button class="btn btn-ghost" id="mClear" type="button">Clear form</button>
+    </div>
+    <div id="mMsg"></div>
+
+    <div id="addedWrap" style="display:none;">
+      <h2 style="font-size:16px;">Added this session</h2>
+      <table id="addedTable">
+        <thead><tr>
+          <th class="l">Date</th><th class="l">Description</th><th>Amount</th>
+          <th class="l">Category</th><th class="l">Paid by</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
   <div id="previewPanel" class="panel" style="display:none;">
     <h2>Review &amp; save</h2>
     <p class="hint" id="previewSummary"></p>
@@ -119,6 +190,7 @@
   let preview = [];
   let lastRawRows = null;
   let lastHeader = null;
+  let manualAdded = [];   // v2: rows saved from the manual card this session
 
   // ---------- helpers ----------
   function escapeHtml(s) {
@@ -249,9 +321,137 @@
     return html;
   }
   function buildPayerSelect() {
-    const sel = document.getElementById('payerIn');
-    sel.innerHTML = '<option value="">\u2014 (not set)</option>' +
+    const opts = '<option value="">\u2014 (not set)</option>' +
       members.map(n => '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>').join('');
+    document.getElementById('payerIn').innerHTML = opts;
+    const mp = document.getElementById('mPayer');
+    const keep = mp.value;
+    mp.innerHTML = opts;
+    if (keep) mp.value = keep;
+  }
+  // ---------- v2: manual entry card ----------
+  function todayISO() {
+    const d = new Date();
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  function buildManualCats() {
+    const el = document.getElementById('mCat');
+    const keep = el.value;
+    el.innerHTML = catOptions(keep || '');
+    if (keep) el.value = keep;
+  }
+  function manualSuggest() {
+    const desc = document.getElementById('mDesc').value || '';
+    const why = document.getElementById('mCatWhy');
+    if (!desc.trim()) { why.textContent = ''; return; }
+    const sel = document.getElementById('mCat');
+    const sug = suggestCategory(desc);
+    if (sug.code && !sel.value) { sel.value = sug.code; }
+    why.textContent = sug.code
+      ? 'Suggested: ' + (catByCode[sug.code] || sug.code) + (sug.source ? ' (via ' + sug.source + ')' : '')
+      : 'No category match yet \u2014 pick one and it will be remembered for next time.';
+  }
+  function freeHash(date, amount, desc) {
+    const base = date + '|' + amount.toFixed(2) + '|' + normDesc(desc);
+    let k = 0;
+    while (existingHashes.has(base + '|' + k)) k++;
+    return base + '|' + k;
+  }
+  function setMMsg(msg, cls) {
+    const el = document.getElementById('mMsg');
+    el.className = cls || ''; el.textContent = msg || '';
+  }
+  function renderAdded() {
+    const wrap = document.getElementById('addedWrap');
+    const tb = document.querySelector('#addedTable tbody');
+    if (!manualAdded.length) { wrap.style.display = 'none'; tb.innerHTML = ''; return; }
+    const fmt2 = v => (v < 0 ? '\u2212£' : '£') + Math.abs(v).toFixed(2);
+    tb.innerHTML = manualAdded.map(r =>
+      '<tr>' +
+      '<td class="l">' + escapeHtml(r.txn_date) + '</td>' +
+      '<td class="l desc" title="' + escapeHtml(r.description) + '">' + escapeHtml(r.description) + '</td>' +
+      '<td>' + fmt2(r.amount) + '</td>' +
+      '<td class="l">' + escapeHtml(r.category_code ? (catByCode[r.category_code] || r.category_code) : '\u2014') + '</td>' +
+      '<td class="l">' + escapeHtml(r.paid_by || '\u2014') + '</td>' +
+      '<td>' + (r.id == null ? '<span class="mini">saved</span>'
+        : '<button class="btn-del" type="button" data-id="' + escapeHtml(r.id) + '" onclick="removeAdded(this)">Remove</button>') + '</td>' +
+      '</tr>').join('');
+    wrap.style.display = 'block';
+  }
+  async function removeAdded(el) {
+    const id = el.dataset.id;
+    if (!id) return;
+    el.disabled = true; el.textContent = 'Removing\u2026';
+    try {
+      await App.write('DELETE', 'bd_card_txn?id=eq.' + encodeURIComponent(id));
+      const row = manualAdded.find(r => String(r.id) === String(id));
+      if (row && row.dedupe_hash) existingHashes.delete(row.dedupe_hash);
+      manualAdded = manualAdded.filter(r => String(r.id) !== String(id));
+      renderAdded();
+      setMMsg('Line removed.', 'm-ok');
+      notifyChanged();
+    } catch (e) {
+      el.disabled = false; el.textContent = 'Remove';
+      setMMsg('Could not remove: ' + (e && e.message ? e.message : e), 'm-err');
+    }
+  }
+  function clearManual(keepHeader) {
+    document.getElementById('mDesc').value = '';
+    document.getElementById('mAmt').value = '';
+    document.getElementById('mCat').value = '';
+    document.getElementById('mCatWhy').textContent = '';
+    document.getElementById('mType').value = 'P';
+    if (!keepHeader) {
+      document.getElementById('mDate').value = todayISO();
+      document.getElementById('mPayer').value = '';
+      setMMsg('');
+    }
+  }
+  async function saveManual() {
+    const date = document.getElementById('mDate').value;
+    const desc = (document.getElementById('mDesc').value || '').trim();
+    const raw  = document.getElementById('mAmt').value;
+    const code = document.getElementById('mCat').value || null;
+    const payer = document.getElementById('mPayer').value || null;
+    const isRefund = document.getElementById('mType').value === 'R';
+
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { setMMsg('Pick a date.', 'm-err'); return; }
+    if (!desc) { setMMsg('Enter a description.', 'm-err'); return; }
+    let amt = parseAmount(raw);
+    if (amt == null || amt === 0) { setMMsg('Enter an amount.', 'm-err'); return; }
+    amt = Math.abs(amt) * (isRefund ? -1 : 1);
+
+    const btn = document.getElementById('mSave');
+    btn.disabled = true; btn.textContent = 'Saving\u2026';
+    try {
+      const hash = freeHash(date, amt, desc);
+      const rec = { txn_date: date, description: desc, amount: amt, category_code: code, paid_by: payer, dedupe_hash: hash };
+      await App.write('POST', 'bd_card_txn', rec);
+      existingHashes.add(hash);
+      // App.write uses Prefer:return=minimal, so look the new row up by its hash to get an id.
+      let newId = null;
+      try {
+        const found = await App.rest('bd_card_txn?select=id&limit=1&dedupe_hash=eq.' + encodeURIComponent(hash));
+        if (found && found.length) newId = found[0].id;
+      } catch (e) { /* non-fatal: the row is saved, we just cannot offer Remove */ }
+      if (code) {
+        const key = merchantKey(desc);
+        if (key) {
+          if (!(key in merchantMap)) { await App.write('POST', 'bd_merchant_map', { match_text: key, category_code: code }); merchantMap[key] = code; }
+          else if (merchantMap[key] !== code) { await App.write('PATCH', 'bd_merchant_map?match_text=eq.' + encodeURIComponent(key), { category_code: code, updated_at: new Date().toISOString() }); merchantMap[key] = code; }
+        }
+      }
+      manualAdded.unshift(Object.assign({ id: newId }, rec));
+      renderAdded();
+      setMMsg('Saved \u2014 it is now on Card Statements.', 'm-ok');
+      notifyChanged();
+      clearManual(true);
+      document.getElementById('mDesc').focus();
+    } catch (e) {
+      setMMsg('Save failed: ' + (e && e.message ? e.message : e), 'm-err');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save line';
+    }
   }
 
   // ---------- load ----------
@@ -271,8 +471,12 @@
       merchantMap = {}; (mm || []).forEach(r => { merchantMap[r.match_text] = r.category_code; });
       members = (mem && mem.all) ? mem.all : [];
       buildPayerSelect();
+      buildManualCats();
+      if (!document.getElementById('mDate').value) document.getElementById('mDate').value = todayISO();
+      renderAdded();
       document.getElementById('status').style.display = 'none';
       document.getElementById('importPanel').style.display = 'block';
+      document.getElementById('manualPanel').style.display = 'block';
     } catch (e) {
       setStatus('Could not load: ' + (e && e.message ? e.message : e), 's-err');
     }
@@ -436,6 +640,20 @@
     document.getElementById('saveBtn').addEventListener('click', save);
     document.getElementById('cancelBtn').addEventListener('click', discard);
     document.getElementById('chkAll').addEventListener('change', onChkAll);
+
+    // ---- v2: manual entry card ----
+    document.getElementById('mSave').addEventListener('click', saveManual);
+    document.getElementById('mClear').addEventListener('click', () => { clearManual(false); document.getElementById('mDesc').focus(); });
+    document.getElementById('mDesc').addEventListener('blur', manualSuggest);
+    document.getElementById('mDesc').addEventListener('change', manualSuggest);
+    // standing rule: data-entry fields blank on focus so a new value can be typed straight in
+    const mAmt = document.getElementById('mAmt');
+    mAmt.addEventListener('focus', function () { this.dataset.prev = this.value; this.value = ''; });
+    mAmt.addEventListener('blur', function () { if (this.value === '' && this.dataset.prev) this.value = this.dataset.prev; });
+    const mDesc = document.getElementById('mDesc');
+    mDesc.addEventListener('focus', function () { const el = this; setTimeout(() => { try { el.setSelectionRange(0, el.value.length); } catch (e) {} }, 0); });
+    // Enter in Description or Amount saves the line
+    [mDesc, mAmt].forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); saveManual(); } }));
   }
 
   window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
