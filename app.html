@@ -53,9 +53,26 @@
        phone (<=600px) swaps the strip for the dropdown selector further down. */
     .shell { display:block; }
     .tab-buttons { display:flex; flex-wrap:wrap; gap:6px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius) var(--radius) 0 0; padding:8px; box-shadow:var(--shadow); position:sticky; top:0; z-index:60; }
-    .tab-buttons button { background:var(--accent-soft); border:1px solid var(--accent-border); cursor:pointer; padding:11px 18px; font-size:15px; font-weight:600; color:var(--accent-dark); border-radius:999px; box-shadow:var(--shadow); transition:background .12s,color .12s,border-color .12s,box-shadow .12s; }
+    .tab-buttons button { background:var(--accent-soft); border:1px solid var(--accent-border); cursor:pointer; padding:11px 18px; font-size:15px; font-weight:600; color:var(--accent-dark); border-radius:var(--radius); box-shadow:var(--shadow); transition:background .12s,color .12s,border-color .12s,box-shadow .12s; }
     .tab-buttons button:hover { background:var(--accent-border); color:var(--accent-dark); }
     .tab-buttons button.active-btn { background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 2px 5px rgba(20,40,50,0.20), 0 6px 16px rgba(20,40,50,0.14); }
+    /* LC-461: dropdown-flyout nav — one menu level on screen at a time, no pill buttons */
+    .navwrap { position:relative; display:inline-flex; }
+    .navdrop { display:none; position:absolute; top:calc(100% + 4px); left:0; min-width:210px; max-height:min(70vh,420px); overflow-y:auto; background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius); box-shadow:0 8px 24px rgba(20,40,50,0.18),0 2px 6px rgba(20,40,50,0.10); padding:6px; z-index:70; }
+    .navdrop-item { display:block; width:100%; text-align:left; background:transparent; border:none; padding:9px 12px; font-size:14px; font-weight:600; color:var(--ink); border-radius:6px; cursor:pointer; }
+    .navdrop-item:hover { background:var(--accent-soft); color:var(--accent-dark); }
+    .navdrop-group { font-size:11px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-soft); padding:8px 12px 4px; }
+    .navdrop-group:first-child { padding-top:4px; }
+    /* the old always-on second-row subnav is superseded by the dropdowns above; hidden
+       above phone width only, so the ≤600px select+row fallback keeps working untouched */
+    @media (min-width: 601px) {
+      #LivingCosts > .subtab-buttons, #BasicData > .subtab-buttons,
+      #Modelling > .subtab-buttons, #Retirement > .subtab-buttons,
+      #Cash > .subtab-buttons, #Crashes > .subtab-buttons, #Annuities > .subtab-buttons,
+      #ScenarioGrid > .subtab-buttons, #Frontier > .subtab-buttons, #MultiModel > .subtab-buttons,
+      #PotTable > .subtab-buttons, #Sensitivity > .subtab-buttons, #MonthlyAudit > .subtab-buttons { display:none; }
+      #Overview > .subtab-buttons .subtab-link, #Overview > .subtab-buttons .subtab-group-label { display:none; }
+    }
     #Overview.tabcontent { padding:0 10px 10px; }   /* LC-457: Overview is a single frame — no page padding */
     .tabcontent { display:none; padding:22px; background:var(--surface); border:1px solid var(--line); border-top:none; border-radius:0 0 var(--radius) var(--radius); box-shadow:var(--shadow); }
     .tabcontent.active { display:block; }
@@ -1546,7 +1563,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-460</span>
+      <span class="build-stamp">LC-461</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1562,13 +1579,71 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <option value="BasicData">Basic Data</option>
   </select>
   <div class="tab-buttons">
-    <button class="tab-link active-btn" onclick="showTab(event,'Overview')">Overview</button>
+    <button class="tab-link active-btn" onclick="navGoSub('Overview','PerfKPIs')" aria-label="Overview (home)" title="Overview" style="padding:11px 14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:block"><path d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3l9-8z"/></svg></button>
+    <div class="navwrap">
+      <button onclick="navToggle('OverviewMenu')" aria-label="Overview options" style="padding:11px 8px">&#9662;</button>
+      <div class="navdrop" id="navdrop-OverviewMenu">
+        <button class="navdrop-item" onclick="navGoSub('Overview','PerfKPIs')">Overview</button>
+        <button class="navdrop-item" onclick="navGoSub('Overview','OverviewDash')">Old dashboard</button>
+      </div>
+    </div>
     <button class="tab-link" onclick="showTab(event,'LogEntry')">Log Entry</button>
     <button class="tab-link" onclick="showTab(event,'Forecast')">Forecast</button>
-    <button class="tab-link" onclick="showTab(event,'LivingCosts')">Living Costs</button>
-    <button class="tab-link" onclick="showTab(event,'Modelling')">Modelling</button>
+    <div class="navwrap">
+      <button class="tab-link" onclick="navToggle('LivingCosts')">Living Costs &#9662;</button>
+      <div class="navdrop" id="navdrop-LivingCosts">
+        <div class="navdrop-group">Planned costs</div>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','Budget')">Budget</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','Bills')">Bills</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','Loans')">Loans</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','BillsSummary')">Bills Summary</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','SaveForecast')">What I Could Save</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','BillCats')">Bill Categories</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','MealCosts')">Meal Costs</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','WeeklyPlan')">Weekly Plan</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','HolidayCosts')">Holiday Costs</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','HolidaySummary')">Holiday Summary</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','InsSavings')">Insurance Savings</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','GiftSavings')">Gift Savings</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','CreditCard')">Credit Card</button>
+        <div class="navdrop-group">Actual costs</div>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','CardEntry')">Card Entry</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','CardStatements')">Card Statements</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','CostAnalysis')">Cost Analysis</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','CardCats')">Card Categories</button>
+        <button class="navdrop-item" onclick="navGoSub('LivingCosts','PayPal')">PayPal</button>
+      </div>
+    </div>
+    <div class="navwrap">
+      <button class="tab-link" onclick="navToggle('Modelling')">Modelling &#9662;</button>
+      <div class="navdrop" id="navdrop-Modelling">
+        <button class="navdrop-item" onclick="navGoTab('Modelling')">Retirement Model</button>
+        <button class="navdrop-item" onclick="navGoTab('Retirement')">Retirement</button>
+        <button class="navdrop-item" onclick="navGoTab('Cash')">Cash &amp; Purchases</button>
+        <button class="navdrop-item" onclick="navGoTab('Crashes')">Market Crashes</button>
+        <button class="navdrop-item" onclick="navGoTab('Annuities')">Annuities</button>
+        <button class="navdrop-item" onclick="navGoTab('ScenarioGrid')">Scenario Grid</button>
+        <button class="navdrop-item" onclick="navGoTab('Frontier')">Frontier</button>
+        <button class="navdrop-item" onclick="navGoTab('MultiModel')">Multi Modelling</button>
+        <button class="navdrop-item" onclick="navGoTab('PotTable')">Pot Table</button>
+        <button class="navdrop-item" onclick="navGoTab('Sensitivity')">Sensitivity</button>
+        <button class="navdrop-item" onclick="navGoTab('MonthlyAudit')">Monthly Audit</button>
+      </div>
+    </div>
     <button class="tab-link" onclick="showTab(event,'Intelligent')">Intelligent Modelling</button>
-    <button class="tab-link" onclick="showTab(event,'BasicData')">Basic Data</button>
+    <div class="navwrap">
+      <button class="tab-link" onclick="navToggle('BasicData')">Basic Data &#9662;</button>
+      <div class="navdrop" id="navdrop-BasicData">
+        <button class="navdrop-item" onclick="navGoSub('BasicData','Members')">Members</button>
+        <button class="navdrop-item" onclick="navGoSub('BasicData','Pensions')">Pensions</button>
+        <button class="navdrop-item" onclick="navGoSub('BasicData','Contributions')">Contributions</button>
+        <button class="navdrop-item" onclick="navGoSub('BasicData','Income')">Workplace Income</button>
+        <button class="navdrop-item" onclick="navGoSub('BasicData','Guaranteed')">Guaranteed Incomes</button>
+        <button class="navdrop-item" onclick="navGoSub('BasicData','Defaults')">Defaults</button>
+        <button class="navdrop-item" onclick="navGoSub('BasicData','BankAccts')">Bank Accounts</button>
+        <button class="navdrop-item" onclick="navGoSub('BasicData','Backup')">Backup</button>
+      </div>
+    </div>
   </div>
 
   <div id="Overview" class="tabcontent active">
@@ -5349,6 +5424,26 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
     }
 
+    // ---- LC-461: dropdown-flyout toolbar — thin wrappers over the untouched showTab/showSub ----
+    function navToggle(id) {
+      const cur = document.getElementById('navdrop-' + id);
+      const wasOpen = cur && cur.style.display === 'block';
+      document.querySelectorAll('.navdrop').forEach(d => d.style.display = 'none');
+      if (cur && !wasOpen) cur.style.display = 'block';
+    }
+    function navGoTab(id) {
+      document.querySelectorAll('.navdrop').forEach(d => d.style.display = 'none');
+      showTab(null, id);
+    }
+    function navGoSub(topId, subId) {
+      document.querySelectorAll('.navdrop').forEach(d => d.style.display = 'none');
+      showTab(null, topId);
+      showSub(null, subId);
+    }
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.navwrap')) document.querySelectorAll('.navdrop').forEach(d => d.style.display = 'none');
+    });
+
     window.addEventListener('resize', () => { clearTimeout(window.__rt); window.__rt = setTimeout(() => { if (document.getElementById('Modelling').style.display === 'block') drawCharts(); }, 150); });
     window.addEventListener('resize', () => {
       clearTimeout(window.__sgrt);
@@ -5976,7 +6071,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-460';
+    if (stamp) stamp.textContent = 'LC-461';
   }
 
   function buildSubnav() {
