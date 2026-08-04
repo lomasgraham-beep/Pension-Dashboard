@@ -51,6 +51,16 @@
   .btn-del { background:#fff; color:#c0392b; border:1px solid #f5c6c2; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:bold; cursor:pointer; min-height:34px; }
   #mMsg { margin-top:10px; font-size:14px; font-weight:bold; min-height:18px; }
   .m-ok { color:#166534; } .m-err { color:#c0392b; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .chip { background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; border-radius:14px; padding:5px 11px; font-size:12px; font-weight:bold; cursor:pointer; min-height:30px; }
+  .chip:disabled { opacity:0.45; cursor:default; }
+  #lastDayWrap { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px; margin-bottom:16px; }
+  #lastDayHead { font-size:14px; color:#475569; font-weight:bold; margin-bottom:2px; }
+  #lastDayWrap table { margin-top:8px; }
+  #lastDayWrap th, #lastDayWrap td { padding:6px 8px; font-size:13px; }
+  #gapHint { font-size:13px; margin-top:8px; min-height:16px; }
+  .g-warn { color:#b45309; font-weight:bold; }
+  .g-ok { color:#64748b; }
 
   @media (prefers-color-scheme: dark) {
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
@@ -70,12 +80,16 @@
     #addedWrap { border-color:#334155 !important; }
     .btn-del { background:#0f172a !important; color:#f87171 !important; border-color:#7f1d1d !important; }
     .m-ok { color:#4ade80 !important; } .m-err { color:#f87171 !important; }
+    .chip { background:#0f172a !important; color:#cbd5e1 !important; border-color:#475569 !important; }
+    #lastDayWrap { background:#0f172a !important; border-color:#334155 !important; }
+    #lastDayHead { color:#cbd5e1 !important; }
+    .g-warn { color:#fbbf24 !important; } .g-ok { color:#94a3b8 !important; }
   }
 </style>
 </head>
 <body>
   <h1>Card Entry</h1>
-  <p class="note">Import a credit-card statement CSV, or key a line in by hand. Either way the saved transactions appear on the Card Statements page. <span class="mini">(card entry build: v2)</span></p>
+  <p class="note">Import a credit-card statement CSV, or key a line in by hand. Either way the saved transactions appear on the Card Statements page. <span class="mini">(card entry build: v3)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="importPanel" class="panel" style="display:none;">
@@ -112,10 +126,21 @@
   <div id="manualPanel" class="panel" style="display:none;">
     <h2>Add a line manually</h2>
     <p class="hint" style="margin-bottom:14px;">Type a single statement line and save it straight to Card Statements. Handy for paper statements or a transaction the CSV missed.</p>
+    <div id="lastDayWrap" style="display:none;">
+      <div id="lastDayHead"></div>
+      <table id="lastDayTable">
+        <thead><tr>
+          <th class="l">Date</th><th class="l">Description</th><th>Amount</th>
+          <th class="l">Category</th><th class="l">Paid by</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
     <div class="mgrid">
       <div class="fld c4">
         <label for="mDate">Date</label>
         <input type="date" id="mDate">
+        <div class="chips" id="dateChips"></div>
       </div>
       <div class="fld c4">
         <label for="mPayer">Paid by</label>
@@ -146,6 +171,7 @@
       </div>
     </div>
     <div class="mini" id="mCatWhy"></div>
+    <div id="gapHint"></div>
     <div class="row" style="margin-top:12px;">
       <button class="btn btn-ghost" id="mClear" type="button">Clear form</button>
     </div>
@@ -334,6 +360,97 @@
     const d = new Date();
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   }
+  // v3: date continuity ------------------------------------------------------
+  let lastDay = null;        // most recent txn_date already saved
+  let lastDayRows = [];      // every row on that date
+  function addDays(iso, n) {
+    const p = String(iso).split('-');
+    const d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+  }
+  function daysBetween(a, b) {
+    const t = iso => { const p = String(iso).split('-'); return Date.UTC(+p[0], +p[1] - 1, +p[2]); };
+    return Math.round((t(b) - t(a)) / 86400000);
+  }
+  const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const MONS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function prettyDate(iso) {
+    if (!iso) return '';
+    const p = String(iso).split('-');
+    const d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+    return DOW[d.getUTCDay()] + ' ' + (+p[2]) + ' ' + MONS[+p[1] - 1] + ' ' + p[0];
+  }
+  // The date to start on: the day after the last entry, never later than today.
+  function suggestedDate() {
+    const today = todayISO();
+    if (!lastDay) return today;
+    const nxt = addDays(lastDay, 1);
+    if (nxt <= today) return nxt;
+    return lastDay > today ? lastDay : today;
+  }
+  function renderLastDay() {
+    const wrap = document.getElementById('lastDayWrap');
+    const head = document.getElementById('lastDayHead');
+    const tb = document.querySelector('#lastDayTable tbody');
+    if (!lastDay || !lastDayRows.length) { wrap.style.display = 'none'; return; }
+    const fmt2 = v => (v < 0 ? '\u2212£' : '£') + Math.abs(v).toFixed(2);
+    const tot = lastDayRows.reduce((s, r) => s + (+r.amount || 0), 0);
+    head.textContent = 'Last day keyed: ' + prettyDate(lastDay) + ' \u2014 ' +
+      lastDayRows.length + ' line' + (lastDayRows.length === 1 ? '' : 's') + ', ' + fmt2(tot);
+    tb.innerHTML = lastDayRows.slice().sort((a, b) => String(a.description).localeCompare(String(b.description))).map(r =>
+      '<tr>' +
+      '<td class="l">' + escapeHtml(r.txn_date) + '</td>' +
+      '<td class="l desc" title="' + escapeHtml(r.description) + '">' + escapeHtml(r.description) + '</td>' +
+      '<td>' + fmt2(+r.amount || 0) + '</td>' +
+      '<td class="l">' + escapeHtml(r.category_code ? (catByCode[r.category_code] || r.category_code) : '\u2014') + '</td>' +
+      '<td class="l">' + escapeHtml(r.paid_by || '\u2014') + '</td>' +
+      '</tr>').join('');
+    wrap.style.display = 'block';
+  }
+  function renderDateHelpers() {
+    const cur = document.getElementById('mDate').value;
+    const today = todayISO();
+    const chips = document.getElementById('dateChips');
+    const parts = [];
+    if (lastDay) {
+      parts.push('<button type="button" class="chip" data-d="' + lastDay + '"' + (cur === lastDay ? ' disabled' : '') + '>Same day as last</button>');
+      const nxt = addDays(lastDay, 1);
+      parts.push('<button type="button" class="chip" data-d="' + nxt + '"' + (cur === nxt ? ' disabled' : '') + '>Next day</button>');
+    }
+    parts.push('<button type="button" class="chip" data-d="' + today + '"' + (cur === today ? ' disabled' : '') + '>Today</button>');
+    chips.innerHTML = parts.join('');
+    chips.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => {
+      document.getElementById('mDate').value = b.dataset.d;
+      renderDateHelpers();
+    }));
+
+    const gh = document.getElementById('gapHint');
+    if (!lastDay) { gh.className = 'g-ok'; gh.textContent = 'No card transactions saved yet \u2014 starting from today.'; return; }
+    const gap = daysBetween(lastDay, today);
+    if (gap <= 0) { gh.className = 'g-ok'; gh.textContent = 'Up to date \u2014 last entry is ' + prettyDate(lastDay) + '.'; }
+    else if (gap === 1) { gh.className = 'g-ok'; gh.textContent = 'Continuing from ' + prettyDate(lastDay) + '. Nothing missing.'; }
+    else { gh.className = 'g-warn'; gh.textContent = 'Gap: ' + (gap - 1) + ' day' + (gap - 1 === 1 ? '' : 's') + ' between ' + prettyDate(lastDay) + ' and today have no entries.'; }
+  }
+  // Fold a freshly-saved row into the last-day view so the block stays live.
+  function noteSaved(rec) {
+    if (!lastDay || rec.txn_date > lastDay) { lastDay = rec.txn_date; lastDayRows = [rec]; }
+    else if (rec.txn_date === lastDay) { lastDayRows.push(rec); }
+    renderLastDay();
+    renderDateHelpers();
+  }
+  async function refreshLastDay() {
+    lastDay = null; lastDayRows = [];
+    try {
+      const top = await App.rest('bd_card_txn?select=txn_date&order=txn_date.desc&limit=1');
+      if (top && top.length && top[0].txn_date) {
+        lastDay = String(top[0].txn_date).slice(0, 10);
+        lastDayRows = await App.rest('bd_card_txn?txn_date=eq.' + lastDay + '&order=description.asc') || [];
+      }
+    } catch (e) { lastDay = null; lastDayRows = []; }
+    renderLastDay();
+    renderDateHelpers();
+  }
   function buildManualCats() {
     const el = document.getElementById('mCat');
     const keep = el.value;
@@ -388,6 +505,7 @@
       if (row && row.dedupe_hash) existingHashes.delete(row.dedupe_hash);
       manualAdded = manualAdded.filter(r => String(r.id) !== String(id));
       renderAdded();
+      await refreshLastDay();
       setMMsg('Line removed.', 'm-ok');
       notifyChanged();
     } catch (e) {
@@ -402,8 +520,9 @@
     document.getElementById('mCatWhy').textContent = '';
     document.getElementById('mType').value = 'P';
     if (!keepHeader) {
-      document.getElementById('mDate').value = todayISO();
+      document.getElementById('mDate').value = suggestedDate();
       document.getElementById('mPayer').value = '';
+      renderDateHelpers();
       setMMsg('');
     }
   }
@@ -443,6 +562,7 @@
       }
       manualAdded.unshift(Object.assign({ id: newId }, rec));
       renderAdded();
+      noteSaved(Object.assign({ id: newId }, rec));
       setMMsg('Saved \u2014 it is now on Card Statements.', 'm-ok');
       notifyChanged();
       clearManual(true);
@@ -472,7 +592,10 @@
       members = (mem && mem.all) ? mem.all : [];
       buildPayerSelect();
       buildManualCats();
-      if (!document.getElementById('mDate').value) document.getElementById('mDate').value = todayISO();
+      // v3: work out the last day already keyed, and pull that day's lines for continuity
+      await refreshLastDay();
+      document.getElementById('mDate').value = suggestedDate();
+      renderDateHelpers();
       renderAdded();
       document.getElementById('status').style.display = 'none';
       document.getElementById('importPanel').style.display = 'block';
@@ -646,6 +769,7 @@
     document.getElementById('mClear').addEventListener('click', () => { clearManual(false); document.getElementById('mDesc').focus(); });
     document.getElementById('mDesc').addEventListener('blur', manualSuggest);
     document.getElementById('mDesc').addEventListener('change', manualSuggest);
+    document.getElementById('mDate').addEventListener('change', renderDateHelpers);
     // standing rule: data-entry fields blank on focus so a new value can be typed straight in
     const mAmt = document.getElementById('mAmt');
     mAmt.addEventListener('focus', function () { this.dataset.prev = this.value; this.value = ''; });
