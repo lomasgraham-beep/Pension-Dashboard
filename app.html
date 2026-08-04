@@ -56,9 +56,13 @@
     .tab-buttons button { background:var(--accent-soft); border:1px solid var(--accent-border); cursor:pointer; padding:11px 18px; font-size:15px; font-weight:600; color:var(--accent-dark); border-radius:var(--radius); box-shadow:var(--shadow); transition:background .12s,color .12s,border-color .12s,box-shadow .12s; }
     .tab-buttons button:hover { background:var(--accent-border); color:var(--accent-dark); }
     .tab-buttons button.active-btn { background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 2px 5px rgba(20,40,50,0.20), 0 6px 16px rgba(20,40,50,0.14); }
-    /* LC-462: dropdown-flyout nav — one menu level on screen at a time, no pill buttons */
+    /* LC-463: dropdown-flyout nav — one menu level on screen at a time, no pill buttons */
     .navwrap { position:relative; display:inline-flex; }
-    .navdrop { display:none; position:absolute; top:calc(100% + 4px); left:0; min-width:210px; max-height:min(70vh,420px); overflow-y:auto; background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius); box-shadow:0 8px 24px rgba(20,40,50,0.18),0 2px 6px rgba(20,40,50,0.10); padding:6px; z-index:70; -webkit-transform:translateZ(0); transform:translateZ(0); }
+    /* LC-463: the toolbar has overflow-x:auto (mpr-dashboard), which CLIPS absolutely
+       positioned children — no z-index can defeat that. position:fixed escapes the clip;
+       coordinates are set in navToggle from the button's rect. Do NOT add a transform
+       here: it would create a containing block and break the fixed positioning. */
+    .navdrop { display:none; position:fixed; top:0; left:0; min-width:210px; max-height:min(70vh,420px); overflow-y:auto; background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius); box-shadow:0 8px 24px rgba(20,40,50,0.18),0 2px 6px rgba(20,40,50,0.10); padding:6px; z-index:9998; -webkit-overflow-scrolling:touch; }
     .navdrop-item { display:block; width:100%; text-align:left; background:transparent; border:none; padding:9px 12px; font-size:14px; font-weight:600; color:var(--ink); border-radius:6px; cursor:pointer; }
     .navdrop-item:hover { background:var(--accent-soft); color:var(--accent-dark); }
     .navdrop-group { font-size:11px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-soft); padding:8px 12px 4px; }
@@ -1563,7 +1567,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-462</span>
+      <span class="build-stamp">LC-463</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -5424,25 +5428,44 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
     }
 
-    // ---- LC-462: dropdown-flyout toolbar — thin wrappers over the untouched showTab/showSub ----
+    // ---- LC-463: dropdown-flyout toolbar — thin wrappers over the untouched showTab/showSub ----
     function navToggle(id) {
       const cur = document.getElementById('navdrop-' + id);
       const wasOpen = cur && cur.style.display === 'block';
+      navCloseAll();
+      if (cur && !wasOpen) {
+        const wrap = cur.closest('.navwrap');
+        const btn = wrap ? wrap.querySelector('button') : null;
+        const r = btn ? btn.getBoundingClientRect() : { left: 8, bottom: 56 };
+        cur.style.display = 'block';
+        // clamp into the viewport: flip left if it would overflow the right edge,
+        // and cap the height to the space actually left below the button
+        const w = cur.offsetWidth || 210;
+        let left = r.left;
+        if (left + w > window.innerWidth - 8) left = Math.max(8, window.innerWidth - w - 8);
+        cur.style.left = left + 'px';
+        cur.style.top = (r.bottom + 4) + 'px';
+        cur.style.maxHeight = Math.max(160, window.innerHeight - r.bottom - 16) + 'px';
+      }
+    }
+    function navCloseAll() {
       document.querySelectorAll('.navdrop').forEach(d => d.style.display = 'none');
-      if (cur && !wasOpen) cur.style.display = 'block';
     }
     function navGoTab(id) {
-      document.querySelectorAll('.navdrop').forEach(d => d.style.display = 'none');
+      navCloseAll();
       showTab(null, id);
     }
     function navGoSub(topId, subId) {
-      document.querySelectorAll('.navdrop').forEach(d => d.style.display = 'none');
+      navCloseAll();
       showTab(null, topId);
       showSub(null, subId);
     }
     document.addEventListener('click', function (e) {
-      if (!e.target.closest('.navwrap')) document.querySelectorAll('.navdrop').forEach(d => d.style.display = 'none');
+      if (!e.target.closest('.navwrap')) navCloseAll();
     });
+    // a fixed dropdown can't follow the button, so close it if the page moves under it
+    window.addEventListener('scroll', navCloseAll, { passive: true });
+    window.addEventListener('resize', navCloseAll);
 
     window.addEventListener('resize', () => { clearTimeout(window.__rt); window.__rt = setTimeout(() => { if (document.getElementById('Modelling').style.display === 'block') drawCharts(); }, 150); });
     window.addEventListener('resize', () => {
@@ -6071,7 +6094,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-462';
+    if (stamp) stamp.textContent = 'LC-463';
   }
 
   function buildSubnav() {
