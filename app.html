@@ -1570,7 +1570,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-477</span>
+      <span class="build-stamp">LC-478</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -2133,6 +2133,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       <button id="subbtn-MealCosts" class="subtab-link" onclick="showSub(event,'MealCosts')">Meal Costs</button>
       <button id="subbtn-WeeklyPlan" class="subtab-link" onclick="showSub(event,'WeeklyPlan')">Weekly Plan</button>
       <button id="subbtn-HolidayCosts" class="subtab-link" onclick="showSub(event,'HolidayCosts')">Holiday Costs</button>
+      <button id="subbtn-FuelCosts" class="subtab-link" onclick="showSub(event,'FuelCosts')">Fuel Costs</button>
       <button id="subbtn-HolidaySummary" class="subtab-link" onclick="showSub(event,'HolidaySummary')">Holiday Summary</button>
       <button id="subbtn-InsSavings" class="subtab-link" onclick="showSub(event,'InsSavings')">Insurance Savings</button>
       <button id="subbtn-GiftSavings" class="subtab-link" onclick="showSub(event,'GiftSavings')">Gift Savings</button>
@@ -2160,6 +2161,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div id="sub-GiftSavings" class="subtabcontent"><iframe id="frame-GiftSavings" class="app-frame" title="Gift Savings"></iframe></div>
     <div id="sub-WeeklyPlan" class="subtabcontent"><iframe id="frame-WeeklyPlan" class="app-frame" title="Weekly Plan"></iframe></div>
     <div id="sub-HolidayCosts" class="subtabcontent"><iframe id="frame-HolidayCosts" class="app-frame" title="Holiday Costs"></iframe></div>
+    <div id="sub-FuelCosts" class="subtabcontent"><iframe id="frame-FuelCosts" class="app-frame" title="Fuel Costs"></iframe></div>
     <div id="sub-HolidaySummary" class="subtabcontent"><iframe id="frame-HolidaySummary" class="app-frame" title="Holiday Summary"></iframe></div>
     <div id="sub-MealCosts" class="subtabcontent"><iframe id="frame-MealCosts" class="app-frame" title="Meal Costs"></iframe></div>
     <div id="sub-BillsSummary" class="subtabcontent"><iframe id="frame-BillsSummary" class="app-frame" title="Summary of Household Bills"></iframe></div>
@@ -6278,7 +6280,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-477';
+    if (stamp) stamp.textContent = 'LC-478';
   }
 
   function buildSubnav() {
