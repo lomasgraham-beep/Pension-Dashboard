@@ -1570,7 +1570,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-476</span>
+      <span class="build-stamp">LC-477</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -5231,7 +5231,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front145';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front146';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', FuelCosts:'fuel_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -5694,15 +5694,19 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         // holiday annual total (retired phase) via the shared helper — single source of truth
         const holidayPlanAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], (holidaySettings && holidaySettings[0]) || {}), 'retired');
         // Budget basis: Plan (above) or Actual last-12-months + adjustment, per the saved choice.
-        const _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual });
+        // ann11: fuel is its own engine term now, no longer inside the holiday figure.
+        const _fuel = await App.loadFuelForEngine();
+        const _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual,
+        fuelWorkPlanAnnual: _fuel.planWork, fuelDiscPlanAnnual: _fuel.planDisc });
         const diningAnnual = _eff.diningAnnual, holidayAnnual = _eff.holidayAnnual;
+        const fuelDiscAnnual = _eff.fuelAnnual, fuelWorkAnnual = _eff.fuelWorkAnnual;
         // Age-taper multipliers (single household set each) — engine defaults to 1.0 if absent.
         const hs = (holidaySettings && holidaySettings[0]) || {};
         const ds = (diningSettings && diningSettings[0]) || {};
         const holidayTaper = { taper_at_70: hs.taper_at_70, taper_at_80: hs.taper_at_80, taper_at_90: hs.taper_at_90 };
         const diningTaper = { taper_at_70: ds.taper_at_70, taper_at_80: ds.taper_at_80, taper_at_90: ds.taper_at_90 };
         let giftRows = []; try { giftRows = await App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc') || []; } catch (e) { giftRows = []; }
-        data = { members, bills, gifts: giftRows, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual, holidayTaper: holidayTaper, diningTaper: diningTaper,
+        data = { members, bills, gifts: giftRows, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual, holidayTaper: holidayTaper, fuelAnnual: fuelDiscAnnual, fuelWorkAnnual: fuelWorkAnnual, fuelTaper: _fuel.taper, fuelWorkEndDate: _fuel.workEndsOn, diningTaper: diningTaper,
                  guaranteed, pensions, contributions, logs,
                  purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: expandFutureSteps(contributionRateHistory || []).concat(contributionExceptions || []), contributionRateHistory: contributionRateHistory || [], workingTiers: workingTiers || [],
                  incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
@@ -6274,7 +6278,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-476';
+    if (stamp) stamp.textContent = 'LC-477';
   }
 
   function buildSubnav() {
