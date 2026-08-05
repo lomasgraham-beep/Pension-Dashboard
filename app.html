@@ -1570,7 +1570,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-482</span>
+      <span class="build-stamp">LC-483</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -2126,12 +2126,12 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       <div class="subtab-row">
       <button id="subbtn-Budget" class="subtab-link active-sub" onclick="showSub(event,'Budget')">Budget</button>
       <button id="subbtn-Bills" class="subtab-link" onclick="showSub(event,'Bills')">Bills</button>
+      <button id="subbtn-WeeklyPlan" class="subtab-link" onclick="showSub(event,'WeeklyPlan')">Weekly Plan</button>
       <button id="subbtn-Loans" class="subtab-link" onclick="showSub(event,'Loans')">Loans</button>
       <button id="subbtn-BillsSummary" class="subtab-link" onclick="showSub(event,'BillsSummary')">Bills Summary</button>
       <button id="subbtn-SaveForecast" class="subtab-link" onclick="showSub(event,'SaveForecast')">What I Could Save</button>
       <button id="subbtn-BillCats" class="subtab-link" onclick="showSub(event,'BillCats')">Bill Categories</button>
       <button id="subbtn-MealCosts" class="subtab-link" onclick="showSub(event,'MealCosts')">Meal Costs</button>
-      <button id="subbtn-WeeklyPlan" class="subtab-link" onclick="showSub(event,'WeeklyPlan')">Weekly Plan</button>
       <button id="subbtn-HolidayCosts" class="subtab-link" onclick="showSub(event,'HolidayCosts')">Holiday Costs</button>
       <button id="subbtn-FuelCosts" class="subtab-link" onclick="showSub(event,'FuelCosts')">Fuel Costs</button>
       <button id="subbtn-HolidaySummary" class="subtab-link" onclick="showSub(event,'HolidaySummary')">Holiday Summary</button>
@@ -5233,7 +5233,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front150';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front151';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', FuelCosts:'fuel_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -5387,10 +5387,10 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         label: 'Living Costs', top: 'LivingCosts', kind: 'sub',
         items: [
           { g: 'Planned costs' },
-          { l: 'Budget', s: 'Budget' }, { l: 'Bills', s: 'Bills' }, { l: 'Loans', s: 'Loans' },
+          { l: 'Budget', s: 'Budget' }, { l: 'Bills', s: 'Bills' }, { l: 'Weekly Plan', s: 'WeeklyPlan' }, { l: 'Loans', s: 'Loans' },
           { l: 'Bills Summary', s: 'BillsSummary' }, { l: 'What I Could Save', s: 'SaveForecast' },
           { l: 'Bill Categories', s: 'BillCats' }, { l: 'Meal Costs', s: 'MealCosts' },
-          { l: 'Weekly Plan', s: 'WeeklyPlan' }, { l: 'Holiday Costs', s: 'HolidayCosts' },
+          { l: 'Holiday Costs', s: 'HolidayCosts' },
           { l: 'Fuel Costs', s: 'FuelCosts' },
           { l: 'Holiday Summary', s: 'HolidaySummary' }, { l: 'Insurance Savings', s: 'InsSavings' },
           { l: 'Gift Savings', s: 'GiftSavings' }, { l: 'Credit Card', s: 'CreditCard' },
@@ -6280,7 +6280,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-482';
+    if (stamp) stamp.textContent = 'LC-483';
   }
 
   function buildSubnav() {

@@ -6,7 +6,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=fuel2"></script>
 <style>
-  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1200px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1560px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin-bottom:2px; }
   .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:14px; }
   .bar { position:sticky; top:0; z-index:5; background:#f4f7f6; padding:10px 0; display:flex; gap:12px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #e2e8f0; margin-bottom:12px; }
@@ -38,7 +38,7 @@
   .pill-hol { background:#f59e0b; color:#3a2500; border:1px solid #b26f06; }
   .pill-fuel { background:#8b5cf6; color:#f5f3ff; border:1px solid #6d28d9; }
 
-  .panels { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px; align-items:start; }
+  .panels { display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:16px; align-items:start; }
   .panel { min-width:0; }
   .panel + .panel { border-left:1px solid #e2e8f0; padding-left:16px; }
   .panel-title { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:bold; color:#2c3e50; margin:0 0 8px; }
@@ -46,16 +46,19 @@
   .dot-din { background:#17b5c4; }
   .dot-hol { background:#f59e0b; }
   .dot-fuel { background:#8b5cf6; }
-  .fuel-tbl { width:100%; border-collapse:collapse; margin-top:4px; }
-  .fuel-tbl th { background:#f8fafc; color:#475569; font-size:12px; text-align:left; padding:6px 8px; border-bottom:1px solid #e2e8f0; font-weight:bold; }
-  .fuel-tbl td { padding:6px 8px; border-bottom:1px solid #eef2f7; font-size:14px; vertical-align:middle; }
-  .fuel-tbl input[type=number] { width:78px; padding:7px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px; text-align:right; }
-  .fuel-tbl select { padding:7px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px; background:#fff; min-width:120px; }
+  .fuel-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .fuel-tbl { width:100%; min-width:300px; border-collapse:collapse; margin-top:4px; table-layout:fixed; }
+  .fuel-tbl col.c-pur { width:37%; } .fuel-tbl col.c-mil { width:19%; }
+  .fuel-tbl col.c-tow { width:11%; } .fuel-tbl col.c-cost { width:19%; } .fuel-tbl col.c-act { width:14%; }
+  .fuel-tbl th { background:#f8fafc; color:#475569; font-size:11px; text-align:left; padding:6px 5px; border-bottom:1px solid #e2e8f0; font-weight:bold; white-space:nowrap; }
+  .fuel-tbl td { padding:6px 5px; border-bottom:1px solid #eef2f7; font-size:14px; vertical-align:middle; overflow:hidden; }
+  .fuel-tbl input[type=number] { width:100%; box-sizing:border-box; padding:7px 5px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px; text-align:right; }
+  .fuel-tbl select { width:100%; box-sizing:border-box; padding:7px 4px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; background:#fff; min-width:0; }
   .fuel-tbl tr.inh td { background:#fafbfc; color:#94a3b8; }
   .fuel-tbl tr.inh select, .fuel-tbl tr.inh input[type=number] { color:#64748b; border-style:dashed; }
-  .inh-tag { font-size:10px; font-weight:bold; color:#8b5cf6; border:1px solid #ddd6fe; background:#f5f3ff; border-radius:4px; padding:1px 5px; margin-left:6px; text-transform:uppercase; letter-spacing:.03em; }
-  .fcost { font-weight:bold; color:#9a3412; white-space:nowrap; }
-  .btn-fdel { background:#fdecea; color:#c0392b; border:1px solid #f5c6c2; border-radius:6px; padding:6px 10px; font-size:13px; font-weight:bold; cursor:pointer; min-height:38px; }
+  .inh-tag { display:block; width:fit-content; font-size:9px; font-weight:bold; color:#8b5cf6; border:1px solid #ddd6fe; background:#f5f3ff; border-radius:4px; padding:0 4px; margin:2px 0 0; text-transform:uppercase; letter-spacing:.03em; }
+  .fcost { font-weight:bold; color:#9a3412; white-space:nowrap; font-size:13px; }
+  .btn-fdel { width:100%; box-sizing:border-box; background:#fdecea; color:#c0392b; border:1px solid #f5c6c2; border-radius:6px; padding:6px 2px; font-size:12px; font-weight:bold; cursor:pointer; min-height:38px; }
   .btn-faddl { background:#3498db; color:#fff; border:none; border-radius:8px; padding:9px 14px; font-size:14px; font-weight:bold; cursor:pointer; min-height:42px; margin-top:10px; }
   .fuel-hint { font-size:12px; color:#94a3b8; margin:8px 0 0; line-height:1.5; }
   .panel-tot { font-size:13px; color:#64748b; margin-top:8px; }
@@ -591,7 +594,10 @@
         '<td class="fcost">' + fmt(App.fuelLineCost(r.ref, fctx)) + '</td>' +
         '<td><button class="btn-fdel" onclick="fuelRemoveLine(' + no + ',' + i + ')">' + (r.inherited ? 'Skip' : 'Remove') + '</button></td>' +
       '</tr>').join('');
-    return '<table class="fuel-tbl"><thead><tr><th>Purpose</th><th>Miles</th><th>Tow</th><th>Cost</th><th></th></tr></thead><tbody>' + body + '</tbody></table>';
+    return '<div class="fuel-wrap"><table class="fuel-tbl">' +
+      '<colgroup><col class="c-pur"><col class="c-mil"><col class="c-tow"><col class="c-cost"><col class="c-act"></colgroup>' +
+      '<thead><tr><th>Purpose</th><th>Miles</th><th>Tow</th><th>Cost</th><th></th></tr></thead><tbody>' +
+      body + '</tbody></table></div>';
   }
 
   function fuelPanelInner(no) {
@@ -1020,7 +1026,7 @@
 <script>
 /* LC-385: deploy stamp (this page does not load the engine). */
 (function () {
-  var TAG = 'weekly v5';
+  var TAG = 'weekly v6';
   function go() {
     var s = document.createElement('div');
     s.style.cssText = 'text-align:right;padding:2px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
