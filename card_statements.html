@@ -30,6 +30,15 @@
   tr.pedit td.catcell { box-shadow: inset 3px 0 0 #f59e0b; }
   td.empty { text-align:left; color:#94a3b8; font-style:italic; }
   select.cat { font-size:14px; padding:6px; max-width:180px; }
+  .searchbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0 4px; }
+  .searchbar label { font-weight:bold; font-size:13px; color:#475569; }
+  #searchBox { flex:1 1 220px; min-width:180px; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:15px; }
+  #searchBox:focus { outline:none; border-color:#3498db; box-shadow:0 0 0 3px rgba(52,152,219,0.15); }
+  .btn-clear { background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:8px; padding:9px 14px; font-size:14px; cursor:pointer; min-height:42px; }
+  .btn-allm { background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:8px; padding:9px 14px; font-size:14px; font-weight:bold; cursor:pointer; min-height:42px; }
+  #searchInfo { font-size:13px; color:#64748b; margin:2px 0 0; min-height:18px; }
+  #searchInfo b { color:#2c3e50; }
+  mark.hit { background:#fde68a; color:#78350f; border-radius:3px; padding:0 1px; }
   #actionBar { display:none; align-items:center; gap:12px; flex-wrap:wrap; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:10px 14px; margin:6px 0 14px; }
   #actionBar .count { font-weight:bold; color:#92400e; }
   #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
@@ -54,13 +63,19 @@
     #actionBar { background:#3a2f12 !important; border-color:#a16207 !important; }
     #actionBar .count { color:#fde68a !important; }
     #status { background:#1e293b !important; color:#93c5fd !important; }
+    .searchbar label { color:#cbd5e1 !important; }
+    #searchBox { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    .btn-clear { background:#1e293b !important; color:#cbd5e1 !important; border-color:#475569 !important; }
+    .btn-allm { background:#1e293b !important; color:#93c5fd !important; border-color:#3b5578 !important; }
+    #searchInfo { color:#94a3b8 !important; } #searchInfo b { color:#f1f5f9 !important; }
+    mark.hit { background:#78350f !important; color:#fde68a !important; }
     td.empty { color:#94a3b8 !important; }
   }
 </style>
 </head>
 <body>
   <h1>Card Statements</h1>
-  <p class="note">Saved card transactions, by month. Change a category or mark a row to delete, then press <strong>Save changes</strong> &mdash; nothing is written until you do. Add transactions on the Card Entry page. <span class="mini">(card statements build: v3)</span></p>
+  <p class="note">Saved card transactions, by month. Change a category or mark a row to delete, then press <strong>Save changes</strong> &mdash; nothing is written until you do. Add transactions on the Card Entry page. Use <strong>Find</strong> to pull up every row matching a word &mdash; comma-separate for alternatives, e.g. <em>petrol, shell, bp</em>. The category totals above follow the filter, so you can see what a search is costing you before re-categorising. <span class="mini">(card statements build: v4)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="ledgerPanel" class="panel" style="display:none;">
@@ -71,6 +86,14 @@
         <select id="monthSel"></select>
       </div>
     </div>
+
+    <div class="searchbar">
+      <label for="searchBox">Find</label>
+      <input type="text" id="searchBox" placeholder="e.g. petrol, shell, bp" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+      <button class="btn-clear" id="clearSearch" type="button">Clear</button>
+      <button class="btn-allm" id="searchAll" type="button" style="display:none;">Search all months</button>
+    </div>
+    <p id="searchInfo"></p>
 
     <div id="actionBar">
       <span class="count" id="pendCount"></span>
@@ -97,6 +120,7 @@
   let catByCode = {};
   let txns = [];
   let merchantMap = {};
+  let searchTerms = [];           // comma-separated OR terms, lower-cased; empty = no filter
   let pendingCat = {};            // String(id) -> new code (or null), only when differs from saved
   let pendingDel = new Set();     // String(id) marked for deletion
 
@@ -187,12 +211,65 @@
     drawMonth(monthSel.value);
   }
   function rowsForMonth(ym) {
-    return (ym === 'ALL') ? txns : txns.filter(t => monthOf(t.txn_date) === ym);
+    const base = (ym === 'ALL') ? txns : txns.filter(t => monthOf(t.txn_date) === ym);
+    return searchTerms.length ? base.filter(matchesSearch) : base;
+  }
+  // Comma-separated terms are OR'd, so "petrol, shell, bp" finds all three in one pass.
+  // Matches the description AND the effective category label, so you can also pull up
+  // everything currently sitting under a given category — or "uncategorised".
+  function matchesSearch(t) {
+    const code = effCat(t);
+    const hay = (String(t.description || '') + ' ' +
+                 (code ? (code + ' ' + (catByCode[code] || '')) : 'uncategorised')).toLowerCase();
+    return searchTerms.some(term => hay.indexOf(term) !== -1);
+  }
+  function parseSearch(raw) {
+    return String(raw || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+  }
+  // Wrap matched runs in <mark>. Operates on ESCAPED text and injects only literal tags,
+  // so nothing from the description can become markup.
+  function highlight(escaped) {
+    if (!searchTerms.length) return escaped;
+    let out = escaped;
+    searchTerms.forEach(term => {
+      const rx = new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+      out = out.replace(rx, '<mark class="hit">$1</mark>');
+    });
+    return out;
   }
   function drawMonth(ym) {
     renderRollup(ym);
     renderList(ym);
+    renderSearchInfo(ym);
     renderActionBar();
+  }
+
+  // Tells you what the filter is actually showing, and — the important bit — whether there are
+  // more matches in other months, so a month-scoped search never quietly hides rows from you.
+  function renderSearchInfo(ym) {
+    const info = document.getElementById('searchInfo');
+    const allBtn = document.getElementById('searchAll');
+    if (!searchTerms.length) {
+      info.textContent = '';
+      allBtn.style.display = 'none';
+      return;
+    }
+    const shown = rowsForMonth(ym);
+    const net = shown.reduce((a, t) => a + (pendingDel.has(String(t.id)) ? 0 : (Number(t.amount) || 0)), 0);
+    const everywhere = txns.filter(matchesSearch).length;
+    const scope = (ym === 'ALL') ? 'all months' : monthLabel(ym);
+    info.innerHTML = shown.length
+      ? ('<b>' + shown.length + '</b> matching row' + (shown.length === 1 ? '' : 's') +
+         ' in ' + escapeHtml(scope) + ' \u00b7 net <b>' + fmt(net) + '</b>')
+      : ('No matches in ' + escapeHtml(scope) + '.');
+    const more = (ym !== 'ALL') && (everywhere > shown.length);
+    allBtn.style.display = more ? 'inline-block' : 'none';
+    if (more) allBtn.textContent = 'Search all months (' + everywhere + ')';
+  }
+
+  function applySearch(raw) {
+    searchTerms = parseSearch(raw);
+    drawMonth(currentMonth());
   }
   function renderRollup(ym) {
     const rows = rowsForMonth(ym);
@@ -226,7 +303,7 @@
         : '<select class="cat" data-id="' + id + '" onchange="onLedgerCat(this)">' + catOptions(effCat(t)) + '</select>';
       return '<tr class="' + cls + '">' +
         '<td class="l">' + escapeHtml(t.txn_date) + '</td>' +
-        '<td class="l desc" title="' + escapeHtml(t.description) + '">' + escapeHtml(t.description) + '</td>' +
+        '<td class="l desc" title="' + escapeHtml(t.description) + '">' + highlight(escapeHtml(t.description)) + '</td>' +
         '<td>' + fmt2(t.amount) + '</td>' +
         '<td class="l catcell">' + catCell + '</td>' +
         '<td>' + action + '</td></tr>';
@@ -319,6 +396,16 @@
   // ---------- wiring ----------
   function wire() {
     document.getElementById('monthSel').addEventListener('change', e => drawMonth(e.target.value));
+    document.getElementById('searchBox').addEventListener('input', e => applySearch(e.target.value));
+    document.getElementById('clearSearch').addEventListener('click', () => {
+      document.getElementById('searchBox').value = '';
+      applySearch('');
+    });
+    document.getElementById('searchAll').addEventListener('click', () => {
+      const sel = document.getElementById('monthSel');
+      sel.value = 'ALL';
+      drawMonth('ALL');
+    });
     document.getElementById('saveBtn').addEventListener('click', saveChanges);
     document.getElementById('discardBtn').addEventListener('click', discardChanges);
   }
