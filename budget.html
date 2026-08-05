@@ -13,6 +13,16 @@
   .info-btn:hover { background:#bfe4e9; }
   .info-btn:focus-visible { outline:3px solid #38bdf8; outline-offset:2px; }
   .info-btn[aria-expanded="true"] { background:#1d3a63; border-color:#1d3a63; color:#fff; }
+  .refresh-btn { width:44px; height:44px; min-width:44px; padding:0; border:1px solid #bfe4e9; border-radius:50%; background:#e6f5f7; color:#14294a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .refresh-btn:hover { background:#bfe4e9; }
+  .refresh-btn:focus-visible { outline:3px solid #38bdf8; outline-offset:2px; }
+  .refresh-btn[disabled] { cursor:default; opacity:0.75; }
+  .refresh-btn svg { width:22px; height:22px; display:block; }
+  .refresh-btn.spin svg { animation:refspin 0.8s linear infinite; transform-origin:50% 50%; }
+  @keyframes refspin { to { transform:rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .refresh-btn.spin svg { animation:none; } }
+  .refresh-note { font-size:12px; color:#64748b; opacity:0; transition:opacity .25s; }
+  .refresh-note.show { opacity:1; }
   .info-panel { margin:-2px 0 18px; padding:12px 14px; border:1px solid #cbd5e1; border-left:4px solid #1d3a63; border-radius:8px; background:#eef2f7; color:#475569; font-size:14px; line-height:1.5; }
   .info-panel[hidden] { display:none; }
   .info-panel p { margin:0; }
@@ -81,6 +91,9 @@
     h1 { color:#f1f5f9 !important; }
     .info-btn { background:#162132 !important; color:#7dd3fc !important; border-color:#475569 !important; }
     .info-btn:hover { background:#243a5e !important; }
+    .refresh-btn { background:#162132 !important; color:#7dd3fc !important; border-color:#475569 !important; }
+    .refresh-btn:hover { background:#243a5e !important; }
+    .refresh-note { color:#94a3b8 !important; }
     .info-btn[aria-expanded="true"] { background:#0e7490 !important; color:#fff !important; border-color:#22d3ee !important; }
     .info-panel { background:#162132 !important; color:#cbd5e1 !important; border-color:#334155 !important; border-left-color:#22d3ee !important; }
     .info-build { color:#94a3b8 !important; }
@@ -110,10 +123,17 @@
   <div class="page-head">
     <h1 id="pageTitle">Monthly Budget</h1>
     <button type="button" id="pageInfoBtn" class="info-btn" aria-label="Show page information" aria-controls="pageInfo" aria-expanded="false" onclick="togglePageInfo()"><span aria-hidden="true">i</span></button>
+    <button type="button" id="refreshBtn" class="refresh-btn" aria-label="Refresh budget data" title="Pull the latest bills, fuel and plan data" onclick="refreshNow()">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        <path d="M20 3.5V9h-5.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <span id="refreshNote" class="refresh-note" role="status" aria-live="polite"></span>
   </div>
   <div id="pageInfo" class="info-panel" hidden>
     <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. The working-days chip at the top of each person&rsquo;s card is read-only and follows the schedule in Basic Data against the month you&rsquo;re viewing &mdash; so a 3-day week starting in September shows 5-day in August and 3-day from September, and salary and pension contributions switch with it. Figures are shown in the money of the year you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr), stepping once each January rather than creeping every month, so amounts hold steady across a year. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel, Julie Hair &amp; Nails and Dogs spend, which is deducted in the Cash Summary. Xmas and Birthdays are not on the card here &mdash; they are saved monthly into a savings account (age-tapered gift values, inflated 0.5%/yr, managed on the Gift Savings page) and appear as a <em>Gift savings</em> set-aside against that account&rsquo;s paying account, smoothing the December peak. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from, and the <b>Loans</b> card lists what is still owed on each &mdash; the balance outstanding at the start of the viewed month and how many payments remain, counting that month. Settled loans drop off the card.</p>
-    <span class="info-build">Budget build: v45</span>
+    <span class="info-build">Budget build: v46</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -818,6 +838,33 @@
   function esc(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // Manual refresh: re-runs load() in place. initNav() is guarded by navReady and the view state
+  // (viewY / viewM / viewMode) lives outside load(), so the month and Monthly/Annual toggle are
+  // kept — unlike a browser reload, which drops the shell back to Overview.
+  let _refreshing = false;
+  async function refreshNow() {
+    if (_refreshing) return;
+    _refreshing = true;
+    const btn = document.getElementById('refreshBtn');
+    const note = document.getElementById('refreshNote');
+    btn.classList.add('spin'); btn.disabled = true;
+    note.classList.remove('show'); note.textContent = '';
+    try {
+      await load();
+      const t = new Date();
+      note.textContent = 'Updated ' + ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2);
+      note.classList.add('show');
+      clearTimeout(refreshNow._t);
+      refreshNow._t = setTimeout(() => note.classList.remove('show'), 4000);
+    } catch (e) {
+      note.textContent = 'Refresh failed';
+      note.classList.add('show');
+    } finally {
+      btn.classList.remove('spin'); btn.disabled = false;
+      _refreshing = false;
+    }
   }
 
   window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });

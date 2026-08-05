@@ -49,7 +49,7 @@
 </head>
 <body>
   <h1>Fuel Costs</h1>
-  <p class="note">The fuel rate used to cost every mile you plan, and the standing weekly driving that applies to all 52 weeks. Fuel used to live inside Holiday Costs; it is now its own cost, so commuting and everyday driving can be planned too. Feeds the Weekly Plan, the Budget credit card, Bills and the retirement model. <span style="color:#94a3b8;">(fuel costs build: v1)</span></p>
+  <p class="note">The fuel rate used to cost every mile you plan, and the standing weekly driving that applies to all 52 weeks. Fuel used to live inside Holiday Costs; it is now its own cost, so commuting and everyday driving can be planned too. Feeds the Weekly Plan, the Budget credit card, Bills and the retirement model. <span style="color:#94a3b8;">(fuel costs build: v2)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div class="panel" id="ratePanel" style="display:none;">
@@ -253,7 +253,9 @@
     } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
   }
 
-  function notify() { try { parent.postMessage('data-changed', '*'); } catch (e) {} }
+  // Must be 'data-saved' — that is what the app shell listens for. It then re-pulls the dashboard
+  // and relays 'refresh-data' to every open framed page, so Budget/Bills pick the change up.
+  function notify() { try { parent.postMessage('data-saved', '*'); } catch (e) {} }
 
   window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
   App.requireLogin(load, { title: 'Fuel Costs' });
