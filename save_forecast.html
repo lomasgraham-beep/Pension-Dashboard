@@ -247,7 +247,7 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, incAmts, otherInc, bankAccts, mealCost, diningRota, holidayPlan, holidayCost, holidaySettings, params, contribs, catRows, contribSchedule, gifts] = await Promise.all([
+      const [members, bills, incAmts, otherInc, bankAccts, mealCost, diningRota, holidayPlan, holidayCost, holidaySettings, params, contribs, catRows, contribSchedule, gifts, fuelSettings, fuelLines] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_income_amounts?order=member_name.asc'),
@@ -262,7 +262,9 @@
         App.rest('bd_pension_contributions?select=member_name,pension_name,monthly_contribution,working_days,august_increase_pct,increase_month,paid_account'),
         App.rest('bd_bill_category?select=code,description'),
         App.rest('bd_contribution_schedule?order=effective_from.asc'),
-        App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc')
+        App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc'),
+        App.rest('bd_fuel_settings?id=eq.1'),
+        App.rest('bd_fuel_line?phase=eq.retired&order=sort_order.asc')
       ]);
 
       const names = (members || []).map(m => m.name).filter(Boolean);
@@ -295,7 +297,21 @@
       const holPlanAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], holSettings), 'retired');
       // Budget basis: Plan (above) or Actual last-12-months + adjustment, per the saved choice.
       // Holiday keeps its even spread; dining keeps its rota month-shape, rescaled to the chosen annual.
-      const _eff = await App.resolveDiscretionary({ diningPlanAnnual: dinPlanAnnual, holidayPlanAnnual: holPlanAnnual });
+      // ---- fuel: real month shape from the weekly plan (weeks map to months, like dining) ----
+      const _fctx = App.fuelCtx((fuelSettings && fuelSettings[0]) || {});
+      const fuelMonth = new Array(12).fill(0);
+      for (let w = 1; w <= WEEKS; w++) fuelMonth[monthIndexForWeek(w)] += App.fuelWeekTotal(fuelLines || [], w, _fctx);
+      const _fSplit = App.fuelAnnual(fuelLines || [], _fctx);
+      const fuelPlanAnnual = _fSplit.total;
+      const _eff = await App.resolveDiscretionary({
+        diningPlanAnnual: dinPlanAnnual, holidayPlanAnnual: holPlanAnnual,
+        fuelWorkPlanAnnual: _fSplit.workAnnual, fuelDiscPlanAnnual: _fSplit.discAnnual
+      });
+      if (_eff.basis === 'actual') {
+        const _fEff = (Number(_eff.fuelWorkAnnual) || 0) + (Number(_eff.fuelAnnual) || 0);
+        if (fuelPlanAnnual > 0) { const _fsc = _fEff / fuelPlanAnnual; for (let m = 0; m < 12; m++) fuelMonth[m] *= _fsc; }
+        else { const _fflat = _fEff / 12; for (let m = 0; m < 12; m++) fuelMonth[m] = _fflat; }
+      }
       if (_eff.basis === 'actual') {
         if (dinPlanAnnual > 0) { const _sc = _eff.diningAnnual / dinPlanAnnual; for (let m = 0; m < 12; m++) diningMonth[m] *= _sc; }
         else { const _flat = _eff.diningAnnual / 12; for (let m = 0; m < 12; m++) diningMonth[m] = _flat; }
@@ -405,7 +421,7 @@
       });
 
       DATA = { cols, acctHolder, acctBank, memberMonth, memberAcct, cardMonth, cardBills,
-               paypalMonth, paypalBills, diningMonth, holidayMonth, salaryByMemberDays, otherByMember,
+               paypalMonth, paypalBills, diningMonth, holidayMonth, fuelMonth, salaryByMemberDays, otherByMember,
                daysWithSalary, jointRetYear, salaryMonth, catMonth, catLabel, cardCat, paypalCat, pensRows, pensTierDays,
                schedule: contribSchedule || [], membersRaw: members || [], bankAcctsRaw: bankAccts || [], gifts: gifts || [] };
 
@@ -519,12 +535,13 @@
     const cols = d.cols.map(n => d.memberMonth[n][m] * cf + (gbo[n] || 0));
     const dining = d.diningMonth[m] * cf;
     const holiday = d.holidayMonth[m] * cf;
+    const fuel = d.fuelMonth[m] * cf;
     const card = d.cardMonth[m] * cf;
     const paypal = d.paypalMonth[m] * cf;
     const pension = pensionMonth(m);   // dated-schedule value in force for the month; flat, not inflation-scaled (matches Budget)
-    const total = cols.reduce((s, v) => s + v, 0) + dining + holiday + card + paypal + pension;
+    const total = cols.reduce((s, v) => s + v, 0) + dining + holiday + fuel + card + paypal + pension;
     const income = incCols.reduce((s, v) => s + v, 0);
-    return { incCols, cols, dining, holiday, card, paypal, pension, total, income, available: income - total };
+    return { incCols, cols, dining, holiday, fuel, card, paypal, pension, total, income, available: income - total };
   }
 
   // ---- month line chart: red = cost out, green = could save ----
@@ -720,6 +737,8 @@
              '<div class="drow"><span class="nm">From weekly rota <span class="dnote">(weeks in ' + MABBR[m] + ')</span></span><span class="vl">' + fmt(d.diningMonth[m] * f) + '</span></div></div>';
     cards += '<div class="dcard"><div class="dhead"><span>Holidays</span><span>' + fmt(d.holidayMonth[m] * f) + '</span></div>' +
              '<div class="drow"><span class="nm">Monthly set-aside <span class="dnote">(today-based)</span></span><span class="vl">' + fmt(d.holidayMonth[m] * f) + '</span></div></div>';
+    cards += '<div class="dcard"><div class="dhead"><span>Fuel</span><span>' + fmt(d.fuelMonth[m] * f) + '</span></div>' +
+             '<div class="drow"><span class="nm">Planned driving <span class="dnote">(from weekly plan)</span></span><span class="vl">' + fmt(d.fuelMonth[m] * f) + '</span></div></div>';
     cards += pensionCard(m);
     return cards;
   }
@@ -771,6 +790,7 @@
     Object.keys(d.paypalBills).forEach(bn => out.push({ key: 'p|' + bn, label: bn, grp: 'PayPal', val: d.paypalBills[bn][m] * f }));
     out.push({ key: 'dining', label: 'Dining', grp: 'Dining', val: d.diningMonth[m] * f });
     out.push({ key: 'holiday', label: 'Holidays', grp: 'Holidays', val: d.holidayMonth[m] * f });
+    out.push({ key: 'fuel', label: 'Fuel', grp: 'Fuel', val: d.fuelMonth[m] * f });
     activePensRows().forEach((r, i) => out.push({ key: 'pens|' + r.member + '|' + r.name + '|' + i, label: r.member + ' ' + r.name, grp: 'Pension', val: pensRowCost(r, m) }));
     return out;
   }

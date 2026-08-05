@@ -24,7 +24,6 @@
   td.wk { text-align:center; color:#64748b; }
   td.money { font-variant-numeric:tabular-nums; }
   td.accom { color:#0f766e; }
-  td.fuel  { color:#9a3412; }
   td.eat   { color:#166534; }
   td.inc   { color:#7c3aed; }
   td.total { font-weight:bold; color:#2c3e50; background:#f8fafc; font-variant-numeric:tabular-nums; }
@@ -45,7 +44,6 @@
     th.cat, td.cat { color:#f1f5f9 !important; }
     td.wk { color:#94a3b8 !important; }
     td.accom { color:#5eead4 !important; }
-    td.fuel  { color:#fdba74 !important; }
     td.eat   { color:#86efac !important; }
     td.inc   { color:#c4b5fd !important; }
     td.total { color:#f1f5f9 !important; background:#0f172a !important; }
@@ -60,7 +58,7 @@
 </head>
 <body>
   <h1>Holiday Summary <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(cost by type)</span></h1>
-  <p class="note">Every holiday week grouped by its type (Caravan / Hotel / Air B&amp;B / Other), showing accommodation, fuel, eating out and incidentals. Figures use the live Holiday Costs, Meal Costs and fuel settings and match the Holidays planner. <span style="color:#94a3b8;">(holiday summary build: v1)</span></p>
+  <p class="note">Every holiday week grouped by its type (Caravan / Hotel / Air B&amp;B / Other), showing accommodation, eating out and incidentals. Figures use the live Holiday Costs and Meal Costs and match the Weekly Plan. Fuel is no longer part of a holiday &mdash; it has its own Fuel Costs page and is planned week by week. <span style="color:#94a3b8;">(holiday summary build: v2)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div class="bar" id="bar" style="display:none;">
@@ -75,7 +73,6 @@
           <th class="cat">Type</th>
           <th>Weeks</th>
           <th>Accommodation</th>
-          <th>Fuel</th>
           <th>Eating out</th>
           <th>Incidentals</th>
           <th>Total</th>
@@ -93,7 +90,7 @@
   const PHASE = 'retired';
   const fmt = App.fmt;
 
-  function blank() { return { weeks: 0, accom: 0, fuel: 0, eat: 0, inc: 0, total: 0 }; }
+  function blank() { return { weeks: 0, accom: 0, eat: 0, inc: 0, total: 0 }; }
 
   async function load() {
     const status = document.getElementById('status');
@@ -131,7 +128,6 @@
       else { if (!uncat) uncat = blank(); bucket = uncat; }
       bucket.weeks += 1;
       bucket.accom += b.accom;
-      bucket.fuel += b.fuel;
       bucket.eat += b.eat;
       bucket.inc += b.incidentals;
       bucket.total += b.total;
@@ -151,7 +147,6 @@
         '<td class="cat">All types</td>' +
         '<td>' + grand.weeks + '</td>' +
         '<td class="money">' + fmt(grand.accom) + '</td>' +
-        '<td class="money">' + fmt(grand.fuel) + '</td>' +
         '<td class="money">' + fmt(grand.eat) + '</td>' +
         '<td class="money">' + fmt(grand.inc) + '</td>' +
         '<td class="total">' + fmt(grand.total) + '</td>' +
@@ -162,7 +157,7 @@
   }
 
   function addInto(dst, src) {
-    dst.weeks += src.weeks; dst.accom += src.accom; dst.fuel += src.fuel;
+    dst.weeks += src.weeks; dst.accom += src.accom;
     dst.eat += src.eat; dst.inc += src.inc; dst.total += src.total;
   }
 
@@ -173,7 +168,6 @@
       '<td class="cat">' + label + '</td>' +
       '<td class="wk">' + (a.weeks || 0) + '</td>' +
       '<td class="money accom">' + fmt(a.accom) + '</td>' +
-      '<td class="money fuel">' + fmt(a.fuel) + '</td>' +
       '<td class="money eat">' + fmt(a.eat) + '</td>' +
       '<td class="money inc">' + fmt(a.inc) + '</td>' +
       '<td class="total">' + fmt(a.total) + '</td>' +

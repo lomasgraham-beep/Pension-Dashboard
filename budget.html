@@ -321,7 +321,7 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, tiers, incAmts, otherInc, pensContribs, bankAccts, billCats, diningRota, mealCost, holidayPlan, holidayCost, holidaySettings, diningSettings, loansRaw, contribSchedule, gifts] = await Promise.all([
+      const [members, bills, tiers, incAmts, otherInc, pensContribs, bankAccts, billCats, diningRota, mealCost, holidayPlan, holidayCost, holidaySettings, diningSettings, loansRaw, contribSchedule, gifts, fuelSettings, fuelLines] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc'),
         App.rest('bd_working_tiers?order=from_date.asc'),
@@ -338,7 +338,9 @@
         App.rest('bd_dining_settings?id=eq.1'),
         App.rest('bd_loans?order=start_date.asc'),
         App.rest('bd_contribution_schedule?order=effective_from.asc'),
-        App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc')
+        App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc'),
+        App.rest('bd_fuel_settings?id=eq.1'),
+        App.rest('bd_fuel_line?phase=eq.retired&order=sort_order.asc')
       ]);
       const names = (members || []).map(m => m.name).filter(Boolean);
       if (!names.length) { status.textContent = 'No members found.'; return; }
@@ -349,9 +351,18 @@
       const holSettings = (holidaySettings && holidaySettings[0]) || {};
       const holidayPlanAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], holSettings), 'retired');
       // Budget basis: Plan (the figures above) or Actual last-12-months + adjustment, per the saved choice.
-      const _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual });
+      // Fuel (ann11 split): planned week by week on bd_fuel_line, no longer part of the holiday
+      // figure. Shown as annual ÷ 12 — the same smoothed treatment as holidays and dining.
+      const _fctx = App.fuelCtx((fuelSettings && fuelSettings[0]) || {});
+      const _fPlan = App.fuelAnnual(fuelLines || [], _fctx);
+      const _eff = await App.resolveDiscretionary({
+        diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual,
+        fuelWorkPlanAnnual: _fPlan.workAnnual, fuelDiscPlanAnnual: _fPlan.discAnnual
+      });
       const diningAnnual = _eff.diningAnnual, holidayAnnual = _eff.holidayAnnual;
       const holidayMonthly = holidayAnnual / 12;
+      const fuelAnnualTotal = (Number(_eff.fuelWorkAnnual) || 0) + (Number(_eff.fuelAnnual) || 0);
+      const fuelMonthly = fuelAnnualTotal / 12;
       let holidayFundingAcct = null;
       const potId = holSettings.savings_account ? String(holSettings.savings_account).trim() : '';
       if (potId) {
@@ -369,7 +380,7 @@
         diningFundingAcct = (dPotAcct && dPotAcct.funded_from != null && String(dPotAcct.funded_from).trim() !== '')
           ? String(dPotAcct.funded_from).trim() : dPotId;   // funding account, or the pot itself if not funded-from
       }
-      DATA = { names, members: members || [], gifts: gifts || [], bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct, diningMonthly: diningMonthly, diningFundingAcct: diningFundingAcct, holidayPotId: potId, diningPotId: dPotId, loans: prepLoans(loansRaw), schedule: contribSchedule || [] };
+      DATA = { names, members: members || [], gifts: gifts || [], bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct, diningMonthly: diningMonthly, diningFundingAcct: diningFundingAcct, fuelMonthly: fuelMonthly, holidayPotId: potId, diningPotId: dPotId, loans: prepLoans(loansRaw), schedule: contribSchedule || [] };
       status.style.display = 'none';
       initNav();
       rebuild();
@@ -698,17 +709,20 @@
     const cardBills = (d.bills || []).filter(b => b.paid_by === 'Credit card');
     const match = re => cardBills.filter(b => re.test(b.bill_name || '') || re.test(b.category_code || ''));
     const grocB = match(/grocer/i);
-    const fuelB = match(/fuel|petrol|diesel/i);
+    // ann11: fuel is NO LONGER a household bill. It comes from the Weekly Plan via
+    // d.fuelMonthly (annual ÷ 12). The old /fuel|petrol|diesel/ bill match is deliberately gone —
+    // leaving it in place would double-count anyone who kept a stray fuel bill row.
     const hairNailsB = cardBills.filter(b =>
       /^julie$/i.test(String(b.category_code || '').trim()) && /hair|nail/i.test(b.bill_name || '')
     );
     const dogsB = cardBills.filter(b => /^dogs?$/i.test(String(b.category_code || '').trim()));
     const sum = (arr, fn) => arr.reduce((s, b) => s + fn(b), 0);
     const groc = sum(grocB, billView);
-    const fuel = sum(fuelB, billView);
+    const fuel = (Number(d.fuelMonthly) || 0) * periodScale() * inflFactor();
     const hairNails = sum(hairNailsB, billView);
     const dogs = sum(dogsB, billView);
-    const avg = sum(grocB, billViewAvg) + sum(fuelB, billViewAvg) + sum(hairNailsB, billViewAvg) + sum(dogsB, billViewAvg);
+    // fuel is already a smoothed annual ÷ 12, so its avg contribution equals its view figure
+    const avg = sum(grocB, billViewAvg) + fuel + sum(hairNailsB, billViewAvg) + sum(dogsB, billViewAvg);
     return { groc: groc, fuel: fuel, hairNails: hairNails, dogs: dogs, total: groc + fuel + hairNails + dogs, avg: avg };
   }
 

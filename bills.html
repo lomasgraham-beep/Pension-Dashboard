@@ -162,6 +162,8 @@
   const HOL_CAT = 'Holiday';   // existing category the derived holiday line sits under
   const DIN_CAT = 'Dining';    // label the derived dining line sits under
   let holAnnual = 0;           // live holiday-planner yearly total (display-only; NOT a saved bill)
+  const FUEL_CAT = 'Fuel';     // label the derived fuel line sits under
+  let fuelAnnual = 0;          // live Weekly Plan fuel total (display-only; NOT a saved bill)
   let dinAnnual = 0;           // live dining-rota yearly total (display-only; NOT a saved bill)
   const LOAN_CAT = 'Loans';    // label the derived loan lines sit under
   let loanRows = [];           // active loan payments (display-only; read from bd_loans, NEVER saved here)
@@ -347,6 +349,7 @@
     const set = new Set(rows.map(r => r.category_code).filter(c => c));
     if (dinAnnual > 0) set.add(DIN_CAT);   // derived lines are filterable even with no real bill in the category
     if (holAnnual > 0) set.add(HOL_CAT);
+    if (fuelAnnual > 0) set.add(FUEL_CAT);
     if (xmasAnnual > 0) set.add(XMAS_CAT);
     if (bdayAnnual > 0) set.add(BDAY_CAT);
     if (loanRows.length) set.add(LOAN_CAT);
@@ -421,6 +424,7 @@
       '</tr>';
   }
   function holidayInView(cat) { return holAnnual > 0 && (cat === 'All' || cat === HOL_CAT); }
+  function fuelInView(cat)    { return fuelAnnual > 0 && (cat === 'All' || cat === FUEL_CAT); }
   function diningInView(cat)  { return dinAnnual > 0 && (cat === 'All' || cat === DIN_CAT); }
   function pensionInView(cat) { return penAnnual > 0 && (cat === 'All' || cat === PEN_CAT); }
   function xmasInView(cat) { return xmasAnnual > 0 && (cat === 'All' || cat === XMAS_CAT); }
@@ -474,6 +478,7 @@
     let derived = '';
     if (diningInView(cat))  derived += derivedRowHtml('Dining', DIN_CAT, dinAnnual, 'from rota', 'Dining tab');
     if (holidayInView(cat)) derived += derivedRowHtml('Holidays', HOL_CAT, holAnnual, 'from planner', 'Holidays tab');
+    if (fuelInView(cat)) derived += derivedRowHtml('Fuel', FUEL_CAT, fuelAnnual, 'from weekly plan', 'Weekly Plan tab');
     if (pensionInView(cat)) derived += derivedRowHtml('Pensions', PEN_CAT, penAnnual, 'from contributions, current tier', 'Contributions tab');
     if (xmasInView(cat))    derived += derivedRowHtml('Xmas', XMAS_CAT, xmasAnnual, 'from gift savings', 'Gift Savings tab');
     if (bdayInView(cat))    derived += derivedRowHtml('Birthdays', BDAY_CAT, bdayAnnual, 'from gift savings', 'Gift Savings tab');
@@ -505,6 +510,7 @@
     const extras = [];
     if (diningInView(cat))  { total += dinAnnual; extras.push('dining'); }
     if (holidayInView(cat)) { total += holAnnual; extras.push('holidays'); }
+    if (fuelInView(cat)) { total += fuelAnnual; extras.push('fuel'); }
     if (pensionInView(cat)) { total += penAnnual; extras.push('pensions'); }
     if (xmasInView(cat))    { total += xmasAnnual; extras.push('xmas'); }
     if (bdayInView(cat))    { total += bdayAnnual; extras.push('birthdays'); }
@@ -586,12 +592,14 @@
       } catch (e) { xmasAnnual = 0; bdayAnnual = 0; }
       // Holiday planner & dining rota yearly totals — display-only lines; never written to bd_household_bills.
       try {
-        const [hPlan, hCost, hMeal, hSet, dRota] = await Promise.all([
+        const [hPlan, hCost, hMeal, hSet, dRota, fSet, fLines] = await Promise.all([
           App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
           App.rest('bd_holiday_cost'),
           App.rest('bd_meal_cost'),
           App.rest('bd_holiday_settings?id=eq.1'),
-          App.rest('bd_dining_rota')
+          App.rest('bd_dining_rota'),
+          App.rest('bd_fuel_settings?id=eq.1'),
+          App.rest('bd_fuel_line?phase=eq.retired&order=sort_order.asc')
         ]);
         const ctx = App.holidayCtx(hCost || [], hMeal || [], (hSet && hSet[0]) || {});
         const holPlanAnnual = App.holidayAnnual(hPlan || [], ctx, 'retired');
@@ -601,9 +609,16 @@
         const DAY_COLS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
         const dinPlanAnnual = (dRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
         // Budget basis: Plan (above) or Actual last-12-months + adjustment, per the saved choice.
-        const _eff = await App.resolveDiscretionary({ diningPlanAnnual: dinPlanAnnual, holidayPlanAnnual: holPlanAnnual });
+        // Fuel (ann11 split): its own derived line, planned on the Weekly Plan. No longer part of
+        // the holiday figure, and no longer a bd_household_bills row.
+        const fPlan = App.fuelAnnual(fLines || [], App.fuelCtx((fSet && fSet[0]) || {}));
+        const _eff = await App.resolveDiscretionary({
+          diningPlanAnnual: dinPlanAnnual, holidayPlanAnnual: holPlanAnnual,
+          fuelWorkPlanAnnual: fPlan.workAnnual, fuelDiscPlanAnnual: fPlan.discAnnual
+        });
         holAnnual = _eff.holidayAnnual; dinAnnual = _eff.diningAnnual;
-      } catch (e) { holAnnual = 0; dinAnnual = 0; }
+        fuelAnnual = (Number(_eff.fuelWorkAnnual) || 0) + (Number(_eff.fuelAnnual) || 0);
+      } catch (e) { holAnnual = 0; dinAnnual = 0; fuelAnnual = 0; }
       deleted = []; dirty = false; document.getElementById('unsaved').style.display = 'none';
       populateCatFilter(); render(); status.style.display = 'none';
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
