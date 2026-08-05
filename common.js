@@ -49,10 +49,14 @@
   function getHeaders() {
     return { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + (authToken || SUPABASE_KEY), "Content-Type": "application/json" };
   }
+  // cache:'no-store' is essential. Without it Safari happily serves a previously fetched GET for
+  // the same URL, so re-running a page's load() returns identical bytes and an in-page refresh
+  // appears to do nothing. Only a full browser reload broke through. PostgREST reads are cheap;
+  // always going to the network is the right trade.
   async function rest(path) {
     const url = SUPABASE_URL + "/rest/v1/" + path;
-    let r = await fetch(url, { headers: getHeaders() });
-    if (r.status === 401) { await refreshToken(); r = await fetch(url, { headers: getHeaders() }); }
+    let r = await fetch(url, { headers: getHeaders(), cache: 'no-store' });
+    if (r.status === 401) { await refreshToken(); r = await fetch(url, { headers: getHeaders(), cache: 'no-store' }); }
     if (!r.ok) throw new Error(path + " -> " + r.status);
     return r.json();
   }
@@ -293,6 +297,11 @@
   // rename of the category is picked up automatically; no code list is stored.
   const DISCRETIONARY_DEFAULT = { basis: 'plan', dining_adjust: 0, holiday_adjust: 0, fuel_adjust: 0 };
   let _discSettingsCache = null;
+
+  // Drops the session-lifetime caches so the next read goes to the database. Call before a manual
+  // in-page refresh: _discSettingsCache otherwise survives for the life of the tab, so a changed
+  // Plan/Actual basis or adjustment would never show up without a full reload.
+  function clearCaches() { _discSettingsCache = null; }
 
   async function loadDiscretionaryBasis(force) {
     if (_discSettingsCache && !force) return _discSettingsCache;
@@ -580,7 +589,7 @@
     HOLIDAY_MEALS: HOLIDAY_MEALS,
     fuelCtx: fuelCtx, fuelLineCost: fuelLineCost, fuelWeekLines: fuelWeekLines,
     fuelWeekBreakdown: fuelWeekBreakdown, fuelWeekTotal: fuelWeekTotal, fuelAnnual: fuelAnnual,
-    loadFuelForEngine: loadFuelForEngine,
+    loadFuelForEngine: loadFuelForEngine, clearCaches: clearCaches,
     FUEL_PURPOSES: FUEL_PURPOSES, FUEL_WORK: FUEL_WORK,
     loadDiscretionaryBasis: loadDiscretionaryBasis, saveDiscretionaryBasis: saveDiscretionaryBasis,
     actualDiscretionary12mo: actualDiscretionary12mo, resolveDiscretionary: resolveDiscretionary,
