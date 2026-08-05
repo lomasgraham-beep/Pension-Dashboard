@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fuel Costs</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=fuel1"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:720px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  h2 { color:#2c3e50; font-size:18px; margin:0 0 4px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
+  .sub { color:#64748b; font-size:13px; margin:0 0 12px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  table { border-collapse:collapse; width:100%; }
+  th, td { padding:10px 12px; border-bottom:1px solid #e2e8f0; text-align:left; }
+  th { background:#f8fafc; color:#475569; font-size:14px; }
+  input[type=number] { width:110px; padding:9px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; text-align:right; }
+  input[type=date] { padding:9px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; }
+  select { padding:9px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; background:#fff; min-width:150px; }
+  .btn { border:none; border-radius:8px; padding:12px 18px; font-size:15px; font-weight:bold; cursor:pointer; min-height:48px; background:#27ae60; color:#fff; }
+  .btn-add { background:#3498db; margin-top:12px; }
+  .btn-del { background:none; border:none; color:#c0392b; font-size:20px; cursor:pointer; padding:4px 8px; line-height:1; }
+  .fuel-grid { display:grid; grid-template-columns:auto 150px; gap:12px 16px; align-items:center; max-width:460px; }
+  .fuel-grid label { font-weight:bold; font-size:14px; color:#2c3e50; }
+  .fuel-note { color:#64748b; font-size:13px; margin:12px 0 0; line-height:1.5; }
+  .cost { font-weight:bold; color:#9a3412; white-space:nowrap; }
+  .tot-row td { background:#eef2f7; font-weight:bold; color:#2c3e50; }
+  .tow-cell { text-align:center; }
+  .empty { color:#94a3b8; font-style:italic; padding:14px 12px; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+  .msg { font-size:14px; font-weight:bold; margin-left:12px; }
+
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1, h2 { color:#f1f5f9 !important; } .note, .sub, .fuel-note { color:#94a3b8 !important; }
+    .panel { background:#1e293b !important; border-color:#334155 !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    .fuel-grid label { color:#e2e8f0 !important; }
+    input[type=number], input[type=date], select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    .cost { color:#fdba74 !important; }
+    .tot-row td { background:#162132 !important; color:#f1f5f9 !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Fuel Costs</h1>
+  <p class="note">The fuel rate used to cost every mile you plan, and the standing weekly driving that applies to all 52 weeks. Fuel used to live inside Holiday Costs; it is now its own cost, so commuting and everyday driving can be planned too. Feeds the Weekly Plan, the Budget credit card, Bills and the retirement model. <span style="color:#94a3b8;">(fuel costs build: v1)</span></p>
+  <div id="status">Loading&hellip;</div>
+
+  <div class="panel" id="ratePanel" style="display:none;">
+    <h2>Fuel rate</h2>
+    <p class="sub">Used to turn planned miles into pounds, everywhere in the app.</p>
+    <div class="fuel-grid">
+      <label for="ppl">Price per litre (£)</label>
+      <input type="number" step="0.01" min="0" id="ppl" onfocus="blankZero(this)">
+      <label for="mpgN">MPG &mdash; normal driving</label>
+      <input type="number" step="0.1" min="0" id="mpgN" onfocus="blankZero(this)">
+      <label for="mpgT">MPG &mdash; towing a caravan</label>
+      <input type="number" step="0.1" min="0" id="mpgT" onfocus="blankZero(this)">
+    </div>
+    <p class="fuel-note">Fuel = miles &divide; MPG = gallons, &times;&nbsp;4.546 = litres, &times;&nbsp;price per litre. Ticking <b>Towing</b> on any line switches it to the towing MPG. <span id="rateEg"></span></p>
+  </div>
+
+  <div class="panel" id="workPanel" style="display:none;">
+    <h2>Commuting</h2>
+    <p class="sub">Fuel for work is treated differently from the rest: it is a fixed cost that <b>stops</b> on a date rather than fading with age, and the spending slider does not touch it. Cutting back on luxuries does not shorten the commute.</p>
+    <div class="fuel-grid">
+      <label for="workEnds">Work fuel ends</label>
+      <input type="date" id="workEnds">
+    </div>
+    <p class="fuel-note">Leave blank if commuting never stops in the model. <span id="workEg"></span></p>
+  </div>
+
+  <div class="panel" id="taperPanel" style="display:none;">
+    <h2>Age taper</h2>
+    <p class="sub">How discretionary driving &mdash; Holiday, Caravan and Out and about &mdash; reduces as you get older, as a multiplier on the older person's age. 1.0 means no reduction. Commuting is never tapered.</p>
+    <div class="fuel-grid">
+      <label for="t70">At age 70</label>
+      <input type="number" step="0.05" min="0" max="1" id="t70" onfocus="blankZero(this)">
+      <label for="t80">At age 80</label>
+      <input type="number" step="0.05" min="0" max="1" id="t80" onfocus="blankZero(this)">
+      <label for="t90">At age 90</label>
+      <input type="number" step="0.05" min="0" max="1" id="t90" onfocus="blankZero(this)">
+    </div>
+  </div>
+
+  <div class="panel" id="standingPanel" style="display:none;">
+    <h2>Standing weekly driving</h2>
+    <p class="sub">Driving you do <b>every week</b>, keyed once here instead of 52 times. Each line appears in every week on the Weekly Plan, greyed out. Change or delete it in a single week there and that week alone detaches &mdash; useful for zeroing the commute in a week you were away.</p>
+    <table id="standTable">
+      <thead><tr><th>Purpose</th><th>Miles / week</th><th class="tow-cell">Towing</th><th>Cost / week</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <button class="btn btn-add" onclick="addLine()">Add a standing line</button>
+  </div>
+
+  <div class="panel" id="savePanel" style="display:none;">
+    <button class="btn" onclick="saveAll()">Save changes</button>
+    <span class="msg" id="msg"></span>
+  </div>
+
+<script>
+  const PHASE = 'retired';
+  let settings = null;     // bd_fuel_settings single row
+  let standing = [];       // bd_fuel_line rows with week_no IS NULL
+  let deleted = [];        // ids to remove on save
+  let ctx = null;
+
+  const fmt = n => App.fmt(n || 0);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // Standing rule: data-entry fields blank on focus so a new value can be typed straight in.
+  function blankZero(el) { if (Number(el.value) === 0) el.value = ''; }
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      const [sRows, lRows] = await Promise.all([
+        App.rest('bd_fuel_settings?id=eq.1'),
+        App.rest('bd_fuel_line?week_no=is.null&order=sort_order.asc')
+      ]);
+      settings = (sRows && sRows[0]) || { id: 1, price_per_litre: 1.63, mpg_normal: 40, mpg_towing: 27, taper_at_70: 1, taper_at_80: 1, taper_at_90: 1, work_ends_on: null };
+      standing = (lRows || []).filter(l => (l.phase || 'retired') === PHASE);
+      deleted = [];
+      ['ratePanel', 'workPanel', 'taperPanel', 'standingPanel', 'savePanel'].forEach(id => document.getElementById(id).style.display = 'block');
+      status.style.display = 'none';
+      fillSettings();
+      render();
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  function fillSettings() {
+    const v = (id, val, dflt) => { document.getElementById(id).value = (val != null ? val : dflt); };
+    v('ppl', settings.price_per_litre, 1.63);
+    v('mpgN', settings.mpg_normal, 40);
+    v('mpgT', settings.mpg_towing, 27);
+    v('t70', settings.taper_at_70, 1);
+    v('t80', settings.taper_at_80, 1);
+    v('t90', settings.taper_at_90, 1);
+    document.getElementById('workEnds').value = settings.work_ends_on ? String(settings.work_ends_on).slice(0, 10) : '';
+    ['ppl', 'mpgN', 'mpgT'].forEach(id => document.getElementById(id).addEventListener('input', render));
+    document.getElementById('workEnds').addEventListener('change', updateWorkEg);
+  }
+
+  // Live context straight from the boxes, so the examples and costs track as you type.
+  function liveCtx() {
+    return App.fuelCtx({
+      price_per_litre: parseFloat(document.getElementById('ppl').value) || 0,
+      mpg_normal: parseFloat(document.getElementById('mpgN').value) || 0,
+      mpg_towing: parseFloat(document.getElementById('mpgT').value) || 0
+    });
+  }
+
+  function purposeOptions(sel) {
+    return App.FUEL_PURPOSES.map(p => '<option value="' + p + '"' + (sel === p ? ' selected' : '') + '>' + p + '</option>').join('');
+  }
+
+  function render() {
+    ctx = liveCtx();
+    const tb = document.querySelector('#standTable tbody');
+    if (!standing.length) {
+      tb.innerHTML = '<tr><td colspan="5" class="empty">No standing lines. Add one for your commute, or leave empty and key driving week by week.</td></tr>';
+    } else {
+      tb.innerHTML = standing.map((l, i) =>
+        '<tr>' +
+          '<td><select onchange="onField(' + i + ',\'purpose\',this.value)">' + purposeOptions(l.purpose) + '</select></td>' +
+          '<td><input type="number" step="1" min="0" value="' + (Number(l.miles) || 0) + '" onfocus="blankZero(this)" oninput="onField(' + i + ',\'miles\',this.value)"></td>' +
+          '<td class="tow-cell"><input type="checkbox" ' + (l.towing ? 'checked' : '') + ' onchange="onField(' + i + ',\'towing\',this.checked)"></td>' +
+          '<td class="cost">' + fmt(App.fuelLineCost(l, ctx)) + '</td>' +
+          '<td><button class="btn-del" title="Remove" onclick="delLine(' + i + ')">&times;</button></td>' +
+        '</tr>').join('');
+      const wk = standing.reduce((s, l) => s + App.fuelLineCost(l, ctx), 0);
+      tb.innerHTML += '<tr class="tot-row"><td>Every week</td><td colspan="2"></td><td class="cost">' + fmt(wk) + '</td><td></td></tr>' +
+        '<tr class="tot-row"><td>&times; 52 weeks</td><td colspan="2"></td><td class="cost">' + fmt(wk * 52) + '</td><td></td></tr>';
+    }
+    updateRateEg();
+    updateWorkEg();
+  }
+
+  function updateRateEg() {
+    const c = m => App.fuelLineCost({ miles: m, towing: false }, ctx);
+    const t = m => App.fuelLineCost({ miles: m, towing: true }, ctx);
+    document.getElementById('rateEg').textContent =
+      'Example: 200 miles \u2248 ' + fmt(c(200)) + ' normal, ' + fmt(t(200)) + ' towing.';
+  }
+
+  function updateWorkEg() {
+    const d = document.getElementById('workEnds').value;
+    const el = document.getElementById('workEg');
+    if (!d) { el.textContent = 'Commuting currently runs for the whole projection.'; return; }
+    const dt = App.parseLocalDate(d);
+    el.textContent = dt ? 'Commuting fuel drops to zero from ' +
+      dt.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) + '.' : '';
+  }
+
+  function onField(i, field, value) {
+    const l = standing[i]; if (!l) return;
+    if (field === 'towing') l.towing = !!value;
+    else if (field === 'miles') l.miles = Number(value) || 0;
+    else l[field] = value;
+    l._dirty = true;
+    render();
+  }
+
+  function addLine() {
+    standing.push({ id: null, phase: PHASE, week_no: null, purpose: 'Work', miles: 0, towing: false, sort_order: standing.length, _dirty: true });
+    render();
+  }
+
+  function delLine(i) {
+    const l = standing[i]; if (!l) return;
+    if (l.id != null && !confirm('Remove this standing line? Any week that overrode it keeps its own line.')) return;
+    if (l.id != null) deleted.push(l.id);
+    standing.splice(i, 1);
+    render();
+  }
+
+  async function saveAll() {
+    const msg = document.getElementById('msg');
+    msg.style.color = '#1e3a8a'; msg.textContent = 'Saving\u2026';
+    try {
+      const sPayload = {
+        price_per_litre: Math.round((parseFloat(document.getElementById('ppl').value) || 0) * 100) / 100,
+        mpg_normal: parseFloat(document.getElementById('mpgN').value) || 0,
+        mpg_towing: parseFloat(document.getElementById('mpgT').value) || 0,
+        taper_at_70: parseFloat(document.getElementById('t70').value) || 1,
+        taper_at_80: parseFloat(document.getElementById('t80').value) || 1,
+        taper_at_90: parseFloat(document.getElementById('t90').value) || 1,
+        work_ends_on: document.getElementById('workEnds').value || null,
+        updated_at: new Date().toISOString()
+      };
+      await App.write('PATCH', 'bd_fuel_settings?id=eq.1', sPayload);
+      settings = Object.assign({}, settings, sPayload);
+
+      for (const id of deleted) await App.write('DELETE', 'bd_fuel_line?id=eq.' + id, undefined);
+      deleted = [];
+
+      for (let i = 0; i < standing.length; i++) {
+        const l = standing[i];
+        const payload = { phase: PHASE, week_no: null, purpose: l.purpose, miles: Number(l.miles) || 0, towing: !!l.towing, sort_order: i };
+        if (l.id == null) await App.write('POST', 'bd_fuel_line', payload);
+        else if (l._dirty || l.sort_order !== i) await App.write('PATCH', 'bd_fuel_line?id=eq.' + l.id, payload);
+        l._dirty = false;
+      }
+      msg.style.color = '#065f46'; msg.textContent = '\u2713 Saved. Reopen the dashboard to update projections.';
+      await load();
+      notify();
+    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
+  }
+
+  function notify() { try { parent.postMessage('data-changed', '*'); } catch (e) {} }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  App.requireLogin(load, { title: 'Fuel Costs' });
+</script>
+
+<script>
+/* deploy stamp (this page does not load the engine). */
+(function () {
+  var TAG = 'fuel v1';
+  function go() {
+    var s = document.createElement('div');
+    s.style.cssText = 'text-align:right;padding:2px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
+    s.textContent = TAG;
+    document.body.appendChild(s);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+})();
+</script>
+</body>
+</html>

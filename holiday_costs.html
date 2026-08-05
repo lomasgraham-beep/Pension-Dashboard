@@ -42,7 +42,7 @@
 </head>
 <body>
   <h1>Holiday Costs</h1>
-  <p class="note">Per-night accommodation prices by type and level, the fuel rate used to cost driving, and the savings pot that holidays are saved into. These feed the Holidays planner and the retirement model. <span style="color:#94a3b8;">(holiday costs build: v2)</span></p>
+  <p class="note">Per-night accommodation prices by type and level, and the savings pot that holidays are saved into. These feed the Weekly Plan and the retirement model. Fuel now has its own <b>Fuel Costs</b> page. <span style="color:#94a3b8;">(holiday costs build: v3)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div class="panel" id="costPanel" style="display:none;">
@@ -51,18 +51,9 @@
     <table id="costTable"><thead><tr><th>Type</th><th>Level</th><th>Price per night (£)</th></tr></thead><tbody></tbody></table>
   </div>
 
-  <div class="panel" id="fuelPanel" style="display:none;">
+  <div class="panel" id="fuelMoved" style="display:none;">
     <h2>Fuel</h2>
-    <p class="sub">Used to cost each holiday's driving from its round-trip miles.</p>
-    <div class="fuel-grid">
-      <label for="ppl">Price per litre (£)</label>
-      <input type="number" step="0.01" min="0" id="ppl">
-      <label for="mpgN">MPG &mdash; normal driving</label>
-      <input type="number" step="0.1" min="0" id="mpgN">
-      <label for="mpgT">MPG &mdash; towing a caravan</label>
-      <input type="number" step="0.1" min="0" id="mpgT">
-    </div>
-    <p class="fuel-note">Fuel per holiday = round-trip&nbsp;miles &divide; MPG = gallons, &times;&nbsp;4.546 = litres, &times;&nbsp;price per litre. Towing uses the towing MPG. <span id="fuelEg"></span></p>
+    <p class="sub">Fuel has moved to its own <b>Fuel Costs</b> page. Price per litre, MPG, standing weekly lines and the age taper live there, and fuel is now planned week by week on the Weekly Plan &mdash; it is no longer part of a holiday's cost.</p>
   </div>
 
   <div class="panel" id="potPanel" style="display:none;">
@@ -98,7 +89,7 @@
       settings = (sRows && sRows[0]) || { id: 1, price_per_litre: 1.63, mpg_normal: 40, mpg_towing: 27, savings_account: '' };
       accounts = aRows || [];
       status.style.display = 'none';
-      ['costPanel', 'fuelPanel', 'potPanel', 'savePanel'].forEach(id => document.getElementById(id).style.display = 'block');
+      ['costPanel', 'fuelMoved', 'potPanel', 'savePanel'].forEach(id => document.getElementById(id).style.display = 'block');
       render();
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
@@ -120,13 +111,6 @@
     });
     tb.innerHTML = html;
 
-    // fuel settings
-    document.getElementById('ppl').value = settings.price_per_litre != null ? settings.price_per_litre : 1.63;
-    document.getElementById('mpgN').value = settings.mpg_normal != null ? settings.mpg_normal : 40;
-    document.getElementById('mpgT').value = settings.mpg_towing != null ? settings.mpg_towing : 27;
-    ['ppl', 'mpgN', 'mpgT'].forEach(id => document.getElementById(id).addEventListener('input', updateEg));
-    updateEg();
-
     // savings pot dropdown — pots are accounts with funded_from set
     const sel = document.getElementById('potSel');
     const pots = accounts.filter(a => a.account_id && a.funded_from != null && String(a.funded_from).trim() !== '');
@@ -137,16 +121,6 @@
       opts += '<option value="' + a.account_id + '"' + (settings.savings_account === a.account_id ? ' selected' : '') + '>' + esc(lbl) + '</option>';
     });
     sel.innerHTML = opts;
-  }
-
-  function updateEg() {
-    const ppl = parseFloat(document.getElementById('ppl').value) || 0;
-    const mpgN = parseFloat(document.getElementById('mpgN').value) || 0;
-    const mpgT = parseFloat(document.getElementById('mpgT').value) || 0;
-    function cost(miles, mpg) { return (mpg > 0 && ppl > 0) ? (miles / mpg) * 4.54609 * ppl : 0; }
-    const eg = document.getElementById('fuelEg');
-    eg.textContent = 'Example: 200 round-trip miles \u2248 ' + App.fmt(cost(200, mpgN)) +
-      ' normal, ' + App.fmt(cost(200, mpgT)) + ' towing.';
   }
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -169,9 +143,6 @@
       // settings
       const potVal = document.getElementById('potSel').value || null;
       const payload = {
-        price_per_litre: Math.round((parseFloat(document.getElementById('ppl').value) || 0) * 100) / 100,
-        mpg_normal: parseFloat(document.getElementById('mpgN').value) || 0,
-        mpg_towing: parseFloat(document.getElementById('mpgT').value) || 0,
         savings_account: potVal
       };
       await App.write('PATCH', 'bd_holiday_settings?id=eq.1', payload);

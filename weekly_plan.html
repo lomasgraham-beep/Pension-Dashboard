@@ -36,6 +36,7 @@
   .pill { display:inline-block; margin-left:8px; padding:1px 8px; border-radius:999px; font-size:11px; font-weight:700; letter-spacing:0.02em; vertical-align:middle; }
   .pill-din { background:#17b5c4; color:#08333a; border:1px solid #0e8a97; }
   .pill-hol { background:#f59e0b; color:#3a2500; border:1px solid #b26f06; }
+  .pill-fuel { background:#8b5cf6; color:#f5f3ff; border:1px solid #6d28d9; }
 
   .panels { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px; align-items:start; }
   .panel { min-width:0; }
@@ -44,6 +45,19 @@
   .panel-title .dot { width:10px; height:10px; border-radius:3px; display:inline-block; }
   .dot-din { background:#17b5c4; }
   .dot-hol { background:#f59e0b; }
+  .dot-fuel { background:#8b5cf6; }
+  .fuel-tbl { width:100%; border-collapse:collapse; margin-top:4px; }
+  .fuel-tbl th { background:#f8fafc; color:#475569; font-size:12px; text-align:left; padding:6px 8px; border-bottom:1px solid #e2e8f0; font-weight:bold; }
+  .fuel-tbl td { padding:6px 8px; border-bottom:1px solid #eef2f7; font-size:14px; vertical-align:middle; }
+  .fuel-tbl input[type=number] { width:78px; padding:7px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px; text-align:right; }
+  .fuel-tbl select { padding:7px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px; background:#fff; min-width:120px; }
+  .fuel-tbl tr.inh td { background:#fafbfc; color:#94a3b8; }
+  .fuel-tbl tr.inh select, .fuel-tbl tr.inh input[type=number] { color:#64748b; border-style:dashed; }
+  .inh-tag { font-size:10px; font-weight:bold; color:#8b5cf6; border:1px solid #ddd6fe; background:#f5f3ff; border-radius:4px; padding:1px 5px; margin-left:6px; text-transform:uppercase; letter-spacing:.03em; }
+  .fcost { font-weight:bold; color:#9a3412; white-space:nowrap; }
+  .btn-fdel { background:#fdecea; color:#c0392b; border:1px solid #f5c6c2; border-radius:6px; padding:6px 10px; font-size:13px; font-weight:bold; cursor:pointer; min-height:38px; }
+  .btn-faddl { background:#3498db; color:#fff; border:none; border-radius:8px; padding:9px 14px; font-size:14px; font-weight:bold; cursor:pointer; min-height:42px; margin-top:10px; }
+  .fuel-hint { font-size:12px; color:#94a3b8; margin:8px 0 0; line-height:1.5; }
   .panel-tot { font-size:13px; color:#64748b; margin-top:8px; }
   .panel-tot b { color:#2c3e50; }
 
@@ -137,6 +151,15 @@
     .wktot { color:#f1f5f9 !important; }
     .pill-din { background:#0e7490 !important; color:#e0f7fb !important; border-color:#22d3ee !important; }
     .pill-hol { background:#b45309 !important; color:#fde9c8 !important; border-color:#f59e0b !important; }
+    .pill-fuel { background:#5b21b6 !important; color:#ede9fe !important; border-color:#8b5cf6 !important; }
+    .fuel-tbl th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    .fuel-tbl td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    .fuel-tbl tr.inh td { background:#18233a !important; color:#7c8ba1 !important; }
+    .fuel-tbl input[type=number], .fuel-tbl select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    .inh-tag { background:#2e1065 !important; color:#c4b5fd !important; border-color:#6d28d9 !important; }
+    .fcost { color:#fdba74 !important; }
+    .btn-fdel { background:#3b1d1d !important; color:#fca5a5 !important; border-color:#7f1d1d !important; }
+    .fuel-hint { color:#7c8ba1 !important; }
     .panel + .panel { border-left-color:#334155 !important; }
     .panel-title { color:#f1f5f9 !important; }
     .panel-tot { color:#94a3b8 !important; } .panel-tot b { color:#f1f5f9 !important; }
@@ -230,6 +253,13 @@
             <td><input type="number" id="holAdj" step="10" value="0" inputmode="numeric" onfocus="adjBlank(this)" onblur="adjRestore(this)" oninput="renderBasis()"></td>
             <td id="bHolAfter" class="bc-after">&pound;0</td>
           </tr>
+          <tr>
+            <td class="bc-cat"><span class="dot dot-fuel"></span>Fuel</td>
+            <td id="bFuel12">&pound;0</td>
+            <td id="bFuelAvg">&pound;0</td>
+            <td><input type="number" id="fuelAdj" step="10" value="0" inputmode="numeric" onfocus="adjBlank(this)" onblur="adjRestore(this)" oninput="renderBasis()"></td>
+            <td id="bFuelAfter" class="bc-after">&pound;0</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -288,9 +318,17 @@
   let holidayPot = '';    // default pot from holiday settings
   let dirtyDin = {};      // dining rota id -> true
   let dirtyHol = {};      // holiday plan id -> true
+  // ---- fuel (ann11 split) ----
+  // fuelLines holds EVERY bd_fuel_line row: standing rows (week_no null, applying to all 52 weeks)
+  // and week rows. A week row carrying standing_id detaches that standing line for its week only.
+  let fuelLines = [];     // bd_fuel_line rows
+  let fuelSet = null;     // bd_fuel_settings
+  let fctx = null;        // fuel cost context
+  let delFuel = [];       // ids removed this session
+  let tmpFuelId = -1;     // negative ids for unsaved rows
   const collapsed = {};   // week_no -> true(collapsed); default collapsed
-  let discSettings = { basis: 'plan', dining_adjust: 0, holiday_adjust: 0 }; // bd_discretionary_basis
-  let discActual = { diningTotal: 0, holidayTotal: 0, endMonth: null, months: 12 }; // trailing-12mo actuals
+  let discSettings = { basis: 'plan', dining_adjust: 0, holiday_adjust: 0, fuel_adjust: 0 }; // bd_discretionary_basis
+  let discActual = { diningTotal: 0, holidayTotal: 0, fuelTotal: 0, endMonth: null, months: 12 }; // trailing-12mo actuals
   let curBasis = 'plan';  // live selection in the Budget basis panel
 
   function tnum(v, d) { return v != null && isFinite(Number(v)) ? Number(v) : d; }
@@ -308,13 +346,17 @@
   function renderBasis() {
     const din12 = discActual ? (Number(discActual.diningTotal) || 0) : 0;
     const hol12 = discActual ? (Number(discActual.holidayTotal) || 0) : 0;
-    const dinAvg = Math.round(din12 / 12), holAvg = Math.round(hol12 / 12);
+    const fuel12 = discActual ? (Number(discActual.fuelTotal) || 0) : 0;
+    const dinAvg = Math.round(din12 / 12), holAvg = Math.round(hol12 / 12), fuelAvg = Math.round(fuel12 / 12);
     const dAdj = Number(document.getElementById('dinAdj').value) || 0;
     const hAdj = Number(document.getElementById('holAdj').value) || 0;
+    const fAdj = Number(document.getElementById('fuelAdj').value) || 0;
     // Round each monthly figure to whole pounds (matching the display) so after × 12 = the model feed.
     const dinAfter = Math.max(0, Math.round(din12 / 12 + dAdj)), holAfter = Math.max(0, Math.round(hol12 / 12 + hAdj));
+    const fuelAfter = Math.max(0, Math.round(fuel12 / 12 + fAdj));
     setText('bDin12', fmt(din12)); setText('bDinAvg', fmt(dinAvg)); setText('bDinAfter', fmt(dinAfter));
     setText('bHol12', fmt(hol12)); setText('bHolAvg', fmt(holAvg)); setText('bHolAfter', fmt(holAfter));
+    setText('bFuel12', fmt(fuel12)); setText('bFuelAvg', fmt(fuelAvg)); setText('bFuelAfter', fmt(fuelAfter));
     setText('basisWin', discActual && discActual.endMonth ? '(12 months to ' + fmtMonth(discActual.endMonth) + ')' : '(no card data yet)');
     document.getElementById('optPlan').classList.toggle('on', curBasis !== 'actual');
     document.getElementById('optActual').classList.toggle('on', curBasis === 'actual');
@@ -323,10 +365,16 @@
     card.classList.toggle('mode-plan', curBasis !== 'actual');
     const planDin = rota.reduce((s, r) => s + rowTotal(r), 0);
     const planHol = plan.reduce((s, w) => s + App.holidayWeekTotal(w, ctx), 0);
-    setText('basisPlanRef', 'Plan year totals for reference \u2014 Dining ' + fmt(planDin) + ' \u00b7 Holidays ' + fmt(planHol) + '.');
+    const planFuel = fuelYearSplit();
+    setText('basisPlanRef', 'Plan year totals for reference \u2014 Dining ' + fmt(planDin) + ' \u00b7 Holidays ' + fmt(planHol) +
+      ' \u00b7 Fuel ' + fmt(planFuel.total) + ' (work ' + fmt(planFuel.work) + ', other ' + fmt(planFuel.disc) + ').');
     const feedDin = (curBasis === 'actual') ? dinAfter * 12 : planDin;
     const feedHol = (curBasis === 'actual') ? holAfter * 12 : planHol;
-    setText('basisFeed', 'Feeding the model (' + (curBasis === 'actual' ? 'Actual' : 'Plan') + '): Dining ' + fmt(feedDin) + '/yr \u00b7 Holidays ' + fmt(feedHol) + '/yr');
+    // On Actual, the single card figure is apportioned by the plan's work:other ratio — the card
+    // cannot tell commuting from leisure driving, but the engine needs the split.
+    const feedFuel = (curBasis === 'actual') ? fuelAfter * 12 : planFuel.total;
+    setText('basisFeed', 'Feeding the model (' + (curBasis === 'actual' ? 'Actual' : 'Plan') + '): Dining ' + fmt(feedDin) +
+      '/yr \u00b7 Holidays ' + fmt(feedHol) + '/yr \u00b7 Fuel ' + fmt(feedFuel) + '/yr');
   }
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function setText(id, t) { const el = document.getElementById(id); if (el) el.textContent = t; }
@@ -345,7 +393,7 @@
     try {
       const _cut = new Date(); _cut.setDate(_cut.getDate() - 400);
       const cutoff = _cut.getFullYear() + '-' + ('0' + (_cut.getMonth() + 1)).slice(-2) + '-' + ('0' + _cut.getDate()).slice(-2);
-      const [rotaRows, costRows, planRows, holCostRows, mealRows, dsRows, hsRows, aRows, catRows, cardTxns, discRow] = await Promise.all([
+      const [rotaRows, costRows, planRows, holCostRows, mealRows, dsRows, hsRows, aRows, catRows, cardTxns, discRow, fsRows, flRows] = await Promise.all([
         App.rest('bd_dining_rota?order=week_no.asc,meal_type.asc'),
         App.rest('bd_meal_cost'),
         App.rest('bd_holiday_plan?phase=eq.' + PHASE + '&order=week_no.asc'),
@@ -356,7 +404,9 @@
         App.rest('bd_bank_account?order=bank_name.asc,account_id.asc'),
         App.rest('bd_bill_category?select=code,description'),
         App.rest('bd_card_txn?select=txn_date,amount,category_code&txn_date=gte.' + cutoff + '&order=txn_date.desc&limit=5000'),
-        App.loadDiscretionaryBasis()
+        App.loadDiscretionaryBasis(),
+        App.rest('bd_fuel_settings?id=eq.1'),
+        App.rest('bd_fuel_line?phase=eq.' + PHASE + '&order=sort_order.asc')
       ]);
       rota = rotaRows || [];
       costMap = {};
@@ -366,6 +416,10 @@
       settingsDin = (dsRows && dsRows[0]) || {};
       settingsHol = (hsRows && hsRows[0]) || {};
       ctx = App.holidayCtx(holCostRows || [], mealRows || [], settingsHol);
+      fuelSet = (fsRows && fsRows[0]) || {};
+      fctx = App.fuelCtx(fuelSet);
+      fuelLines = (flRows || []).slice();
+      delFuel = []; tmpFuelId = -1;
       accounts = aRows || [];
       holidayPot = (settingsHol.savings_account != null && String(settingsHol.savings_account).trim() !== '') ? String(settingsHol.savings_account).trim() : '';
       document.getElementById('dtap70').value = tnum(settingsDin.taper_at_70, 1);
@@ -375,11 +429,12 @@
       document.getElementById('htap80').value = tnum(settingsHol.taper_at_80, 1);
       document.getElementById('htap90').value = tnum(settingsHol.taper_at_90, 1);
       renderPot();
-      discSettings = discRow || { basis: 'plan', dining_adjust: 0, holiday_adjust: 0 };
+      discSettings = discRow || { basis: 'plan', dining_adjust: 0, holiday_adjust: 0, fuel_adjust: 0 };
       curBasis = (discSettings.basis === 'actual') ? 'actual' : 'plan';
       discActual = App.actualDiscretionary12mo(cardTxns || [], catRows || []);
       document.getElementById('dinAdj').value = Number(discSettings.dining_adjust) || 0;
       document.getElementById('holAdj').value = Number(discSettings.holiday_adjust) || 0;
+      document.getElementById('fuelAdj').value = Number(discSettings.fuel_adjust) || 0;
       dirtyDin = {}; dirtyHol = {};
       status.style.display = 'none';
       document.getElementById('taperCard').style.display = 'block';
@@ -403,7 +458,7 @@
   function holidayHas(w) {
     if (!w) return false;
     if (w.category && String(w.category).trim() !== '') return true;
-    if (Number(w.nights) > 0 || Number(w.miles) > 0 || Number(w.incidentals) > 0) return true;
+    if (Number(w.nights) > 0 || Number(w.incidentals) > 0) return true;
     if (w.label && String(w.label).trim() !== '') return true;
     return MEALS.some(m => (w.eating_out[m] || []).some(v => v && String(v).trim() !== ''));
   }
@@ -433,6 +488,131 @@
       body += '<tr>' + cells + '</tr>';
     });
     return '<table class="eat"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+  }
+
+  // ---- fuel helpers ----
+  // The rows that apply to one week: standing lines this week has NOT detached, then the week's own.
+  // Returns wrappers so handlers can mutate the underlying object in fuelLines.
+  function weekFuelRows(no) {
+    const detached = {};
+    fuelLines.forEach(l => { if (l.week_no != null && Number(l.week_no) === no && l.standing_id != null) detached[l.standing_id] = true; });
+    const out = [];
+    fuelLines.forEach(l => { if (l.week_no == null && !detached[l.id]) out.push({ ref: l, inherited: true }); });
+    fuelLines.forEach(l => { if (l.week_no != null && Number(l.week_no) === no) out.push({ ref: l, inherited: false }); });
+    return out;
+  }
+  function fuelWeekSplit(no) {
+    let work = 0, disc = 0;
+    weekFuelRows(no).forEach(r => {
+      const c = App.fuelLineCost(r.ref, fctx);
+      if (r.ref.purpose === 'Work') work += c; else disc += c;
+    });
+    return { work: work, disc: disc, total: work + disc };
+  }
+  function fuelWeekTotal(no) { return fuelWeekSplit(no).total; }
+  // Only flag weeks that carry their OWN fuel rows. Standing lines apply everywhere, so pilling
+  // all 52 weeks would say nothing — the pill means "this week differs from the standing plan".
+  function fuelHas(no) { return fuelLines.some(l => l.week_no != null && Number(l.week_no) === no); }
+  function fuelYearTotal() { let t = 0; for (let n = 1; n <= WEEKS; n++) t += fuelWeekTotal(n); return t; }
+  function fuelYearSplit() {
+    let work = 0, disc = 0;
+    for (let n = 1; n <= WEEKS; n++) { const b = fuelWeekSplit(n); work += b.work; disc += b.disc; }
+    return { work: work, disc: disc, total: work + disc };
+  }
+
+  function fuelPurposeOptions(sel) {
+    return (App.FUEL_PURPOSES || ['Work', 'Holiday', 'Caravan', 'Out and about'])
+      .map(x => '<option value="' + x + '"' + (sel === x ? ' selected' : '') + '>' + x + '</option>').join('');
+  }
+
+  // Editing an inherited line DETACHES it for this week: a real row is written carrying
+  // standing_id, seeded from the standing values, and the edit applied on top. Later changes to
+  // the standing definition then leave this week alone.
+  function fuelDetach(no, standingRef) {
+    const row = {
+      id: tmpFuelId--, phase: PHASE, week_no: no, purpose: standingRef.purpose,
+      miles: Number(standingRef.miles) || 0, towing: !!standingRef.towing,
+      standing_id: standingRef.id, sort_order: Number(standingRef.sort_order) || 0,
+      _new: true, _dirty: true
+    };
+    fuelLines.push(row);
+    return row;
+  }
+
+  function fuelOnField(no, idx, field, value) {
+    const rows = weekFuelRows(no); const r = rows[idx]; if (!r) return;
+    const target = r.inherited ? fuelDetach(no, r.ref) : r.ref;
+    if (field === 'towing') target.towing = !!value;
+    else if (field === 'miles') target.miles = Number(value) || 0;
+    else target[field] = value;
+    target._dirty = true;
+    renderFuelPanel(no);
+    updateWeekHead(no);
+    recalcGrand();
+  }
+
+  function fuelAddLine(no) {
+    fuelLines.push({ id: tmpFuelId--, phase: PHASE, week_no: no, purpose: 'Out and about',
+                     miles: 0, towing: false, standing_id: null,
+                     sort_order: weekFuelRows(no).length, _new: true, _dirty: true });
+    renderFuelPanel(no); updateWeekHead(no); recalcGrand();
+  }
+
+  // Removing an inherited line is also a detach — a zero-mile row that suppresses it for this week.
+  function fuelRemoveLine(no, idx) {
+    const rows = weekFuelRows(no); const r = rows[idx]; if (!r) return;
+    if (r.inherited) { const d = fuelDetach(no, r.ref); d.miles = 0; d._dirty = true; }
+    else {
+      if (r.ref.id > 0) delFuel.push(r.ref.id);
+      const i = fuelLines.indexOf(r.ref); if (i >= 0) fuelLines.splice(i, 1);
+    }
+    renderFuelPanel(no); updateWeekHead(no); recalcGrand();
+  }
+
+  // Drop every week-specific row so the week falls back to the standing lines.
+  function fuelResetWeek(no) {
+    if (!confirm('Reset week ' + no + ' fuel to the standing weekly lines?')) return;
+    fuelLines.filter(l => l.week_no != null && Number(l.week_no) === no).forEach(l => {
+      if (l.id > 0) delFuel.push(l.id);
+      const i = fuelLines.indexOf(l); if (i >= 0) fuelLines.splice(i, 1);
+    });
+    renderFuelPanel(no); updateWeekHead(no); recalcGrand();
+  }
+
+  function fuelRowsHtml(no) {
+    const rows = weekFuelRows(no);
+    if (!rows.length) return '<p class="fuel-hint">No fuel this week. Add a line, or set a standing weekly line on the Fuel Costs page.</p>';
+    const body = rows.map((r, i) =>
+      '<tr class="' + (r.inherited ? 'inh' : '') + '">' +
+        '<td><select onchange="fuelOnField(' + no + ',' + i + ',\'purpose\',this.value)">' + fuelPurposeOptions(r.ref.purpose) + '</select>' +
+          (r.inherited ? '<span class="inh-tag">standing</span>' : '') + '</td>' +
+        '<td><input type="number" step="1" min="0" value="' + (Number(r.ref.miles) || 0) + '" onfocus="holBlankZero(this)" onblur="holRestoreZero(this)" oninput="fuelOnField(' + no + ',' + i + ',\'miles\',this.value)"></td>' +
+        '<td><input type="checkbox" ' + (r.ref.towing ? 'checked' : '') + ' onchange="fuelOnField(' + no + ',' + i + ',\'towing\',this.checked)"></td>' +
+        '<td class="fcost">' + fmt(App.fuelLineCost(r.ref, fctx)) + '</td>' +
+        '<td><button class="btn-fdel" onclick="fuelRemoveLine(' + no + ',' + i + ')">' + (r.inherited ? 'Skip' : 'Remove') + '</button></td>' +
+      '</tr>').join('');
+    return '<table class="fuel-tbl"><thead><tr><th>Purpose</th><th>Miles</th><th>Tow</th><th>Cost</th><th></th></tr></thead><tbody>' + body + '</tbody></table>';
+  }
+
+  function fuelPanelInner(no) {
+    const b = fuelWeekSplit(no);
+    return '<div id="fuelrows_' + no + '">' + fuelRowsHtml(no) + '</div>' +
+      '<div class="panel-tot">Week fuel <b id="fwt_' + no + '">' + fmt(b.total) + '</b>' +
+        '<span class="fuel-hint" style="display:block;margin-top:2px;">Work ' + fmt(b.work) + ' &middot; Other ' + fmt(b.disc) + '</span></div>' +
+      '<button class="btn-faddl" onclick="fuelAddLine(' + no + ')">+ Add fuel line</button> ' +
+      '<button class="btn-clearwk" onclick="fuelResetWeek(' + no + ')">Reset to standing</button>' +
+      '<p class="fuel-hint">Greyed lines come from the standing weekly plan. Change or Skip one and this week keeps its own value \u2014 the other weeks are untouched.</p>';
+  }
+
+  function fuelPanel(no) {
+    return '<div class="panel">' +
+      '<div class="panel-title"><span class="dot dot-fuel"></span>Fuel</div>' +
+      '<div id="fuelpanel_' + no + '">' + fuelPanelInner(no) + '</div></div>';
+  }
+
+  function renderFuelPanel(no) {
+    const el = document.getElementById('fuelpanel_' + no);
+    if (el) el.innerHTML = fuelPanelInner(no);
   }
 
   // ---- panels ----
@@ -478,9 +658,6 @@
           '<div class="fld"><label>Trip name (optional)</label><input type="text" value="' + esc(w.label) + '" oninput="holOnField(' + w.id + ',\'label\',this.value)"></div>' +
         '</div>' +
         '<div class="row">' +
-          '<div class="fld"><label>Round-trip miles</label><input type="number" step="1" min="0" value="' + (w.miles != null ? w.miles : 0) + '" onfocus="holBlankZero(this)" onblur="holRestoreZero(this)" oninput="holOnField(' + w.id + ',\'miles\',this.value)"></div>' +
-          '<div class="fld tow"><input type="checkbox" ' + (w.towing ? 'checked' : '') + ' onchange="holOnField(' + w.id + ',\'towing\',this.checked)"><label>Towing caravan</label></div>' +
-          '<div class="fuelout" id="fuel_' + w.id + '"></div>' +
           '<div class="fld"><label>Incidentals \u00a3</label><input type="number" step="1" min="0" value="' + (w.incidentals != null ? w.incidentals : 0) + '" onfocus="holBlankZero(this)" onblur="holRestoreZero(this)" oninput="holOnField(' + w.id + ',\'incidentals\',this.value)"></div>' +
         '</div>' +
         '<div class="eat-title">Eating out</div>' +
@@ -499,6 +676,7 @@
     let p = '';
     if (diningHas(no)) p += '<span class="pill pill-din">Dining</span>';
     if (holidayHas(w)) p += '<span class="pill pill-hol">Holiday</span>';
+    if (fuelHas(no)) p += '<span class="pill pill-fuel">Fuel</span>';
     return p;
   }
 
@@ -508,7 +686,7 @@
     for (let no = 1; no <= WEEKS; no++) {
       const w = weekFor(no);
       const isC = collapsed[no] !== false;   // default collapsed
-      const combined = diningWeekTotal(no) + (w ? App.holidayWeekTotal(w, ctx) : 0);
+      const combined = diningWeekTotal(no) + (w ? App.holidayWeekTotal(w, ctx) : 0) + fuelWeekTotal(no);
       const lbl = (w && w.label) ? '<span class="label">' + esc(w.label) + '</span>' : '';
       html += '<div class="wk">' +
         '<div class="wk-head" onclick="toggle(' + no + ')">' +
@@ -517,7 +695,7 @@
           '<span class="wktot" id="wt_' + no + '">' + fmt(combined) + '</span>' +
         '</div>' +
         '<div class="wk-body" id="wkbody_' + no + '" style="display:' + (isC ? 'none' : 'block') + ';">' +
-          '<div class="panels">' + diningPanel(no) + holidayPanel(no, w) + '</div>' +
+          '<div class="panels">' + diningPanel(no) + holidayPanel(no, w) + fuelPanel(no) + '</div>' +
         '</div></div>';
     }
     document.getElementById('weeks').innerHTML = html;
@@ -527,10 +705,8 @@
 
   function refreshWeek(w) {
     const b = App.holidayWeekBreakdown(w, ctx);
-    const fuelEl = document.getElementById('fuel_' + w.id);
-    if (fuelEl) fuelEl.textContent = 'Fuel: ' + fmt(b.fuel);
     const brkEl = document.getElementById('brk_' + w.id);
-    if (brkEl) brkEl.innerHTML = 'Accom <b>' + fmt(b.accom) + '</b> &middot; Fuel <b>' + fmt(b.fuel) +
+    if (brkEl) brkEl.innerHTML = 'Accom <b>' + fmt(b.accom) +
       '</b> &middot; Incidentals <b>' + fmt(b.incidentals) + '</b> &middot; Eating out <b>' + fmt(b.eat) +
       '</b> &nbsp;=&nbsp; Holiday total <b>' + fmt(b.total) + '</b>';
     updateWeekHead(w.week_no);
@@ -540,8 +716,10 @@
     const w = weekFor(no);
     const dt = diningWeekTotal(no);
     const ht = w ? App.holidayWeekTotal(w, ctx) : 0;
+    const ft = fuelWeekTotal(no);
     setText('dwt_' + no, fmt(dt));
-    setText('wt_' + no, fmt(dt + ht));
+    setText('fwt_' + no, fmt(ft));
+    setText('wt_' + no, fmt(dt + ht + ft));
     const pills = document.getElementById('pills_' + no);
     if (pills) pills.innerHTML = headPills(no, w);
     updateStripCell(no);
@@ -550,6 +728,7 @@
   function recalcGrand() {
     let total = rota.reduce((s, r) => s + rowTotal(r), 0);
     total += plan.reduce((s, w) => s + App.holidayWeekTotal(w, ctx), 0);
+    total += fuelYearTotal();
     setText('grandTotal', fmt(total));
   }
 
@@ -657,8 +836,7 @@
       w.nights = n;
       MEALS.forEach(m => { const arr = w.eating_out[m] || []; if (arr.length > n) arr.length = n; while (arr.length < n) arr.push(''); w.eating_out[m] = arr; });
       const eatEl = document.getElementById('eat_' + id); if (eatEl) eatEl.innerHTML = eatGrid(w);
-    } else if (field === 'towing') { w.towing = !!value; }
-    else if (field === 'miles' || field === 'incidentals') { w[field] = Number(value) || 0; }
+    } else if (field === 'incidentals') { w[field] = Number(value) || 0; }
     else if (field === 'label') {
       w.label = value;
       const chev = document.getElementById('chev_' + w.week_no);
@@ -677,7 +855,7 @@
     refreshWeek(w);
     recalcGrand();
   }
-  function resetWeekObj(w) { w.label = null; w.category = null; w.level = null; w.nights = 0; w.miles = 0; w.towing = false; w.incidentals = 0; w.eating_out = {}; MEALS.forEach(m => { w.eating_out[m] = []; }); }
+  function resetWeekObj(w) { w.label = null; w.category = null; w.level = null; w.nights = 0; w.incidentals = 0; w.eating_out = {}; MEALS.forEach(m => { w.eating_out[m] = []; }); }
   function holClearWeek(id) {
     const w = plan.find(x => x.id === id); if (!w) return;
     if (!confirm('Clear all holiday data for Week ' + w.week_no + '? This will be permanent once you Save.')) return;
@@ -687,7 +865,7 @@
   }
   function holCopyWeekData(src, dst) {
     dst.label = src.label; dst.category = src.category; dst.level = src.level; dst.nights = src.nights;
-    dst.miles = src.miles; dst.towing = src.towing; dst.incidentals = src.incidentals;
+    dst.incidentals = src.incidentals;
     dst.eating_out = {}; MEALS.forEach(m => { dst.eating_out[m] = (src.eating_out[m] || []).slice(); });
   }
   function holCopyGridHtml(id) {
@@ -765,7 +943,8 @@
     const potVal = (document.getElementById('potSel').value || '').trim();
     const potChanged = potVal !== ownStored;
     const dinSettingsChanged = dinTaperChanged || potChanged;
-    if (!dinIds.length && !holIds.length && !dinSettingsChanged && !holTaperChanged) { setMsg('No changes to save.', '#64748b'); return; }
+    const fuelChanged = delFuel.length > 0 || fuelLines.some(l => l._dirty);
+    if (!dinIds.length && !holIds.length && !dinSettingsChanged && !holTaperChanged && !fuelChanged) { setMsg('No changes to save.', '#64748b'); return; }
     setMsg('Saving\u2026', '#1e3a8a');
     try {
       if (dinSettingsChanged) {
@@ -791,14 +970,31 @@
         MEALS.forEach(m => { const arr = (w.eating_out[m] || []).slice(0, n); while (arr.length < n) arr.push(''); grid[m] = arr; });
         const payload = {
           label: w.label || null, category: w.category || null, level: w.level || null,
-          nights: n, miles: Number(w.miles) || 0, towing: !!w.towing,
+          nights: n,
           incidentals: Number(w.incidentals) || 0, eating_out: grid
         };
         await App.write('PATCH', 'bd_holiday_plan?id=eq.' + id, payload);
       }
+      // fuel lines: deletes first, then inserts/updates
+      for (const id of delFuel) await App.write('DELETE', 'bd_fuel_line?id=eq.' + id, undefined);
+      delFuel = [];
+      for (const l of fuelLines) {
+        if (!l._dirty) continue;
+        const row = { phase: PHASE, week_no: l.week_no, purpose: l.purpose,
+                      miles: Number(l.miles) || 0, towing: !!l.towing,
+                      standing_id: l.standing_id != null ? l.standing_id : null,
+                      sort_order: Number(l.sort_order) || 0 };
+        if (l.id < 0) await App.write('POST', 'bd_fuel_line', row);
+        else await App.write('PATCH', 'bd_fuel_line?id=eq.' + l.id, row);
+      }
       dirtyDin = {}; dirtyHol = {};
+      fuelLines.forEach(l => { delete l._dirty; delete l._new; });
       setMsg('\u2713 Saved. Reopen the dashboard to update projections.', '#065f46');
       notify();
+      // Reload after a fuel save so newly inserted rows pick up their real ids — otherwise a
+      // second edit of an unsaved row (still holding its negative id) would insert a duplicate.
+      // `collapsed` is module-level, so the open/closed state of each week survives the reload.
+      if (fuelChanged) await load();
     } catch (e) { setMsg('Save failed: ' + e.message, '#c0392b'); }
   }
 
@@ -807,10 +1003,11 @@
     const msg = document.getElementById('basisMsg');
     const dAdj = Number(document.getElementById('dinAdj').value) || 0;
     const hAdj = Number(document.getElementById('holAdj').value) || 0;
+    const fAdj = Number(document.getElementById('fuelAdj').value) || 0;
     msg.style.color = '#1e3a8a'; msg.textContent = 'Saving\u2026';
     try {
-      await App.saveDiscretionaryBasis({ basis: curBasis, dining_adjust: dAdj, holiday_adjust: hAdj });
-      discSettings = { basis: curBasis, dining_adjust: dAdj, holiday_adjust: hAdj };
+      await App.saveDiscretionaryBasis({ basis: curBasis, dining_adjust: dAdj, holiday_adjust: hAdj, fuel_adjust: fAdj });
+      discSettings = { basis: curBasis, dining_adjust: dAdj, holiday_adjust: hAdj, fuel_adjust: fAdj };
       msg.style.color = '#065f46'; msg.textContent = '\u2713 Saved. Reopen the dashboard to update projections.';
       notify();
     } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
@@ -823,7 +1020,7 @@
 <script>
 /* LC-385: deploy stamp (this page does not load the engine). */
 (function () {
-  var TAG = 'weekly v4';
+  var TAG = 'weekly v5';
   function go() {
     var s = document.createElement('div');
     s.style.cssText = 'text-align:right;padding:2px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
