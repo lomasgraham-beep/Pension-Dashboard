@@ -112,7 +112,7 @@
 </head>
 <body>
   <h1>Card Entry</h1>
-  <p class="note">Import a CSV, read a screenshot, or key a line in by hand. Either way the saved transactions appear on the Card Statements page. <span class="mini">(card entry build: v7)</span></p>
+  <p class="note">Import a CSV, read a screenshot, or key a line in by hand. Either way the saved transactions appear on the Card Statements page. <span class="mini">(card entry build: v8)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="importPanel" class="panel" style="display:none;">
@@ -423,7 +423,7 @@
     let html = '<option value="">\u2014</option>';
     billCats.forEach(c => {
       const sel = c.code === selected ? ' selected' : '';
-      html += '<option value="' + escapeHtml(c.code) + '"' + sel + '>' + escapeHtml(c.description || c.code) + '</option>';
+      html += '<option value="' + escapeHtml(c.code) + '"' + sel + ' title="' + escapeHtml(c.description || '') + '">' + escapeHtml(c.code) + '</option>';
     });
     return html;
   }
@@ -666,7 +666,9 @@
         App.memberNames().catch(() => ({ all: [] }))
       ]);
       billCats = cats || [];
-      catByCode = {}; billCats.forEach(c => { catByCode[c.code] = c.description || c.code; });
+      // v8: card pages label categories by CODE, not description — codes are short, stable
+      // and fit the narrow pickers; descriptions are editable on Bill Categories.
+      catByCode = {}; billCats.forEach(c => { catByCode[c.code] = c.code; });
       resolveConcepts();
       existingHashes = new Set((hashes || []).map(t => t.dedupe_hash).filter(Boolean));
       merchantMap = {}; (mm || []).forEach(r => { merchantMap[r.match_text] = r.category_code; });

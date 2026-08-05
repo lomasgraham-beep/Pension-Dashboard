@@ -64,12 +64,19 @@
 </head>
 <body>
   <h1>Card Categories</h1>
-  <p class="note">How the Card Entry page chooses a category for each transaction: it uses what you&rsquo;ve taught it first, then these starter rules. Learned merchant keys are editable below. <span class="mini">(card categories build: v2)</span></p>
+  <p class="note">How the Card Entry page chooses a category for each transaction: it uses what you&rsquo;ve taught it first, then these starter rules. Learned merchant keys are editable below. <span class="mini">(card categories build: v3)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="matchPanel" class="panel" style="display:none;">
     <h2>Category matching</h2>
     <p class="hint">A starter rule only produces a suggestion if it resolves to one of your own categories. Anything marked in red won&rsquo;t auto-fill until you have a matching category or teach it yourself.</p>
+    <h3>Your category codes</h3>
+    <p class="hint">Card pages label a transaction by its <b>code</b>, because codes are short, stable and fit the pickers. Descriptions are edited on <b>Bill Categories</b> under Planned costs.</p>
+    <table id="codeTable">
+      <thead><tr><th class="l">Code</th><th class="l">Description</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
     <h3>Starter rules &rarr; your categories</h3>
     <table id="ruleTable">
       <thead><tr><th class="l">Spending type</th><th class="l">Resolves to</th><th class="l">Recognises</th></tr></thead>
@@ -110,6 +117,7 @@
   // ---------- state ----------
   let billCats = [];
   let catByCode = {};
+  let descByCode = {};
   let merchantMap = {};
   let txns = [];               // v2: id/description/category_code only, for match counts
 
@@ -143,7 +151,7 @@
     let html = '<option value="">\u2014</option>';
     billCats.forEach(c => {
       const sel = c.code === selected ? ' selected' : '';
-      html += '<option value="' + escapeHtml(c.code) + '"' + sel + '>' + escapeHtml(c.description || c.code) + '</option>';
+      html += '<option value="' + escapeHtml(c.code) + '"' + sel + ' title="' + escapeHtml(c.description || '') + '">' + escapeHtml(c.code) + '</option>';
     });
     return html;
   }
@@ -194,7 +202,10 @@
         App.rest('bd_card_txn?select=id,description,category_code')
       ]);
       billCats = cats || [];
-      catByCode = {}; billCats.forEach(c => { catByCode[c.code] = c.description || c.code; });
+      // v3: label categories by CODE, not description. The description is still shown
+      // beside the code in the starter-rule table so the mapping stays readable.
+      catByCode = {}; billCats.forEach(c => { catByCode[c.code] = c.code; });
+      descByCode = {}; billCats.forEach(c => { descByCode[c.code] = c.description || ''; });
       resolveConcepts();
       merchantMap = {}; (mm || []).forEach(r => { merchantMap[r.match_text] = r.category_code; });
       txns = tx || [];
@@ -209,10 +220,18 @@
 
   // ---------- render ----------
   function renderMatching() {
+    const cb = document.querySelector('#codeTable tbody');
+    cb.innerHTML = billCats.length
+      ? billCats.map(c => '<tr><td class="l"><strong>' + escapeHtml(c.code) + '</strong></td><td class="l">' +
+          escapeHtml(c.description || '\u2014') + '</td></tr>').join('')
+      : '<tr><td class="empty" colspan="2">No categories yet \u2014 add them on Bill Categories.</td></tr>';
+
     const rb = document.querySelector('#ruleTable tbody');
     rb.innerHTML = STARTER.map(rule => {
       const code = conceptCode[rule.concept];
-      const resolved = code ? escapeHtml(catByCode[code] || code) : '<span class="warn">no matching category</span>';
+      const resolved = code
+        ? '<strong>' + escapeHtml(code) + '</strong>' + (descByCode[code] ? ' <span class="mini">' + escapeHtml(descByCode[code]) + '</span>' : '')
+        : '<span class="warn">no matching category</span>';
       const sample = rule.needles.slice(0, 6).map(n => n.trim()).join(', ') + (rule.needles.length > 6 ? '\u2026' : '');
       return '<tr><td class="l">' + escapeHtml(rule.concept) + '</td><td class="l">' + resolved +
              '</td><td class="l mini">' + escapeHtml(sample) + '</td></tr>';

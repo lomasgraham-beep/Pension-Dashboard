@@ -60,7 +60,7 @@
 </head>
 <body>
   <h1>Card Statements</h1>
-  <p class="note">Saved card transactions, by month. Change a category or mark a row to delete, then press <strong>Save changes</strong> &mdash; nothing is written until you do. Add transactions on the Card Entry page. <span class="mini">(card statements build: v2)</span></p>
+  <p class="note">Saved card transactions, by month. Change a category or mark a row to delete, then press <strong>Save changes</strong> &mdash; nothing is written until you do. Add transactions on the Card Entry page. <span class="mini">(card statements build: v3)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="ledgerPanel" class="panel" style="display:none;">
@@ -128,7 +128,7 @@
     let html = '<option value="">\u2014</option>';
     billCats.forEach(c => {
       const sel = c.code === selected ? ' selected' : '';
-      html += '<option value="' + escapeHtml(c.code) + '"' + sel + '>' + escapeHtml(c.description || c.code) + '</option>';
+      html += '<option value="' + escapeHtml(c.code) + '"' + sel + ' title="' + escapeHtml(c.description || '') + '">' + escapeHtml(c.code) + '</option>';
     });
     return html;
   }
@@ -149,7 +149,8 @@
         App.rest('bd_merchant_map')
       ]);
       billCats = cats || [];
-      catByCode = {}; billCats.forEach(c => { catByCode[c.code] = c.description || c.code; });
+      // v3: label categories by CODE, not description.
+      catByCode = {}; billCats.forEach(c => { catByCode[c.code] = c.code; });
       txns = tx || [];
       merchantMap = {}; (mm || []).forEach(r => { merchantMap[r.match_text] = r.category_code; });
       pendingCat = {}; pendingDel = new Set();
