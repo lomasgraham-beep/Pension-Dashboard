@@ -1,5 +1,22 @@
 /* ============================================================
    engine.js  —  Pension modelling engine (pure JavaScript)
+   build tag: ann11 (additive: fuel costing split out of the holiday figure, behind FUEL_COSTS.
+                     Takes TWO fields, because fuel is two different animals:
+                       data.fuelAnnual     — discretionary driving (Holiday / Caravan / Out and
+                                             about). Spending-slider aware and age-tapered via
+                                             data.fuelTaper, exactly like dining and holidays.
+                       data.fuelWorkAnnual — commuting. NOT slider-aware and NOT tapered: it is a
+                                             fixed cost that ENDS rather than fades, and is forced
+                                             to 0 from data.fuelWorkEndDate onward.
+                     NOTE the caller contract change: from ann11 the holiday figure passed in
+                     data.holidayAnnual must NO LONGER include fuel (common.js
+                     holidayWeekBreakdown stops adding it). Passing an old-style holidayAnnual
+                     alongside a fuelAnnual double-counts fuel.
+                     Inertness: fuelM is 0 whenever FUEL_COSTS is false, and 0 whenever neither
+                     data.fuelAnnual nor data.fuelWorkAnnual is supplied — so every caller that has
+                     not yet been updated behaves exactly as ann10, byte-identical, proven by the
+                     field comparison in the delivery. Also corrects the BUILD export, which had
+                     been left reading 'ann9' since the ann10 delivery.)
    build tag: ann10 (additive: optional Xmas / birthday gift savings via data.gifts, behind the
                      GIFT_SAVINGS flag. Each gift row (gift_value + taper_at_70/80/90) is tapered on
                      person-1's age and inflated at 0.5%/yr, and replaces the legacy Xmas/Birthday bill
@@ -132,6 +149,29 @@
   // supplied — so any caller that hasn't been updated to pass a holiday figure behaves exactly as
   // before. Only when the flag is true AND a holidayAnnual is supplied does spend rise.
   const HOLIDAY_COSTS = true;
+
+  // ---- Fuel costing (build ann11) ----
+  // Fuel used to live inside the holiday figure (miles ÷ MPG × price per litre, folded into
+  // holidayWeekBreakdown). It is now its own term, because fuel is not one kind of spend:
+  //
+  //   data.fuelAnnual     — discretionary driving (Holiday / Caravan / Out and about). Behaves like
+  //                         dining and holidays: spending-slider aware, age-tapered via
+  //                         data.fuelTaper ({ taper_at_70/80/90 }) on the OLDER member's age.
+  //   data.fuelWorkAnnual — commuting. Deliberately NOT slider-aware and NOT tapered. Cutting
+  //                         discretionary spend does not shorten the commute, and an 85-year-old is
+  //                         not driving to work at a reduced mileage — the cost ENDS. It is forced
+  //                         to 0 from data.fuelWorkEndDate (any Date-parsable value) onward; with no
+  //                         end date supplied it runs for the whole projection.
+  //
+  // CALLER CONTRACT: from ann11, data.holidayAnnual must NOT include fuel. common.js's
+  // holidayWeekBreakdown no longer adds it. A caller passing a pre-ann11 holidayAnnual together with
+  // a fuelAnnual will double-count fuel — hence the staged rollout in the delivery notes.
+  //
+  // Inertness: when FUEL_COSTS is false, fuelM is forced to 0 regardless of the data, so the engine's
+  // output is identical to build ann10. It is also 0 whenever neither data.fuelAnnual nor
+  // data.fuelWorkAnnual is supplied — so any caller not yet updated behaves exactly as before. Only
+  // when the flag is true AND a fuel figure is supplied does spend rise.
+  const FUEL_COSTS = true;
 
   // ann10 flag: when GIFT_SAVINGS is true, Xmas / birthday costs come from data.gifts (each row a
   // { gift_type:'Xmas'|'Birthday', gift_value, taper_at_70/80/90 }) instead of their legacy household-bill
@@ -427,6 +467,13 @@
     const p2RetIdx = (p2Name && rbm[p2Name]) ? (rbm[p2Name].getFullYear() * 12 + rbm[p2Name].getMonth()) : startIdx;
     // Earliest retirement (where the drawdown era will eventually begin once F is active).
     const earliestRetIdx = Math.min(p1RetIdx, p2RetIdx);
+    // ann11: month index from which work fuel stops. null = no end date supplied, so it never stops.
+    // Same year*12+month convention as every other index here; an unparsable date is treated as absent.
+    let fuelWorkEndIdx = null;
+    if (data.fuelWorkEndDate) {
+      const fwe = new Date(data.fuelWorkEndDate);
+      if (!isNaN(fwe.getTime())) fuelWorkEndIdx = fwe.getFullYear() * 12 + fwe.getMonth();
+    }
     // Salary lookup: net monthly for a member at a given working-days tier, grown by award % since now.
     const fIncomeSources = data.incomeSources || [];
     const fIncomeAmounts = data.incomeAmounts || [];
@@ -821,7 +868,7 @@
         accYear = yr;
         acc = {
           year: yr, gAge: gDobYr != null ? yr - gDobYr : 0, jAge: jDobYr != null ? yr - jDobYr : 0,
-          outgoings: 0, billsTotal: 0, diningTotal: 0, holidayTotal: 0, gTarget: 0, jTarget: 0,
+          outgoings: 0, billsTotal: 0, diningTotal: 0, holidayTotal: 0, fuelTotal: 0, gTarget: 0, jTarget: 0,
           taxFree: gTf + jTf, taxable: gTx + jTx,
           g_taxFree: gTf, g_taxable: gTx, j_taxFree: jTf, j_taxable: jTx,
           g_tfGrowth: 0, g_txGrowth: 0, j_tfGrowth: 0, j_txGrowth: 0, tfGrowth: 0, txGrowth: 0, crash: null,
@@ -871,6 +918,17 @@
       let holidayM = 0;
       if (HOLIDAY_COSTS && data.holidayAnnual != null) {
         holidayM = (Number(data.holidayAnnual) || 0) * spendRed * taperFor(data.holidayTaper || {}, oldest) / 12 * inflFactor;
+      }
+
+      // Fuel (ann11): two terms with deliberately different behaviour — see the FUEL_COSTS note above.
+      // Discretionary driving tracks dining/holidays (slider + age taper); work fuel does neither and
+      // simply stops at fuelWorkEndIdx. Inert (0) unless the flag is on and a figure was supplied.
+      let fuelM = 0;
+      if (FUEL_COSTS && (data.fuelAnnual != null || data.fuelWorkAnnual != null)) {
+        const fuelDiscM = (Number(data.fuelAnnual) || 0) * spendRed * taperFor(data.fuelTaper || {}, oldest) / 12 * inflFactor;
+        const working = (fuelWorkEndIdx == null) || (idx < fuelWorkEndIdx);
+        const fuelWorkM = working ? (Number(data.fuelWorkAnnual) || 0) / 12 * inflFactor : 0;
+        fuelM = fuelDiscM + fuelWorkM;
       }
 
       // ---- Savings accounts for THIS month ----
@@ -949,7 +1007,7 @@
       // finance payments + any deposit shortfall are extra outgoings the drawdown must cover;
       // withheld instant-access contributions reduce the cost the drawdown must cover.
       const cashOutM = financeThisMonth + depositShortfall;
-      let outM = billsM + diningM + holidayM + cashOutM;
+      let outM = billsM + diningM + holidayM + fuelM + cashOutM;
 
       // Withheld contributions from instant-access accounts cover living costs, reducing drawdown
       // (capped so drawdown can't go below zero across the household).
@@ -1106,7 +1164,7 @@
       monthlyRows.push({
         year: yr, month: (idx % 12), label: MONTH_NAMES[idx % 12] + ' ' + yr,
         gAge: gAge, jAge: jAge,
-        outgoings: outM, billsTotal: billsM, diningTotal: diningM, holidayTotal: holidayM, gTarget: gTargetM, jTarget: jTargetM,
+        outgoings: outM, billsTotal: billsM, diningTotal: diningM, holidayTotal: holidayM, fuelTotal: fuelM, gTarget: gTargetM, jTarget: jTargetM,
         taxFree: oGTf + oJTf, taxable: oGTx + oJTx,
         g_taxFree: oGTf, g_taxable: oGTx, j_taxFree: oJTf, j_taxable: oJTx,
         g_tfGrowth: gTfGrowth, g_txGrowth: gTxGrowth, j_tfGrowth: jTfGrowth, j_txGrowth: jTxGrowth,
@@ -1129,7 +1187,7 @@
         acctBalances: savingsAccts.map(a => ({ name: a.name, member: a.member, bal: a.bal }))
       });
 
-      acc.outgoings += outM; acc.billsTotal += billsM; acc.diningTotal += diningM; acc.holidayTotal += holidayM;
+      acc.outgoings += outM; acc.billsTotal += billsM; acc.diningTotal += diningM; acc.holidayTotal += holidayM; acc.fuelTotal += fuelM;
       acc.gTarget += gTargetM; acc.jTarget += jTargetM;
       acc.stateGross += gRes.inc.stateGross + jRes.inc.stateGross;
       acc.g_other += gRes.inc.total; acc.j_other += jRes.inc.total;
@@ -1180,7 +1238,7 @@
   }
 
   global.PensionEngine = {
-    BUILD: 'ann9',   // LC-383: exported so framed pages can self-check the loaded engine build
+    BUILD: 'ann11',  // LC-383: exported so framed pages can self-check the loaded engine build
     INFL: INFL, GROWTH: GROWTH, PA: PA,
     latestPots: latestPots,
     forecast: forecast,
