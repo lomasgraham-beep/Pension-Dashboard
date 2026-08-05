@@ -599,11 +599,15 @@
       const holidayPlanAnnual = App.holidayAnnual(holidayPlan || [],
         App.holidayCtx(holidayCost || [], mealCost || [], (holidaySettings && holidaySettings[0]) || {}), 'retired');
       // Budget basis: Plan (above) or Actual last-12-months + adjustment, per the saved choice.
-      const _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual });
+      // ann11: fuel is its own engine term now, no longer inside the holiday figure.
+      const _fuel = await App.loadFuelForEngine();
+      const _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual,
+        fuelWorkPlanAnnual: _fuel.planWork, fuelDiscPlanAnnual: _fuel.planDisc });
       const diningAnnual = _eff.diningAnnual, holidayAnnual = _eff.holidayAnnual;
+      const fuelDiscAnnual = _eff.fuelAnnual, fuelWorkAnnual = _eff.fuelWorkAnnual;
       const _hs = (holidaySettings && holidaySettings[0]) || {}, _ds = (diningSettings && diningSettings[0]) || {};
       let giftRows = []; try { giftRows = await App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc') || []; } catch (e) { giftRows = []; }
-      const data = { members, bills, gifts: giftRows, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual,
+      const data = { members, bills, gifts: giftRows, dining, diningAnnual: diningAnnual, holidayAnnual: holidayAnnual, fuelAnnual: fuelDiscAnnual, fuelWorkAnnual: fuelWorkAnnual, fuelTaper: _fuel.taper, fuelWorkEndDate: _fuel.workEndsOn,
         holidayTaper: { taper_at_70: _hs.taper_at_70, taper_at_80: _hs.taper_at_80, taper_at_90: _hs.taper_at_90 },
         diningTaper: { taper_at_70: _ds.taper_at_70, taper_at_80: _ds.taper_at_80, taper_at_90: _ds.taper_at_90 },
         guaranteed, pensions, contributions, logs,
@@ -702,7 +706,7 @@
 <script>
 /* LC-384: engine build self-check + deploy stamp. */
 (function () {
-  var WANT = 'ann11', TAG = 'monthly audit maudit9';
+  var WANT = 'ann11', TAG = 'monthly audit maudit10';
   function go() {
     var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
     if (got !== WANT) {

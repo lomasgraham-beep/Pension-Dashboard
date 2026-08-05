@@ -187,7 +187,7 @@
   <div class="mm-head">
     <span class="mm-title">Multi Modelling</span>
     <span class="mm-pill" id="modelName" style="display:none;"></span>
-    <span style="font-size:11px; color:var(--sub);">(build: mm12)</span>
+    <span style="font-size:11px; color:var(--sub);">(build: mm13)</span>
     <span class="spacer"></span>
     <button class="mm-btn pri" id="btnNew" type="button">+ New multi model</button>
     <button class="mm-btn" id="btnEdit" type="button" disabled>Edit</button>
@@ -239,13 +239,17 @@
       var diningPlanAnnual = (diningRota||[]).reduce(function(sum,r){ return sum + DAY_COLS.reduce(function(s,col){ return s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]]||0) : 0); }, 0); }, 0);
       var holidayPlanAnnual = App.holidayAnnual(holidayPlan||[], App.holidayCtx(holidayCost||[], mealCost||[], (holidaySettings&&holidaySettings[0])||{}), 'retired');
       // Budget basis: Plan (above) or Actual last-12-months + adjustment, per the saved choice.
-      var _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual });
+      // ann11: fuel is its own engine term now, no longer inside the holiday figure.
+      var _fuel = await App.loadFuelForEngine();
+      var _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual,
+        fuelWorkPlanAnnual: _fuel.planWork, fuelDiscPlanAnnual: _fuel.planDisc });
       var diningAnnual = _eff.diningAnnual, holidayAnnual = _eff.holidayAnnual;
+      var fuelDiscAnnual = _eff.fuelAnnual, fuelWorkAnnual = _eff.fuelWorkAnnual;
       var _hs = (holidaySettings&&holidaySettings[0])||{}, _ds = (diningSettings&&diningSettings[0])||{};
       var holidayTaper = { taper_at_70:_hs.taper_at_70, taper_at_80:_hs.taper_at_80, taper_at_90:_hs.taper_at_90 };
       var diningTaper = { taper_at_70:_ds.taper_at_70, taper_at_80:_ds.taper_at_80, taper_at_90:_ds.taper_at_90 };
       let giftRows = []; try { giftRows = await App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc') || []; } catch (e) { giftRows = []; }
-      data = { members:members, bills:bills, gifts: giftRows, dining:dining, diningAnnual:diningAnnual, holidayAnnual:holidayAnnual, holidayTaper:holidayTaper, diningTaper:diningTaper, guaranteed:guaranteed, pensions:pensions, contributions:contributions, logs:logs, purchases:purchases||[], crashes:crashes||[], savingsAccounts:savingsAccounts||[], contributionExceptions:contributionExceptions||[], workingTiers:workingTiers||[], incomeSources:incomeSources||[], incomeAmounts:incomeAmounts||[], annuities:[] };
+      data = { members:members, bills:bills, gifts: giftRows, dining:dining, diningAnnual:diningAnnual, holidayAnnual:holidayAnnual, holidayTaper:holidayTaper, fuelAnnual: fuelDiscAnnual, fuelWorkAnnual: fuelWorkAnnual, fuelTaper: _fuel.taper, fuelWorkEndDate: _fuel.workEndsOn, diningTaper:diningTaper, guaranteed:guaranteed, pensions:pensions, contributions:contributions, logs:logs, purchases:purchases||[], crashes:crashes||[], savingsAccounts:savingsAccounts||[], contributionExceptions:contributionExceptions||[], workingTiers:workingTiers||[], incomeSources:incomeSources||[], incomeAmounts:incomeAmounts||[], annuities:[] };
       var sortedM = (members||[]).slice().sort(function(a,b){ return String(a.name||'').localeCompare(String(b.name||'')); });
       p1Name = sortedM[0] ? sortedM[0].name : 'Graham'; p2Name = sortedM[1] ? sortedM[1].name : null;
       stateNames = new Set((guaranteed||[]).map(function(x){ return x.income_name; }).filter(function(n){ return n && n.toLowerCase().indexOf('state') >= 0; }));

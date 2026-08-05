@@ -70,10 +70,14 @@
     const diningPlanAnnual = (diningRota || []).reduce((sum, r) => sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealCostMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
     const holidayPlanAnnual = App.holidayAnnual(holidayPlan || [], App.holidayCtx(holidayCost || [], mealCost || [], (holidaySettings && holidaySettings[0]) || {}), 'retired');
     // Budget basis: Plan (above) or Actual last-12-months + adjustment, per the saved choice.
-    const _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual });
+    // ann11: fuel is its own engine term now, no longer inside the holiday figure.
+    const _fuel = await App.loadFuelForEngine();
+    const _eff = await App.resolveDiscretionary({ diningPlanAnnual: diningPlanAnnual, holidayPlanAnnual: holidayPlanAnnual,
+        fuelWorkPlanAnnual: _fuel.planWork, fuelDiscPlanAnnual: _fuel.planDisc });
     const diningAnnual = _eff.diningAnnual, holidayAnnual = _eff.holidayAnnual;
+    const fuelDiscAnnual = _eff.fuelAnnual, fuelWorkAnnual = _eff.fuelWorkAnnual;
     let giftRows = []; try { giftRows = await App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc') || []; } catch (e) { giftRows = []; }
-    const data = { members, bills, gifts: giftRows, dining, diningAnnual, holidayAnnual, guaranteed, pensions, contributions, logs, purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [], incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
+    const data = { members, bills, gifts: giftRows, dining, diningAnnual, holidayAnnual, fuelAnnual: fuelDiscAnnual, fuelWorkAnnual: fuelWorkAnnual, fuelTaper: _fuel.taper, fuelWorkEndDate: _fuel.workEndsOn, guaranteed, pensions, contributions, logs, purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [], incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
     const sortedM = (members || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const p1Name = sortedM[0] ? sortedM[0].name : 'Graham';
     const p2Name = sortedM[1] ? sortedM[1].name : null;
