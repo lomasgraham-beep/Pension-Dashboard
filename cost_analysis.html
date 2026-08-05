@@ -62,7 +62,7 @@
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
   <h2>Cost Analysis <span style="font-size:11px; font-weight:normal; color:#94a3b8;">(costs v3)</span></h2>
-  <p class="note">Actual spending per category, from your card transactions. Bars run highest cost (left) to lowest (right). Switch between a single month, a calendar year, or a rolling 12 months, and drag the zoom to widen the bars. In a year view the table also shows the monthly average &mdash; handy for variable costs like groceries and fuel. Anything categorised <strong>Reimburse</strong> is excluded.</p>
+  <p class="note">Actual spending per category, from your card transactions. Bars run highest cost (left) to lowest (right). Switch between a single month, a calendar year, or a rolling 12 months, and drag the zoom to widen the bars. In a year view the table also shows the monthly average &mdash; handy for variable costs like groceries and fuel. Anything categorised <strong>Reimburse</strong> is excluded. <span style="color:#94a3b8;">(cost analysis build: v1)</span></p>
 
   <div class="controls">
     <div class="seg" id="modeSeg">
@@ -125,7 +125,9 @@
         App.rest('bd_bill_category?order=code.asc'),
         fetchAllTxns()
       ]);
-      const catByCode = {}; (cats || []).forEach(c => { catByCode[c.code] = c.description || c.code; });
+      // Label spending categories by CODE, matching the card pages. Descriptions are
+      // edited on Bill Categories and listed on Card Categories.
+      const catByCode = {}; (cats || []).forEach(c => { catByCode[c.code] = c.code; });
       txns = [];
       (tx || []).forEach(t => {
         const label = t.category_code ? (catByCode[t.category_code] || t.category_code) : 'Uncategorised';

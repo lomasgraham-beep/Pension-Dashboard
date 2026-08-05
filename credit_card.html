@@ -38,7 +38,7 @@
 </head>
 <body>
   <h1>Credit Card</h1>
-  <p class="note">Monthly credit-card spending by category &mdash; every bill whose &ldquo;Paid by&rdquo; is Credit card, plus the Dining roll-up. Figures are monthly (weekly &times;52/12, annual &divide;12, monthly as-is); Dining is the rota total &divide; 12. <span style="color:#94a3b8;">(credit card build: v1)</span></p>
+  <p class="note">Monthly credit-card spending by category &mdash; every bill whose &ldquo;Paid by&rdquo; is Credit card, plus the Dining roll-up. Figures are monthly (weekly &times;52/12, annual &divide;12, monthly as-is); Dining is the rota total &divide; 12. <span style="color:#94a3b8;">(credit card build: v2)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="cardPanel" class="panel" style="display:none;">
@@ -91,7 +91,8 @@
     const tb = document.querySelector('#ccTable tbody');
 
     const catLabel = {};
-    (billCats || []).forEach(c => { catLabel[c.code] = c.description || c.code; });
+    // Label by CODE, matching the card pages.
+    (billCats || []).forEach(c => { catLabel[c.code] = c.code; });
 
     const mine = (bills || []).filter(b => b.paid_by === 'Credit card');
     const byCat = {};

@@ -166,7 +166,7 @@
 
   <div class="head">
     <div class="hrow">
-      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front26)</span></span>
+      <span class="h-title">Safe-to-Retire Frontier <span style="font-weight:400;color:var(--sub);font-size:11px;">(build: front27)</span></span>
       <div class="seg" id="seg">
         <button type="button" class="seg-btn active" data-mode="joint">Joint</button>
         <button type="button" class="seg-btn" data-mode="p1" id="segP1">Graham</button>
@@ -878,7 +878,8 @@
       ]);
 
       catLabel = {};
-      (billCategories || []).forEach(c => { if (c.code) catLabel[c.code] = c.description || c.code; });
+      // Label by CODE, matching the card pages.
+      (billCategories || []).forEach(c => { if (c.code) catLabel[c.code] = c.code; });
 
       const mealCostMap = {};
       (mealCost || []).forEach(c => { mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
