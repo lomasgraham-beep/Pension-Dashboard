@@ -62,7 +62,12 @@
   .g-warn { color:#b45309; font-weight:bold; }
   .g-ok { color:#64748b; }
   .thumbs { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
-  .thumbs img { width:88px; height:88px; object-fit:cover; border:1px solid #cbd5e1; border-radius:6px; }
+  .thumb { position:relative; }
+  .thumbs img { width:88px; height:88px; object-fit:cover; border:1px solid #cbd5e1; border-radius:6px; display:block; }
+  .thumbdel { position:absolute; top:-8px; right:-8px; width:26px; height:26px; border-radius:13px; border:1px solid #cbd5e1; background:#fff; color:#c0392b; font-size:16px; font-weight:bold; line-height:1; cursor:pointer; padding:0; }
+  .rowdel { border:1px solid #e2e8f0; background:#fff; color:#94a3b8; border-radius:6px; width:34px; height:34px; font-size:18px; line-height:1; cursor:pointer; padding:0; }
+  .rowdel:hover { color:#c0392b; border-color:#f5c6c2; }
+  .tag-rep { background:#fef3c7; color:#92400e; }
   #shotMsg { margin-top:10px; font-size:14px; font-weight:bold; min-height:18px; }
   #ocrProg { min-height:16px; }
   #ocrText { min-height:170px; }
@@ -97,6 +102,9 @@
     #lastDayHead { color:#cbd5e1 !important; }
     .g-warn { color:#fbbf24 !important; } .g-ok { color:#94a3b8 !important; }
     .thumbs img { border-color:#475569 !important; }
+    .thumbdel { background:#1e293b !important; color:#f87171 !important; border-color:#475569 !important; }
+    .rowdel { background:#0f172a !important; color:#94a3b8 !important; border-color:#334155 !important; }
+    .tag-rep { background:#78350f !important; color:#fde68a !important; }
     input.ed { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
     tr.err input.ed { border-color:#7f1d1d !important; }
   }
@@ -104,7 +112,7 @@
 </head>
 <body>
   <h1>Card Entry</h1>
-  <p class="note">Import a CSV, read a screenshot, or key a line in by hand. Either way the saved transactions appear on the Card Statements page. <span class="mini">(card entry build: v5)</span></p>
+  <p class="note">Import a CSV, read a screenshot, or key a line in by hand. Either way the saved transactions appear on the Card Statements page. <span class="mini">(card entry build: v7)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="importPanel" class="panel" style="display:none;">
@@ -137,9 +145,11 @@
   <div id="shotPanel" class="panel" style="display:none;">
     <h2>Read from a screenshot</h2>
     <p class="hint" style="margin-bottom:12px;">
-      Pick one or more screenshots of your statement and let the page read the text off them.
-      <b>For best accuracy on iPad</b>, long-press the screenshot in Photos, tap <b>Copy All</b>,
-      and paste it into the box below instead &mdash; Apple&rsquo;s own text recognition is more reliable with numbers than the in-page reader.
+      Three ways in, best first:<br>
+      <b>1. Paste the screenshot itself.</b> In Photos, tap Share &rarr; Copy Photo, then paste anywhere on this page &mdash; it will be read automatically.<br>
+      <b>2. Paste Apple&rsquo;s text.</b> In Photos, tap the <b>Live Text button</b> (the small square-with-lines icon in the bottom-right of the image), then <b>Copy All</b>, and paste into the box below. Don&rsquo;t long-press the text itself &mdash; if a merchant name looks like a web address, such as Amazon.co.uk, iPadOS offers you the link menu instead of Copy All.<br>
+      <b>3. Pick the file below</b> and press Read text from image.<br>
+      Apple&rsquo;s recognition is the more accurate with numbers, so route 2 is worth the extra taps when a statement matters.
     </p>
     <div class="row">
       <div>
@@ -149,6 +159,12 @@
       <div>
         <button class="btn btn-go" id="ocrBtn" type="button" disabled>Read text from image</button>
       </div>
+      <div>
+        <button class="btn btn-ghost" id="clearShot" type="button">Clear image</button>
+      </div>
+      <div>
+        <button class="btn btn-ghost" id="clearAllShot" type="button">Start again</button>
+      </div>
     </div>
     <div id="ocrProg" class="hint"></div>
     <div id="shotThumbs" class="thumbs"></div>
@@ -156,6 +172,9 @@
     <div style="margin-top:14px;">
       <label for="ocrText">Recognised text &mdash; check it and correct anything wrong before reading it in</label>
       <textarea id="ocrText" placeholder="Paste Live Text here, or read a screenshot above.&#10;&#10;01 Aug 2026&#10;TESCO STORES 2843     42.10&#10;SHELL FILLING STN     61.83"></textarea>
+      <div class="row" style="margin-top:8px;">
+        <button class="btn btn-ghost" id="clearText" type="button">Clear text</button>
+      </div>
     </div>
 
     <div class="mgrid" style="margin-top:12px;">
@@ -252,7 +271,7 @@
       <thead><tr>
         <th class="l"><input type="checkbox" id="chkAll" checked></th>
         <th class="l">Date</th><th class="l">Description</th><th>Amount</th>
-        <th class="l">Category</th><th class="l">Status</th>
+        <th class="l">Category</th><th class="l">Status</th><th></th>
       </tr></thead>
       <tbody></tbody>
     </table>
@@ -263,6 +282,7 @@
         <select id="payerIn"></select>
       </div>
       <button class="btn btn-save" id="saveBtn" type="button">Save selected</button>
+      <button class="btn btn-ghost" id="clearFlagged" type="button" style="display:none;">Remove flagged rows</button>
       <button class="btn btn-ghost" id="cancelBtn" type="button">Discard</button>
     </div>
   </div>
@@ -664,6 +684,7 @@
       document.getElementById('manualPanel').style.display = 'block';
       const yr = document.getElementById('yearIn');
       if (!yr.value) yr.value = String(new Date().getFullYear());
+      syncShotButtons();
     } catch (e) {
       setStatus('Could not load: ' + (e && e.message ? e.message : e), 's-err');
     }
@@ -698,22 +719,13 @@
   // v4: shared by the CSV importer and the screenshot reader — dedupe hashing,
   // duplicate detection and category suggestion all live here so both agree.
   function buildPreview(rows) {
-    const occ = {};
-    preview = [];
-    (rows || []).forEach(r => {
-      const rawDesc = (r.desc || '').trim();
-      const date = r.date;
-      const amount = r.amount;
-      const errFlag = (!date) || (amount == null) || (!rawDesc);
-      let hash = '', dup = false;
-      if (!errFlag) {
-        const base = date + '|' + amount.toFixed(2) + '|' + normDesc(rawDesc);
-        const k = (occ[base] = (occ[base] || 0)); occ[base] = k + 1;
-        hash = base + '|' + k; dup = existingHashes.has(hash);
-      }
-      const sug = errFlag ? { code: '', source: '' } : suggestCategory(rawDesc);
-      preview.push({ date: date, desc: rawDesc, amount: amount, code: sug.code, src: sug.source, hash: hash, dup: dup, err: errFlag, include: !errFlag && !dup });
+    preview = (rows || []).map(r => {
+      const desc = String(r.desc || '').trim();
+      const sug = desc ? suggestCategory(desc) : { code: '', source: '' };
+      return { date: r.date || null, desc: desc, amount: r.amount, code: sug.code, src: sug.source,
+               hash: '', dup: false, rep: false, err: false, include: true };
     });
+    recomputeRows();
     renderPreview();
   }
   function showMapper(header, map) {
@@ -874,6 +886,84 @@
   // ---------- OCR (lazy-loaded, only when asked for) ----------
   let tessPromise = null;
   let shotFiles = [];
+  // Screenshots taken in dark mode are light text on a dark ground, which the reader
+  // is markedly worse at. Invert those, and give small images a bit more to work with.
+  function shouldInvert(meanLuma) { return meanLuma < 118; }
+  function meanLumaOf(px) {
+    let sum = 0, n = 0;
+    for (let i = 0; i < px.length; i += 148) { sum += 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]; n++; }
+    return n ? (sum / n) : 255;
+  }
+  async function prepImage(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((res, rej) => {
+        const i = new Image();
+        i.onload = () => res(i); i.onerror = () => rej(new Error('image could not be decoded'));
+        i.src = url;
+      });
+      // The reader wants roughly 300dpi-equivalent text. Phone screenshots of a card app
+      // are usually well under that once the list is scaled down, so scale up.
+      let scale = 1;
+      if (img.naturalWidth) scale = Math.min(3, Math.max(1, 1800 / img.naturalWidth));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(img.naturalWidth * scale);
+      cv.height = Math.round(img.naturalHeight * scale);
+      const ctx = cv.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, cv.width, cv.height);
+      const dat = ctx.getImageData(0, 0, cv.width, cv.height);
+      const px = dat.data;
+      const inverted = shouldInvert(meanLumaOf(px));
+      // Flatten to greyscale, invert if it is a dark-mode grab, then stretch the contrast
+      // so anti-aliased grey text becomes properly black on properly white.
+      const hist = new Uint32Array(256);
+      for (let i = 0; i < px.length; i += 4) {
+        let v = (0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]) | 0;
+        if (inverted) v = 255 - v;
+        px[i] = px[i + 1] = px[i + 2] = v;
+        hist[v]++;
+      }
+      const total = px.length / 4;
+      const lo = percentileOf(hist, total, 0.02);
+      const hi = percentileOf(hist, total, 0.98);
+      if (hi - lo > 20) {
+        const lut = new Uint8ClampedArray(256);
+        for (let v = 0; v < 256; v++) lut[v] = Math.max(0, Math.min(255, Math.round((v - lo) * 255 / (hi - lo))));
+        for (let i = 0; i < px.length; i += 4) { const v = lut[px[i]]; px[i] = px[i + 1] = px[i + 2] = v; }
+      }
+      ctx.putImageData(dat, 0, 0);
+      return { source: cv, inverted: inverted };
+    } finally { try { URL.revokeObjectURL(url); } catch (e) {} }
+  }
+  function percentileOf(hist, total, frac) {
+    let want = total * frac, run = 0;
+    for (let v = 0; v < 256; v++) { run += hist[v]; if (run >= want) return v; }
+    return 255;
+  }
+  // How many lines of a read look like real statement lines? Used to judge whether a
+  // different page-segmentation mode would do better.
+  function amountLineCount(text) {
+    return String(text || '').split('\n').filter(l => grabAmount(l.trim())).length;
+  }
+  // Pull any images off a paste event — lets a screenshot be pasted straight in,
+  // which sidesteps Apple's link detector on merchant names like Amazon.co.uk.
+  function imagesFromClipboard(e) {
+    const out = [];
+    const dt = e && (e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData));
+    const items = (dt && dt.items) || [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (it && it.kind === 'file' && it.type && it.type.indexOf('image/') === 0) {
+        const f = it.getAsFile(); if (f) out.push(f);
+      }
+    }
+    if (!out.length && dt && dt.files) {
+      for (let i = 0; i < dt.files.length; i++) { const f = dt.files[i]; if (f && /^image\//.test(f.type)) out.push(f); }
+    }
+    return out;
+  }
   function loadTesseract() {
     if (window.Tesseract) return Promise.resolve(window.Tesseract);
     if (tessPromise) return tessPromise;
@@ -889,12 +979,48 @@
   function showThumbs(files) {
     const wrap = document.getElementById('shotThumbs');
     wrap.innerHTML = '';
-    files.forEach(f => {
+    files.forEach((f, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'thumb';
       const img = document.createElement('img');
       img.src = URL.createObjectURL(f);
       img.onload = () => { try { URL.revokeObjectURL(img.src); } catch (e) {} };
-      wrap.appendChild(img);
+      const x = document.createElement('button');
+      x.type = 'button'; x.className = 'thumbdel'; x.title = 'Remove this image';
+      x.innerHTML = '&times;';
+      x.addEventListener('click', () => dropShot(i));
+      cell.appendChild(img); cell.appendChild(x);
+      wrap.appendChild(cell);
     });
+  }
+  function dropShot(i) {
+    shotFiles.splice(i, 1);
+    showThumbs(shotFiles);
+    syncShotButtons();
+    setShotMsg(shotFiles.length ? shotFiles.length + ' image' + (shotFiles.length === 1 ? '' : 's') + ' ready.' : 'No image selected.');
+  }
+  function syncShotButtons() {
+    document.getElementById('ocrBtn').disabled = !shotFiles.length;
+    document.getElementById('clearShot').disabled = !shotFiles.length;
+    document.getElementById('clearText').disabled = !(document.getElementById('ocrText').value || '').trim();
+  }
+  // The file input keeps its own copy of the selection, so it must be reset too or the
+  // same file cannot be picked again.
+  function clearShotImages() {
+    shotFiles = [];
+    document.getElementById('shotIn').value = '';
+    document.getElementById('shotThumbs').innerHTML = '';
+    document.getElementById('ocrProg').textContent = '';
+    syncShotButtons();
+  }
+  function clearShotText() {
+    document.getElementById('ocrText').value = '';
+    syncShotButtons();
+  }
+  function resetShotPanel() {
+    clearShotImages();
+    clearShotText();
+    setShotMsg('Cleared.', 'm-ok');
   }
   async function runOcr() {
     if (!shotFiles.length) { setShotMsg('Pick a screenshot first.', 'm-err'); return; }
@@ -913,18 +1039,45 @@
         }
       });
       const parts = [];
+      let anyInverted = false;
       for (let i = 0; i < shotFiles.length; i++) {
         prog.textContent = 'Reading image ' + (i + 1) + ' of ' + shotFiles.length + '\u2026';
-        const res = await worker.recognize(shotFiles[i]);
-        parts.push((res && res.data && res.data.text) ? res.data.text : '');
+        let src = shotFiles[i];
+        try { const prepped = await prepImage(shotFiles[i]); src = prepped.source; if (prepped.inverted) anyInverted = true; }
+        catch (e) { src = shotFiles[i]; }   // preprocessing is a bonus, never a blocker
+        // PSM 4 (a single column of text at varying sizes) suits a statement list far
+        // better than the default. If it comes back with almost no amounts, the layout
+        // was probably misread, so try PSM 6 and keep whichever found more.
+        let best = '';
+        try { await worker.setParameters({ tessedit_pageseg_mode: '4' }); } catch (e) {}
+        let res = await worker.recognize(src);
+        best = (res && res.data && res.data.text) ? res.data.text : '';
+        if (amountLineCount(best) < 2) {
+          prog.textContent = 'Retrying image ' + (i + 1) + ' with a different layout\u2026';
+          try {
+            await worker.setParameters({ tessedit_pageseg_mode: '6' });
+            const alt = await worker.recognize(src);
+            const altText = (alt && alt.data && alt.data.text) ? alt.data.text : '';
+            if (amountLineCount(altText) > amountLineCount(best)) best = altText;
+          } catch (e) { /* keep the first attempt */ }
+        }
+        parts.push(best);
       }
       const text = parts.join('\n').replace(/\n{3,}/g, '\n\n').trim();
       const box = document.getElementById('ocrText');
-      box.value = box.value.trim() ? (box.value.trim() + '\n' + text) : text;
-      document.getElementById('signMode').value = guessSign(box.value);
+      // Replace rather than append: appending to a previous read (or to pasted Live Text)
+      // puts two versions of the same statement in the box and duplicates every row.
+      const previous = box.value.trim();
       prog.textContent = '';
-      if (!text) setShotMsg('No text could be read from that image. Try the Live Text route instead.', 'm-err');
-      else setShotMsg('Text read. Check it for mistakes \u2014 especially the amounts \u2014 then press \u201CRead these lines\u201D.', 'm-ok');
+      if (!text) {
+        setShotMsg('No text could be read from that image. Try the Live Text route instead.', 'm-err');
+      } else {
+        box.value = text;
+        document.getElementById('signMode').value = guessSign(text);
+        setShotMsg('Text read' + (anyInverted ? ' (dark screenshot inverted first)' : '') +
+          (previous ? ', replacing what was in the box' : '') +
+          '. Check it \u2014 especially the amounts \u2014 then press \u201CRead these lines\u201D.', 'm-ok');
+      }
     } catch (e) {
       prog.textContent = '';
       setShotMsg((e && e.message ? e.message : String(e)) + '. You can still long-press the screenshot in Photos, tap Copy All, and paste it into the box.', 'm-err');
@@ -941,12 +1094,16 @@
     const occ = {};
     preview.forEach(p => {
       p.err = (!p.date) || (p.amount == null) || (!String(p.desc || '').trim());
-      if (p.err) { p.hash = ''; p.dup = false; p.include = false; return; }
+      if (p.err) { p.hash = ''; p.dup = false; p.rep = false; p.include = false; return; }
       const base = p.date + '|' + p.amount.toFixed(2) + '|' + normDesc(p.desc);
       const k = (occ[base] = (occ[base] || 0)); occ[base] = k + 1;
       p.hash = base + '|' + k;
       p.dup = existingHashes.has(p.hash);
-      if (p.dup) p.include = false;
+      // Same date, amount and merchant as an earlier row in this same batch. Usually a
+      // double read rather than a genuine second purchase, so it is left unticked —
+      // but it stays tickable, because two identical purchases in a day do happen.
+      p.rep = k > 0;
+      if (p.dup || p.rep) p.include = false;
     });
   }
   function renderPreview(noScroll) {
@@ -954,11 +1111,12 @@
     const tb = document.querySelector('#previewTable tbody');
     if (!preview.length) { panel.style.display = 'none'; return; }
     tb.innerHTML = preview.map((p, i) => {
-      const cls = p.err ? 'err' : (p.dup ? 'dup' : '');
-      const chk = (p.include && !p.err && !p.dup) ? ' checked' : '';
+      const cls = p.err ? 'err' : (p.dup || p.rep ? 'dup' : '');
+      const chk = (p.include && !p.err && !p.dup && !p.rep) ? ' checked' : '';
       const dis = (p.err || p.dup) ? ' disabled' : '';
       const tag = p.err ? '<span class="tag tag-err">check</span>'
                 : p.dup ? '<span class="tag tag-dup">already saved</span>'
+                : p.rep ? '<span class="tag tag-rep">repeat of row above</span>'
                 : '<span class="tag tag-new">new</span>';
       const cat = '<select class="cat" data-i="' + i + '" onchange="onCat(this)">' + catOptions(p.code) + '</select>' +
           '<div class="mini">' + (p.src ? 'via ' + escapeHtml(p.src) : 'no match') + '</div>';
@@ -968,19 +1126,42 @@
         '<td class="l"><input type="text" class="ed ed-desc" data-i="' + i + '" data-f="desc" value="' + escapeHtml(p.desc || '') + '" onchange="onEdit(this)"></td>' +
         '<td><input type="text" class="ed ed-amt" inputmode="decimal" data-i="' + i + '" data-f="amount" value="' + (p.amount == null ? '' : p.amount.toFixed(2)) + '" onchange="onEdit(this)"></td>' +
         '<td class="l">' + cat + '</td>' +
-        '<td class="l">' + tag + '</td></tr>';
+        '<td class="l">' + tag + '</td>' +
+        '<td><button type="button" class="rowdel" data-i="' + i + '" onclick="removeRow(this)" title="Remove this row">&times;</button></td>' +
+        '</tr>';
     }).join('');
     // corrections should replace on typing, not force manual deletion first
     tb.querySelectorAll('input.ed-desc, input.ed-amt').forEach(el => {
       el.addEventListener('focus', function () { const x = this; setTimeout(() => { try { x.setSelectionRange(0, x.value.length); } catch (e) {} }, 0); });
     });
-    const nNew = preview.filter(p => !p.err && !p.dup).length;
+    const nNew = preview.filter(p => !p.err && !p.dup && !p.rep).length;
     const nDup = preview.filter(p => p.dup).length;
+    const nRep = preview.filter(p => p.rep).length;
     const nErr = preview.filter(p => p.err).length;
     document.getElementById('previewSummary').textContent =
-      preview.length + ' rows: ' + nNew + ' new, ' + nDup + ' already saved' + (nErr ? ', ' + nErr + ' need attention' : '') + '. Anything the reader got wrong can be corrected here before saving.';
+      preview.length + ' rows: ' + nNew + ' new' +
+      (nDup ? ', ' + nDup + ' already saved' : '') +
+      (nRep ? ', ' + nRep + ' repeated in this batch' : '') +
+      (nErr ? ', ' + nErr + ' need attention' : '') +
+      '. Correct anything the reader got wrong, or remove a row with \u00D7.';
+    document.getElementById('clearFlagged').style.display = (nErr + nRep) ? 'inline-block' : 'none';
     panel.style.display = 'block';
     if (!noScroll) { document.getElementById('chkAll').checked = true; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  }
+  function removeRow(el) {
+    const i = +el.dataset.i;
+    if (isNaN(i)) return;
+    preview.splice(i, 1);
+    if (!preview.length) { document.getElementById('previewPanel').style.display = 'none'; return; }
+    recomputeRows();
+    renderPreview(true);
+  }
+  // One tap to bin everything the reader could not make sense of.
+  function clearFlaggedRows() {
+    preview = preview.filter(p => !p.err && !p.rep);
+    if (!preview.length) { document.getElementById('previewPanel').style.display = 'none'; return; }
+    recomputeRows();
+    renderPreview(true);
   }
   function onEdit(el) {
     const p = preview[+el.dataset.i];
@@ -992,14 +1173,14 @@
     const wasIncluded = p.include;
     recomputeRows();
     // A row that was broken and has just been fixed should tick itself back on.
-    if (!p.err && !p.dup) p.include = (wasIncluded !== false) || true;
+    if (!p.err && !p.dup && !p.rep) p.include = (wasIncluded !== false) || true;
     renderPreview(true);
   }
   function onInc(el) { preview[+el.dataset.i].include = el.checked; }
   function onCat(el) { preview[+el.dataset.i].code = el.value; }
   function onChkAll() {
     const on = document.getElementById('chkAll').checked;
-    preview.forEach((p) => { if (!p.err && !p.dup) { p.include = on; } });
+    preview.forEach((p) => { if (!p.err && !p.dup && !p.rep) { p.include = on; } });
     document.querySelectorAll('#previewTable tbody input[type=checkbox]').forEach(c => { if (!c.disabled) c.checked = on; });
   }
 
@@ -1024,10 +1205,8 @@
       document.getElementById('previewPanel').style.display = 'none';
       document.getElementById('fileIn').value = '';
       document.getElementById('pasteIn').value = '';
-      document.getElementById('ocrText').value = '';
-      document.getElementById('shotIn').value = '';
-      document.getElementById('shotThumbs').innerHTML = '';
-      shotFiles = []; document.getElementById('ocrBtn').disabled = true;
+      clearShotImages();
+      clearShotText();
       setShotMsg('');
       notifyChanged();
       await load();
@@ -1091,14 +1270,37 @@
     // ---- v4: screenshot reader ----
     document.getElementById('shotIn').addEventListener('change', e => {
       shotFiles = Array.from(e.target.files || []);
-      document.getElementById('ocrBtn').disabled = !shotFiles.length;
       showThumbs(shotFiles);
+      syncShotButtons();
       setShotMsg(shotFiles.length ? shotFiles.length + ' image' + (shotFiles.length === 1 ? '' : 's') + ' ready.' : '');
     });
+    document.getElementById('clearShot').addEventListener('click', () => { clearShotImages(); setShotMsg('Image cleared.', 'm-ok'); });
+    document.getElementById('clearText').addEventListener('click', () => { clearShotText(); setShotMsg('Text cleared.', 'm-ok'); });
+    document.getElementById('clearAllShot').addEventListener('click', resetShotPanel);
+    document.getElementById('ocrText').addEventListener('input', syncShotButtons);
+    document.getElementById('clearFlagged').addEventListener('click', clearFlaggedRows);
     document.getElementById('ocrBtn').addEventListener('click', runOcr);
     document.getElementById('readTextBtn').addEventListener('click', readRecognisedText);
-    document.getElementById('ocrText').addEventListener('paste', () => {
+    // A pasted screenshot is read straight away — no need to get Live Text to cooperate.
+    function acceptPastedImages(e) {
+      const imgs = imagesFromClipboard(e);
+      if (!imgs.length) return false;
+      e.preventDefault();
+      shotFiles = imgs;
+      showThumbs(shotFiles);
+      syncShotButtons();
+      setShotMsg('Screenshot pasted \u2014 reading it now\u2026', 'm-ok');
+      document.getElementById('shotPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      runOcr();
+      return true;
+    }
+    document.getElementById('ocrText').addEventListener('paste', e => {
+      if (acceptPastedImages(e)) return;
       setTimeout(() => { document.getElementById('signMode').value = guessSign(document.getElementById('ocrText').value); }, 30);
+    });
+    document.addEventListener('paste', e => {
+      if (e.target && e.target.id === 'ocrText') return;   // already handled above
+      acceptPastedImages(e);
     });
     // standing rule: data-entry fields blank on focus so a new value can be typed straight in
     const mAmt = document.getElementById('mAmt');

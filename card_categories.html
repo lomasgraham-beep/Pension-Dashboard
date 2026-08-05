@@ -25,6 +25,23 @@
   .hint { font-size:13px; color:#64748b; margin:4px 0 0; }
   .warn { color:#c0392b; }
 
+  /* ---- v2: editable merchant keys ---- */
+  input[type=text], select { padding:9px 10px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:16px; box-sizing:border-box; background:#fff; color:#333; min-height:42px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+  .fld { display:flex; flex-direction:column; }
+  label { font-weight:bold; font-size:14px; color:#475569; margin-bottom:4px; }
+  .btn { padding:10px 16px; border:none; border-radius:6px; font-size:15px; font-weight:bold; cursor:pointer; min-height:44px; }
+  .btn-go { background:#3498db; color:#fff; }
+  .btn-ghost { background:#fff; color:#475569; border:1px solid #cbd5e1; }
+  .btn:disabled { opacity:0.5; cursor:default; }
+  .key-in { width:200px; }
+  .cat-in { min-width:190px; }
+  .chk { display:flex; align-items:center; gap:8px; font-size:14px; color:#475569; margin-top:10px; }
+  .chk input { width:20px; height:20px; }
+  #derived { font-size:13px; color:#64748b; min-height:16px; margin-top:6px; }
+  .cnt { font-variant-numeric:tabular-nums; }
+  .cnt-0 { color:#94a3b8; }
+
   @media (prefers-color-scheme: dark) {
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
     h1, h2, h3, h4 { color:#f1f5f9 !important; }
@@ -37,12 +54,17 @@
     #status { background:#1e293b !important; color:#93c5fd !important; }
     td.empty { color:#94a3b8 !important; }
     .warn { color:#f87171 !important; }
+    input[type=text], select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    label, .chk { color:#cbd5e1 !important; }
+    .btn-ghost { background:#0f172a !important; color:#cbd5e1 !important; border-color:#475569 !important; }
+    #derived { color:#94a3b8 !important; }
+    .cnt-0 { color:#64748b !important; }
   }
 </style>
 </head>
 <body>
   <h1>Card Categories</h1>
-  <p class="note">How the Card Entry page chooses a category for each transaction: it uses what you&rsquo;ve taught it first, then these starter rules. <span class="mini">(card categories build: v1)</span></p>
+  <p class="note">How the Card Entry page chooses a category for each transaction: it uses what you&rsquo;ve taught it first, then these starter rules. Learned merchant keys are editable below. <span class="mini">(card categories build: v2)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="matchPanel" class="panel" style="display:none;">
@@ -54,10 +76,34 @@
       <tbody></tbody>
     </table>
     <h3>Learned from you</h3>
+    <p class="hint">Change a category here and every future import picks it up. A key matches if it appears <b>anywhere</b> in the description, so a key of <b>RED DRAGON</b> catches <b>THE RED DRAGON CENTRE 029</b> &mdash; broader keys mean fewer corrections later.</p>
+    <label class="chk"><input type="checkbox" id="alsoSaved"> Also recategorise transactions already saved when I change a mapping</label>
     <table id="memTable">
-      <thead><tr><th class="l">Merchant key</th><th class="l">Category</th><th></th></tr></thead>
+      <thead><tr><th class="l">Merchant key</th><th class="l">Category</th><th>Matches</th><th></th></tr></thead>
       <tbody></tbody>
     </table>
+
+    <h3>Teach a new merchant key</h3>
+    <p class="hint">Paste a description off a statement and the key is worked out for you, or type a key yourself.</p>
+    <div class="row">
+      <div class="fld">
+        <label for="descIn">Statement description (optional)</label>
+        <input type="text" id="descIn" placeholder="THE RED DRAGON CENTRE 029" autocomplete="off">
+      </div>
+      <div class="fld">
+        <label for="newKey">Merchant key</label>
+        <input type="text" id="newKey" class="key-in" placeholder="RED DRAGON" autocomplete="off">
+      </div>
+      <div class="fld">
+        <label for="newCat">Category</label>
+        <select id="newCat" class="cat-in"></select>
+      </div>
+      <div class="fld">
+        <label>&nbsp;</label>
+        <button class="btn btn-go" id="addBtn" type="button">Add mapping</button>
+      </div>
+    </div>
+    <div id="derived"></div>
   </div>
 
 <script>
@@ -65,6 +111,7 @@
   let billCats = [];
   let catByCode = {};
   let merchantMap = {};
+  let txns = [];               // v2: id/description/category_code only, for match counts
 
   // ---------- helpers ----------
   function escapeHtml(s) {
@@ -77,6 +124,38 @@
   }
   function notifyChanged() {
     try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {}
+  }
+  // v2: kept byte-for-byte in step with Card Entry so a key taught here behaves
+  // identically when the next statement is imported.
+  function normDesc(s) {
+    return String(s || '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  function merchantKey(s) {
+    let n = normDesc(s);
+    n = n.replace(/^(PAYPAL|SQ|SUMUP|IZ|IZETTLE|ZTL|WWW|TFL|GOOGLE|GOOGL|APL|APPLE PAY)\s+/, '');
+    const toks = n.split(' ').filter(Boolean);
+    if (!toks.length) return n;
+    let key = toks[0];
+    if (key.length <= 3 && toks[1]) key += ' ' + toks[1];
+    return key;
+  }
+  function catOptions(selected) {
+    let html = '<option value="">\u2014</option>';
+    billCats.forEach(c => {
+      const sel = c.code === selected ? ' selected' : '';
+      html += '<option value="' + escapeHtml(c.code) + '"' + sel + '>' + escapeHtml(c.description || c.code) + '</option>';
+    });
+    return html;
+  }
+  // Which saved transactions would this key catch? Mirrors suggestCategory's matching:
+  // the derived key first, then a plain substring scan.
+  function txnsMatching(key) {
+    const k = normDesc(key);
+    if (!k) return [];
+    return txns.filter(t => {
+      const nd = normDesc(t.description);
+      return merchantKey(t.description) === k || nd.indexOf(k) !== -1;
+    });
   }
 
   // ---------- starter rules ----------
@@ -109,14 +188,17 @@
   async function load() {
     try {
       setStatus('Loading\u2026');
-      const [cats, mm] = await Promise.all([
+      const [cats, mm, tx] = await Promise.all([
         App.rest('bd_bill_category?order=code.asc'),
-        App.rest('bd_merchant_map')
+        App.rest('bd_merchant_map'),
+        App.rest('bd_card_txn?select=id,description,category_code')
       ]);
       billCats = cats || [];
       catByCode = {}; billCats.forEach(c => { catByCode[c.code] = c.description || c.code; });
       resolveConcepts();
       merchantMap = {}; (mm || []).forEach(r => { merchantMap[r.match_text] = r.category_code; });
+      txns = tx || [];
+      document.getElementById('newCat').innerHTML = catOptions('');
       document.getElementById('status').style.display = 'none';
       document.getElementById('matchPanel').style.display = 'block';
       renderMatching();
@@ -139,15 +221,117 @@
     const mb = document.querySelector('#memTable tbody');
     const keys = Object.keys(merchantMap).sort();
     if (!keys.length) {
-      mb.innerHTML = '<tr><td class="empty" colspan="3">Nothing learned yet. Categorise a merchant on Card Entry or Card Statements and it\u2019ll appear here.</td></tr>';
+      mb.innerHTML = '<tr><td class="empty" colspan="4">Nothing learned yet. Categorise a merchant on Card Entry or Card Statements, or add one below.</td></tr>';
     } else {
       mb.innerHTML = keys.map(k => {
         const code = merchantMap[k];
-        return '<tr><td class="l">' + escapeHtml(k) + '</td>' +
-               '<td class="l">' + escapeHtml(catByCode[code] || code || '\u2014') + '</td>' +
-               '<td><button class="btn-del" onclick="delMerchant(\'' + encodeURIComponent(k) + '\')">\u2715</button></td></tr>';
+        const n = txnsMatching(k).length;
+        const enc = encodeURIComponent(k);
+        return '<tr>' +
+          '<td class="l"><input type="text" class="key-in" value="' + escapeHtml(k) + '" data-key="' + enc + '" onchange="renameMerchant(this)"></td>' +
+          '<td class="l"><select class="cat-in" data-key="' + enc + '" onchange="setMerchantCat(this)">' + catOptions(code) + '</select></td>' +
+          '<td class="cnt' + (n ? '' : ' cnt-0') + '">' + n + '</td>' +
+          '<td><button class="btn-del" onclick="delMerchant(\'' + enc + '\')">\u2715</button></td></tr>';
       }).join('');
     }
+  }
+  // ---------- v2: editing ----------
+  async function recategoriseSaved(key, code) {
+    const hits = txnsMatching(key).filter(t => t.category_code !== code);
+    if (!hits.length) return 0;
+    const label = code ? (catByCode[code] || code) : 'no category';
+    if (!confirm('Also change ' + hits.length + ' saved transaction' + (hits.length === 1 ? '' : 's') +
+                 ' matching "' + key + '" to ' + label + '?')) return 0;
+    // PostgREST takes an id list, so this is a handful of calls rather than one per row.
+    for (let i = 0; i < hits.length; i += 100) {
+      const ids = hits.slice(i, i + 100).map(t => t.id);
+      await App.write('PATCH', 'bd_card_txn?id=in.(' + ids.join(',') + ')', { category_code: code || null });
+    }
+    hits.forEach(t => { t.category_code = code || null; });
+    return hits.length;
+  }
+  async function setMerchantCat(el) {
+    const key = decodeURIComponent(el.dataset.key);
+    const code = el.value || null;
+    const was = merchantMap[key];
+    try {
+      await App.write('PATCH', 'bd_merchant_map?match_text=eq.' + encodeURIComponent(key),
+        { category_code: code, updated_at: new Date().toISOString() });
+      merchantMap[key] = code;
+      let extra = '';
+      if (document.getElementById('alsoSaved').checked) {
+        const n = await recategoriseSaved(key, code);
+        if (n) extra = ' and updated ' + n + ' saved transaction' + (n === 1 ? '' : 's');
+      }
+      setStatus(key + ' \u2192 ' + (code ? (catByCode[code] || code) : '\u2014') + extra + '.', 's-ok');
+      notifyChanged();
+      renderMatching();
+    } catch (e) {
+      merchantMap[key] = was;
+      setStatus('Could not update: ' + (e && e.message ? e.message : e), 's-err');
+      renderMatching();
+    }
+  }
+  async function renameMerchant(el) {
+    const oldKey = decodeURIComponent(el.dataset.key);
+    const newKey = normDesc(el.value);
+    if (newKey === oldKey) { el.value = oldKey; return; }
+    if (!newKey) { setStatus('A merchant key cannot be blank.', 's-err'); renderMatching(); return; }
+    if (Object.prototype.hasOwnProperty.call(merchantMap, newKey)) {
+      setStatus('There is already a mapping for ' + newKey + '.', 's-err'); renderMatching(); return;
+    }
+    const code = merchantMap[oldKey];
+    try {
+      await App.write('PATCH', 'bd_merchant_map?match_text=eq.' + encodeURIComponent(oldKey),
+        { match_text: newKey, category_code: code, updated_at: new Date().toISOString() });
+      delete merchantMap[oldKey];
+      merchantMap[newKey] = code;
+      setStatus('Renamed ' + oldKey + ' to ' + newKey + ' \u2014 now matches ' + txnsMatching(newKey).length + ' saved transaction(s).', 's-ok');
+      notifyChanged();
+      renderMatching();
+    } catch (e) {
+      setStatus('Could not rename: ' + (e && e.message ? e.message : e), 's-err');
+      renderMatching();
+    }
+  }
+  async function addMerchant() {
+    const keyEl = document.getElementById('newKey');
+    const key = normDesc(keyEl.value);
+    const code = document.getElementById('newCat').value || null;
+    if (!key) { setStatus('Enter a merchant key, or paste a description to work one out.', 's-err'); return; }
+    if (!code) { setStatus('Pick a category for this merchant key.', 's-err'); return; }
+    if (Object.prototype.hasOwnProperty.call(merchantMap, key)) {
+      setStatus('There is already a mapping for ' + key + ' \u2014 change it in the table above.', 's-err'); return;
+    }
+    const btn = document.getElementById('addBtn');
+    btn.disabled = true; btn.textContent = 'Adding\u2026';
+    try {
+      await App.write('POST', 'bd_merchant_map', { match_text: key, category_code: code });
+      merchantMap[key] = code;
+      let extra = '';
+      if (document.getElementById('alsoSaved').checked) {
+        const n = await recategoriseSaved(key, code);
+        if (n) extra = ' and updated ' + n + ' saved transaction' + (n === 1 ? '' : 's');
+      }
+      setStatus('Added ' + key + ' \u2192 ' + (catByCode[code] || code) + extra + '.', 's-ok');
+      keyEl.value = ''; document.getElementById('descIn').value = '';
+      document.getElementById('newCat').value = '';
+      document.getElementById('derived').textContent = '';
+      notifyChanged();
+      renderMatching();
+    } catch (e) {
+      setStatus('Could not add: ' + (e && e.message ? e.message : e), 's-err');
+    } finally { btn.disabled = false; btn.textContent = 'Add mapping'; }
+  }
+  function onDescIn() {
+    const raw = document.getElementById('descIn').value;
+    const out = document.getElementById('derived');
+    if (!raw.trim()) { out.textContent = ''; return; }
+    const k = merchantKey(raw);
+    document.getElementById('newKey').value = k;
+    const n = txnsMatching(k).length;
+    out.textContent = 'Key worked out: ' + k + ' \u2014 matches ' + n + ' saved transaction' + (n === 1 ? '' : 's') +
+      '. Widen it if you want it to catch more.';
   }
   async function delMerchant(encKey) {
     const key = decodeURIComponent(encKey);
@@ -162,6 +346,14 @@
   }
 
   window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  document.getElementById('addBtn').addEventListener('click', addMerchant);
+  document.getElementById('descIn').addEventListener('input', onDescIn);
+  // standing rule: data-entry fields blank on focus
+  ['descIn', 'newKey'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('focus', function () { this.dataset.prev = this.value; this.value = ''; });
+    el.addEventListener('blur', function () { if (this.value === '' && this.dataset.prev) this.value = this.dataset.prev; });
+  });
 
   if (typeof App === 'undefined' || !App.requireLogin) {
     document.getElementById('status').textContent = 'Error: common.js did not load (App is undefined).';
