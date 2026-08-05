@@ -258,6 +258,25 @@
     };
   }
 
+  // One call for every page that feeds the engine: fetches the fuel settings and lines and returns
+  // the plan figures, the taper and the work end date in the shape the engine wants. Degrades to
+  // zeros on any error, so a page that loads before the fuel tables exist still renders — and with
+  // zeros the engine's fuel term stays inert, exactly as it was before the ann11 split.
+  async function loadFuelForEngine() {
+    try {
+      const res = await Promise.all([
+        rest('bd_fuel_settings?id=eq.1'),
+        rest('bd_fuel_line?phase=eq.retired&order=sort_order.asc')
+      ]);
+      const c = fuelCtx((res[0] && res[0][0]) || {});
+      const a = fuelAnnual(res[1] || [], c);
+      return { ctx: c, planWork: a.workAnnual, planDisc: a.discAnnual, planTotal: a.total,
+               taper: c.taper, workEndsOn: c.workEndsOn };
+    } catch (e) {
+      return { ctx: fuelCtx({}), planWork: 0, planDisc: 0, planTotal: 0, taper: {}, workEndsOn: null, degraded: true };
+    }
+  }
+
   // ---- discretionary basis: Plan vs Actual last-12-months (shared) ----
   // ONE saved choice governs the dining & holiday annual figures handed to the
   // budget, the bills page and the whole modelling engine, so every surface agrees.
@@ -561,6 +580,7 @@
     HOLIDAY_MEALS: HOLIDAY_MEALS,
     fuelCtx: fuelCtx, fuelLineCost: fuelLineCost, fuelWeekLines: fuelWeekLines,
     fuelWeekBreakdown: fuelWeekBreakdown, fuelWeekTotal: fuelWeekTotal, fuelAnnual: fuelAnnual,
+    loadFuelForEngine: loadFuelForEngine,
     FUEL_PURPOSES: FUEL_PURPOSES, FUEL_WORK: FUEL_WORK,
     loadDiscretionaryBasis: loadDiscretionaryBasis, saveDiscretionaryBasis: saveDiscretionaryBasis,
     actualDiscretionary12mo: actualDiscretionary12mo, resolveDiscretionary: resolveDiscretionary,
