@@ -137,13 +137,11 @@
     // accommodation: per-night price × nights
     let accom = 0;
     if (week.category && week.level) accom = (ctx.costMap[week.category + '|' + week.level] || 0) * nights;
-    // fuel: gallons -> litres -> £
-    let fuel = 0;
-    const miles = Number(week.miles) || 0;
-    const mpg = week.towing ? ctx.mpgTowing : ctx.mpgNormal;
-    if (miles > 0 && mpg > 0 && ctx.pricePerLitre > 0) {
-      fuel = (miles / mpg) * LITRES_PER_UK_GALLON * ctx.pricePerLitre;
-    }
+    // fuel: REMOVED at the ann11 split — fuel is now its own term (see the fuel section below)
+    // and is planned per week on bd_fuel_line, not from bd_holiday_plan.miles/towing.
+    // The key is retained and forced to 0 so any page still reading b.fuel shows nothing
+    // rather than throwing; those readers are being removed in the same rollout.
+    const fuel = 0;
     // incidentals
     const incidentals = Number(week.incidentals) || 0;
     // eating out: sum every filled cell in the meal×night grid
@@ -169,6 +167,97 @@
     return Math.round(total * 100) / 100;
   }
 
+  // ---- fuel costing (build ann11 split) ----
+  // Fuel used to be folded into the holiday week total. It is now planned independently on
+  // bd_fuel_line and costed here, because fuel is two different kinds of spend:
+  //
+  //   purpose 'Work'  -> commuting. A fixed cost that ENDS on a date; never tapered, never
+  //                      touched by the spending slider.
+  //   everything else -> discretionary driving (Holiday / Caravan / Out and about), which
+  //                      behaves exactly like dining and holidays.
+  //
+  // STANDING LINES AND DETACHMENT
+  // A row with week_no === null is a STANDING line: it applies to all 52 weeks (the weekly
+  // commute, keyed once). A row for a specific week carrying standing_id = <that standing row's
+  // id> DETACHES it for that week only — the week's row replaces it outright. So a holiday week
+  // with no commute is a detach row with miles 0, and later edits to the standing definition
+  // leave already-detached weeks alone.
+  const FUEL_PURPOSES = ['Work', 'Holiday', 'Caravan', 'Out and about'];
+  const FUEL_WORK = 'Work';
+
+  function fuelCtx(settingsRow) {
+    const s = settingsRow || {};
+    return {
+      pricePerLitre: Number(s.price_per_litre) || 0,
+      mpgNormal: Number(s.mpg_normal) || 0,
+      mpgTowing: Number(s.mpg_towing) || 0,
+      taper: { taper_at_70: s.taper_at_70, taper_at_80: s.taper_at_80, taper_at_90: s.taper_at_90 },
+      workEndsOn: s.work_ends_on || null
+    };
+  }
+
+  // miles ÷ MPG = UK gallons; × 4.54609 = litres; × £/litre. Towing switches to the towing MPG.
+  function fuelLineCost(line, ctx) {
+    const miles = Number(line && line.miles) || 0;
+    const mpg = (line && line.towing) ? ctx.mpgTowing : ctx.mpgNormal;
+    if (miles <= 0 || mpg <= 0 || ctx.pricePerLitre <= 0) return 0;
+    return (miles / mpg) * LITRES_PER_UK_GALLON * ctx.pricePerLitre;
+  }
+
+  // The lines that actually apply to one week: standing lines minus any this week has detached,
+  // plus the week's own rows. `inherited` tells the UI to render it greyed and read-only-ish.
+  function fuelWeekLines(allLines, weekNo) {
+    const rows = allLines || [];
+    const detached = {};
+    rows.forEach(function (l) {
+      if (l.week_no != null && Number(l.week_no) === Number(weekNo) && l.standing_id != null) {
+        detached[l.standing_id] = true;
+      }
+    });
+    const out = [];
+    rows.forEach(function (l) {
+      if (l.week_no == null && !detached[l.id]) {
+        out.push({ id: l.id, purpose: l.purpose, miles: l.miles, towing: l.towing,
+                   sort_order: l.sort_order, inherited: true, standing_id: l.id });
+      }
+    });
+    rows.forEach(function (l) {
+      if (l.week_no != null && Number(l.week_no) === Number(weekNo)) {
+        out.push({ id: l.id, purpose: l.purpose, miles: l.miles, towing: l.towing,
+                   sort_order: l.sort_order, inherited: false, standing_id: l.standing_id });
+      }
+    });
+    out.sort(function (a, b) { return (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0); });
+    return out;
+  }
+
+  // One week, split the way the engine wants it.
+  function fuelWeekBreakdown(allLines, weekNo, ctx) {
+    let work = 0, disc = 0;
+    fuelWeekLines(allLines, weekNo).forEach(function (l) {
+      const c = fuelLineCost(l, ctx);
+      if (l.purpose === FUEL_WORK) work += c; else disc += c;
+    });
+    return { work: work, disc: disc, total: work + disc };
+  }
+
+  function fuelWeekTotal(allLines, weekNo, ctx) { return fuelWeekBreakdown(allLines, weekNo, ctx).total; }
+
+  // Σ over all 52 weeks -> { workAnnual, discAnnual, total }. These map straight onto the engine's
+  // data.fuelWorkAnnual / data.fuelAnnual.
+  function fuelAnnual(allLines, ctx) {
+    let work = 0, disc = 0;
+    for (let w = 1; w <= 52; w++) {
+      const b = fuelWeekBreakdown(allLines, w, ctx);
+      work += b.work; disc += b.disc;
+    }
+    return {
+      workAnnual: Math.round(work * 100) / 100,
+      discAnnual: Math.round(disc * 100) / 100,
+      total: Math.round((work + disc) * 100) / 100
+    };
+  }
+
   // ---- discretionary basis: Plan vs Actual last-12-months (shared) ----
   // ONE saved choice governs the dining & holiday annual figures handed to the
   // budget, the bills page and the whole modelling engine, so every surface agrees.
@@ -183,7 +272,7 @@
   // Persisted in bd_discretionary_basis (single row, id=1) so the choice and the two
   // adjustments follow the user to any device. Category resolution is by name so a
   // rename of the category is picked up automatically; no code list is stored.
-  const DISCRETIONARY_DEFAULT = { basis: 'plan', dining_adjust: 0, holiday_adjust: 0 };
+  const DISCRETIONARY_DEFAULT = { basis: 'plan', dining_adjust: 0, holiday_adjust: 0, fuel_adjust: 0 };
   let _discSettingsCache = null;
 
   async function loadDiscretionaryBasis(force) {
@@ -195,7 +284,8 @@
       out = {
         basis: (r.basis === 'actual') ? 'actual' : 'plan',
         dining_adjust: Number(r.dining_adjust) || 0,
-        holiday_adjust: Number(r.holiday_adjust) || 0
+        holiday_adjust: Number(r.holiday_adjust) || 0,
+        fuel_adjust: Number(r.fuel_adjust) || 0
       };
     } catch (e) { /* table missing or unreadable -> safe default (plan) */ }
     _discSettingsCache = out;
@@ -207,25 +297,27 @@
       basis: (s && s.basis === 'actual') ? 'actual' : 'plan',
       dining_adjust: Number(s && s.dining_adjust) || 0,
       holiday_adjust: Number(s && s.holiday_adjust) || 0,
+      fuel_adjust: Number(s && s.fuel_adjust) || 0,
       updated_at: new Date().toISOString()
     };
     await write('PATCH', 'bd_discretionary_basis?id=eq.1', payload);
-    _discSettingsCache = { basis: payload.basis, dining_adjust: payload.dining_adjust, holiday_adjust: payload.holiday_adjust };
+    _discSettingsCache = { basis: payload.basis, dining_adjust: payload.dining_adjust, holiday_adjust: payload.holiday_adjust, fuel_adjust: payload.fuel_adjust };
     return _discSettingsCache;
   }
 
   // Resolve which bd_bill_category codes are the Dining / Holidays (and Reimburse)
   // buckets, by name (description first, then code), case-insensitive.
   function discretionaryCodeSets(catRows) {
-    const dining = {}, holiday = {}, reimburse = {};
+    const dining = {}, holiday = {}, reimburse = {}, fuel = {};
     (catRows || []).forEach(function (c) {
       const nm = String(c.description || '').trim().toLowerCase();
       const cd = String(c.code || '').trim().toLowerCase();
       if (nm === 'dining' || cd === 'dining') dining[c.code] = true;
       if (nm === 'holiday' || nm === 'holidays' || cd === 'holiday' || cd === 'holidays') holiday[c.code] = true;
       if (nm === 'reimburse' || cd === 'reimburse') reimburse[c.code] = true;
+      if (nm === 'fuel' || nm === 'petrol' || nm === 'diesel' || cd === 'fuel') fuel[c.code] = true;
     });
-    return { dining: dining, holiday: holiday, reimburse: reimburse };
+    return { dining: dining, holiday: holiday, reimburse: reimburse, fuel: fuel };
   }
 
   // Trailing-12-month actual card spend for the Dining / Holidays categories.
@@ -240,12 +332,12 @@
     const present = {};
     (txns || []).forEach(function (t) { const ym = String(t.txn_date || '').slice(0, 7); if (ym) present[ym] = true; });
     const keys = Object.keys(present).sort();
-    if (!keys.length) return { diningTotal: 0, holidayTotal: 0, endMonth: null, months: 12 };
+    if (!keys.length) return { diningTotal: 0, holidayTotal: 0, fuelTotal: 0, endMonth: null, months: 12 };
     const end = keys[keys.length - 1];
     const ey = Number(end.slice(0, 4)), em = Number(end.slice(5, 7));
     const wanted = {};
     for (let i = 11; i >= 0; i--) { let mm = em - i, yy = ey; while (mm <= 0) { mm += 12; yy -= 1; } wanted[yy + '-' + ('0' + mm).slice(-2)] = true; }
-    let dTot = 0, hTot = 0;
+    let dTot = 0, hTot = 0, fTot = 0;
     (txns || []).forEach(function (t) {
       const ym = String(t.txn_date || '').slice(0, 7);
       if (!wanted[ym]) return;
@@ -254,8 +346,10 @@
       const amt = Number(t.amount) || 0;
       if (sets.dining[code]) dTot += amt;
       else if (sets.holiday[code]) hTot += amt;
+      else if (sets.fuel[code]) fTot += amt;
     });
-    return { diningTotal: Math.round(dTot * 100) / 100, holidayTotal: Math.round(hTot * 100) / 100, endMonth: end, months: 12 };
+    return { diningTotal: Math.round(dTot * 100) / 100, holidayTotal: Math.round(hTot * 100) / 100,
+             fuelTotal: Math.round(fTot * 100) / 100, endMonth: end, months: 12 };
   }
 
   // The single figures the engine / budget / bills should consume, honouring the
@@ -263,13 +357,23 @@
   // are returned unchanged (identical to today). On 'actual' the trailing-12-month
   // totals + monthly adjustment×12 are used. If the actual data can't be read, it
   // falls back to plan so nothing ever breaks (degraded:true flags that).
+  //
+  // FUEL AND THE ACTUAL BASIS (ann11). Card spend on fuel cannot tell commuting from leisure
+  // driving — it is one merchant category. But the engine needs the work/discretionary split,
+  // because only the discretionary half tapers and only the work half stops at a date. So on
+  // the 'actual' basis the combined actual figure is APPORTIONED using the plan's own
+  // work:discretionary ratio. The total honours what you really spent; the split honours how
+  // you said you drive. With no fuel plan keyed at all, it falls to discretionary.
   async function resolveDiscretionary(opts) {
     const planD = Number(opts && opts.diningPlanAnnual) || 0;
     const planH = Number(opts && opts.holidayPlanAnnual) || 0;
+    const planFW = Number(opts && opts.fuelWorkPlanAnnual) || 0;
+    const planFD = Number(opts && opts.fuelDiscPlanAnnual) || 0;
     let settings;
     try { settings = await loadDiscretionaryBasis(); } catch (e) { settings = Object.assign({}, DISCRETIONARY_DEFAULT); }
     if (settings.basis !== 'actual') {
-      return { basis: 'plan', diningAnnual: planD, holidayAnnual: planH };
+      return { basis: 'plan', diningAnnual: planD, holidayAnnual: planH,
+               fuelWorkAnnual: planFW, fuelAnnual: planFD };
     }
     let cats = [], txns = [];
     try {
@@ -279,18 +383,26 @@
       ]);
       cats = res[0] || []; txns = res[1] || [];
     } catch (e) {
-      return { basis: 'plan', diningAnnual: planD, holidayAnnual: planH, degraded: true };
+      return { basis: 'plan', diningAnnual: planD, holidayAnnual: planH,
+               fuelWorkAnnual: planFW, fuelAnnual: planFD, degraded: true };
     }
     const a = actualDiscretionary12mo(txns, cats);
     const dAdj = Number(settings.dining_adjust) || 0;   // monthly £
     const hAdj = Number(settings.holiday_adjust) || 0;  // monthly £
+    const fAdj = Number(settings.fuel_adjust) || 0;    // monthly £
+    // apportion the one actual fuel figure across work / discretionary by the plan's ratio
+    const fActual = Math.max(0, Math.round(a.fuelTotal / 12 + fAdj) * 12);
+    const planFT = planFW + planFD;
+    const workShare = planFT > 0 ? (planFW / planFT) : 0;
     // Round each monthly figure to whole pounds first (matching the whole-£ display),
     // then annualise — so the "after adjust / month" shown on Weekly Plan × 12 equals
     // exactly what the model is fed (no few-pounds drift from hidden pence).
     return {
       basis: 'actual',
       diningAnnual: Math.max(0, Math.round(a.diningTotal / 12 + dAdj) * 12),
-      holidayAnnual: Math.max(0, Math.round(a.holidayTotal / 12 + hAdj) * 12)
+      holidayAnnual: Math.max(0, Math.round(a.holidayTotal / 12 + hAdj) * 12),
+      fuelWorkAnnual: Math.round(fActual * workShare * 100) / 100,
+      fuelAnnual: Math.round(fActual * (1 - workShare) * 100) / 100
     };
   }
 
@@ -447,6 +559,9 @@
     holidayCtx: holidayCtx, holidayWeekBreakdown: holidayWeekBreakdown,
     holidayWeekTotal: holidayWeekTotal, holidayAnnual: holidayAnnual,
     HOLIDAY_MEALS: HOLIDAY_MEALS,
+    fuelCtx: fuelCtx, fuelLineCost: fuelLineCost, fuelWeekLines: fuelWeekLines,
+    fuelWeekBreakdown: fuelWeekBreakdown, fuelWeekTotal: fuelWeekTotal, fuelAnnual: fuelAnnual,
+    FUEL_PURPOSES: FUEL_PURPOSES, FUEL_WORK: FUEL_WORK,
     loadDiscretionaryBasis: loadDiscretionaryBasis, saveDiscretionaryBasis: saveDiscretionaryBasis,
     actualDiscretionary12mo: actualDiscretionary12mo, resolveDiscretionary: resolveDiscretionary,
     discretionaryCodeSets: discretionaryCodeSets,
