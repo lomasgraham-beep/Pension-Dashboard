@@ -6,7 +6,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=cat1"></script>
 <style>
-  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:760px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1200px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin-bottom:2px; }
   .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
   .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
@@ -21,7 +21,20 @@
   .btn-add { background:#27ae60; color:#fff; }
   .btn-del { background:#fff5f5; color:#c0392b; border:1px solid #f5c6cb; padding:8px 14px; min-height:0; font-size:14px; }
   table { border-collapse:collapse; width:100%; margin-top:6px; }
-  th, td { padding:10px 12px; border-bottom:1px solid #e2e8f0; text-align:left; }
+  th, td { padding:9px 10px; border-bottom:1px solid #e2e8f0; text-align:left; vertical-align:top; }
+  /* v5: fixed column budget — without this the definition textarea expands and squeezes the rest */
+  #catTable { table-layout:fixed; }
+  #catTable th:nth-child(1), #catTable td:nth-child(1) { width:88px; }
+  #catTable th:nth-child(2), #catTable td:nth-child(2) { width:150px; }
+  #catTable th:nth-child(3), #catTable td:nth-child(3) { width:auto; }
+  #catTable th:nth-child(4), #catTable td:nth-child(4) { width:210px; }
+  #catTable th:nth-child(5), #catTable td:nth-child(5) { width:76px; text-align:right; }
+  #catTable th:nth-child(6), #catTable td:nth-child(6) { width:96px; text-align:right; }
+  #catTable td:nth-child(1) { word-break:break-word; }
+  .actcell { display:flex; flex-direction:column; gap:6px; }
+  .actrow { display:flex; gap:8px; align-items:center; white-space:nowrap; }
+  .covline { font-size:12px; color:#64748b; line-height:1.35; }
+  .covline b { color:#2c3e50; }
   th { background:#f8fafc; color:#475569; font-size:14px; }
   .inuse { color:#64748b; font-size:13px; }
   #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
@@ -46,7 +59,7 @@
 </head>
 <body>
   <h1>Bill Categories</h1>
-  <p class="note">Manage the category codes used by Household Bills. Add a category here first, then it becomes available in the bills dropdown. Descriptions are editable in the table below. <span style="color:#94a3b8;">(categories build: v4)</span></p>
+  <p class="note">Manage the category codes used by Household Bills. Add a category here first, then it becomes available in the bills dropdown. Descriptions are editable in the table below. <span style="color:#94a3b8;">(categories build: v5)</span></p>
   <div id="status">Loading…</div>
 
   <div class="panel" id="panel" style="display:none;">
@@ -71,8 +84,8 @@
       <button class="btn btn-save" onclick="saveDefs()">Save changes</button>
       <span class="inuse" id="defHint" style="margin-left:10px;">Edit any description or definition below, then Save. Codes can’t be changed — bills, card transactions and merchant keys all point at them.</span>
     </div>
-    <p class="note" style="margin-top:0;">Tick <strong>Use actual costs</strong> to drive a category from your real card spend instead of the planned figure &mdash; the trailing 12 months divided by 12. It only takes effect when the basis on the Weekly Plan page is <strong>Mixed</strong> (or <strong>Actual</strong>, which additionally forces dining, holidays and fuel on). <strong>Card spend (12mo)</strong> is your coverage check: a category with no card spend, or with no bill row to override, is flagged here because the tick would otherwise do nothing silently. Categories paid by direct debit &mdash; council tax, mortgage &mdash; have no card spend and should stay unticked. <span class="inuse" id="covWin"></span></p>
-    <table id="catTable"><thead><tr><th>Code</th><th>Description</th><th>Category Definition</th><th>Use actual costs</th><th>Card spend (12mo)</th><th>In use by</th><th></th></tr></thead><tbody></tbody></table>
+    <p class="note" style="margin-top:0;">Tick <strong>Use actual costs</strong> to drive a category from your real card spend instead of the planned figure &mdash; the trailing 12 months divided by 12. It only takes effect when the basis on the Weekly Plan page is <strong>Mixed</strong> (or <strong>Actual</strong>, which additionally forces dining, holidays and fuel on). <strong>Card spend (12mo)</strong> is your coverage check: a category with no card spend, or with no bill row to override, is flagged here because the tick would otherwise do nothing silently. Categories paid by direct debit &mdash; council tax, mortgage &mdash; have no card spend and should stay unticked. A ticked category with no card spend keeps its planned figure rather than dropping to zero. <span class="inuse" id="covWin"></span></p>
+    <table id="catTable"><thead><tr><th>Code</th><th>Description</th><th>Category Definition</th><th>Actual costs &amp; 12mo card spend</th><th>In use</th><th></th></tr></thead><tbody></tbody></table>
   </div>
 
 <script>
@@ -126,14 +139,14 @@
 
   function renderRows() {
     const tb = document.querySelector('#catTable tbody');
-    if (!cats.length) { tb.innerHTML = '<tr><td colspan="7" style="color:#94a3b8;">No categories yet — add one above.</td></tr>'; return; }
+    if (!cats.length) { tb.innerHTML = '<tr><td colspan="6" style="color:#94a3b8;">No categories yet — add one above.</td></tr>'; return; }
     tb.innerHTML = cats.map(c => {
       const code = c.code;
       const n = usage[code] || 0;
-      const useText = n === 0 ? 'not used' : n + (n === 1 ? ' bill' : ' bills');
+      const useText = n === 0 ? '\u2014' : n + (n === 1 ? ' bill' : ' bills');
       const delBtn = n === 0
         ? '<button class="btn-del" onclick="delCat(\'' + encodeURIComponent(code) + '\')">Delete</button>'
-        : '<span class="inuse">in use — can\'t delete</span>';
+        : '<span class="inuse">in use</span>';
       const cnt = (c.definition || '').length;
       const safeCode = esc(code).replace(/"/g, '&quot;');
       const descCell =
@@ -146,34 +159,30 @@
       // ---- v4: actual-costs flag, adjust, and coverage ----
       const cov = coverage[code] || { total: 0, count: 0 };
       const planner = isPlannerCat(c), reimb = isReimburseCat(c);
-      let actCell, covCell;
+      let actCell;
       if (reimb) {
-        actCell = '<span class="inuse">n/a &mdash; refunds</span>';
-        covCell = '<span class="inuse">excluded</span>';
+        actCell = '<div class="covline">n/a &mdash; refunds are excluded from every category total</div>';
       } else {
-        const chk = '<label style="display:flex; gap:6px; align-items:center; white-space:nowrap;">' +
+        const chk = '<label class="actrow">' +
           '<input type="checkbox" class="act-input" data-code="' + safeCode + '"' +
-          (c.use_actual ? ' checked' : '') + ' style="width:20px; height:20px;">' +
-          '<span>' + (planner ? 'Actual (planner)' : 'Actual') + '</span></label>';
-        const adj = '<div style="margin-top:6px; white-space:nowrap;"><span class="inuse">adjust &pound;/mo </span>' +
+          (c.use_actual ? ' checked' : '') + ' style="width:20px; height:20px; flex:none;">' +
+          '<span>Use actual' + (planner ? ' (planner)' : '') + '</span>' +
+          '<span class="inuse">adjust &pound;</span>' +
           '<input type="number" step="0.01" class="adj-input" data-code="' + safeCode + '" ' +
-          'value="' + (Number(c.actual_adjust) || 0) + '" style="width:90px;"></div>';
-        actCell = chk + adj;
+          'value="' + (Number(c.actual_adjust) || 0) + '" style="width:72px; flex:none;"></label>';
         // coverage: the guard against ticking a category with nothing behind it
-        if (cov.count === 0) {
-          covCell = '<span class="warncov">no card spend</span>';
-        } else {
-          covCell = '<strong>' + fmtGBP(cov.total) + '</strong><div class="inuse">' + cov.count +
-                    (cov.count === 1 ? ' txn' : ' txns') + ' &middot; ' + fmtGBP(cov.total / 12) + '/mo</div>';
-        }
-        // flagged but nothing to apply it to
-        if (c.use_actual && !planner && cov.count === 0) covCell += '<div class="warncov">flag has no effect</div>';
-        if (c.use_actual && !planner && cov.count > 0 && n === 0) covCell += '<div class="warncov">no bill row to override</div>';
+        let cov1;
+        if (cov.count === 0) cov1 = '<span class="warncov">no card spend</span>';
+        else cov1 = '<b>' + fmtGBP(cov.total) + '</b> &middot; ' + cov.count + (cov.count === 1 ? ' txn' : ' txns') +
+                    ' &middot; ' + fmtGBP(cov.total / 12) + '/mo';
+        let warn = '';
+        if (c.use_actual && !planner && cov.count === 0) warn = '<div class="warncov">tick has no effect &mdash; planned figure kept</div>';
+        else if (c.use_actual && !planner && n === 0) warn = '<div class="warncov">no bill row to override</div>';
+        actCell = '<div class="actcell">' + chk + '<div class="covline">' + cov1 + '</div>' + warn + '</div>';
       }
-      return '<tr><td><strong>' + esc(code) + '</strong></td><td style="min-width:180px;">' + descCell + '</td>' +
-             '<td style="min-width:260px;">' + defCell + '</td>' +
-             '<td style="min-width:150px;">' + actCell + '</td>' +
-             '<td style="min-width:120px;">' + covCell + '</td>' +
+      return '<tr><td><strong>' + esc(code) + '</strong></td><td>' + descCell + '</td>' +
+             '<td>' + defCell + '</td>' +
+             '<td>' + actCell + '</td>' +
              '<td class="inuse">' + useText + '</td>' +
              '<td style="text-align:right; white-space:nowrap;">' + delBtn + '</td></tr>';
     }).join('');
