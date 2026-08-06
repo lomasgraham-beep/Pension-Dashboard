@@ -111,6 +111,10 @@
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
     h1 { color:#f1f5f9 !important; } .note { color:#94a3b8 !important; }
     #status { background:#1e293b !important; color:#93c5fd !important; }
+    .navbar { background:#1e293b !important; border-color:#334155 !important; }
+    .nav-btn { background:#0f172a !important; color:#cbd5e1 !important; border-color:#475569 !important; }
+    .nav-btn.now.away { background:#b45309 !important; color:#fff !important; border-color:#b45309 !important; }
+    .nav-view { color:#f1f5f9 !important; }
     .seg { border-color:#334155 !important; }
     .seg-btn { background:#1e293b; color:#cbd5e1; border-right-color:#334155; }
     .seg-btn.active { background:#38d6e6; color:#0f172a; }
@@ -154,26 +158,14 @@
 </head>
 <body>
   <h1>What I Could Save</h1>
-  <p class="note">Month-by-month for the year you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home on a 5-day or 3-day week. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months, as do Xmas and birthday gifts (age-tapered gift values inflated 0.5%/yr, from the Gift Savings page), sitting in the paying account's column. The last column is what's left to save after everything, including pension contributions (shown as their net cost, matching the budget). Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings) and general costs each April — not at the calendar-year line. Pension contributions follow their own dated schedule: a planned change (e.g. a September step) takes effect in its month and then stays flat, and is not inflated on top — exactly matching the Budget. The chart shows what's left to save each month as green bars (red if a month runs short) against the red cost line; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf19)</span></p>
+  <p class="note">Month-by-month for the rolling 12 months from the month you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home. The working pattern is no longer a choice — each month uses the pattern in force that month from the working-days schedule, so a window spanning a change shows the old pattern before it and the new one after, and the 12-month total is the real blend. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months, as do Xmas and birthday gifts (age-tapered gift values inflated 0.5%/yr, from the Gift Savings page), sitting in the paying account's column. The last column is what's left to save after everything, including pension contributions (shown as their net cost, matching the budget). Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings) and general costs each April — not at the calendar-year line. Pension contributions follow their own dated schedule: a planned change (e.g. a September step) takes effect in its month and then stays flat, and is not inflated on top — exactly matching the Budget. The chart shows what's left to save each month as green bars (red if a month runs short) against the red cost line; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf20)</span></p>
   <div id="status">Loading&hellip;</div>
 
-  <div id="controls" class="controls" style="display:none;">
-    <div class="ctl">
-      <span class="lbl">Working week</span>
-      <div class="seg" id="daysSeg">
-        <button class="seg-btn active" data-d="5" onclick="setDays(5)">5-day week</button>
-        <button class="seg-btn" data-d="3" onclick="setDays(3)">3-day week</button>
-      </div>
-    </div>
-    <div class="ctl">
-      <span class="lbl">Year</span>
-      <div class="yearpick">
-        <button class="stepbtn" id="yminus" onclick="stepYear(-1)">&minus;</button>
-        <input type="range" id="yslider" min="0" max="0" step="1" value="0" oninput="onSlider(this.value)">
-        <button class="stepbtn" id="yplus" onclick="stepYear(1)">+</button>
-        <span class="yearval" id="yearVal">&mdash;</span>
-      </div>
-    </div>
+  <div id="controls" class="navbar" style="display:none;">
+    <button class="nav-btn" id="prevBtn" onclick="stepMonth(-1)">&#9664; Prev</button>
+    <button class="nav-btn now" id="nowBtn" onclick="goNow()">This Month</button>
+    <button class="nav-btn" id="nextBtn" onclick="stepMonth(1)">Next &#9654;</button>
+    <span class="nav-view" id="navView"></span>
   </div>
 
   <div id="headline" class="headline" style="display:none;"></div>
@@ -201,9 +193,18 @@
   function monthIndexForWeek(w) { return new Date(CUR_Y, 0, 1 + (w - 1) * 7).getMonth(); }
 
   let DATA = null;
-  let selDays = 5;
-  let selYear = CUR_Y;
-  let minYear = CUR_Y, maxYear = CUR_Y;
+  // sf20: rolling 12-month window. selY/selM0 are the START of the window, not a calendar year.
+  // Slot sl (0..11) -> absolute month index startIdx()+sl; slotY/slotM give its year and calendar
+  // month. Every per-month array (bills, dining, fuel, card) is still indexed by CALENDAR month,
+  // so anything reading those uses slotM(sl), while inflation factors use slotY(sl).
+  let selY = CUR_Y, selM0 = CUR_M0;
+  let minIdx = NOW_IDX, maxIdx = NOW_IDX;
+  let navReady = false;
+  function startIdx() { return selY * 12 + selM0; }
+  function slotIdx(sl) { return startIdx() + sl; }
+  function slotY(sl) { return Math.floor(slotIdx(sl) / 12); }
+  function slotM(sl) { return slotIdx(sl) % 12; }
+  function slotLabel(sl) { return MABBR[slotM(sl)] + ' ' + slotY(sl); }
   const openMonths = new Set();
   const openDiffs = new Set();
 
@@ -247,10 +248,11 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [members, bills, incAmts, otherInc, bankAccts, mealCost, diningRota, holidayPlan, holidayCost, holidaySettings, params, contribs, catRows, contribSchedule, gifts, fuelSettings, fuelLines] = await Promise.all([
+      const [members, bills, incAmts, workTiers, otherInc, bankAccts, mealCost, diningRota, holidayPlan, holidayCost, holidaySettings, params, contribs, catRows, contribSchedule, gifts, fuelSettings, fuelLines] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
         App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc').then(App.applyJulieBasis),
         App.rest('bd_income_amounts?order=member_name.asc'),
+        App.rest('bd_working_tiers?order=from_date.asc'),
         App.rest('bd_other_income?order=member_name.asc'),
         App.rest('bd_bank_account?order=account_id.asc'),
         App.rest('bd_meal_cost'),
@@ -388,8 +390,9 @@
         const y = new Date(p.retirement_date).getFullYear();
         if (isFinite(y) && (jointRetYear == null || y > jointRetYear)) jointRetYear = y;
       });
-      minYear = CUR_Y;
-      maxYear = (jointRetYear && jointRetYear >= CUR_Y) ? jointRetYear : CUR_Y;
+      // window start can run from this month to December of the joint-retirement year
+      minIdx = NOW_IDX;
+      maxIdx = Math.max(NOW_IDX, ((jointRetYear && jointRetYear >= CUR_Y) ? jointRetYear : CUR_Y) * 12 + 11);
 
       // salary review month per member = the increase_month they use on their pension contributions
       // (Graham stated salary rises follow the same timing as contribution increases). Most common per member; default April.
@@ -423,37 +426,56 @@
       DATA = { cols, acctHolder, acctBank, memberMonth, memberAcct, cardMonth, cardBills,
                paypalMonth, paypalBills, diningMonth, holidayMonth, fuelMonth, salaryByMemberDays, otherByMember,
                daysWithSalary, jointRetYear, salaryMonth, catMonth, catLabel, cardCat, paypalCat, pensRows, pensTierDays,
-               schedule: contribSchedule || [], membersRaw: members || [], bankAcctsRaw: bankAccts || [], gifts: gifts || [] };
+               tiers: workTiers || [], schedule: contribSchedule || [], membersRaw: members || [], bankAcctsRaw: bankAccts || [], gifts: gifts || [] };
 
-      selYear = CUR_Y;
-      initSlider();
+      selY = CUR_Y; selM0 = CUR_M0;
+      initNav();
       status.style.display = 'none';
       document.getElementById('controls').style.display = 'flex';
       render();
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
 
-  function initSlider() {
-    const s = document.getElementById('yslider');
-    s.min = String(minYear); s.max = String(maxYear); s.value = String(selYear);
-    const single = maxYear <= minYear;
-    s.disabled = single;
-    document.getElementById('yminus').disabled = single;
-    document.getElementById('yplus').disabled = single;
-    syncYearUI();
+  function initNav() {
+    navReady = true;
+    document.getElementById('controls').style.display = 'flex';
+    updateNav();
   }
-  function syncYearUI() {
-    document.getElementById('yearVal').textContent = selYear;
-    document.getElementById('yslider').value = String(selYear);
-    document.getElementById('yminus').disabled = (selYear <= minYear);
-    document.getElementById('yplus').disabled = (selYear >= maxYear);
+  function clampStart(idx) { return Math.max(minIdx, Math.min(maxIdx, idx)); }
+  function setStart(idx) { const c = clampStart(idx); selY = Math.floor(c / 12); selM0 = c % 12; updateNav(); render(); }
+  function stepMonth(delta) { setStart(startIdx() + delta); }
+  function goNow() { setStart(NOW_IDX); }
+  function isThisMonth() { return startIdx() === NOW_IDX; }
+  function updateNav() {
+    if (!navReady) return;
+    document.getElementById('navView').textContent = 'Viewing: ' + MONTHS_FULL[selM0] + ' ' + selY;
+    document.getElementById('nowBtn').classList.toggle('away', !isThisMonth());
+    document.getElementById('prevBtn').disabled = (startIdx() <= minIdx);
+    document.getElementById('nextBtn').disabled = (startIdx() >= maxIdx);
   }
-  function onSlider(v) { selYear = Math.max(minYear, Math.min(maxYear, Number(v))); syncYearUI(); render(); }
-  function stepYear(delta) { selYear = Math.max(minYear, Math.min(maxYear, selYear + delta)); syncYearUI(); render(); }
-  function setDays(d) {
-    selDays = d;
-    document.querySelectorAll('#daysSeg .seg-btn').forEach(b => b.classList.toggle('active', Number(b.dataset.d) === d));
-    render();
+
+  // sf20: the working-days tier follows the month being shown, not a selector. A tier applies from
+  // the month its from_date falls in, so a 3-day week starting 1 Sep leaves August on 5-day and
+  // makes September onward 3-day — within a single window, side by side. Before the earliest tier,
+  // the earliest one applies. Null (no schedule) lets memberSalary fall back to their fullest row.
+  function tierMonthIdx(dt) {
+    if (!dt) return null;
+    const q = String(dt).split('T')[0].split('-');
+    if (q.length < 2) return null;
+    const y = Number(q[0]), mo = Number(q[1]);
+    return (Number.isFinite(y) && Number.isFinite(mo)) ? y * 12 + (mo - 1) : null;
+  }
+  function daysAt(member, idx) {
+    let best = null, bestIdx = -Infinity, first = null, firstIdx = Infinity;
+    (DATA.tiers || []).forEach(t => {
+      if (t.member_name !== member || t.days == null) return;
+      const ti = tierMonthIdx(t.from_date);
+      if (ti == null) return;
+      if (ti < firstIdx) { firstIdx = ti; first = t; }
+      if (ti <= idx && ti > bestIdx) { bestIdx = ti; best = t; }
+    });
+    const use = best || first;
+    return use ? Number(use.days) : null;
   }
 
   function memberSalary(name, days) {
@@ -466,18 +488,19 @@
   function incomeForMember(name, days) { return memberSalary(name, days) + DATA.otherByMember[name]; }
 
   // pension: pick the tier matching the selected pattern, else the member's fullest pension tier
-  function effectivePensDays(name) {
+  function effectivePensDays(name, idx) {
     const tiers = DATA.pensTierDays[name] || {};
-    if (tiers[selDays]) return selDays;
+    const d = daysAt(name, idx);
+    if (d != null && tiers[d]) return d;
     const keys = Object.keys(tiers).map(Number);
     return keys.length ? Math.max.apply(null, keys) : null;
   }
   // Contribution in force for a pension row in the given month, from the dated schedule
   // (bd_contribution_schedule) — mirrors budget.html contribForViewedMonth. Latest entry whose
-  // effective_from <= (selYear, m) wins; schedule working_days blank matches any tier. Flat (no
+  // effective_from <= the month's absolute index wins; schedule working_days blank matches any
+  // tier. Flat (no
   // escalation), falling back to the live mirror value (netToday) when no dated entry applies.
-  function pensRowCost(r, m) {
-    const viewIdx = selYear * 12 + m;
+  function pensRowCost(r, viewIdx) {
     let best = null, bestIdx = -Infinity;
     (DATA.schedule || []).forEach(e => {
       if (e.member_name !== r.member || e.pension_name !== r.pname) return;
@@ -489,11 +512,10 @@
     });
     return best ? (Number(best.monthly_value) || 0) : r.netToday;
   }
-  function activePensRows() {
-    return DATA.pensRows.filter(r => { const ed = effectivePensDays(r.member); return r.days == null || r.days === ed; });
+  function activePensRows(idx) {
+    return DATA.pensRows.filter(r => { const ed = effectivePensDays(r.member, idx); return r.days == null || r.days === ed; });
   }
-  function pensionMonth(m) { return activePensRows().reduce((s, r) => s + pensRowCost(r, m), 0); }
-  function incomeTotal(days) { return DATA.cols.reduce((s, n) => s + incomeForMember(n, days), 0); }
+  function pensionMonth(idx) { return activePensRows(idx).reduce((s, r) => s + pensRowCost(r, idx), 0); }
 
   // ---- Gift savings (Xmas / Birthdays): bills-style taper on a gift value, inflated 0.5%/yr from now.
   // Bought on the card but funded from a savings account, so carried as a smoothed monthly set-aside
@@ -512,9 +534,9 @@
   }
   function giftFactor(Y) { return Math.pow(1.005, Math.max(0, Y - CUR_Y)); }
   // owner (paying-account holder) -> smoothed monthly gift set-aside for the selected year (0.5%-inflated)
-  function giftByOwner() {
+  function giftByOwner(Y) {
     const d = DATA, out = {};
-    const age = giftRefAge(selYear), f = giftFactor(selYear);
+    const age = giftRefAge(Y), f = giftFactor(Y);
     (d.gifts || []).forEach(g => {
       const sav = (g.savings_account || '').trim(); if (!sav) return;
       const savAcct = (d.bankAcctsRaw || []).find(a => (a.account_id || '').trim() === sav);
@@ -528,17 +550,19 @@
     return out;
   }
 
-  function monthValues(m) {
-    const d = DATA, cf = costFactor(selYear, m);
-    const gbo = giftByOwner();   // owner -> gift set-aside (0.5%-inflated), constant across the year
-    const incCols = d.cols.map(n => incomeForMember(n, selDays) * incomeFactor(n, selYear, m));   // steps up in each person's review month
+  function monthValues(sl) {
+    const d = DATA, y = slotY(sl), m = slotM(sl), idx = slotIdx(sl), cf = costFactor(y, m);
+    const gbo = giftByOwner(y);   // owner -> gift set-aside (0.5%-inflated)
+    // sf20: each month takes the working pattern in force THAT month, so a window spanning a tier
+    // change shows 5-day months then 3-day months and the 12-month total is the real blend.
+    const incCols = d.cols.map(n => incomeForMember(n, daysAt(n, idx)) * incomeFactor(n, y, m));   // steps up in each person's review month
     const cols = d.cols.map(n => d.memberMonth[n][m] * cf + (gbo[n] || 0));
     const dining = d.diningMonth[m] * cf;
     const holiday = d.holidayMonth[m] * cf;
     const fuel = d.fuelMonth[m] * cf;
     const card = d.cardMonth[m] * cf;
     const paypal = d.paypalMonth[m] * cf;
-    const pension = pensionMonth(m);   // dated-schedule value in force for the month; flat, not inflation-scaled (matches Budget)
+    const pension = pensionMonth(idx);   // dated-schedule value in force for the month; flat, not inflation-scaled (matches Budget)
     const total = cols.reduce((s, v) => s + v, 0) + dining + holiday + fuel + card + paypal + pension;
     const income = incCols.reduce((s, v) => s + v, 0);
     return { incCols, cols, dining, holiday, fuel, card, paypal, pension, total, income, available: income - total };
@@ -612,7 +636,7 @@
     const c = CHART; if (!c) return;
     const g = document.getElementById('chartGuide');
     if (g) { g.setAttribute('x1', c.xs[m]); g.setAttribute('x2', c.xs[m]); g.style.display = 'block'; }
-    document.getElementById('chartReadout').innerHTML = '<b>' + MABBR[m] + ' ' + selYear + '</b> &middot; <span style="color:var(--cost)">cost ' + fmt(c.totals[m]) + '</span> &middot; <span style="color:var(--save)">save ' + fmt(c.avails[m]) + '</span>';
+    document.getElementById('chartReadout').innerHTML = '<b>' + slotLabel(m) + '</b> &middot; <span style="color:var(--cost)">cost ' + fmt(c.totals[m]) + '</span> &middot; <span style="color:var(--save)">save ' + fmt(c.avails[m]) + '</span>';
   }
   function clearPoint() { const g = document.getElementById('chartGuide'); if (g) g.style.display = 'none'; setReadoutDefault(); }
 
@@ -625,12 +649,22 @@
     for (let m = 0; m < 12; m++) { const v = monthValues(m); annualTotal += v.total; annualIncome += v.income; }
     const annualAvail = annualIncome - annualTotal;
     const hn = document.getElementById('headline');
-    const fellBack = d.cols.filter(n => { const map = d.salaryByMemberDays[n] || {}; return map[selDays] == null && Object.keys(map).length > 0; });
-    const fbNote = fellBack.length ? '<div class="meta" style="margin-top:4px;">' + esc(fellBack.join(' & ')) + (fellBack.length > 1 ? ' are' : ' is') + ' shown at their standard pattern \u2014 no ' + selDays + '-day salary entered.</div>' : '';
+    // sf20: the pattern is per month now, so report the distinct patterns actually used in the window
+    const usedDays = {};
+    for (let sl = 0; sl < 12; sl++) d.cols.forEach(n => { const dd = daysAt(n, slotIdx(sl)); if (dd != null) usedDays[dd] = 1; });
+    const dayKeys = Object.keys(usedDays).map(Number).sort((a, b) => b - a);
+    const patNote = dayKeys.length ? ' on a ' + dayKeys.join('/') + '-day week' : '';
+    const fellBack = d.cols.filter(n => {
+      const map = d.salaryByMemberDays[n] || {};
+      if (!Object.keys(map).length) return false;
+      for (let sl = 0; sl < 12; sl++) { const dd = daysAt(n, slotIdx(sl)); if (dd != null && map[dd] == null) return true; }
+      return false;
+    });
+    const fbNote = fellBack.length ? '<div class="meta" style="margin-top:4px;">' + esc(fellBack.join(' & ')) + (fellBack.length > 1 ? ' are' : ' is') + ' shown at their standard pattern \u2014 no salary entered for the pattern their schedule gives.</div>' : '';
     const warn = (annualIncome === 0) ? '<div class="warn">No income found for these members. Add salaries and other income on the Workplace Income page.</div>' : '';
     hn.innerHTML =
       '<div class="big' + (annualAvail < 0 ? ' neg' : '') + '">' + fmt(annualAvail) + '</div>' +
-      '<div class="meta">could be saved across ' + selYear + ' on a ' + selDays + '-day week &middot; take-home avg ' + fmt(annualIncome / 12) + '/mo &middot; costs ' + fmt(annualTotal) + '/yr</div>' +
+      '<div class="meta">could be saved across the 12 months from ' + slotLabel(0) + patNote + ' &middot; take-home avg ' + fmt(annualIncome / 12) + '/mo &middot; costs ' + fmt(annualTotal) + ' over the window</div>' +
       fbNote + warn;
     hn.style.display = 'block';
 
@@ -660,7 +694,7 @@
 
       const open = openMonths.has(m);
       const odiff = openDiffs.has(m);
-      const cells = ['<td class="mon"><span class="chev">&#9656;</span> ' + MABBR[m] + ' ' + selYear +
+      const cells = ['<td class="mon"><span class="chev">&#9656;</span> ' + slotLabel(m) +
           '<button type="button" class="ibtn" onclick="event.stopPropagation();toggleDiff(' + m + ')" title="What changed vs the previous month">i</button></td>']
         .concat(v.incCols.map(val => '<td class="inc">' + fmt(val) + '</td>'))
         .concat(v.cols.map(val => '<td>' + fmt(val) + '</td>'))
@@ -679,7 +713,7 @@
     }
 
     // year totals row
-    const totalCells = ['<td class="mon">' + selYear + ' total</td>']
+    const totalCells = ['<td class="mon">12-month total</td>']
       .concat(yearSums.inc.map(val => '<td class="inc">' + fmt(val) + '</td>'))
       .concat(yearSums.cols.map(val => '<td>' + fmt(val) + '</td>'))
       .concat([
@@ -709,9 +743,12 @@
     return rows.map(r => '<div class="drow"><span class="nm">' + esc(r.label) + '</span><span class="vl">' + fmt(r.val) + '</span></div>').join('');
   }
 
-  function acctCards(m, f, byCat) {
+  function acctCards(sl, f, byCat) {
+    // sl is a SLOT (0..11) in the rolling window. The per-month arrays are indexed by CALENDAR
+    // month (cm); gift set-asides inflate by the slot's year; pensions key off the absolute index.
+    const cm = slotM(sl), y = slotY(sl);
     const d = DATA; let cards = '';
-    const gbo = giftByOwner();   // owner -> gift set-aside (already 0.5%-inflated for the selected year)
+    const gbo = giftByOwner(y);   // owner -> gift set-aside (already 0.5%-inflated for the selected year)
     d.cols.forEach(name => {
       const accts = d.memberAcct[name] || {};
       const acctIds = Object.keys(accts).sort();
@@ -719,10 +756,10 @@
       if (!acctIds.length) inner = '<div class="empty">No bills paid by ' + esc(name) + '</div>';
       acctIds.forEach(aid => {
         const a = accts[aid];
-        const sub = a.m[m] * f; total += sub;
+        const sub = a.m[cm] * f; total += sub;
         const bank = d.acctBank[aid] ? (d.acctBank[aid] + ' \u00b7 ') : '';
         inner += '<div class="drow acct-sub"><span class="nm">' + esc(bank + aid) + '</span><span class="vl">' + fmt(sub) + '</span></div>';
-        inner += innerRows(byCat ? a.cat : a.bills, m, f, byCat) || '<div class="empty">\u2014</div>';
+        inner += innerRows(byCat ? a.cat : a.bills, cm, f, byCat) || '<div class="empty">\u2014</div>';
       });
       const gv = gbo[name] || 0;
       if (gv > 0.005) {
@@ -731,20 +768,20 @@
       }
       cards += '<div class="dcard"><div class="dhead"><span>' + esc(name) + '</span><span>' + fmt(total) + '</span></div>' + inner + '</div>';
     });
-    cards += costCard('Credit card', byCat ? d.cardCat : d.cardBills, d.cardMonth[m] * f, m, f, byCat);
-    cards += costCard('PayPal', byCat ? d.paypalCat : d.paypalBills, d.paypalMonth[m] * f, m, f, byCat);
-    cards += '<div class="dcard"><div class="dhead"><span>Dining</span><span>' + fmt(d.diningMonth[m] * f) + '</span></div>' +
-             '<div class="drow"><span class="nm">From weekly rota <span class="dnote">(weeks in ' + MABBR[m] + ')</span></span><span class="vl">' + fmt(d.diningMonth[m] * f) + '</span></div></div>';
-    cards += '<div class="dcard"><div class="dhead"><span>Holidays</span><span>' + fmt(d.holidayMonth[m] * f) + '</span></div>' +
-             '<div class="drow"><span class="nm">Monthly set-aside <span class="dnote">(today-based)</span></span><span class="vl">' + fmt(d.holidayMonth[m] * f) + '</span></div></div>';
-    cards += '<div class="dcard"><div class="dhead"><span>Fuel</span><span>' + fmt(d.fuelMonth[m] * f) + '</span></div>' +
-             '<div class="drow"><span class="nm">Planned driving <span class="dnote">(from weekly plan)</span></span><span class="vl">' + fmt(d.fuelMonth[m] * f) + '</span></div></div>';
-    cards += pensionCard(m);
+    cards += costCard('Credit card', byCat ? d.cardCat : d.cardBills, d.cardMonth[cm] * f, cm, f, byCat);
+    cards += costCard('PayPal', byCat ? d.paypalCat : d.paypalBills, d.paypalMonth[cm] * f, cm, f, byCat);
+    cards += '<div class="dcard"><div class="dhead"><span>Dining</span><span>' + fmt(d.diningMonth[cm] * f) + '</span></div>' +
+             '<div class="drow"><span class="nm">From weekly rota <span class="dnote">(weeks in ' + MABBR[cm] + ')</span></span><span class="vl">' + fmt(d.diningMonth[cm] * f) + '</span></div></div>';
+    cards += '<div class="dcard"><div class="dhead"><span>Holidays</span><span>' + fmt(d.holidayMonth[cm] * f) + '</span></div>' +
+             '<div class="drow"><span class="nm">Monthly set-aside <span class="dnote">(today-based)</span></span><span class="vl">' + fmt(d.holidayMonth[cm] * f) + '</span></div></div>';
+    cards += '<div class="dcard"><div class="dhead"><span>Fuel</span><span>' + fmt(d.fuelMonth[cm] * f) + '</span></div>' +
+             '<div class="drow"><span class="nm">Planned driving <span class="dnote">(from weekly plan)</span></span><span class="vl">' + fmt(d.fuelMonth[cm] * f) + '</span></div></div>';
+    cards += pensionCard(slotIdx(sl));
     return cards;
   }
 
-  function pensionCard(m) {
-    const rows = activePensRows().map(r => ({ label: r.member + ' ' + r.name, val: pensRowCost(r, m) })).filter(x => x.val > 0.005);
+  function pensionCard(idx) {
+    const rows = activePensRows(idx).map(r => ({ label: r.member + ' ' + r.name, val: pensRowCost(r, idx) })).filter(x => x.val > 0.005);
     if (!rows.length) return '';
     rows.sort((a, b) => b.val - a.val);
     const total = rows.reduce((s, x) => s + x.val, 0);
@@ -753,7 +790,7 @@
   }
 
   function detailHtml(m) {
-    const f = costFactor(selYear, m);
+    const f = costFactor(slotY(m), slotM(m));
     return '<div class="dwrap-cat">' +
       '<div class="dwrap" id="detcat_' + m + '">' + acctCards(m, f, true) + '</div>' +
       '<div class="dwrap" id="detbill_' + m + '" style="display:none;">' + acctCards(m, f, false) + '</div>' +
@@ -777,28 +814,28 @@
   }
 
   // every cost line for a month (bills by owner/account, card, paypal, dining, holidays), inflation-adjusted
-  function lineValuesForMonth(m) {
-    const d = DATA, f = costFactor(selYear, m), out = [];
+  function lineValuesForMonth(sl) {
+    const d = DATA, cm = slotM(sl), idx = slotIdx(sl), f = costFactor(slotY(sl), cm), out = [];
     d.cols.forEach(name => {
       const accts = d.memberAcct[name] || {};
       Object.keys(accts).forEach(aid => {
         const bills = accts[aid].bills;
-        Object.keys(bills).forEach(bn => out.push({ key: 'm|' + name + '|' + aid + '|' + bn, label: bn, grp: name, val: bills[bn][m] * f }));
+        Object.keys(bills).forEach(bn => out.push({ key: 'm|' + name + '|' + aid + '|' + bn, label: bn, grp: name, val: bills[bn][cm] * f }));
       });
     });
-    Object.keys(d.cardBills).forEach(bn => out.push({ key: 'c|' + bn, label: bn, grp: 'Card', val: d.cardBills[bn][m] * f }));
-    Object.keys(d.paypalBills).forEach(bn => out.push({ key: 'p|' + bn, label: bn, grp: 'PayPal', val: d.paypalBills[bn][m] * f }));
-    out.push({ key: 'dining', label: 'Dining', grp: 'Dining', val: d.diningMonth[m] * f });
-    out.push({ key: 'holiday', label: 'Holidays', grp: 'Holidays', val: d.holidayMonth[m] * f });
-    out.push({ key: 'fuel', label: 'Fuel', grp: 'Fuel', val: d.fuelMonth[m] * f });
-    activePensRows().forEach((r, i) => out.push({ key: 'pens|' + r.member + '|' + r.name + '|' + i, label: r.member + ' ' + r.name, grp: 'Pension', val: pensRowCost(r, m) }));
+    Object.keys(d.cardBills).forEach(bn => out.push({ key: 'c|' + bn, label: bn, grp: 'Card', val: d.cardBills[bn][cm] * f }));
+    Object.keys(d.paypalBills).forEach(bn => out.push({ key: 'p|' + bn, label: bn, grp: 'PayPal', val: d.paypalBills[bn][cm] * f }));
+    out.push({ key: 'dining', label: 'Dining', grp: 'Dining', val: d.diningMonth[cm] * f });
+    out.push({ key: 'holiday', label: 'Holidays', grp: 'Holidays', val: d.holidayMonth[cm] * f });
+    out.push({ key: 'fuel', label: 'Fuel', grp: 'Fuel', val: d.fuelMonth[cm] * f });
+    activePensRows(idx).forEach((r, i) => out.push({ key: 'pens|' + r.member + '|' + r.name + '|' + i, label: r.member + ' ' + r.name, grp: 'Pension', val: pensRowCost(r, idx) }));
     return out;
   }
 
   function signed(v) { return (v >= 0 ? '+' : '\u2212') + fmt(Math.abs(v)); }
 
   function diffHtml(m) {
-    if (m === 0) return '<div class="diffwrap"><div class="diffnote">' + MABBR[0] + ' ' + selYear + ' is the first month shown \u2014 no earlier month here to compare against.</div></div>';
+    if (m === 0) return '<div class="diffwrap"><div class="diffnote">' + slotLabel(0) + ' is the first month shown \u2014 no earlier month here to compare against.</div></div>';
     const prev = m - 1;
     const cur = {}, pre = {};
     lineValuesForMonth(m).forEach(x => cur[x.key] = x);
@@ -815,7 +852,7 @@
     const totalDelta = rows.reduce((s, r) => s + r.delta, 0);
     const availDelta = -totalDelta;
 
-    let head = '<div class="diffhead">' + MABBR[m] + ' ' + selYear + ' vs ' + MABBR[prev] + ' ' + selYear + '</div>';
+    let head = '<div class="diffhead">' + slotLabel(m) + ' vs ' + slotLabel(prev) + '</div>';
     let sum = '<div class="diffsum">' +
       '<span><span class="k">Available to save </span><span class="v ' + (availDelta < 0 ? 'neg' : 'pos') + '">' + signed(availDelta) + '</span></span>' +
       '<span><span class="k">Total out </span><span class="v ' + (totalDelta > 0 ? 'neg' : 'pos') + '">' + signed(totalDelta) + '</span></span>' +
