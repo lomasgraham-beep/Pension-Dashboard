@@ -13,6 +13,14 @@
   #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
   .s-err { background:#fdecea !important; color:#c0392b !important; }
 
+  /* sf21: the light-mode rules for these were missing entirely in sf20, so the buttons fell back to
+     unstyled browser defaults and rendered tiny. Sized ~2x Budget's nav for iPad touch. */
+  .navbar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0 0 16px; padding:14px 16px; background:#fff; border:1px solid #e2e8f0; border-radius:12px; }
+  .nav-btn { border:1px solid #cbd5e1; background:#fff; color:#2c3e50; border-radius:10px; padding:14px 22px; font-size:19px; font-weight:bold; cursor:pointer; min-height:56px; line-height:1.2; }
+  .nav-btn:hover { background:#f1f5f9; }
+  .nav-btn.now.away { background:#f59e0b; color:#1a1a1a; border-color:#f59e0b; }
+  .nav-btn:disabled { opacity:0.4; cursor:default; }
+  .nav-view { font-weight:bold; color:#2c3e50; font-size:19px; margin-left:6px; }
   .controls { display:flex; gap:18px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px; }
   .ctl { display:flex; flex-direction:column; gap:6px; }
   .ctl .lbl { font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#64748b; }
@@ -158,7 +166,7 @@
 </head>
 <body>
   <h1>What I Could Save</h1>
-  <p class="note">Month-by-month for the rolling 12 months from the month you pick: net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home. The working pattern is no longer a choice — each month uses the pattern in force that month from the working-days schedule, so a window spanning a change shows the old pattern before it and the new one after, and the 12-month total is the real blend. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months, as do Xmas and birthday gifts (age-tapered gift values inflated 0.5%/yr, from the Gift Savings page), sitting in the paying account's column. The last column is what's left to save after everything, including pension contributions (shown as their net cost, matching the budget). Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings) and general costs each April — not at the calendar-year line. Pension contributions follow their own dated schedule: a planned change (e.g. a September step) takes effect in its month and then stays flat, and is not inflated on top — exactly matching the Budget. The chart shows what's left to save each month as green bars (red if a month runs short) against the red cost line; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf20)</span></p>
+  <p class="note">Month-by-month for the rolling 12 months from the month you pick (this month on load; Prev steps back up to 24 months, Next forward): net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home. The working pattern is no longer a choice — each month uses the pattern in force that month from the working-days schedule, so a window spanning a change shows the old pattern before it and the new one after, and the 12-month total is the real blend. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months, as do Xmas and birthday gifts (age-tapered gift values inflated 0.5%/yr, from the Gift Savings page), sitting in the paying account's column. The last column is what's left to save after everything, including pension contributions (shown as their net cost, matching the budget). Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings) and general costs each April — not at the calendar-year line. Pension contributions follow their own dated schedule: a planned change (e.g. a September step) takes effect in its month and then stays flat, and is not inflated on top — exactly matching the Budget. The chart shows what's left to save each month as green bars (red if a month runs short) against the red cost line; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf21)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="controls" class="navbar" style="display:none;">
@@ -197,8 +205,14 @@
   // Slot sl (0..11) -> absolute month index startIdx()+sl; slotY/slotM give its year and calendar
   // month. Every per-month array (bills, dining, fuel, card) is still indexed by CALENDAR month,
   // so anything reading those uses slotM(sl), while inflation factors use slotY(sl).
+  // sf21: the window may run BACKWARDS from this month as well as forwards. Bounded at 24 months
+  // back — far enough to look over the shoulder, short enough that you aren't modelling a past that
+  // predates the current bills. upliftsAt() floors at 0, so past months simply carry today's prices
+  // rather than deflating; the pension schedule and tier schedule both fall back to their earliest
+  // entry before their first dated row, so nothing breaks going back.
+  const BACK_MONTHS = 24;
   let selY = CUR_Y, selM0 = CUR_M0;
-  let minIdx = NOW_IDX, maxIdx = NOW_IDX;
+  let minIdx = NOW_IDX - BACK_MONTHS, maxIdx = NOW_IDX;
   let navReady = false;
   function startIdx() { return selY * 12 + selM0; }
   function slotIdx(sl) { return startIdx() + sl; }
@@ -390,8 +404,8 @@
         const y = new Date(p.retirement_date).getFullYear();
         if (isFinite(y) && (jointRetYear == null || y > jointRetYear)) jointRetYear = y;
       });
-      // window start can run from this month to December of the joint-retirement year
-      minIdx = NOW_IDX;
+      // window start runs from 24 months back to December of the joint-retirement year
+      minIdx = NOW_IDX - BACK_MONTHS;
       maxIdx = Math.max(NOW_IDX, ((jointRetYear && jointRetYear >= CUR_Y) ? jointRetYear : CUR_Y) * 12 + 11);
 
       // salary review month per member = the increase_month they use on their pension contributions
