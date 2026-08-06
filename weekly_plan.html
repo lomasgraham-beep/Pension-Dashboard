@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weekly Plan</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=cat1"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1560px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:14px; }
+  .bar { position:sticky; top:0; z-index:5; background:#f4f7f6; padding:10px 0; display:flex; gap:12px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #e2e8f0; margin-bottom:12px; }
+  .btn { border:none; border-radius:8px; padding:11px 16px; font-size:15px; font-weight:bold; cursor:pointer; min-height:46px; background:#17a2b4; color:#fff; }
+  .btn-light { background:#64748b; }
+  .btn-danger { background:#c0392b; }
+  .btn-clearwk { border:none; border-radius:6px; background:#fdecea; color:#c0392b; font-weight:bold; font-size:13px; padding:8px 14px; cursor:pointer; margin-top:10px; }
+  .btn-copywk { border:none; border-radius:6px; background:#e0f2fe; color:#075985; font-weight:bold; font-size:13px; padding:8px 14px; cursor:pointer; margin:10px 0 0 8px; }
+  .copy-panel { margin-top:10px; padding:12px; border:1px solid #bae6fd; border-radius:8px; background:#f0f9ff; }
+  .copy-head { font-weight:bold; color:#075985; margin-bottom:6px; }
+  .copy-grid { display:flex; flex-wrap:wrap; gap:6px 10px; margin:8px 0; }
+  .copy-wk { font-size:15px; display:inline-flex; align-items:center; gap:5px; background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:7px 9px; min-width:66px; cursor:pointer; }
+  .copy-wk input { width:18px; height:18px; }
+  .copy-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+  .btn-copy-mini { border:none; border-radius:6px; background:#cbd5e1; color:#1e293b; font-weight:bold; font-size:13px; padding:8px 12px; cursor:pointer; }
+  .btn-copy-go { border:none; border-radius:6px; background:#0284c7; color:#fff; font-weight:bold; font-size:14px; padding:9px 16px; cursor:pointer; }
+  .grand { font-weight:bold; color:#2c3e50; font-size:16px; }
+
+  .wk { border:1px solid #e2e8f0; border-radius:8px; margin-bottom:14px; overflow:hidden; background:#fff; }
+  .wk-head { background:#2c3e50; color:#fff; font-weight:bold; padding:8px 12px; display:flex; justify-content:space-between; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+  .wk-head .label { font-weight:normal; color:#cbd5e1; font-size:13px; margin-left:8px; }
+  .wk-head .headline { display:flex; align-items:center; flex-wrap:wrap; }
+  .chev { display:inline-block; width:1em; color:#cbd5e1; }
+  .wk-body { padding:12px; }
+  .wktot { font-weight:bold; color:#fff; white-space:nowrap; }
+
+  .pill { display:inline-block; margin-left:8px; padding:1px 8px; border-radius:999px; font-size:11px; font-weight:700; letter-spacing:0.02em; vertical-align:middle; }
+  .pill-din { background:#17b5c4; color:#08333a; border:1px solid #0e8a97; }
+  .pill-hol { background:#f59e0b; color:#3a2500; border:1px solid #b26f06; }
+  .pill-fuel { background:#8b5cf6; color:#f5f3ff; border:1px solid #6d28d9; }
+
+  .panels { display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:16px; align-items:start; }
+  .panel { min-width:0; }
+  .panel + .panel { border-left:1px solid #e2e8f0; padding-left:16px; }
+  .panel-title { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:bold; color:#2c3e50; margin:0 0 8px; }
+  .panel-title .dot { width:10px; height:10px; border-radius:3px; display:inline-block; }
+  .dot-din { background:#17b5c4; }
+  .dot-hol { background:#f59e0b; }
+  .dot-fuel { background:#8b5cf6; }
+  .fuel-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .fuel-tbl { width:100%; min-width:300px; border-collapse:collapse; margin-top:4px; table-layout:fixed; }
+  .fuel-tbl col.c-pur { width:37%; } .fuel-tbl col.c-mil { width:19%; }
+  .fuel-tbl col.c-tow { width:11%; } .fuel-tbl col.c-cost { width:19%; } .fuel-tbl col.c-act { width:14%; }
+  .fuel-tbl th { background:#f8fafc; color:#475569; font-size:11px; text-align:left; padding:6px 5px; border-bottom:1px solid #e2e8f0; font-weight:bold; white-space:nowrap; }
+  .fuel-tbl td { padding:6px 5px; border-bottom:1px solid #eef2f7; font-size:14px; vertical-align:middle; overflow:hidden; }
+  .fuel-tbl input[type=number] { width:100%; box-sizing:border-box; padding:7px 5px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px; text-align:right; }
+  .fuel-tbl select { width:100%; box-sizing:border-box; padding:7px 4px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; background:#fff; min-width:0; }
+  .fuel-tbl tr.inh td { background:#fafbfc; color:#94a3b8; }
+  .fuel-tbl tr.inh select, .fuel-tbl tr.inh input[type=number] { color:#64748b; border-style:dashed; }
+  .inh-tag { display:block; width:fit-content; font-size:9px; font-weight:bold; color:#8b5cf6; border:1px solid #ddd6fe; background:#f5f3ff; border-radius:4px; padding:0 4px; margin:2px 0 0; text-transform:uppercase; letter-spacing:.03em; }
+  .fcost { font-weight:bold; color:#9a3412; white-space:nowrap; font-size:13px; }
+  .btn-fdel { width:100%; box-sizing:border-box; background:#fdecea; color:#c0392b; border:1px solid #f5c6c2; border-radius:6px; padding:6px 2px; font-size:12px; font-weight:bold; cursor:pointer; min-height:38px; }
+  .btn-faddl { background:#3498db; color:#fff; border:none; border-radius:8px; padding:9px 14px; font-size:14px; font-weight:bold; cursor:pointer; min-height:42px; margin-top:10px; }
+  .fuel-hint { font-size:12px; color:#94a3b8; margin:8px 0 0; line-height:1.5; }
+  .panel-tot { font-size:13px; color:#64748b; margin-top:8px; }
+  .panel-tot b { color:#2c3e50; }
+
+  .dwrap { overflow-x:auto; }
+  table.dgrid { border-collapse:collapse; }
+  table.dgrid th, table.dgrid td { padding:5px 6px; border:1px solid #eef2f7; text-align:center; }
+  table.dgrid th { background:#f0fdff; color:#0e7490; font-size:12px; }
+  table.dgrid td.meal { text-align:left; font-weight:bold; color:#2c3e50; background:#fff; white-space:nowrap; font-size:13px; }
+  table.dgrid td.tot { font-weight:bold; color:#0f766e; font-size:13px; white-space:nowrap; }
+  select.dcell { width:50px; padding:6px 2px; border:1px solid #e2e8f0; border-radius:5px; font-size:15px; text-align:center; background:#fff; }
+
+  .row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; }
+  .fld { display:flex; flex-direction:column; }
+  .fld label { font-size:12px; font-weight:bold; color:#64748b; margin-bottom:3px; text-transform:uppercase; }
+  .fld input[type=number], .fld input[type=text], .fld select { padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; background:#fff; }
+  .fld input[type=number] { width:96px; text-align:right; }
+  .fld input[type=text] { width:180px; }
+  .fld.tow { flex-direction:row; align-items:center; gap:6px; }
+  .fld.tow label { margin:0; text-transform:none; font-size:13px; color:#2c3e50; }
+  .fuelout { font-size:14px; color:#9a3412; font-weight:bold; padding-bottom:8px; }
+  .eat-title { font-size:13px; font-weight:bold; color:#2c3e50; margin:6px 0; }
+  .eat-hint { font-size:13px; color:#94a3b8; font-style:italic; }
+  table.eat { border-collapse:collapse; }
+  table.eat th, table.eat td { padding:6px 8px; border:1px solid #eef2f7; text-align:center; font-size:18px; }
+  table.eat th { background:#f0fdf4; color:#166534; font-size:13px; }
+  table.eat td.meal { text-align:left; font-weight:bold; color:#2c3e50; background:#fff; white-space:nowrap; font-size:13px; }
+  select.cell { width:70px; padding:7px 4px; border:1px solid #e2e8f0; border-radius:5px; font-size:18px; text-align:center; background:#fff; }
+  .brk { font-size:13px; color:#64748b; margin-top:10px; }
+  .brk b { color:#9a3412; }
+
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+
+  .taper-card { border:1px solid #99f6e4; border-radius:8px; background:#f0fdfa; padding:12px 14px; margin-bottom:14px; }
+  .taper-head { font-weight:bold; color:#0f766e; font-size:15px; }
+  .taper-sub { color:#64748b; font-size:13px; margin:4px 0 10px; }
+  .taper-grp { font-size:12px; font-weight:bold; color:#0f766e; text-transform:uppercase; letter-spacing:0.04em; margin:8px 0 4px; }
+  .taper-row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; }
+  .taper-row .fld input[type=number] { width:80px; }
+
+  .basis-card { border:1px solid #bfdbfe; border-radius:8px; background:#eff6ff; padding:12px 14px; margin-bottom:14px; }
+  .basis-head { font-weight:bold; color:#1e3a8a; font-size:15px; }
+  .basis-win { font-weight:normal; color:#64748b; font-size:12px; margin-left:6px; }
+  .basis-sub { color:#64748b; font-size:13px; margin:4px 0 10px; }
+  .basis-toggle { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .basis-opt { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:8px; padding:9px 16px; font-size:14px; font-weight:bold; cursor:pointer; min-height:44px; }
+  .basis-opt.on { background:#17a2b4; color:#fff; border-color:#17a2b4; }
+  .basis-tablewrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  table.basis-table { border-collapse:collapse; width:100%; min-width:560px; }
+  table.basis-table th, table.basis-table td { padding:8px 10px; border:1px solid #e2e8f0; text-align:right; font-size:14px; }
+  table.basis-table th { background:#dbeafe; color:#1e3a8a; font-size:12px; text-transform:uppercase; letter-spacing:0.03em; }
+  table.basis-table th:first-child, table.basis-table td.bc-cat { text-align:left; }
+  table.basis-table td.bc-cat { font-weight:bold; color:#2c3e50; white-space:nowrap; }
+  table.basis-table .dot { width:10px; height:10px; border-radius:3px; display:inline-block; margin-right:6px; vertical-align:middle; }
+  table.basis-table input[type=number] { width:92px; text-align:right; padding:7px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; background:#fff; }
+  .bc-after { font-weight:bold; color:#0f766e; }
+  .basis-planref { font-size:12px; color:#94a3b8; margin-top:8px; }
+  #basisFeed { font-size:13px; font-weight:bold; color:#1e3a8a; margin-top:4px; }
+  .basis-actions { display:flex; gap:12px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+  .basis-card.mode-plan table.basis-table th:nth-child(4),
+  .basis-card.mode-plan table.basis-table th:nth-child(5),
+  .basis-card.mode-plan table.basis-table td:nth-child(4),
+  .basis-card.mode-plan table.basis-table td:nth-child(5) { opacity:0.5; }
+
+  .strip-card { border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:10px 12px; margin-bottom:14px; }
+  .strip-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+  .strip-title { font-size:13px; font-weight:bold; color:#2c3e50; }
+  .strip-leg { font-size:12px; color:#64748b; display:flex; gap:12px; flex-wrap:wrap; }
+  .strip-leg span { display:inline-flex; align-items:center; gap:5px; }
+  .leg-sw { width:12px; height:12px; border-radius:3px; display:inline-block; overflow:hidden; }
+  .strip { display:flex; flex-wrap:nowrap; gap:12px; margin-top:8px; overflow-x:auto; overflow-y:hidden; padding-bottom:4px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .strip::-webkit-scrollbar { display:none; }
+  .mgroup { display:flex; flex-direction:column; gap:4px; flex:0 0 auto; }
+  .mlabel { font-size:11px; color:#64748b; text-align:center; font-weight:bold; letter-spacing:0.02em; }
+  .mcells { display:flex; gap:3px; }
+  .sc { width:22px; height:22px; border-radius:4px; cursor:pointer; overflow:hidden; border:1px solid transparent; box-sizing:border-box; }
+  .sc-none { background:#fff; border-color:#e2e8f0; }
+  .sc-din { background:#17b5c4; }
+  .sc-hol { background:#f59e0b; }
+  .sc-half { display:inline-block; width:50%; height:100%; float:left; }
+  .half-din { background:#17b5c4; }
+  .half-hol { background:#f59e0b; }
+
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1 { color:#f1f5f9 !important; } .note { color:#94a3b8 !important; }
+    .bar { background:#0f172a !important; border-color:#334155 !important; }
+    .grand { color:#f1f5f9 !important; }
+    .wk { background:#1e293b !important; border-color:#334155 !important; }
+    .wk-head { background:#1e293b !important; color:#f1f5f9 !important; border-bottom:1px solid #334155; }
+    .wktot { color:#f1f5f9 !important; }
+    .pill-din { background:#0e7490 !important; color:#e0f7fb !important; border-color:#22d3ee !important; }
+    .pill-hol { background:#b45309 !important; color:#fde9c8 !important; border-color:#f59e0b !important; }
+    .pill-fuel { background:#5b21b6 !important; color:#ede9fe !important; border-color:#8b5cf6 !important; }
+    .fuel-tbl th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    .fuel-tbl td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    .fuel-tbl tr.inh td { background:#18233a !important; color:#7c8ba1 !important; }
+    .fuel-tbl input[type=number], .fuel-tbl select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    .inh-tag { background:#2e1065 !important; color:#c4b5fd !important; border-color:#6d28d9 !important; }
+    .fcost { color:#fdba74 !important; }
+    .btn-fdel { background:#3b1d1d !important; color:#fca5a5 !important; border-color:#7f1d1d !important; }
+    .fuel-hint { color:#7c8ba1 !important; }
+    .panel + .panel { border-left-color:#334155 !important; }
+    .panel-title { color:#f1f5f9 !important; }
+    .panel-tot { color:#94a3b8 !important; } .panel-tot b { color:#f1f5f9 !important; }
+    table.dgrid th { background:#0b2530 !important; color:#67e8f9 !important; }
+    table.dgrid td { border-color:#334155 !important; }
+    table.dgrid td.meal { background:#1e293b !important; color:#f1f5f9 !important; }
+    table.dgrid td.tot { color:#5eead4 !important; }
+    select.dcell, .fld input, .fld select, select.cell { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    .fld label { color:#94a3b8 !important; }
+    .fld.tow label { color:#e2e8f0 !important; }
+    .eat-title { color:#f1f5f9 !important; }
+    table.eat th { background:#0b2818 !important; color:#86efac !important; }
+    table.eat td { border-color:#334155 !important; }
+    table.eat td.meal { background:#1e293b !important; color:#f1f5f9 !important; }
+    .fuelout, .brk b { color:#fdba74 !important; }
+    .btn-clearwk { background:#3a1a1a !important; color:#f87171 !important; }
+    .btn-copywk { background:#0c2a3a !important; color:#7dd3fc !important; }
+    .copy-panel { background:#0b1f2e !important; border-color:#155e75 !important; }
+    .copy-head { color:#7dd3fc !important; }
+    .copy-wk { background:#0f172a !important; border-color:#475569 !important; color:#e2e8f0 !important; }
+    .btn-copy-mini { background:#334155 !important; color:#e2e8f0 !important; }
+    .brk { color:#94a3b8 !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+    .taper-card { background:#062a2a !important; border-color:#155e58 !important; }
+    .taper-head, .taper-grp { color:#5eead4 !important; }
+    .taper-sub { color:#94a3b8 !important; }
+    .strip-card { background:#1e293b !important; border-color:#334155 !important; }
+    .strip-title { color:#f1f5f9 !important; }
+    .strip-leg { color:#94a3b8 !important; }
+    .sc-none { background:#0f172a !important; border-color:#475569 !important; }
+    .mlabel { color:#94a3b8 !important; }
+    .basis-card { background:#0b1f3a !important; border-color:#1e3a5f !important; }
+    .basis-head { color:#93c5fd !important; }
+    .basis-sub, .basis-win, .basis-planref { color:#94a3b8 !important; }
+    .basis-opt { background:#0f172a !important; color:#cbd5e1 !important; border-color:#475569 !important; }
+    .basis-opt.on { background:#17a2b4 !important; color:#fff !important; border-color:#17a2b4 !important; }
+    table.basis-table th { background:#12294a !important; color:#93c5fd !important; }
+    table.basis-table th, table.basis-table td { border-color:#334155 !important; }
+    table.basis-table td.bc-cat { color:#f1f5f9 !important; }
+    table.basis-table input[type=number] { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    .bc-after { color:#5eead4 !important; }
+    #basisFeed { color:#93c5fd !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Weekly Plan <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(52-week dining &amp; holidays)</span></h1>
+  <p class="note">Both planners in one place: each week shows home dining and the holiday side by side, and the year strip flags where they overlap. Dining and holiday costs feed the retirement model &mdash; choose <b>Plan</b> or <b>Actual (last 12 months)</b> in the Budget basis panel below, and it applies to the budget, the bills page and the model on any device. <span style="color:#94a3b8;">(weekly build: v6)</span></p>
+  <div id="status">Loading&hellip;</div>
+
+  <div class="taper-card" id="taperCard" style="display:none;">
+    <div class="taper-head">Age-based spending reduction</div>
+    <div class="taper-sub">Multiplier applied once the older of you reaches each age. 1 = no reduction, 0.8 = spend 80%. Dining and holidays keep their own tapers. Save to apply. You can also set the account each savings pot is funded from.</div>
+    <div class="taper-grp">Dining</div>
+    <div class="taper-row">
+      <div class="fld"><label>At 70</label><input type="number" id="dtap70" step="0.05" min="0" max="1" value="1" onfocus="tapBlank(this)" onblur="tapRestore(this)"></div>
+      <div class="fld"><label>At 80</label><input type="number" id="dtap80" step="0.05" min="0" max="1" value="1" onfocus="tapBlank(this)" onblur="tapRestore(this)"></div>
+      <div class="fld"><label>At 90</label><input type="number" id="dtap90" step="0.05" min="0" max="1" value="1" onfocus="tapBlank(this)" onblur="tapRestore(this)"></div>
+      <div class="fld"><label>Dining savings pot</label><select id="potSel"></select></div>
+    </div>
+    <div class="taper-grp">Holidays</div>
+    <div class="taper-row">
+      <div class="fld"><label>At 70</label><input type="number" id="htap70" step="0.05" min="0" max="1" value="1" onfocus="tapBlank(this)" onblur="tapRestore(this)"></div>
+      <div class="fld"><label>At 80</label><input type="number" id="htap80" step="0.05" min="0" max="1" value="1" onfocus="tapBlank(this)" onblur="tapRestore(this)"></div>
+      <div class="fld"><label>At 90</label><input type="number" id="htap90" step="0.05" min="0" max="1" value="1" onfocus="tapBlank(this)" onblur="tapRestore(this)"></div>
+    </div>
+  </div>
+
+  <div class="basis-card mode-plan" id="basisCard" style="display:none;">
+    <div class="basis-head">Budget basis <span class="basis-win" id="basisWin"></span></div>
+    <div class="basis-sub">Choose whether the budget, the bills page and the whole retirement model use your <b>planned</b> dining &amp; holiday costs (the 52 weeks below), or your <b>actual</b> spend over the last 12 months on the <b>Dining</b> and <b>Holidays</b> card categories. In Actual mode you can nudge each monthly average up or down. Saved to your account, so it applies on any device. <b>Mixed</b> lets each category decide for itself \u2014 set the ticks on the Bills Categories page.</div>
+    <div class="basis-toggle">
+      <button type="button" class="basis-opt" id="optPlan" onclick="setBasis('plan')">Plan</button>
+      <button type="button" class="basis-opt" id="optActual" onclick="setBasis('actual')">Actual &mdash; last 12 months</button>
+      <button type="button" class="basis-opt" id="optMixed" onclick="setBasis('mixed')">Mixed &mdash; per category</button>
+    </div>
+    <div class="basis-sub" id="mixedNote" style="display:none;"></div>
+    <div class="basis-tablewrap">
+      <table class="basis-table">
+        <thead><tr><th>Category</th><th>12-month total</th><th>Avg / month</th><th>Adjust &pound;/mo</th><th>After adjust / month</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="bc-cat"><span class="dot dot-din"></span>Dining</td>
+            <td id="bDin12">&pound;0</td>
+            <td id="bDinAvg">&pound;0</td>
+            <td><input type="number" id="dinAdj" step="10" value="0" inputmode="numeric" onfocus="adjBlank(this)" onblur="adjRestore(this)" oninput="renderBasis()"></td>
+            <td id="bDinAfter" class="bc-after">&pound;0</td>
+          </tr>
+          <tr>
+            <td class="bc-cat"><span class="dot dot-hol"></span>Holidays</td>
+            <td id="bHol12">&pound;0</td>
+            <td id="bHolAvg">&pound;0</td>
+            <td><input type="number" id="holAdj" step="10" value="0" inputmode="numeric" onfocus="adjBlank(this)" onblur="adjRestore(this)" oninput="renderBasis()"></td>
+            <td id="bHolAfter" class="bc-after">&pound;0</td>
+          </tr>
+          <tr>
+            <td class="bc-cat"><span class="dot dot-fuel"></span>Fuel</td>
+            <td id="bFuel12">&pound;0</td>
+            <td id="bFuelAvg">&pound;0</td>
+            <td><input type="number" id="fuelAdj" step="10" value="0" inputmode="numeric" onfocus="adjBlank(this)" onblur="adjRestore(this)" oninput="renderBasis()"></td>
+            <td id="bFuelAfter" class="bc-after">&pound;0</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="basis-planref" id="basisPlanRef"></div>
+    <div id="basisFeed"></div>
+    <div class="basis-actions">
+      <button class="btn" onclick="saveBasis()">Save basis</button>
+      <span id="basisMsg" style="font-weight:bold;"></span>
+    </div>
+  </div>
+
+  <div class="bar" id="bar" style="display:none;">
+    <button class="btn" onclick="saveAll()">Save changes</button>
+    <button class="btn btn-light" onclick="expandAll()">Expand all</button>
+    <button class="btn btn-light" onclick="collapseAll()">Collapse all</button>
+    <button class="btn btn-danger" onclick="clearAllBoth()">Clear all</button>
+    <span id="msg" style="font-weight:bold;"></span>
+    <span class="grand" style="margin-left:auto;">Year total: <span id="grandTotal">£0</span></span>
+  </div>
+
+  <div class="strip-card" id="stripCard" style="display:none;">
+    <div class="strip-head">
+      <span class="strip-title">The year at a glance</span>
+      <span class="strip-leg">
+        <span><span class="leg-sw" style="background:#17b5c4;"></span>Dining</span>
+        <span><span class="leg-sw" style="background:#f59e0b;"></span>Holiday</span>
+        <span><span class="leg-sw"><span class="sc-half half-din"></span><span class="sc-half half-hol"></span></span>Both</span>
+        <span><span class="leg-sw" style="background:#fff;border:1px solid #cbd5e1;"></span>Empty</span>
+      </span>
+    </div>
+    <div class="strip" id="strip"></div>
+  </div>
+
+  <div id="weeks"></div>
+
+<script>
+  const WEEKS = 52;
+  const PHASE = 'retired';
+  const fmt = App.fmt;
+  const DINING_MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Drinks'];
+  const MEALS = App.HOLIDAY_MEALS || ['Breakfast', 'Lunch', 'Dinner', 'Drinks'];
+  const DAYS = [['mon', 'M'], ['tue', 'T'], ['wed', 'W'], ['thu', 'Th'], ['fri', 'F'], ['sat', 'S'], ['sun', 'Su']];
+  const CATS = [['Caravan', 'Caravan'], ['Hotel', 'Hotel'], ['AirBnB', 'Air B&B'], ['Other', 'Other']];
+  const LEVELS = [['L', 'Low'], ['M', 'Medium'], ['H', 'High']];
+  const YEAR = new Date().getFullYear();
+  const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function monthFor(no) { return MONTHS_SHORT[new Date(YEAR, 0, 1 + (no - 1) * 7).getMonth()]; }
+
+  let rota = [];          // bd_dining_rota rows
+  let costMap = {};       // "Meal|L" -> cost
+  let plan = [];          // bd_holiday_plan rows (retired), one per week
+  let ctx = null;         // holiday cost lookup context
+  let settingsDin = null; // bd_dining_settings
+  let settingsHol = null; // bd_holiday_settings
+  let accounts = [];      // bd_bank_account
+  let holidayPot = '';    // default pot from holiday settings
+  let dirtyDin = {};      // dining rota id -> true
+  let dirtyHol = {};      // holiday plan id -> true
+  // ---- fuel (ann11 split) ----
+  // fuelLines holds EVERY bd_fuel_line row: standing rows (week_no null, applying to all 52 weeks)
+  // and week rows. A week row carrying standing_id detaches that standing line for its week only.
+  let fuelLines = [];     // bd_fuel_line rows
+  let fuelSet = null;     // bd_fuel_settings
+  let fctx = null;        // fuel cost context
+  let delFuel = [];       // ids removed this session
+  let tmpFuelId = -1;     // negative ids for unsaved rows
+  const collapsed = {};   // week_no -> true(collapsed); default collapsed
+  let discSettings = { basis: 'plan', dining_adjust: 0, holiday_adjust: 0, fuel_adjust: 0 }; // bd_discretionary_basis
+  // v5: dining/holiday/fuel now carry their tick and their adjust on bd_bill_category, so the
+  // adjust boxes below read and write THERE rather than to bd_discretionary_basis. Keeping both
+  // would give two sources of truth for the same number.
+  let catFlags = { dining: null, holiday: null, fuel: null };   // kind -> { code, use_actual, actual_adjust }
+  function matchDomain(c) {
+    const nm = String(c.description || '').trim().toLowerCase();
+    const cd = String(c.code || '').trim().toLowerCase();
+    if (nm === 'dining' || cd === 'dining') return 'dining';
+    if (nm === 'holiday' || nm === 'holidays' || cd === 'holiday' || cd === 'holidays') return 'holiday';
+    if (nm === 'fuel' || nm === 'petrol' || nm === 'diesel' || cd === 'fuel') return 'fuel';
+    return null;
+  }
+  let discActual = { diningTotal: 0, holidayTotal: 0, fuelTotal: 0, endMonth: null, months: 12 }; // trailing-12mo actuals
+  let curBasis = 'plan';  // live selection in the Budget basis panel
+
+  function tnum(v, d) { return v != null && isFinite(Number(v)) ? Number(v) : d; }
+  function readTaper(id) { let v = parseFloat(document.getElementById(id).value); if (!isFinite(v)) v = 1; v = Math.max(0, Math.min(1, v)); return Math.round(v * 100) / 100; }
+  function tapBlank(el) { el.dataset.prev = el.value; el.value = ''; }
+  function tapRestore(el) { if (el.value === '') el.value = (el.dataset.prev != null ? el.dataset.prev : '1'); }
+  function holBlankZero(el) { if (el.value === '0') el.value = ''; }
+  function holRestoreZero(el) { if (el.value.trim() === '') el.value = '0'; }
+  // Budget-basis adjustment inputs: blank on focus (touch-friendly), restore prev/0 on blur.
+  function adjBlank(el) { el.dataset.prev = el.value; el.value = ''; }
+  function adjRestore(el) { if (el.value.trim() === '') el.value = (el.dataset.prev != null ? el.dataset.prev : '0'); renderBasis(); }
+  function fmtMonth(ym) { if (!ym) return ''; return MONTHS_SHORT[Number(ym.slice(5, 7)) - 1] + ' ' + ym.slice(0, 4); }
+  function setBasis(b) { curBasis = (b === 'actual' || b === 'mixed') ? b : 'plan'; renderBasis(); }
+  // v5: which of the three planner domains is actually on actuals in the current mode.
+  // 'actual' forces all three on; 'mixed' defers to each category's own tick; 'plan' none.
+  function domainOn(kind) {
+    if (curBasis === 'plan') return false;
+    if (curBasis === 'actual') return true;
+    return !!(catFlags[kind] && catFlags[kind].use_actual);
+  }
+
+  function renderBasis() {
+    const din12 = discActual ? (Number(discActual.diningTotal) || 0) : 0;
+    const hol12 = discActual ? (Number(discActual.holidayTotal) || 0) : 0;
+    const fuel12 = discActual ? (Number(discActual.fuelTotal) || 0) : 0;
+    const dinAvg = Math.round(din12 / 12), holAvg = Math.round(hol12 / 12), fuelAvg = Math.round(fuel12 / 12);
+    const dAdj = Number(document.getElementById('dinAdj').value) || 0;
+    const hAdj = Number(document.getElementById('holAdj').value) || 0;
+    const fAdj = Number(document.getElementById('fuelAdj').value) || 0;
+    // Round each monthly figure to whole pounds (matching the display) so after × 12 = the model feed.
+    const dinAfter = Math.max(0, Math.round(din12 / 12 + dAdj)), holAfter = Math.max(0, Math.round(hol12 / 12 + hAdj));
+    const fuelAfter = Math.max(0, Math.round(fuel12 / 12 + fAdj));
+    setText('bDin12', fmt(din12)); setText('bDinAvg', fmt(dinAvg)); setText('bDinAfter', fmt(dinAfter));
+    setText('bHol12', fmt(hol12)); setText('bHolAvg', fmt(holAvg)); setText('bHolAfter', fmt(holAfter));
+    setText('bFuel12', fmt(fuel12)); setText('bFuelAvg', fmt(fuelAvg)); setText('bFuelAfter', fmt(fuelAfter));
+    setText('basisWin', discActual && discActual.endMonth ? '(12 months to ' + fmtMonth(discActual.endMonth) + ')' : '(no card data yet)');
+    document.getElementById('optPlan').classList.toggle('on', curBasis === 'plan');
+    document.getElementById('optActual').classList.toggle('on', curBasis === 'actual');
+    document.getElementById('optMixed').classList.toggle('on', curBasis === 'mixed');
+    const card = document.getElementById('basisCard');
+    card.classList.toggle('mode-actual', curBasis !== 'plan');
+    card.classList.toggle('mode-plan', curBasis === 'plan');
+    const mn = document.getElementById('mixedNote');
+    if (curBasis === 'mixed') {
+      const on = ['dining', 'holiday', 'fuel'].filter(domainOn);
+      const names = { dining: 'Dining', holiday: 'Holidays', fuel: 'Fuel' };
+      mn.style.display = 'block';
+      mn.innerHTML = 'In Mixed mode each category follows its own <b>Use actual costs</b> tick on the '
+        + 'Bills Categories page. Currently on actuals here: <b>'
+        + (on.length ? on.map(k => names[k]).join(', ') : 'none of these three')
+        + '</b>. Other categories (bill-backed ones like Julie or Groceries) are governed there too.';
+    } else { mn.style.display = 'none'; }
+    const planDin = rota.reduce((s, r) => s + rowTotal(r), 0);
+    const planHol = plan.reduce((s, w) => s + App.holidayWeekTotal(w, ctx), 0);
+    const planFuel = fuelYearSplit();
+    setText('basisPlanRef', 'Plan year totals for reference \u2014 Dining ' + fmt(planDin) + ' \u00b7 Holidays ' + fmt(planHol) +
+      ' \u00b7 Fuel ' + fmt(planFuel.total) + ' (work ' + fmt(planFuel.work) + ', other ' + fmt(planFuel.disc) + ').');
+    const feedDin = domainOn('dining') ? dinAfter * 12 : planDin;
+    const feedHol = domainOn('holiday') ? holAfter * 12 : planHol;
+    // On Actual, the single card figure is apportioned by the plan's work:other ratio — the card
+    // cannot tell commuting from leisure driving, but the engine needs the split.
+    const feedFuel = domainOn('fuel') ? fuelAfter * 12 : planFuel.total;
+    const tag = k => domainOn(k) ? ' (actual)' : ' (plan)';
+    const modeName = curBasis === 'actual' ? 'Actual' : (curBasis === 'mixed' ? 'Mixed' : 'Plan');
+    setText('basisFeed', 'Feeding the model (' + modeName + '): Dining ' + fmt(feedDin) + '/yr' + tag('dining') +
+      ' \u00b7 Holidays ' + fmt(feedHol) + '/yr' + tag('holiday') + ' \u00b7 Fuel ' + fmt(feedFuel) + '/yr' + tag('fuel'));
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function setText(id, t) { const el = document.getElementById(id); if (el) el.textContent = t; }
+  function notify() { try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {} }
+
+  function normGrid(w) {
+    let g = w.eating_out;
+    if (typeof g === 'string') { try { g = JSON.parse(g); } catch (e) { g = {}; } }
+    if (!g || typeof g !== 'object') g = {};
+    MEALS.forEach(m => { if (!Array.isArray(g[m])) g[m] = []; });
+    w.eating_out = g;
+  }
+
+  async function load() {
+    const status = document.getElementById('status');
+    try {
+      const _cut = new Date(); _cut.setDate(_cut.getDate() - 400);
+      const cutoff = _cut.getFullYear() + '-' + ('0' + (_cut.getMonth() + 1)).slice(-2) + '-' + ('0' + _cut.getDate()).slice(-2);
+      const [rotaRows, costRows, planRows, holCostRows, mealRows, dsRows, hsRows, aRows, catRows, cardTxns, discRow, fsRows, flRows] = await Promise.all([
+        App.rest('bd_dining_rota?order=week_no.asc,meal_type.asc'),
+        App.rest('bd_meal_cost'),
+        App.rest('bd_holiday_plan?phase=eq.' + PHASE + '&order=week_no.asc'),
+        App.rest('bd_holiday_cost'),
+        App.rest('bd_meal_cost'),
+        App.rest('bd_dining_settings?id=eq.1'),
+        App.rest('bd_holiday_settings?id=eq.1'),
+        App.rest('bd_bank_account?order=bank_name.asc,account_id.asc'),
+        App.rest('bd_bill_category?select=code,description'),
+        App.rest('bd_card_txn?select=txn_date,amount,category_code&txn_date=gte.' + cutoff + '&order=txn_date.desc&limit=5000'),
+        App.loadDiscretionaryBasis(),
+        App.rest('bd_fuel_settings?id=eq.1'),
+        App.rest('bd_fuel_line?phase=eq.' + PHASE + '&order=sort_order.asc')
+      ]);
+      rota = rotaRows || [];
+      costMap = {};
+      (costRows || []).forEach(c => { costMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
+      plan = planRows || [];
+      plan.forEach(normGrid);
+      settingsDin = (dsRows && dsRows[0]) || {};
+      settingsHol = (hsRows && hsRows[0]) || {};
+      ctx = App.holidayCtx(holCostRows || [], mealRows || [], settingsHol);
+      fuelSet = (fsRows && fsRows[0]) || {};
+      fctx = App.fuelCtx(fuelSet);
+      fuelLines = (flRows || []).slice();
+      delFuel = []; tmpFuelId = -1;
+      accounts = aRows || [];
+      holidayPot = (settingsHol.savings_account != null && String(settingsHol.savings_account).trim() !== '') ? String(settingsHol.savings_account).trim() : '';
+      document.getElementById('dtap70').value = tnum(settingsDin.taper_at_70, 1);
+      document.getElementById('dtap80').value = tnum(settingsDin.taper_at_80, 1);
+      document.getElementById('dtap90').value = tnum(settingsDin.taper_at_90, 1);
+      document.getElementById('htap70').value = tnum(settingsHol.taper_at_70, 1);
+      document.getElementById('htap80').value = tnum(settingsHol.taper_at_80, 1);
+      document.getElementById('htap90').value = tnum(settingsHol.taper_at_90, 1);
+      renderPot();
+      discSettings = discRow || { basis: 'plan', dining_adjust: 0, holiday_adjust: 0, fuel_adjust: 0 };
+      // v6 BUGFIX: this line still only knew 'actual' and silently coerced a saved 'mixed' to
+      // 'plan' on every page load. Because the basis is written back on every save from this page,
+      // that also persisted the downgrade — Mixed could never survive a reload. Any new mode added
+      // here must be added in setBasis(), renderBasis(), this line, AND common.js load/save.
+      curBasis = (discSettings.basis === 'actual' || discSettings.basis === 'mixed') ? discSettings.basis : 'plan';
+      discActual = App.actualDiscretionary12mo(cardTxns || [], catRows || []);
+      // v5: adjusts now live on bd_bill_category. Fall back to the old bd_discretionary_basis
+      // columns only where a category row is missing, so nothing is lost if a code was renamed.
+      catFlags = { dining: null, holiday: null, fuel: null };
+      try {
+        const cb = await App.loadCategoryBasis(true);
+        Object.keys(cb.cats || {}).forEach(code => {
+          const kind = matchDomain(cb.cats[code]);
+          if (kind && !catFlags[kind]) catFlags[kind] = cb.cats[code];
+        });
+      } catch (e) { /* columns missing -> fall back below */ }
+      const adjOf = (kind, legacy) => catFlags[kind] ? (Number(catFlags[kind].actual_adjust) || 0) : (Number(legacy) || 0);
+      document.getElementById('dinAdj').value = adjOf('dining', discSettings.dining_adjust);
+      document.getElementById('holAdj').value = adjOf('holiday', discSettings.holiday_adjust);
+      document.getElementById('fuelAdj').value = adjOf('fuel', discSettings.fuel_adjust);
+      dirtyDin = {}; dirtyHol = {};
+      status.style.display = 'none';
+      document.getElementById('taperCard').style.display = 'block';
+      document.getElementById('basisCard').style.display = 'block';
+      document.getElementById('stripCard').style.display = 'block';
+      document.getElementById('bar').style.display = 'flex';
+      renderBasis();
+      render();
+    } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  // ---- dining helpers ----
+  function rowFor(week, meal) { return rota.find(r => Number(r.week_no) === week && r.meal_type === meal); }
+  function cellCost(meal, lvl) { if (!lvl) return 0; return costMap[meal + '|' + lvl] || 0; }
+  function rowTotal(r) { if (!r) return 0; return DAYS.reduce((s, [col]) => s + cellCost(r.meal_type, r[col]), 0); }
+  function diningWeekTotal(no) { let t = 0; DINING_MEALS.forEach(m => { t += rowTotal(rowFor(no, m)); }); return t; }
+  function diningHas(no) { return DINING_MEALS.some(m => { const r = rowFor(no, m); return r && DAYS.some(([c]) => r[c] && String(r[c]).trim() !== ''); }); }
+
+  // ---- holiday helpers ----
+  function weekFor(no) { return plan.find(w => Number(w.week_no) === no); }
+  function holidayHas(w) {
+    if (!w) return false;
+    if (w.category && String(w.category).trim() !== '') return true;
+    if (Number(w.nights) > 0 || Number(w.incidentals) > 0) return true;
+    if (w.label && String(w.label).trim() !== '') return true;
+    return MEALS.some(m => (w.eating_out[m] || []).some(v => v && String(v).trim() !== ''));
+  }
+
+  function catOptions(sel) { let o = '<option value="">&mdash;</option>'; CATS.forEach(([c, l]) => o += '<option value="' + c + '"' + (sel === c ? ' selected' : '') + '>' + l + '</option>'); return o; }
+  function lvlOptions(sel) { let o = '<option value="">&mdash;</option>'; LEVELS.forEach(([c, l]) => o += '<option value="' + c + '"' + (sel === c ? ' selected' : '') + '>' + l + '</option>'); return o; }
+
+  function eatGrid(w) {
+    const nights = Math.max(0, Number(w.nights) || 0);
+    if (nights <= 0) return '<p class="eat-hint">Set nights above to plan eating out.</p>';
+    let head = '<tr><th>Meal</th>';
+    for (let n = 1; n <= nights; n++) head += '<th>N' + n + '</th>';
+    head += '</tr>';
+    let body = '';
+    MEALS.forEach(meal => {
+      const arr = w.eating_out[meal] || [];
+      let cells = '<td class="meal">' + meal + '</td>';
+      for (let n = 0; n < nights; n++) {
+        const v = arr[n] || '';
+        cells += '<td><select class="cell" onchange="holOnMeal(' + w.id + ',\'' + meal + '\',' + n + ',this.value)">' +
+          '<option value=""></option>' +
+          '<option' + (v === 'L' ? ' selected' : '') + '>L</option>' +
+          '<option' + (v === 'M' ? ' selected' : '') + '>M</option>' +
+          '<option' + (v === 'H' ? ' selected' : '') + '>H</option>' +
+          '</select></td>';
+      }
+      body += '<tr>' + cells + '</tr>';
+    });
+    return '<table class="eat"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+  }
+
+  // ---- fuel helpers ----
+  // The rows that apply to one week: standing lines this week has NOT detached, then the week's own.
+  // Returns wrappers so handlers can mutate the underlying object in fuelLines.
+  function weekFuelRows(no) {
+    const detached = {};
+    fuelLines.forEach(l => { if (l.week_no != null && Number(l.week_no) === no && l.standing_id != null) detached[l.standing_id] = true; });
+    const out = [];
+    fuelLines.forEach(l => { if (l.week_no == null && !detached[l.id]) out.push({ ref: l, inherited: true }); });
+    fuelLines.forEach(l => { if (l.week_no != null && Number(l.week_no) === no) out.push({ ref: l, inherited: false }); });
+    return out;
+  }
+  function fuelWeekSplit(no) {
+    let work = 0, disc = 0;
+    weekFuelRows(no).forEach(r => {
+      const c = App.fuelLineCost(r.ref, fctx);
+      if (r.ref.purpose === 'Work') work += c; else disc += c;
+    });
+    return { work: work, disc: disc, total: work + disc };
+  }
+  function fuelWeekTotal(no) { return fuelWeekSplit(no).total; }
+  // Only flag weeks that carry their OWN fuel rows. Standing lines apply everywhere, so pilling
+  // all 52 weeks would say nothing — the pill means "this week differs from the standing plan".
+  function fuelHas(no) { return fuelLines.some(l => l.week_no != null && Number(l.week_no) === no); }
+  function fuelYearTotal() { let t = 0; for (let n = 1; n <= WEEKS; n++) t += fuelWeekTotal(n); return t; }
+  function fuelYearSplit() {
+    let work = 0, disc = 0;
+    for (let n = 1; n <= WEEKS; n++) { const b = fuelWeekSplit(n); work += b.work; disc += b.disc; }
+    return { work: work, disc: disc, total: work + disc };
+  }
+
+  function fuelPurposeOptions(sel) {
+    return (App.FUEL_PURPOSES || ['Work', 'Holiday', 'Caravan', 'Out and about'])
+      .map(x => '<option value="' + x + '"' + (sel === x ? ' selected' : '') + '>' + x + '</option>').join('');
+  }
+
+  // Editing an inherited line DETACHES it for this week: a real row is written carrying
+  // standing_id, seeded from the standing values, and the edit applied on top. Later changes to
+  // the standing definition then leave this week alone.
+  function fuelDetach(no, standingRef) {
+    const row = {
+      id: tmpFuelId--, phase: PHASE, week_no: no, purpose: standingRef.purpose,
+      miles: Number(standingRef.miles) || 0, towing: !!standingRef.towing,
+      standing_id: standingRef.id, sort_order: Number(standingRef.sort_order) || 0,
+      _new: true, _dirty: true
+    };
+    fuelLines.push(row);
+    return row;
+  }
+
+  function fuelOnField(no, idx, field, value) {
+    const rows = weekFuelRows(no); const r = rows[idx]; if (!r) return;
+    const target = r.inherited ? fuelDetach(no, r.ref) : r.ref;
+    if (field === 'towing') target.towing = !!value;
+    else if (field === 'miles') target.miles = Number(value) || 0;
+    else target[field] = value;
+    target._dirty = true;
+    renderFuelPanel(no);
+    updateWeekHead(no);
+    recalcGrand();
+  }
+
+  function fuelAddLine(no) {
+    fuelLines.push({ id: tmpFuelId--, phase: PHASE, week_no: no, purpose: 'Out and about',
+                     miles: 0, towing: false, standing_id: null,
+                     sort_order: weekFuelRows(no).length, _new: true, _dirty: true });
+    renderFuelPanel(no); updateWeekHead(no); recalcGrand();
+  }
+
+  // Removing an inherited line is also a detach — a zero-mile row that suppresses it for this week.
+  function fuelRemoveLine(no, idx) {
+    const rows = weekFuelRows(no); const r = rows[idx]; if (!r) return;
+    if (r.inherited) { const d = fuelDetach(no, r.ref); d.miles = 0; d._dirty = true; }
+    else {
+      if (r.ref.id > 0) delFuel.push(r.ref.id);
+      const i = fuelLines.indexOf(r.ref); if (i >= 0) fuelLines.splice(i, 1);
+    }
+    renderFuelPanel(no); updateWeekHead(no); recalcGrand();
+  }
+
+  // Drop every week-specific row so the week falls back to the standing lines.
+  function fuelResetWeek(no) {
+    if (!confirm('Reset week ' + no + ' fuel to the standing weekly lines?')) return;
+    fuelLines.filter(l => l.week_no != null && Number(l.week_no) === no).forEach(l => {
+      if (l.id > 0) delFuel.push(l.id);
+      const i = fuelLines.indexOf(l); if (i >= 0) fuelLines.splice(i, 1);
+    });
+    renderFuelPanel(no); updateWeekHead(no); recalcGrand();
+  }
+
+  function fuelRowsHtml(no) {
+    const rows = weekFuelRows(no);
+    if (!rows.length) return '<p class="fuel-hint">No fuel this week. Add a line, or set a standing weekly line on the Fuel Costs page.</p>';
+    const body = rows.map((r, i) =>
+      '<tr class="' + (r.inherited ? 'inh' : '') + '">' +
+        '<td><select onchange="fuelOnField(' + no + ',' + i + ',\'purpose\',this.value)">' + fuelPurposeOptions(r.ref.purpose) + '</select>' +
+          (r.inherited ? '<span class="inh-tag">standing</span>' : '') + '</td>' +
+        '<td><input type="number" step="1" min="0" value="' + (Number(r.ref.miles) || 0) + '" onfocus="holBlankZero(this)" onblur="holRestoreZero(this)" oninput="fuelOnField(' + no + ',' + i + ',\'miles\',this.value)"></td>' +
+        '<td><input type="checkbox" ' + (r.ref.towing ? 'checked' : '') + ' onchange="fuelOnField(' + no + ',' + i + ',\'towing\',this.checked)"></td>' +
+        '<td class="fcost">' + fmt(App.fuelLineCost(r.ref, fctx)) + '</td>' +
+        '<td><button class="btn-fdel" onclick="fuelRemoveLine(' + no + ',' + i + ')">' + (r.inherited ? 'Skip' : 'Remove') + '</button></td>' +
+      '</tr>').join('');
+    return '<div class="fuel-wrap"><table class="fuel-tbl">' +
+      '<colgroup><col class="c-pur"><col class="c-mil"><col class="c-tow"><col class="c-cost"><col class="c-act"></colgroup>' +
+      '<thead><tr><th>Purpose</th><th>Miles</th><th>Tow</th><th>Cost</th><th></th></tr></thead><tbody>' +
+      body + '</tbody></table></div>';
+  }
+
+  function fuelPanelInner(no) {
+    const b = fuelWeekSplit(no);
+    return '<div id="fuelrows_' + no + '">' + fuelRowsHtml(no) + '</div>' +
+      '<div class="panel-tot">Week fuel <b id="fwt_' + no + '">' + fmt(b.total) + '</b>' +
+        '<span class="fuel-hint" style="display:block;margin-top:2px;">Work ' + fmt(b.work) + ' &middot; Other ' + fmt(b.disc) + '</span></div>' +
+      '<button class="btn-faddl" onclick="fuelAddLine(' + no + ')">+ Add fuel line</button> ' +
+      '<button class="btn-clearwk" onclick="fuelResetWeek(' + no + ')">Reset to standing</button>' +
+      '<p class="fuel-hint">Greyed lines come from the standing weekly plan. Change or Skip one and this week keeps its own value \u2014 the other weeks are untouched.</p>';
+  }
+
+  function fuelPanel(no) {
+    return '<div class="panel">' +
+      '<div class="panel-title"><span class="dot dot-fuel"></span>Fuel</div>' +
+      '<div id="fuelpanel_' + no + '">' + fuelPanelInner(no) + '</div></div>';
+  }
+
+  function renderFuelPanel(no) {
+    const el = document.getElementById('fuelpanel_' + no);
+    if (el) el.innerHTML = fuelPanelInner(no);
+  }
+
+  // ---- panels ----
+  function diningPanel(no) {
+    let rows = '';
+    DINING_MEALS.forEach(meal => {
+      const r = rowFor(no, meal);
+      const rt = rowTotal(r);
+      const cells = DAYS.map(([col]) => {
+        const v = r ? (r[col] || '') : '';
+        const id = 'dc_' + no + '_' + meal + '_' + col;
+        return '<td><select class="dcell" id="' + id + '" onchange="dinOnCell(' + no + ',\'' + meal + '\',\'' + col + '\',this.value)">' +
+          '<option value=""></option>' +
+          '<option' + (v === 'L' ? ' selected' : '') + '>L</option>' +
+          '<option' + (v === 'M' ? ' selected' : '') + '>M</option>' +
+          '<option' + (v === 'H' ? ' selected' : '') + '>H</option>' +
+          '</select></td>';
+      }).join('');
+      rows += '<tr><td class="meal">' + meal + '</td>' + cells + '<td class="tot" id="drt_' + no + '_' + meal + '">' + fmt(rt) + '</td></tr>';
+    });
+    return '<div class="panel">' +
+      '<div class="panel-title"><span class="dot dot-din"></span>Home dining</div>' +
+      '<div class="dwrap"><table class="dgrid"><thead><tr><th style="text-align:left;">Meal</th>' +
+      DAYS.map(([, lbl]) => '<th>' + lbl + '</th>').join('') +
+      '<th>Total</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="panel-tot">Week dining <b id="dwt_' + no + '">' + fmt(diningWeekTotal(no)) + '</b></div>' +
+      '<button class="btn-clearwk" onclick="dinClearWeek(' + no + ')">Clear dining</button>' +
+      '<button class="btn-copywk" onclick="dinToggleCopy(' + no + ')">Copy dining to weeks\u2026</button>' +
+      '<div class="copy-panel" id="dcopy_' + no + '" style="display:none;"></div>' +
+      '</div>';
+  }
+
+  function holidayPanel(no, w) {
+    let inner;
+    if (!w) {
+      inner = '<p class="eat-hint">Missing week row \u2014 re-run the SQL seed.</p>';
+    } else {
+      inner =
+        '<div class="row">' +
+          '<div class="fld"><label>Type</label><select onchange="holOnField(' + w.id + ',\'category\',this.value)">' + catOptions(w.category) + '</select></div>' +
+          '<div class="fld"><label>Level</label><select onchange="holOnField(' + w.id + ',\'level\',this.value)">' + lvlOptions(w.level) + '</select></div>' +
+          '<div class="fld"><label>Nights</label><input type="number" step="1" min="0" value="' + (w.nights != null ? w.nights : 0) + '" onfocus="holBlankZero(this)" onblur="holRestoreZero(this)" onchange="holOnField(' + w.id + ',\'nights\',this.value)"></div>' +
+          '<div class="fld"><label>Trip name (optional)</label><input type="text" value="' + esc(w.label) + '" oninput="holOnField(' + w.id + ',\'label\',this.value)"></div>' +
+        '</div>' +
+        '<div class="row">' +
+          '<div class="fld"><label>Incidentals \u00a3</label><input type="number" step="1" min="0" value="' + (w.incidentals != null ? w.incidentals : 0) + '" onfocus="holBlankZero(this)" onblur="holRestoreZero(this)" oninput="holOnField(' + w.id + ',\'incidentals\',this.value)"></div>' +
+        '</div>' +
+        '<div class="eat-title">Eating out</div>' +
+        '<div id="eat_' + w.id + '">' + eatGrid(w) + '</div>' +
+        '<div class="brk" id="brk_' + w.id + '"></div>' +
+        '<button class="btn-clearwk" onclick="holClearWeek(' + w.id + ')">Clear holiday</button>' +
+        '<button class="btn-copywk" onclick="holToggleCopy(' + w.id + ')">Copy holiday to weeks\u2026</button>' +
+        '<div class="copy-panel" id="hcopy_' + w.id + '" style="display:none;"></div>';
+    }
+    return '<div class="panel">' +
+      '<div class="panel-title"><span class="dot dot-hol"></span>Holiday</div>' +
+      inner + '</div>';
+  }
+
+  function headPills(no, w) {
+    let p = '';
+    if (diningHas(no)) p += '<span class="pill pill-din">Dining</span>';
+    if (holidayHas(w)) p += '<span class="pill pill-hol">Holiday</span>';
+    if (fuelHas(no)) p += '<span class="pill pill-fuel">Fuel</span>';
+    return p;
+  }
+
+  function render() {
+    buildStrip();
+    let html = '';
+    for (let no = 1; no <= WEEKS; no++) {
+      const w = weekFor(no);
+      const isC = collapsed[no] !== false;   // default collapsed
+      const combined = diningWeekTotal(no) + (w ? App.holidayWeekTotal(w, ctx) : 0) + fuelWeekTotal(no);
+      const lbl = (w && w.label) ? '<span class="label">' + esc(w.label) + '</span>' : '';
+      html += '<div class="wk">' +
+        '<div class="wk-head" onclick="toggle(' + no + ')">' +
+          '<span class="headline"><span class="chev" id="chev_' + no + '">' + (isC ? '\u25B8' : '\u25BE') + '</span> Week ' + no + ' \u00b7 ' + monthFor(no) + lbl +
+            '<span id="pills_' + no + '">' + headPills(no, w) + '</span></span>' +
+          '<span class="wktot" id="wt_' + no + '">' + fmt(combined) + '</span>' +
+        '</div>' +
+        '<div class="wk-body" id="wkbody_' + no + '" style="display:' + (isC ? 'none' : 'block') + ';">' +
+          '<div class="panels">' + diningPanel(no) + holidayPanel(no, w) + fuelPanel(no) + '</div>' +
+        '</div></div>';
+    }
+    document.getElementById('weeks').innerHTML = html;
+    for (let no = 1; no <= WEEKS; no++) { const w = weekFor(no); if (w) refreshWeek(w); }
+    recalcGrand();
+  }
+
+  function refreshWeek(w) {
+    const b = App.holidayWeekBreakdown(w, ctx);
+    const brkEl = document.getElementById('brk_' + w.id);
+    if (brkEl) brkEl.innerHTML = 'Accom <b>' + fmt(b.accom) +
+      '</b> &middot; Incidentals <b>' + fmt(b.incidentals) + '</b> &middot; Eating out <b>' + fmt(b.eat) +
+      '</b> &nbsp;=&nbsp; Holiday total <b>' + fmt(b.total) + '</b>';
+    updateWeekHead(w.week_no);
+  }
+
+  function updateWeekHead(no) {
+    const w = weekFor(no);
+    const dt = diningWeekTotal(no);
+    const ht = w ? App.holidayWeekTotal(w, ctx) : 0;
+    const ft = fuelWeekTotal(no);
+    setText('dwt_' + no, fmt(dt));
+    setText('fwt_' + no, fmt(ft));
+    setText('wt_' + no, fmt(dt + ht + ft));
+    const pills = document.getElementById('pills_' + no);
+    if (pills) pills.innerHTML = headPills(no, w);
+    updateStripCell(no);
+  }
+
+  function recalcGrand() {
+    let total = rota.reduce((s, r) => s + rowTotal(r), 0);
+    total += plan.reduce((s, w) => s + App.holidayWeekTotal(w, ctx), 0);
+    total += fuelYearTotal();
+    setText('grandTotal', fmt(total));
+  }
+
+  // ---- year strip ----
+  function cellClass(no) {
+    const w = weekFor(no);
+    const d = diningHas(no), h = holidayHas(w);
+    if (d && h) return 'both';
+    if (h) return 'hol';
+    if (d) return 'din';
+    return 'none';
+  }
+  function cellHtml(no) {
+    const k = cellClass(no);
+    let cls = 'sc', inner = '';
+    if (k === 'both') { inner = '<span class="sc-half half-din"></span><span class="sc-half half-hol"></span>'; }
+    else if (k === 'hol') cls += ' sc-hol';
+    else if (k === 'din') cls += ' sc-din';
+    else cls += ' sc-none';
+    return '<div class="' + cls + '" id="sc_' + no + '" title="Week ' + no + ' \u00b7 ' + monthFor(no) + '" onclick="jumpToWeek(' + no + ')">' + inner + '</div>';
+  }
+  function buildStrip() {
+    let html = '', curMonth = null, cells = '';
+    for (let no = 1; no <= WEEKS; no++) {
+      const m = monthFor(no);
+      if (m !== curMonth) {
+        if (curMonth !== null) html += '<div class="mgroup"><div class="mlabel">' + curMonth + '</div><div class="mcells">' + cells + '</div></div>';
+        curMonth = m; cells = '';
+      }
+      cells += cellHtml(no);
+    }
+    if (curMonth !== null) html += '<div class="mgroup"><div class="mlabel">' + curMonth + '</div><div class="mcells">' + cells + '</div></div>';
+    document.getElementById('strip').innerHTML = html;
+  }
+  function updateStripCell(no) {
+    const el = document.getElementById('sc_' + no);
+    if (!el) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = cellHtml(no);
+    const fresh = tmp.firstChild;
+    el.className = fresh.className;
+    el.innerHTML = fresh.innerHTML;
+  }
+  function jumpToWeek(no) {
+    collapsed[no] = false; applyState(no);
+    const el = document.getElementById('wkbody_' + no);
+    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // ---- dining events / clear / copy ----
+  function dinOnCell(no, meal, col, value) {
+    const r = rowFor(no, meal);
+    if (!r) return;
+    r[col] = value || null;
+    dirtyDin[r.id] = true;
+    setText('drt_' + no + '_' + meal, fmt(rowTotal(r)));
+    updateWeekHead(no);
+    recalcGrand();
+  }
+  function dinClearWeek(no) {
+    if (!confirm('Clear all home dining for Week ' + no + '? This will be permanent once you Save.')) return;
+    DINING_MEALS.forEach(meal => { const r = rowFor(no, meal); if (!r) return; DAYS.forEach(([col]) => { r[col] = null; }); dirtyDin[r.id] = true; });
+    render();
+    setMsg('Week ' + no + ' dining cleared \u2014 press Save to keep.', '#c0392b');
+  }
+  function dinCopyWeekData(srcWeek, dstWeek) {
+    DINING_MEALS.forEach(meal => {
+      const src = rowFor(srcWeek, meal); const dst = rowFor(dstWeek, meal);
+      if (!src || !dst) return;
+      DAYS.forEach(([col]) => { dst[col] = src[col] || null; });
+      dirtyDin[dst.id] = true;
+    });
+  }
+  function dinCopyGridHtml(no) {
+    let boxes = '';
+    for (let k = 1; k <= WEEKS; k++) { if (k === no) continue; boxes += '<label class="copy-wk"><input type="checkbox" data-wk="' + k + '"> ' + k + ' ' + monthFor(k) + '</label>'; }
+    return '<div class="copy-head">Copy Week ' + no + ' dining to (overwrites the selected weeks):</div>' +
+      '<div class="copy-actions"><button class="btn-copy-mini" onclick="dinCopySelAll(' + no + ',true)">Select all</button>' +
+      '<button class="btn-copy-mini" onclick="dinCopySelAll(' + no + ',false)">Clear</button></div>' +
+      '<div class="copy-grid">' + boxes + '</div>' +
+      '<div class="copy-actions"><button class="btn-copy-go" onclick="dinDoCopy(' + no + ')">Copy to selected</button>' +
+      '<button class="btn-copy-mini" onclick="dinToggleCopy(' + no + ')">Cancel</button></div>';
+  }
+  function dinToggleCopy(no) {
+    const panel = document.getElementById('dcopy_' + no); if (!panel) return;
+    if (panel.style.display === 'none') { panel.innerHTML = dinCopyGridHtml(no); panel.style.display = 'block'; }
+    else { panel.style.display = 'none'; panel.innerHTML = ''; }
+  }
+  function dinCopySelAll(no, val) { document.querySelectorAll('#dcopy_' + no + ' input[type=checkbox][data-wk]').forEach(b => { b.checked = val; }); }
+  function dinDoCopy(no) {
+    const targets = [];
+    document.querySelectorAll('#dcopy_' + no + ' input[type=checkbox][data-wk]').forEach(b => { if (b.checked) targets.push(Number(b.getAttribute('data-wk'))); });
+    if (!targets.length) { alert('Select at least one week to copy to.'); return; }
+    if (!confirm('Copy Week ' + no + ' dining to ' + targets.length + ' week(s)? This overwrites their data.')) return;
+    let n = 0; targets.forEach(t => { if (t !== no) { dinCopyWeekData(no, t); n++; } });
+    render();
+    setMsg('Copied Week ' + no + ' dining to ' + n + ' week(s) \u2014 press Save to keep.', '#065f46');
+  }
+
+  // ---- holiday events / clear / copy ----
+  function holOnField(id, field, value) {
+    const w = plan.find(x => x.id === id); if (!w) return;
+    if (field === 'nights') {
+      const n = Math.max(0, Math.round(Number(value) || 0));
+      w.nights = n;
+      MEALS.forEach(m => { const arr = w.eating_out[m] || []; if (arr.length > n) arr.length = n; while (arr.length < n) arr.push(''); w.eating_out[m] = arr; });
+      const eatEl = document.getElementById('eat_' + id); if (eatEl) eatEl.innerHTML = eatGrid(w);
+    } else if (field === 'incidentals') { w[field] = Number(value) || 0; }
+    else if (field === 'label') {
+      w.label = value;
+      const chev = document.getElementById('chev_' + w.week_no);
+      const headSpan = chev ? chev.parentElement : null;
+      if (headSpan) { let lab = headSpan.querySelector('.label'); if (!lab && value) { lab = document.createElement('span'); lab.className = 'label'; chev.parentElement.insertBefore(lab, document.getElementById('pills_' + w.week_no)); } if (lab) lab.textContent = value || ''; }
+    } else { w[field] = value || null; }
+    dirtyHol[id] = true;
+    refreshWeek(w);
+    recalcGrand();
+  }
+  function holOnMeal(id, meal, nightIdx, value) {
+    const w = plan.find(x => x.id === id); if (!w) return;
+    if (!Array.isArray(w.eating_out[meal])) w.eating_out[meal] = [];
+    w.eating_out[meal][nightIdx] = value || '';
+    dirtyHol[id] = true;
+    refreshWeek(w);
+    recalcGrand();
+  }
+  function resetWeekObj(w) { w.label = null; w.category = null; w.level = null; w.nights = 0; w.incidentals = 0; w.eating_out = {}; MEALS.forEach(m => { w.eating_out[m] = []; }); }
+  function holClearWeek(id) {
+    const w = plan.find(x => x.id === id); if (!w) return;
+    if (!confirm('Clear all holiday data for Week ' + w.week_no + '? This will be permanent once you Save.')) return;
+    resetWeekObj(w); dirtyHol[id] = true;
+    render();
+    setMsg('Week ' + w.week_no + ' holiday cleared \u2014 press Save to keep.', '#c0392b');
+  }
+  function holCopyWeekData(src, dst) {
+    dst.label = src.label; dst.category = src.category; dst.level = src.level; dst.nights = src.nights;
+    dst.incidentals = src.incidentals;
+    dst.eating_out = {}; MEALS.forEach(m => { dst.eating_out[m] = (src.eating_out[m] || []).slice(); });
+  }
+  function holCopyGridHtml(id) {
+    const src = plan.find(x => x.id === id); if (!src) return '';
+    let boxes = '';
+    for (let no = 1; no <= WEEKS; no++) { if (no === src.week_no) continue; boxes += '<label class="copy-wk"><input type="checkbox" data-wk="' + no + '"> ' + no + ' ' + monthFor(no) + '</label>'; }
+    return '<div class="copy-head">Copy Week ' + src.week_no + ' holiday to (overwrites the selected weeks):</div>' +
+      '<div class="copy-actions"><button class="btn-copy-mini" onclick="holCopySelAll(' + id + ',true)">Select all</button>' +
+      '<button class="btn-copy-mini" onclick="holCopySelAll(' + id + ',false)">Clear</button></div>' +
+      '<div class="copy-grid">' + boxes + '</div>' +
+      '<div class="copy-actions"><button class="btn-copy-go" onclick="holDoCopy(' + id + ')">Copy to selected</button>' +
+      '<button class="btn-copy-mini" onclick="holToggleCopy(' + id + ')">Cancel</button></div>';
+  }
+  function holToggleCopy(id) {
+    const panel = document.getElementById('hcopy_' + id); if (!panel) return;
+    if (panel.style.display === 'none') { panel.innerHTML = holCopyGridHtml(id); panel.style.display = 'block'; }
+    else { panel.style.display = 'none'; panel.innerHTML = ''; }
+  }
+  function holCopySelAll(id, val) { document.querySelectorAll('#hcopy_' + id + ' input[type=checkbox][data-wk]').forEach(b => { b.checked = val; }); }
+  function holDoCopy(id) {
+    const src = plan.find(x => x.id === id); if (!src) return;
+    const targets = [];
+    document.querySelectorAll('#hcopy_' + id + ' input[type=checkbox][data-wk]').forEach(b => { if (b.checked) targets.push(Number(b.getAttribute('data-wk'))); });
+    if (!targets.length) { alert('Select at least one week to copy to.'); return; }
+    if (!confirm('Copy Week ' + src.week_no + ' holiday to ' + targets.length + ' week(s)? This overwrites their data.')) return;
+    let n = 0; targets.forEach(no => { const dst = weekFor(no); if (dst && dst.id !== src.id) { holCopyWeekData(src, dst); dirtyHol[dst.id] = true; n++; } });
+    render();
+    setMsg('Copied Week ' + src.week_no + ' holiday to ' + n + ' week(s) \u2014 press Save to keep.', '#065f46');
+  }
+
+  // ---- shared collapse / clear-all ----
+  function applyState(no) {
+    const isC = collapsed[no] !== false;
+    const body = document.getElementById('wkbody_' + no);
+    const chev = document.getElementById('chev_' + no);
+    if (body) body.style.display = isC ? 'none' : 'block';
+    if (chev) chev.textContent = isC ? '\u25B8' : '\u25BE';
+  }
+  function toggle(no) { collapsed[no] = !(collapsed[no] !== false); applyState(no); }
+  function collapseAll() { for (let n = 1; n <= WEEKS; n++) { collapsed[n] = true; applyState(n); } }
+  function expandAll() { for (let n = 1; n <= WEEKS; n++) { collapsed[n] = false; applyState(n); } }
+  function clearAllBoth() {
+    if (!confirm('Clear dining AND holiday data for ALL 52 weeks? This will be permanent once you Save.')) return;
+    rota.forEach(r => { DAYS.forEach(([col]) => { r[col] = null; }); dirtyDin[r.id] = true; });
+    plan.forEach(w => { resetWeekObj(w); dirtyHol[w.id] = true; });
+    render();
+    setMsg('All weeks cleared \u2014 press Save to keep the change.', '#c0392b');
+  }
+
+  function setMsg(text, colour) { const m = document.getElementById('msg'); m.style.color = colour || '#1e3a8a'; m.textContent = text; }
+
+  // ---- savings pot dropdown ----
+  function renderPot() {
+    const sel = document.getElementById('potSel');
+    const own = (settingsDin.savings_account != null && String(settingsDin.savings_account).trim() !== '') ? String(settingsDin.savings_account).trim() : '';
+    const cur = own || holidayPot || '';
+    let opts = '<option value="">\u2014 none (keep on credit card) \u2014</option>';
+    (accounts || []).filter(a => a.account_id).forEach(a => {
+      const bits = [a.bank_name, a.account_holder].filter(Boolean).join(' \u00b7 ');
+      const lbl = a.account_id + (bits ? ' (' + bits + ')' : '');
+      opts += '<option value="' + esc(a.account_id) + '"' + (cur === a.account_id ? ' selected' : '') + '>' + esc(lbl) + '</option>';
+    });
+    sel.innerHTML = opts;
+  }
+
+  // ---- save both tables ----
+  async function saveAll() {
+    const dinIds = Object.keys(dirtyDin);
+    const holIds = Object.keys(dirtyHol).map(Number);
+    const dt70 = readTaper('dtap70'), dt80 = readTaper('dtap80'), dt90 = readTaper('dtap90');
+    const ht70 = readTaper('htap70'), ht80 = readTaper('htap80'), ht90 = readTaper('htap90');
+    const dinTaperChanged = !settingsDin || tnum(settingsDin.taper_at_70, 1) !== dt70 || tnum(settingsDin.taper_at_80, 1) !== dt80 || tnum(settingsDin.taper_at_90, 1) !== dt90;
+    const holTaperChanged = !settingsHol || tnum(settingsHol.taper_at_70, 1) !== ht70 || tnum(settingsHol.taper_at_80, 1) !== ht80 || tnum(settingsHol.taper_at_90, 1) !== ht90;
+    const ownStored = (settingsDin && settingsDin.savings_account != null && String(settingsDin.savings_account).trim() !== '') ? String(settingsDin.savings_account).trim() : '';
+    const potVal = (document.getElementById('potSel').value || '').trim();
+    const potChanged = potVal !== ownStored;
+    const dinSettingsChanged = dinTaperChanged || potChanged;
+    const fuelChanged = delFuel.length > 0 || fuelLines.some(l => l._dirty);
+    if (!dinIds.length && !holIds.length && !dinSettingsChanged && !holTaperChanged && !fuelChanged) { setMsg('No changes to save.', '#64748b'); return; }
+    setMsg('Saving\u2026', '#1e3a8a');
+    try {
+      if (dinSettingsChanged) {
+        const sPayload = { taper_at_70: dt70, taper_at_80: dt80, taper_at_90: dt90, savings_account: potVal || null };
+        await App.write('PATCH', 'bd_dining_settings?id=eq.1', sPayload);
+        settingsDin = Object.assign({}, settingsDin, sPayload);
+      }
+      if (holTaperChanged) {
+        const hPayload = { taper_at_70: ht70, taper_at_80: ht80, taper_at_90: ht90 };
+        await App.write('PATCH', 'bd_holiday_settings?id=eq.1', hPayload);
+        settingsHol = Object.assign({}, settingsHol, hPayload);
+      }
+      for (const id of dinIds) {
+        const r = rota.find(x => x.id === id);
+        if (!r) continue;
+        const payload = { mon: r.mon || null, tue: r.tue || null, wed: r.wed || null, thu: r.thu || null, fri: r.fri || null, sat: r.sat || null, sun: r.sun || null };
+        await App.write('PATCH', 'bd_dining_rota?id=eq.' + id, payload);
+      }
+      for (const id of holIds) {
+        const w = plan.find(x => x.id === id); if (!w) continue;
+        const n = Math.max(0, Number(w.nights) || 0);
+        const grid = {};
+        MEALS.forEach(m => { const arr = (w.eating_out[m] || []).slice(0, n); while (arr.length < n) arr.push(''); grid[m] = arr; });
+        const payload = {
+          label: w.label || null, category: w.category || null, level: w.level || null,
+          nights: n,
+          incidentals: Number(w.incidentals) || 0, eating_out: grid
+        };
+        await App.write('PATCH', 'bd_holiday_plan?id=eq.' + id, payload);
+      }
+      // fuel lines: deletes first, then inserts/updates
+      for (const id of delFuel) await App.write('DELETE', 'bd_fuel_line?id=eq.' + id, undefined);
+      delFuel = [];
+      for (const l of fuelLines) {
+        if (!l._dirty) continue;
+        const row = { phase: PHASE, week_no: l.week_no, purpose: l.purpose,
+                      miles: Number(l.miles) || 0, towing: !!l.towing,
+                      standing_id: l.standing_id != null ? l.standing_id : null,
+                      sort_order: Number(l.sort_order) || 0 };
+        if (l.id < 0) await App.write('POST', 'bd_fuel_line', row);
+        else await App.write('PATCH', 'bd_fuel_line?id=eq.' + l.id, row);
+      }
+      dirtyDin = {}; dirtyHol = {};
+      fuelLines.forEach(l => { delete l._dirty; delete l._new; });
+      setMsg('\u2713 Saved. Reopen the dashboard to update projections.', '#065f46');
+      notify();
+      // Reload after a fuel save so newly inserted rows pick up their real ids — otherwise a
+      // second edit of an unsaved row (still holding its negative id) would insert a duplicate.
+      // `collapsed` is module-level, so the open/closed state of each week survives the reload.
+      if (fuelChanged) await load();
+    } catch (e) { setMsg('Save failed: ' + e.message, '#c0392b'); }
+  }
+
+  // ---- save the budget basis (separate global setting; applies everywhere on any device) ----
+  async function saveBasis() {
+    const msg = document.getElementById('basisMsg');
+    const dAdj = Number(document.getElementById('dinAdj').value) || 0;
+    const hAdj = Number(document.getElementById('holAdj').value) || 0;
+    const fAdj = Number(document.getElementById('fuelAdj').value) || 0;
+    msg.style.color = '#1e3a8a'; msg.textContent = 'Saving\u2026';
+    try {
+      await App.saveDiscretionaryBasis({ basis: curBasis, dining_adjust: dAdj, holiday_adjust: hAdj, fuel_adjust: fAdj });
+      // v5: the adjust is authoritative on bd_bill_category now. Write it there too, preserving each
+      // category's own use_actual tick — this panel sets the amount, Bills Categories sets the tick.
+      const pairs = [['dining', dAdj], ['holiday', hAdj], ['fuel', fAdj]];
+      for (const [kind, val] of pairs) {
+        const c = catFlags[kind];
+        if (!c) continue;
+        try { await App.saveCategoryActual(c.code, c.use_actual, val); c.actual_adjust = val; } catch (e) { /* legacy columns still hold it */ }
+      }
+      discSettings = { basis: curBasis, dining_adjust: dAdj, holiday_adjust: hAdj, fuel_adjust: fAdj };
+      msg.style.color = '#065f46'; msg.textContent = '\u2713 Saved. Reopen the dashboard to update projections.';
+      notify();
+    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
+  App.requireLogin(load, { title: 'Weekly Plan' });
+</script>
+
+<script>
+/* LC-385: deploy stamp (this page does not load the engine). */
+(function () {
+  var TAG = 'weekly v6';
+  function go() {
+    var s = document.createElement('div');
+    s.style.cssText = 'text-align:right;padding:2px 8px 3px;font:10px "Segoe UI",Tahoma,sans-serif;color:#94a3b8;opacity:.8;';
+    s.textContent = TAG;
+    document.body.appendChild(s);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+})();
+</script>
+</body>
+</html>
