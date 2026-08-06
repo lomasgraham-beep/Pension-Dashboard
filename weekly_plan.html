@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Weekly Plan</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=julie1"></script>
+<script src="common.js?v=cat1"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1560px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin-bottom:2px; }
@@ -210,7 +210,7 @@
 </head>
 <body>
   <h1>Weekly Plan <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(52-week dining &amp; holidays)</span></h1>
-  <p class="note">Both planners in one place: each week shows home dining and the holiday side by side, and the year strip flags where they overlap. Dining and holiday costs feed the retirement model &mdash; choose <b>Plan</b> or <b>Actual (last 12 months)</b> in the Budget basis panel below, and it applies to the budget, the bills page and the model on any device. <span style="color:#94a3b8;">(weekly build: v4)</span></p>
+  <p class="note">Both planners in one place: each week shows home dining and the holiday side by side, and the year strip flags where they overlap. Dining and holiday costs feed the retirement model &mdash; choose <b>Plan</b> or <b>Actual (last 12 months)</b> in the Budget basis panel below, and it applies to the budget, the bills page and the model on any device. <span style="color:#94a3b8;">(weekly build: v5)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div class="taper-card" id="taperCard" style="display:none;">
@@ -233,11 +233,13 @@
 
   <div class="basis-card mode-plan" id="basisCard" style="display:none;">
     <div class="basis-head">Budget basis <span class="basis-win" id="basisWin"></span></div>
-    <div class="basis-sub">Choose whether the budget, the bills page and the whole retirement model use your <b>planned</b> dining &amp; holiday costs (the 52 weeks below), or your <b>actual</b> spend over the last 12 months on the <b>Dining</b> and <b>Holidays</b> card categories. In Actual mode you can nudge each monthly average up or down. Saved to your account, so it applies on any device.</div>
+    <div class="basis-sub">Choose whether the budget, the bills page and the whole retirement model use your <b>planned</b> dining &amp; holiday costs (the 52 weeks below), or your <b>actual</b> spend over the last 12 months on the <b>Dining</b> and <b>Holidays</b> card categories. In Actual mode you can nudge each monthly average up or down. Saved to your account, so it applies on any device. <b>Mixed</b> lets each category decide for itself \u2014 set the ticks on the Bills Categories page.</div>
     <div class="basis-toggle">
       <button type="button" class="basis-opt" id="optPlan" onclick="setBasis('plan')">Plan</button>
       <button type="button" class="basis-opt" id="optActual" onclick="setBasis('actual')">Actual &mdash; last 12 months</button>
+      <button type="button" class="basis-opt" id="optMixed" onclick="setBasis('mixed')">Mixed &mdash; per category</button>
     </div>
+    <div class="basis-sub" id="mixedNote" style="display:none;"></div>
     <div class="basis-tablewrap">
       <table class="basis-table">
         <thead><tr><th>Category</th><th>12-month total</th><th>Avg / month</th><th>Adjust &pound;/mo</th><th>After adjust / month</th></tr></thead>
@@ -331,6 +333,18 @@
   let tmpFuelId = -1;     // negative ids for unsaved rows
   const collapsed = {};   // week_no -> true(collapsed); default collapsed
   let discSettings = { basis: 'plan', dining_adjust: 0, holiday_adjust: 0, fuel_adjust: 0 }; // bd_discretionary_basis
+  // v5: dining/holiday/fuel now carry their tick and their adjust on bd_bill_category, so the
+  // adjust boxes below read and write THERE rather than to bd_discretionary_basis. Keeping both
+  // would give two sources of truth for the same number.
+  let catFlags = { dining: null, holiday: null, fuel: null };   // kind -> { code, use_actual, actual_adjust }
+  function matchDomain(c) {
+    const nm = String(c.description || '').trim().toLowerCase();
+    const cd = String(c.code || '').trim().toLowerCase();
+    if (nm === 'dining' || cd === 'dining') return 'dining';
+    if (nm === 'holiday' || nm === 'holidays' || cd === 'holiday' || cd === 'holidays') return 'holiday';
+    if (nm === 'fuel' || nm === 'petrol' || nm === 'diesel' || cd === 'fuel') return 'fuel';
+    return null;
+  }
   let discActual = { diningTotal: 0, holidayTotal: 0, fuelTotal: 0, endMonth: null, months: 12 }; // trailing-12mo actuals
   let curBasis = 'plan';  // live selection in the Budget basis panel
 
@@ -344,7 +358,14 @@
   function adjBlank(el) { el.dataset.prev = el.value; el.value = ''; }
   function adjRestore(el) { if (el.value.trim() === '') el.value = (el.dataset.prev != null ? el.dataset.prev : '0'); renderBasis(); }
   function fmtMonth(ym) { if (!ym) return ''; return MONTHS_SHORT[Number(ym.slice(5, 7)) - 1] + ' ' + ym.slice(0, 4); }
-  function setBasis(b) { curBasis = (b === 'actual') ? 'actual' : 'plan'; renderBasis(); }
+  function setBasis(b) { curBasis = (b === 'actual' || b === 'mixed') ? b : 'plan'; renderBasis(); }
+  // v5: which of the three planner domains is actually on actuals in the current mode.
+  // 'actual' forces all three on; 'mixed' defers to each category's own tick; 'plan' none.
+  function domainOn(kind) {
+    if (curBasis === 'plan') return false;
+    if (curBasis === 'actual') return true;
+    return !!(catFlags[kind] && catFlags[kind].use_actual);
+  }
 
   function renderBasis() {
     const din12 = discActual ? (Number(discActual.diningTotal) || 0) : 0;
@@ -361,23 +382,36 @@
     setText('bHol12', fmt(hol12)); setText('bHolAvg', fmt(holAvg)); setText('bHolAfter', fmt(holAfter));
     setText('bFuel12', fmt(fuel12)); setText('bFuelAvg', fmt(fuelAvg)); setText('bFuelAfter', fmt(fuelAfter));
     setText('basisWin', discActual && discActual.endMonth ? '(12 months to ' + fmtMonth(discActual.endMonth) + ')' : '(no card data yet)');
-    document.getElementById('optPlan').classList.toggle('on', curBasis !== 'actual');
+    document.getElementById('optPlan').classList.toggle('on', curBasis === 'plan');
     document.getElementById('optActual').classList.toggle('on', curBasis === 'actual');
+    document.getElementById('optMixed').classList.toggle('on', curBasis === 'mixed');
     const card = document.getElementById('basisCard');
-    card.classList.toggle('mode-actual', curBasis === 'actual');
-    card.classList.toggle('mode-plan', curBasis !== 'actual');
+    card.classList.toggle('mode-actual', curBasis !== 'plan');
+    card.classList.toggle('mode-plan', curBasis === 'plan');
+    const mn = document.getElementById('mixedNote');
+    if (curBasis === 'mixed') {
+      const on = ['dining', 'holiday', 'fuel'].filter(domainOn);
+      const names = { dining: 'Dining', holiday: 'Holidays', fuel: 'Fuel' };
+      mn.style.display = 'block';
+      mn.innerHTML = 'In Mixed mode each category follows its own <b>Use actual costs</b> tick on the '
+        + 'Bills Categories page. Currently on actuals here: <b>'
+        + (on.length ? on.map(k => names[k]).join(', ') : 'none of these three')
+        + '</b>. Other categories (bill-backed ones like Julie or Groceries) are governed there too.';
+    } else { mn.style.display = 'none'; }
     const planDin = rota.reduce((s, r) => s + rowTotal(r), 0);
     const planHol = plan.reduce((s, w) => s + App.holidayWeekTotal(w, ctx), 0);
     const planFuel = fuelYearSplit();
     setText('basisPlanRef', 'Plan year totals for reference \u2014 Dining ' + fmt(planDin) + ' \u00b7 Holidays ' + fmt(planHol) +
       ' \u00b7 Fuel ' + fmt(planFuel.total) + ' (work ' + fmt(planFuel.work) + ', other ' + fmt(planFuel.disc) + ').');
-    const feedDin = (curBasis === 'actual') ? dinAfter * 12 : planDin;
-    const feedHol = (curBasis === 'actual') ? holAfter * 12 : planHol;
+    const feedDin = domainOn('dining') ? dinAfter * 12 : planDin;
+    const feedHol = domainOn('holiday') ? holAfter * 12 : planHol;
     // On Actual, the single card figure is apportioned by the plan's work:other ratio — the card
     // cannot tell commuting from leisure driving, but the engine needs the split.
-    const feedFuel = (curBasis === 'actual') ? fuelAfter * 12 : planFuel.total;
-    setText('basisFeed', 'Feeding the model (' + (curBasis === 'actual' ? 'Actual' : 'Plan') + '): Dining ' + fmt(feedDin) +
-      '/yr \u00b7 Holidays ' + fmt(feedHol) + '/yr \u00b7 Fuel ' + fmt(feedFuel) + '/yr');
+    const feedFuel = domainOn('fuel') ? fuelAfter * 12 : planFuel.total;
+    const tag = k => domainOn(k) ? ' (actual)' : ' (plan)';
+    const modeName = curBasis === 'actual' ? 'Actual' : (curBasis === 'mixed' ? 'Mixed' : 'Plan');
+    setText('basisFeed', 'Feeding the model (' + modeName + '): Dining ' + fmt(feedDin) + '/yr' + tag('dining') +
+      ' \u00b7 Holidays ' + fmt(feedHol) + '/yr' + tag('holiday') + ' \u00b7 Fuel ' + fmt(feedFuel) + '/yr' + tag('fuel'));
   }
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function setText(id, t) { const el = document.getElementById(id); if (el) el.textContent = t; }
@@ -435,9 +469,20 @@
       discSettings = discRow || { basis: 'plan', dining_adjust: 0, holiday_adjust: 0, fuel_adjust: 0 };
       curBasis = (discSettings.basis === 'actual') ? 'actual' : 'plan';
       discActual = App.actualDiscretionary12mo(cardTxns || [], catRows || []);
-      document.getElementById('dinAdj').value = Number(discSettings.dining_adjust) || 0;
-      document.getElementById('holAdj').value = Number(discSettings.holiday_adjust) || 0;
-      document.getElementById('fuelAdj').value = Number(discSettings.fuel_adjust) || 0;
+      // v5: adjusts now live on bd_bill_category. Fall back to the old bd_discretionary_basis
+      // columns only where a category row is missing, so nothing is lost if a code was renamed.
+      catFlags = { dining: null, holiday: null, fuel: null };
+      try {
+        const cb = await App.loadCategoryBasis(true);
+        Object.keys(cb.cats || {}).forEach(code => {
+          const kind = matchDomain(cb.cats[code]);
+          if (kind && !catFlags[kind]) catFlags[kind] = cb.cats[code];
+        });
+      } catch (e) { /* columns missing -> fall back below */ }
+      const adjOf = (kind, legacy) => catFlags[kind] ? (Number(catFlags[kind].actual_adjust) || 0) : (Number(legacy) || 0);
+      document.getElementById('dinAdj').value = adjOf('dining', discSettings.dining_adjust);
+      document.getElementById('holAdj').value = adjOf('holiday', discSettings.holiday_adjust);
+      document.getElementById('fuelAdj').value = adjOf('fuel', discSettings.fuel_adjust);
       dirtyDin = {}; dirtyHol = {};
       status.style.display = 'none';
       document.getElementById('taperCard').style.display = 'block';
@@ -1013,6 +1058,14 @@
     msg.style.color = '#1e3a8a'; msg.textContent = 'Saving\u2026';
     try {
       await App.saveDiscretionaryBasis({ basis: curBasis, dining_adjust: dAdj, holiday_adjust: hAdj, fuel_adjust: fAdj });
+      // v5: the adjust is authoritative on bd_bill_category now. Write it there too, preserving each
+      // category's own use_actual tick — this panel sets the amount, Bills Categories sets the tick.
+      const pairs = [['dining', dAdj], ['holiday', hAdj], ['fuel', fAdj]];
+      for (const [kind, val] of pairs) {
+        const c = catFlags[kind];
+        if (!c) continue;
+        try { await App.saveCategoryActual(c.code, c.use_actual, val); c.actual_adjust = val; } catch (e) { /* legacy columns still hold it */ }
+      }
       discSettings = { basis: curBasis, dining_adjust: dAdj, holiday_adjust: hAdj, fuel_adjust: fAdj };
       msg.style.color = '#065f46'; msg.textContent = '\u2713 Saved. Reopen the dashboard to update projections.';
       notify();

@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Summary of Household Bills</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=julie1"></script>
+<script src="common.js?v=cat1"></script>
 <style>
   :root { --accent:#1d3a63; --accent-dark:#14294a; --accent-soft:#e6f5f7; --accent-border:#bfe4e9; --on-accent:#ffffff; --other:#94a3b8; }
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:980px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
@@ -334,7 +334,7 @@
       // JULIE category total here matches Budget's Hair and Nails row and what the engine is fed.
       // Julie needs no derived line the way Holiday/Dining/Fuel do — she is already a real bill
       // row in her own category, so overriding the amount is enough for the rollup to follow.
-      allBills = await App.applyJulieBasis(await App.rest('bd_household_bills?order=bill_name.asc'));
+      allBills = await App.applyCategoryBasis(await App.rest('bd_household_bills?order=bill_name.asc'));
       try { giftRows = await App.rest('bd_gift_savings') || []; } catch (e) { giftRows = []; }
       // Holiday planner & dining rota yearly totals (display-only; merge into their categories).
       try {

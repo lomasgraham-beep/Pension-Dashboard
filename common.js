@@ -301,7 +301,7 @@
   // Drops the session-lifetime caches so the next read goes to the database. Call before a manual
   // in-page refresh: _discSettingsCache otherwise survives for the life of the tab, so a changed
   // Plan/Actual basis or adjustment would never show up without a full reload.
-  function clearCaches() { _discSettingsCache = null; _julieCache = null; }
+  function clearCaches() { _discSettingsCache = null; _catBasisCache = null; _actualCache = null; }
 
   async function loadDiscretionaryBasis(force) {
     if (_discSettingsCache && !force) return _discSettingsCache;
@@ -310,7 +310,7 @@
       const rows = await rest('bd_discretionary_basis?id=eq.1');
       const r = (rows && rows[0]) || {};
       out = {
-        basis: (r.basis === 'actual') ? 'actual' : 'plan',
+        basis: (r.basis === 'actual' || r.basis === 'mixed') ? r.basis : 'plan',
         dining_adjust: Number(r.dining_adjust) || 0,
         holiday_adjust: Number(r.holiday_adjust) || 0,
         fuel_adjust: Number(r.fuel_adjust) || 0
@@ -322,7 +322,7 @@
 
   async function saveDiscretionaryBasis(s) {
     const payload = {
-      basis: (s && s.basis === 'actual') ? 'actual' : 'plan',
+      basis: (s && (s.basis === 'actual' || s.basis === 'mixed')) ? s.basis : 'plan',
       dining_adjust: Number(s && s.dining_adjust) || 0,
       holiday_adjust: Number(s && s.holiday_adjust) || 0,
       fuel_adjust: Number(s && s.fuel_adjust) || 0,
@@ -330,6 +330,7 @@
     };
     await write('PATCH', 'bd_discretionary_basis?id=eq.1', payload);
     _discSettingsCache = { basis: payload.basis, dining_adjust: payload.dining_adjust, holiday_adjust: payload.holiday_adjust, fuel_adjust: payload.fuel_adjust };
+    _catBasisCache = null; _actualCache = null;   // basis changed -> per-category view is stale
     return _discSettingsCache;
   }
 
@@ -348,36 +349,142 @@
     return { dining: dining, holiday: holiday, reimburse: reimburse, fuel: fuel };
   }
 
-  // Trailing-12-month actual card spend for the Dining / Holidays categories.
-  // txns:   bd_card_txn rows { txn_date, amount, category_code }
-  // catRows: bd_bill_category rows { code, description }
-  // Window = the 12 calendar months ending at the most recent txn month present
-  // (mirrors Cost Analysis' rolling year). Net of refunds (negative amounts).
-  // Returns { diningTotal, holidayTotal, endMonth, months } — totals are the
-  // 12-month figures; divide by `months` (12) for the smoothed monthly average.
-  function actualDiscretionary12mo(txns, catRows) {
+  // ---- Trailing-12-month actual card spend, PER CATEGORY -------------------------------
+  // Window = the 12 calendar months ending at the most recent txn month present (mirrors Cost
+  // Analysis' rolling year). Net of refunds (negative amounts). Reimburse-coded rows are excluded
+  // entirely — they are money coming back, not a category of spend.
+  // Returns { byCode: { code -> { total, count } }, endMonth, months }. `count` exists so the
+  // Bills Category page can show coverage: a flagged category with 0 txns is the silent-zero trap.
+  function actualByCategory12mo(txns, catRows) {
     const sets = discretionaryCodeSets(catRows);
     const present = {};
     (txns || []).forEach(function (t) { const ym = String(t.txn_date || '').slice(0, 7); if (ym) present[ym] = true; });
     const keys = Object.keys(present).sort();
-    if (!keys.length) return { diningTotal: 0, holidayTotal: 0, fuelTotal: 0, endMonth: null, months: 12 };
+    if (!keys.length) return { byCode: {}, endMonth: null, months: 12 };
     const end = keys[keys.length - 1];
     const ey = Number(end.slice(0, 4)), em = Number(end.slice(5, 7));
     const wanted = {};
     for (let i = 11; i >= 0; i--) { let mm = em - i, yy = ey; while (mm <= 0) { mm += 12; yy -= 1; } wanted[yy + '-' + ('0' + mm).slice(-2)] = true; }
-    let dTot = 0, hTot = 0, fTot = 0;
+    const byCode = {};
     (txns || []).forEach(function (t) {
       const ym = String(t.txn_date || '').slice(0, 7);
       if (!wanted[ym]) return;
       const code = t.category_code;
       if (!code || sets.reimburse[code]) return;
-      const amt = Number(t.amount) || 0;
-      if (sets.dining[code]) dTot += amt;
-      else if (sets.holiday[code]) hTot += amt;
-      else if (sets.fuel[code]) fTot += amt;
+      const e = byCode[code] || (byCode[code] = { total: 0, count: 0 });
+      e.total += Number(t.amount) || 0; e.count += 1;
     });
-    return { diningTotal: Math.round(dTot * 100) / 100, holidayTotal: Math.round(hTot * 100) / 100,
-             fuelTotal: Math.round(fTot * 100) / 100, endMonth: end, months: 12 };
+    Object.keys(byCode).forEach(function (k) { byCode[k].total = Math.round(byCode[k].total * 100) / 100; });
+    return { byCode: byCode, endMonth: end, months: 12 };
+  }
+  // sum the 12-month actual across every code in a set (dining / holiday / fuel are each one code
+  // in practice, but the sets allow synonyms so this stays correct if you add one)
+  function sumSet(byCode, set) {
+    let t = 0;
+    Object.keys(set || {}).forEach(function (c) { if (byCode[c]) t += byCode[c].total; });
+    return Math.round(t * 100) / 100;
+  }
+  // Back-compat shape used by the old three-domain callers.
+  function actualDiscretionary12mo(txns, catRows) {
+    const sets = discretionaryCodeSets(catRows);
+    const a = actualByCategory12mo(txns, catRows);
+    return { diningTotal: sumSet(a.byCode, sets.dining), holidayTotal: sumSet(a.byCode, sets.holiday),
+             fuelTotal: sumSet(a.byCode, sets.fuel), endMonth: a.endMonth, months: 12 };
+  }
+
+  // ---- Per-category basis (Plan / Actual / Mixed) ---------------------------------------
+  // basis 'plan'   -> nothing uses actuals, whatever the flags say
+  // basis 'actual' -> everything uses actuals, whatever the flags say (kept so you keep the
+  //                   one-tap whole-model comparison)
+  // basis 'mixed'  -> each category follows its own use_actual flag on bd_bill_category
+  //
+  // If the use_actual / actual_adjust columns do not exist yet the select fails, cats stays empty,
+  // and every category resolves to plan under 'mixed' — i.e. the app degrades to today's behaviour
+  // rather than erroring.
+  let _catBasisCache = null;
+  let _actualCache = null;
+
+  async function loadCategoryBasis(force) {
+    if (_catBasisCache && !force) return _catBasisCache;
+    let basis = 'plan';
+    const cats = {};
+    try {
+      const rows = await rest('bd_discretionary_basis?id=eq.1');
+      const r = (rows && rows[0]) || {};
+      basis = (r.basis === 'actual' || r.basis === 'mixed') ? r.basis : 'plan';
+    } catch (e) { /* unreadable -> plan */ }
+    try {
+      const cr = await rest('bd_bill_category?select=code,description,use_actual,actual_adjust');
+      (cr || []).forEach(function (c) {
+        if (c.code == null) return;
+        cats[c.code] = { code: c.code, description: c.description,
+                         use_actual: c.use_actual === true,
+                         actual_adjust: Number(c.actual_adjust) || 0 };
+      });
+    } catch (e) { /* columns missing -> every category stays on plan under 'mixed' */ }
+    _catBasisCache = { basis: basis, cats: cats };
+    return _catBasisCache;
+  }
+
+  function categoryUsesActual(code, s) {
+    if (!s || s.basis === 'plan') return false;
+    if (s.basis === 'actual') return true;
+    const c = s.cats && s.cats[code];
+    return !!(c && c.use_actual);
+  }
+  // Bill-backed categories follow their OWN FLAG ONLY, never the global 'actual'.
+  // The global switch has always meant "the three planner domains on actuals"; letting it also
+  // sweep every bill category would zero out every bill in a category with no card spend the
+  // instant you tapped Actual (council tax, mortgage, anything on direct debit). So:
+  //   plan   -> nothing
+  //   actual -> planner domains forced on; bill categories follow their flags
+  //   mixed  -> everything follows its flag
+  function categoryFlagged(code, s) {
+    if (!s || s.basis === 'plan') return false;
+    const c = s.cats && s.cats[code];
+    return !!(c && c.use_actual);
+  }
+  function categoryAdjust(code, s) {
+    const c = s && s.cats && s.cats[code];
+    return c ? (Number(c.actual_adjust) || 0) : 0;
+  }
+  // a whole domain (dining / holiday / fuel) is on actuals if ANY of its codes is
+  function setUsesActual(set, s) {
+    if (!s || s.basis === 'plan') return false;
+    if (s.basis === 'actual') return true;
+    return Object.keys(set || {}).some(function (c) { return categoryUsesActual(c, s); });
+  }
+  function setAdjust(set, s) {
+    let t = 0;
+    Object.keys(set || {}).forEach(function (c) { if (categoryUsesActual(c, s)) t += categoryAdjust(c, s); });
+    return t;
+  }
+
+  // cached read of categories + the last 5,000 txns, shared by every resolver below
+  async function loadActuals(force) {
+    if (_actualCache && !force) return _actualCache;
+    const res = await Promise.all([
+      rest('bd_bill_category?select=code,description'),
+      rest('bd_card_txn?select=txn_date,amount,category_code&order=txn_date.desc&limit=5000')
+    ]);
+    _actualCache = { cats: res[0] || [], txns: res[1] || [], agg: actualByCategory12mo(res[1] || [], res[0] || []) };
+    return _actualCache;
+  }
+
+  // Per-category coverage for the Bills Category page: 12-month total, txn count, and the flag.
+  // Lets you see BEFORE ticking whether a category has any card spend behind it.
+  async function categoryCoverage() {
+    const s = await loadCategoryBasis(true);
+    let a;
+    try { a = await loadActuals(true); } catch (e) { return { basis: s.basis, endMonth: null, rows: {} }; }
+    const rows = {};
+    Object.keys(s.cats).forEach(function (code) {
+      const e = a.agg.byCode[code];
+      rows[code] = { code: code, description: s.cats[code].description,
+                     use_actual: s.cats[code].use_actual, actual_adjust: s.cats[code].actual_adjust,
+                     total: e ? e.total : 0, count: e ? e.count : 0 };
+    });
+    return { basis: s.basis, endMonth: a.agg.endMonth, rows: rows };
   }
 
   // The single figures the engine / budget / bills should consume, honouring the
@@ -397,158 +504,148 @@
     const planH = Number(opts && opts.holidayPlanAnnual) || 0;
     const planFW = Number(opts && opts.fuelWorkPlanAnnual) || 0;
     const planFD = Number(opts && opts.fuelDiscPlanAnnual) || 0;
-    let settings;
-    try { settings = await loadDiscretionaryBasis(); } catch (e) { settings = Object.assign({}, DISCRETIONARY_DEFAULT); }
-    if (settings.basis !== 'actual') {
-      return { basis: 'plan', diningAnnual: planD, holidayAnnual: planH,
-               fuelWorkAnnual: planFW, fuelAnnual: planFD };
+    const planOut = { basis: 'plan', diningActual: false, holidayActual: false, fuelActual: false,
+                      diningAnnual: planD, holidayAnnual: planH, fuelWorkAnnual: planFW, fuelAnnual: planFD };
+    let s2;
+    try { s2 = await loadCategoryBasis(); } catch (e) { return planOut; }
+    if (s2.basis === 'plan') return planOut;
+
+    let a, cats;
+    try { a = await loadActuals(); cats = a.cats; }
+    catch (e) { return Object.assign({}, planOut, { degraded: true }); }
+    const sets = discretionaryCodeSets(cats);
+
+    // Each domain is resolved INDEPENDENTLY now. Under 'mixed' you can have dining on actuals
+    // while holidays stay on plan; under 'actual' all three are on, as before.
+    const dOn = setUsesActual(sets.dining, s2);
+    const hOn = setUsesActual(sets.holiday, s2);
+    const fOn = setUsesActual(sets.fuel, s2);
+
+    const dining = dOn ? Math.max(0, Math.round(sumSet(a.agg.byCode, sets.dining) / 12 + setAdjust(sets.dining, s2)) * 12) : planD;
+    const holiday = hOn ? Math.max(0, Math.round(sumSet(a.agg.byCode, sets.holiday) / 12 + setAdjust(sets.holiday, s2)) * 12) : planH;
+
+    // Fuel keeps its apportionment: card spend can't tell commuting from leisure, so the actual
+    // total is split by the PLAN's own work:discretionary ratio.
+    let fW = planFW, fD = planFD;
+    if (fOn) {
+      const fActual = Math.max(0, Math.round(sumSet(a.agg.byCode, sets.fuel) / 12 + setAdjust(sets.fuel, s2)) * 12);
+      const planFT = planFW + planFD;
+      const workShare = planFT > 0 ? (planFW / planFT) : 0;
+      fW = Math.round(fActual * workShare * 100) / 100;
+      fD = Math.round(fActual * (1 - workShare) * 100) / 100;
     }
-    let cats = [], txns = [];
-    try {
-      const res = await Promise.all([
-        rest('bd_bill_category?select=code,description'),
-        rest('bd_card_txn?select=txn_date,amount,category_code&order=txn_date.desc&limit=5000')
-      ]);
-      cats = res[0] || []; txns = res[1] || [];
-    } catch (e) {
-      return { basis: 'plan', diningAnnual: planD, holidayAnnual: planH,
-               fuelWorkAnnual: planFW, fuelAnnual: planFD, degraded: true };
-    }
-    const a = actualDiscretionary12mo(txns, cats);
-    const dAdj = Number(settings.dining_adjust) || 0;   // monthly £
-    const hAdj = Number(settings.holiday_adjust) || 0;  // monthly £
-    const fAdj = Number(settings.fuel_adjust) || 0;    // monthly £
-    // apportion the one actual fuel figure across work / discretionary by the plan's ratio
-    const fActual = Math.max(0, Math.round(a.fuelTotal / 12 + fAdj) * 12);
-    const planFT = planFW + planFD;
-    const workShare = planFT > 0 ? (planFW / planFT) : 0;
-    // Round each monthly figure to whole pounds first (matching the whole-£ display),
-    // then annualise — so the "after adjust / month" shown on Weekly Plan × 12 equals
-    // exactly what the model is fed (no few-pounds drift from hidden pence).
     return {
-      basis: 'actual',
-      diningAnnual: Math.max(0, Math.round(a.diningTotal / 12 + dAdj) * 12),
-      holidayAnnual: Math.max(0, Math.round(a.holidayTotal / 12 + hAdj) * 12),
-      fuelWorkAnnual: Math.round(fActual * workShare * 100) / 100,
-      fuelAnnual: Math.round(fActual * (1 - workShare) * 100) / 100
+      // 'basis' stays the SAVED mode. Callers that need to know whether a particular domain is on
+      // actuals must read diningActual / holidayActual / fuelActual — testing basis === 'actual'
+      // is wrong under 'mixed' and will silently skip the rescale.
+      basis: s2.basis,
+      diningActual: dOn, holidayActual: hOn, fuelActual: fOn,
+      diningAnnual: dining, holidayAnnual: holiday, fuelWorkAnnual: fW, fuelAnnual: fD
     };
   }
 
-  // ---- Julie (Hair & Nails) on the Actual basis ---------------------------------------
-  // Julie is NOT a discretionary domain like dining / holidays / fuel, and deliberately is not
-  // modelled as one. Those three have a planner, so resolveDiscretionary arbitrates between two
-  // independent sources. Julie has no planner: her bd_household_bills row IS the plan. So there is
-  // nothing to arbitrate — there is only an OVERRIDE of the amount on that row.
+  // ---- Bill-backed categories on the Actual basis -------------------------------------
+  // Two kinds of category exist and they differ in where the PLAN comes from:
+  //   planner-backed (dining / holidays / fuel) -> resolveDiscretionary arbitrates two sources
+  //   bill-backed    (everything else)          -> the bd_household_bills row IS the plan, so the
+  //                                                actual simply OVERRIDES the amount on that row
+  // This handles the second kind. It replaces the old hardcoded Julie special case: Julie is now
+  // just a category with use_actual ticked, and nothing here knows her name.
   //
-  // Hence the shape below. applyJulieBasis() rewrites the bill row in the bills array, and every
-  // consumer (budget, bills summary, the engine feeds) simply passes its bills through it on load.
-  // Because the row is rewritten rather than replaced, spend_reduction and the age-taper flags set
-  // on it keep working untouched: the basis changes the AMOUNT, not the BEHAVIOUR. That also means
-  // no page needs derived-line plumbing the way Fuel and Holidays did.
+  // Apply wherever bills are CONSUMED. NEVER on bills.html / bills_categories.html, where the row
+  // is EDITED — an actual figure in an editable field invites saving it back over the plan.
+
+  let _billOverrideWarn = null;   // codes flagged but with no bill row to override (diagnostic)
+
+  // Returns a NEW bills array; the input is never mutated, because several pages hand the same
+  // rows to more than one engine run and a mutated row would compound across runs.
   //
-  // Apply this wherever bills are CONSUMED. Never on bills.html or bills_categories.html, where the
-  // row is EDITED — showing an actual figure in an editable field invites saving it back as the plan.
-
-  const JULIE_BILL_RE = /hair|nail/i;
-  let _julieCache = null;   // { annual: number|null } for the life of the tab; dropped by clearCaches()
-
-  // Resolve which bd_bill_category codes are the Julie bucket, by name then code, case-insensitive
-  // — the same rule discretionaryCodeSets uses, so renaming the category is picked up automatically.
-  function julieCodeSet(catRows) {
-    const set = {};
-    (catRows || []).forEach(function (c) {
-      const nm = String(c.description || '').trim().toLowerCase();
-      const cd = String(c.code || '').trim().toLowerCase();
-      if (nm === 'julie' || cd === 'julie') set[c.code] = true;
-    });
-    return set;
-  }
-
-  // Is this bill row the Julie Hair & Nails line? Category AND name, matching budget.html.
-  // Payment method is deliberately NOT part of the test — the row's identity is the spend, not the
-  // card it happens to be drawn on, and the engine sees every bill regardless of paid_by.
-  function isJulieBill(b, codeSet) {
-    if (!b) return false;
-    const cd = String(b.category_code || '').trim();
-    if (!cd) return false;
-    const inCat = (codeSet && Object.keys(codeSet).length) ? !!codeSet[b.category_code]
-                                                           : (cd.toLowerCase() === 'julie');
-    return inCat && JULIE_BILL_RE.test(String(b.bill_name || ''));
-  }
-
-  // Trailing-12-month actual card spend on the Julie category, as an ANNUAL figure.
-  // The window is the 12 calendar months ending at the LATEST month present in bd_card_txn — not
-  // the 12 months to today — which is exactly what actualDiscretionary12mo does, so Julie lines up
-  // with Dining / Holidays / Fuel and lags in the same way when statements are behind.
-  // Two small queries (latest date, then the Julie rows in range) rather than pulling 5,000 txns.
-  // Reimburse needs no exclusion: a txn carries one category code, so a Julie row cannot also be one.
+  // Rows are rewritten rather than replaced, so spend_reduction and the age-taper flags set on each
+  // row keep working: the basis changes the AMOUNT, not the BEHAVIOUR.
   //
-  // Returns null when the category cannot be resolved or the data cannot be read. Every caller
-  // treats null as "stay on the planned bill row" — NOT as "spent nothing". A genuine £0 (category
-  // exists, nothing coded to it) still returns 0, so a real zero is reported honestly.
-  async function julieActualAnnual(force) {
-    if (_julieCache && !force) return _julieCache.annual;
-    let out = null;
-    try {
-      const cats = await rest('bd_bill_category?select=code,description');
-      const codes = Object.keys(julieCodeSet(cats));
-      if (codes.length) {
-        const lastRow = await rest('bd_card_txn?select=txn_date&order=txn_date.desc&limit=1');
-        const endYm = (lastRow && lastRow[0]) ? String(lastRow[0].txn_date || '').slice(0, 7) : '';
-        if (/^\d{4}-\d{2}$/.test(endYm)) {
-          const ey = Number(endYm.slice(0, 4)), em = Number(endYm.slice(5, 7));
-          let sy = ey, sm = em - 11; while (sm <= 0) { sm += 12; sy -= 1; }
-          let ny = ey, nm = em + 1; if (nm > 12) { nm = 1; ny += 1; }
-          const pad = n => ('0' + n).slice(-2);
-          const from = sy + '-' + pad(sm) + '-01';
-          const upto = ny + '-' + pad(nm) + '-01';   // exclusive
-          const inList = codes.map(c => encodeURIComponent(String(c))).join(',');
-          const rows = await rest('bd_card_txn?select=amount&category_code=in.(' + inList + ')'
-            + '&txn_date=gte.' + from + '&txn_date=lt.' + upto);
-          const total = (rows || []).reduce((t, r) => t + (Number(r.amount) || 0), 0);
-          out = Math.max(0, Math.round(total * 100) / 100);
-        }
-      }
-    } catch (e) { out = null; }   // unreadable -> caller stays on plan
-    _julieCache = { annual: out };
-    return out;
-  }
-
-  // Returns a NEW bills array with the Julie row(s) carrying the actual figure, or the array
-  // unchanged on the plan basis / on any failure. The input is never mutated — several pages hand
-  // the same rows to more than one engine run, and a mutated row would compound across runs.
+  // The row is normalised to MONTHLY at annual/12 with a full pay_months mask — NOT to Annual.
+  // Annual looks tidier but is wrong: monthCharge() lands an annual bill entirely in its bill_month,
+  // so a rewritten row would dump the whole year into one month on Budget and What I Could Save, or
+  // show zero if the row has no bill_month at all. A full-mask monthly row costs premium x 12 in the
+  // engine (identical total) and spreads evenly in every month-by-month view, which is what
+  // "annual / 12" is supposed to mean.
   //
-  // frequency / pay_months are normalised to Annual / null on the rewritten row so the engine's
-  // mask-aware billEffectiveAnnual() returns the figure untouched. With more than one matching row
-  // the actual is split across them in proportion to their planned share, so each row keeps its own
-  // taper and spend_reduction flags; if the plan totals zero it all lands on the first row.
-  async function applyJulieBasis(bills) {
+  // Where a category has several bill rows the actual is split across them in proportion to their
+  // planned share, with the last row absorbing the rounding remainder.
+  async function applyCategoryBasis(bills) {
     const src = bills || [];
-    let settings;
-    try { settings = await loadDiscretionaryBasis(); } catch (e) { return src; }
-    if (settings.basis !== 'actual') return src;
-    let cats = [];
-    try { cats = await rest('bd_bill_category?select=code,description'); } catch (e) { return src; }
-    const codeSet = julieCodeSet(cats);
-    const idx = [];
-    src.forEach(function (b, i) { if (isJulieBill(b, codeSet)) idx.push(i); });
-    if (!idx.length) return src;                       // nothing to override
-    const annual = await julieActualAnnual();
-    if (annual == null) return src;                    // unreadable -> stay on plan
-    const planTot = idx.reduce((t, i) => t + (Number(src[i].total_annual) || 0), 0);
+    let s2;
+    try { s2 = await loadCategoryBasis(); } catch (e) { return src; }
+    if (s2.basis === 'plan') return src;
+
+    let a, cats;
+    try { a = await loadActuals(); cats = a.cats; } catch (e) { return src; }
+    const sets = discretionaryCodeSets(cats);
+    // planner-backed domains are handled by resolveDiscretionary, not here — overriding their bill
+    // rows too would double-count them
+    const skip = {};
+    [sets.dining, sets.holiday, sets.fuel, sets.reimburse].forEach(function (st) {
+      Object.keys(st || {}).forEach(function (c) { skip[c] = true; });
+    });
+
+    // which flagged categories actually have bill rows?
+    const byCat = {};
+    src.forEach(function (b, i) {
+      const cd = b && b.category_code;
+      if (!cd || skip[cd]) return;
+      if (!categoryFlagged(cd, s2)) return;
+      (byCat[cd] = byCat[cd] || []).push(i);
+    });
+
+    // diagnostics surfaced on the Bills Category page
+    const warn = [];
+    Object.keys(s2.cats).forEach(function (cd) {
+      if (skip[cd] || !categoryFlagged(cd, s2)) return;
+      if (!byCat[cd] && a.agg.byCode[cd]) warn.push(cd);
+    });
+    if (!Object.keys(byCat).length) { _billOverrideWarn = warn; return src; }
     const out = src.slice();
-    let assigned = 0;
-    idx.forEach(function (i, k) {
-      const share = planTot > 0 ? ((Number(src[i].total_annual) || 0) / planTot) : (k === 0 ? 1 : 0);
-      // last row takes the remainder, so independent rounding can never drift the total by a penny
-      const amt = (k === idx.length - 1) ? Math.round((annual - assigned) * 100) / 100
-                                         : Math.round(annual * share * 100) / 100;
-      assigned = Math.round((assigned + amt) * 100) / 100;
-      out[i] = Object.assign({}, src[i], {
-        frequency: 'Annual', pay_months: null, premium: amt, total_annual: amt, julie_actual: true
+    Object.keys(byCat).forEach(function (cd) {
+      const idx = byCat[cd];
+      const e = a.agg.byCode[cd];
+      // Flagged but not a single card transaction in the window? Leave the planned bill alone and
+      // warn. Zeroing a real cost on no evidence is far worse than under-reporting one — a genuine
+      // £0 is indistinguishable here from "you flagged a direct-debit category by mistake".
+      if (!e || !e.count) { warn.push(cd); return; }
+      const annual = Math.max(0, e.total + categoryAdjust(cd, s2) * 12);
+      const planTot = idx.reduce(function (t, i) { return t + (Number(src[i].total_annual) || 0); }, 0);
+      let assigned = 0;
+      idx.forEach(function (i, k) {
+        const share = planTot > 0 ? ((Number(src[i].total_annual) || 0) / planTot) : (k === 0 ? 1 : 0);
+        const amt = (k === idx.length - 1) ? Math.round((annual - assigned) * 100) / 100
+                                           : Math.round(annual * share * 100) / 100;
+        assigned = Math.round((assigned + amt) * 100) / 100;
+        out[i] = Object.assign({}, src[i], {
+          frequency: 'Monthly', pay_months: '111111111111',
+          premium: Math.round(amt / 12 * 100) / 100, total_annual: amt,
+          bill_month: null, actual_basis: true, actual_code: cd
+        });
       });
     });
+    _billOverrideWarn = warn;   // recorded last: the loop above adds no-evidence codes too
     return out;
+  }
+  // codes flagged for actuals that either had no bill row to carry the spend, or no card
+  // transactions at all in the window — both mean the flag did nothing — populated by the
+  // last applyCategoryBasis() call, surfaced as a warning on the Bills Category page
+  function billOverrideWarnings() { return _billOverrideWarn || []; }
+
+  // Deprecated alias kept so a half-finished deploy can't break: pages still calling the old name
+  // get the general behaviour. Remove once every page is on applyCategoryBasis.
+  async function applyJulieBasis(bills) { return applyCategoryBasis(bills); }
+
+  // Save one category's actual-basis settings. PATCH by code; the caller owns the UI state.
+  async function saveCategoryActual(code, useActual, adjust) {
+    await write('PATCH', 'bd_bill_category?code=eq.' + encodeURIComponent(code), {
+      use_actual: !!useActual,
+      actual_adjust: Number(adjust) || 0
+    });
+    _catBasisCache = null; _actualCache = null;
   }
 
   // ---- login (auth) gate ----
@@ -711,8 +808,11 @@
     loadDiscretionaryBasis: loadDiscretionaryBasis, saveDiscretionaryBasis: saveDiscretionaryBasis,
     actualDiscretionary12mo: actualDiscretionary12mo, resolveDiscretionary: resolveDiscretionary,
     discretionaryCodeSets: discretionaryCodeSets,
-    julieCodeSet: julieCodeSet, isJulieBill: isJulieBill,
-    julieActualAnnual: julieActualAnnual, applyJulieBasis: applyJulieBasis,
+    actualByCategory12mo: actualByCategory12mo,
+    loadCategoryBasis: loadCategoryBasis, categoryUsesActual: categoryUsesActual,
+    categoryAdjust: categoryAdjust, categoryCoverage: categoryCoverage,
+    applyCategoryBasis: applyCategoryBasis, billOverrideWarnings: billOverrideWarnings,
+    applyJulieBasis: applyJulieBasis, saveCategoryActual: saveCategoryActual,
     requireLogin: requireLogin, doLogin: doLogin, doLogout: doLogout,
     token: () => authToken
   };
