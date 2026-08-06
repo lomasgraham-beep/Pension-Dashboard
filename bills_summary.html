@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Summary of Household Bills</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=fuel2"></script>
+<script src="common.js?v=julie1"></script>
 <style>
   :root { --accent:#1d3a63; --accent-dark:#14294a; --accent-soft:#e6f5f7; --accent-border:#bfe4e9; --on-accent:#ffffff; --other:#94a3b8; }
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:980px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
@@ -85,7 +85,7 @@
 </head>
 <body>
   <h1>Summary of Household Bills</h1>
-  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. The <strong>Holiday</strong> and <strong>Dining</strong> categories include their planner totals (flat &mdash; neither is age-tapered); <strong>Xmas</strong> and <strong>Birthdays</strong> come from the Gift Savings page and do taper with age. <span style="color:#94a3b8;">(summary build: v14)</span></p>
+  <p class="note">Bills grouped by category and spread across a typical year. Weekly bills count as ~4.33&times; per month; annual bills land in their chosen month. Use the age buttons to see how costs taper through retirement. The <strong>Holiday</strong> and <strong>Dining</strong> categories include their planner totals (flat &mdash; neither is age-tapered); <strong>Xmas</strong> and <strong>Birthdays</strong> come from the Gift Savings page and do taper with age. The <strong>JULIE</strong> category follows the Plan / Actual basis set on the Weekly Plan page. <span style="color:#94a3b8;">(summary build: v15)</span></p>
   <div id="status">Loading…</div>
 
   <div id="ageRow" class="agebar-row" style="display:none;">
@@ -330,7 +330,11 @@
     const status = document.getElementById('status');
     try {
       status.textContent = 'Loading… (fetching bills)';
-      allBills = await App.rest('bd_household_bills?order=bill_name.asc');
+      // v15: route the bills through the shared Julie basis helper before aggregating, so the
+      // JULIE category total here matches Budget's Hair and Nails row and what the engine is fed.
+      // Julie needs no derived line the way Holiday/Dining/Fuel do — she is already a real bill
+      // row in her own category, so overriding the amount is enough for the rollup to follow.
+      allBills = await App.applyJulieBasis(await App.rest('bd_household_bills?order=bill_name.asc'));
       try { giftRows = await App.rest('bd_gift_savings') || []; } catch (e) { giftRows = []; }
       // Holiday planner & dining rota yearly totals (display-only; merge into their categories).
       try {

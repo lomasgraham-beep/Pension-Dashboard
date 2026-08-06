@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Scenario Grid</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=fuel2"></script>
+<script src="common.js?v=julie1"></script>
 <script src="engine.js?v=ann10"></script>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
@@ -102,7 +102,7 @@
   <div class="grid-head">
     <div class="gh-left">
       <span class="gh-title">Scenario Grid</span>
-      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid10)</span></span>
+      <span class="gh-sub">retire&nbsp;year&nbsp;&times;&nbsp;spend&nbsp;%&nbsp;&middot; combined pots&nbsp;<span style="opacity:.7;">(build: grid11)</span></span>
       <span class="spend-ctl"><label>Spend %</label>
         <input id="sp0" type="number" min="0" max="200" step="5" value="50" inputmode="numeric">
         <input id="sp1" type="number" min="0" max="200" step="5" value="60" inputmode="numeric">
@@ -414,7 +414,7 @@
       const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases,
              crashes, savingsAccounts, contributionExceptions, workingTiers,
              incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings, diningSettings] = await Promise.all([
-        App.rest('bd_members'), App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
+        App.rest('bd_members'), App.rest('bd_household_bills').then(App.applyJulieBasis), App.rest('bd_dining_habits'),
         App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
         App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
         App.rest('bd_purchases?order=purchase_date.asc'),

@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monthly Audit</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=fuel2"></script>
+<script src="common.js?v=julie1"></script>
 <script src="engine.js?v=ann10"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -52,7 +52,7 @@
 </style>
 </head>
 <body>
-  <h2>Monthly Audit <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(audit build: maudit9)</span></h2>
+  <h2>Monthly Audit <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(audit build: maudit10)</span></h2>
   <p class="note">The engine's own month-by-month workings, shown so each row's sums can be checked by eye:
   <b>Bills + Dining + Holidays = Outgoings</b>, then <b>Gross fixed income &minus; Tax = Net</b>, the
   <b>Gap</b> that's left, and the <b>pension draw</b> (with its own tax) that fills it. Each row closes with <b>Pot start &minus; Draw + Growth = Pot closing</b> exactly &mdash; growth shows red when a market crash is pulling the pot down. The reconciliation
@@ -574,7 +574,7 @@
              crashes, savingsAccounts, contributionExceptions, workingTiers,
              incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan,
              holidayCost, holidaySettings, diningSettings] = await Promise.all([
-        App.rest('bd_members'), App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
+        App.rest('bd_members'), App.rest('bd_household_bills').then(App.applyJulieBasis), App.rest('bd_dining_habits'),
         App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
         App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
         App.rest('bd_purchases?order=purchase_date.asc'),

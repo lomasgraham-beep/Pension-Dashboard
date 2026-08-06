@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pot at Retirement</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=fuel2"></script>
+<script src="common.js?v=julie1"></script>
 <script src="engine.js?v=ann10"></script>
 <style>
   :root {
@@ -78,7 +78,7 @@
 </head>
 <body>
   <div class="head">
-    <div class="h-title">Pot at Retirement <span class="build">(build: pt7)</span></div>
+    <div class="h-title">Pot at Retirement <span class="build">(build: pt8)</span></div>
     <div class="h-sub" id="hsub">Pot value for each possible retirement month, from this month onwards. <b>Safe spend %</b> is the most you could spend at that date and still have both pots last (capped by the spend lock). <b>Lowest pot</b> is the lowest the combined pot falls to during drawdown at that spend, and the year it happens (red if it empties).</div>
     <div class="ctlrow">
       <span class="ctl-label">Offset months</span>
@@ -308,7 +308,7 @@
       const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases,
              crashes, savingsAccounts, contributionExceptions, workingTiers,
              incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings, diningSettings] = await Promise.all([
-        App.rest('bd_members'), App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
+        App.rest('bd_members'), App.rest('bd_household_bills').then(App.applyJulieBasis), App.rest('bd_dining_habits'),
         App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
         App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
         App.rest('bd_purchases?order=purchase_date.asc'),

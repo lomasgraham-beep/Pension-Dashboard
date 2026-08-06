@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monthly Budget</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=fuel2"></script>
+<script src="common.js?v=julie1"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1500px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin:0; }
@@ -133,7 +133,7 @@
   </div>
   <div id="pageInfo" class="info-panel" hidden>
     <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. The working-days chip at the top of each person&rsquo;s card is read-only and follows the schedule in Basic Data against the month you&rsquo;re viewing &mdash; so a 3-day week starting in September shows 5-day in August and 3-day from September, and salary and pension contributions switch with it. Figures are shown in the money of the year you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr), stepping once each January rather than creeping every month, so amounts hold steady across a year. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel, Julie Hair &amp; Nails and Dogs spend, which is deducted in the Cash Summary. Hair &amp; Nails follows the same <b>Plan / Actual</b> basis as dining, holidays and fuel (set on the Weekly Plan page): on <em>Actual</em> it uses your real card spend on the <b>JULIE</b> category over the last 12 months, divided by 12, and the row is marked <em>actual</em>. If that category doesn&rsquo;t exist or can&rsquo;t be read it quietly falls back to the planned bill row. Xmas and Birthdays are not on the card here &mdash; they are saved monthly into a savings account (age-tapered gift values, inflated 0.5%/yr, managed on the Gift Savings page) and appear as a <em>Gift savings</em> set-aside against that account&rsquo;s paying account, smoothing the December peak. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from, and the <b>Loans</b> card lists what is still owed on each &mdash; the balance outstanding at the start of the viewed month and how many payments remain, counting that month. Settled loans drop off the card.</p>
-    <span class="info-build">Budget build: v48</span>
+    <span class="info-build">Budget build: v49</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -383,44 +383,17 @@
       const holidayMonthly = holidayAnnual / 12;
       const fuelAnnualTotal = (Number(_eff.fuelWorkAnnual) || 0) + (Number(_eff.fuelAnnual) || 0);
       const fuelMonthly = fuelAnnualTotal / 12;
-      // v48 — Julie (Hair & Nails) on the Actual basis.
-      // Unlike dining/holidays/fuel, Julie has no planner: the bd_household_bills row IS the plan.
-      // So there is nothing for resolveDiscretionary to arbitrate and no shared helper to reuse —
-      // Budget resolves it here instead, which keeps common.js (and its 38-page cache tag) untouched.
-      // The 12-month window is computed exactly as actualDiscretionary12mo does it: the 12 calendar
-      // months ending at the LATEST month present in bd_card_txn, not the 12 months to today. Two
-      // small queries (max date, then the JULIE rows in range) rather than pulling 5,000 txns.
-      // Reimburse needs no exclusion here because a txn carries one category code, so a JULIE row
-      // cannot also be a Reimburse row.
-      // julieMonthly stays null on the plan basis, and on any failure — creditCardParts() reads null
-      // as "use the bill rows", so a missing category or an unreadable table degrades to plan rather
-      // than silently reporting zero.
-      let julieMonthly = null;
-      if (_eff.basis === 'actual') {
-        try {
-          const jCodes = (billCats || []).filter(c =>
-            String(c.description || '').trim().toLowerCase() === 'julie' ||
-            String(c.code || '').trim().toLowerCase() === 'julie'
-          ).map(c => c.code).filter(c => c != null && String(c).trim() !== '');
-          if (jCodes.length) {
-            const lastRow = await App.rest('bd_card_txn?select=txn_date&order=txn_date.desc&limit=1');
-            const endYm = (lastRow && lastRow[0]) ? String(lastRow[0].txn_date || '').slice(0, 7) : '';
-            if (/^\d{4}-\d{2}$/.test(endYm)) {
-              const ey = Number(endYm.slice(0, 4)), em = Number(endYm.slice(5, 7));
-              let sy = ey, sm = em - 11; while (sm <= 0) { sm += 12; sy -= 1; }
-              let ny = ey, nm = em + 1; if (nm > 12) { nm = 1; ny += 1; }
-              const pad = n => ('0' + n).slice(-2);
-              const from = sy + '-' + pad(sm) + '-01';
-              const upto = ny + '-' + pad(nm) + '-01';   // exclusive
-              const inList = jCodes.map(c => encodeURIComponent(String(c))).join(',');
-              const jRows = await App.rest('bd_card_txn?select=amount&category_code=in.(' + inList + ')'
-                + '&txn_date=gte.' + from + '&txn_date=lt.' + upto);
-              const jTotal = (jRows || []).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-              julieMonthly = Math.max(0, jTotal) / 12;
-            }
-          }
-        } catch (e) { julieMonthly = null; }   // unreadable -> fall back to the planned bill row
-      }
+      // v49 — Julie (Hair & Nails) on the Actual basis, via the shared App.applyJulieBasis().
+      // v48 resolved this locally inside Budget. It now goes through common.js so that Budget, the
+      // Bills Summary and all nine engine feeds read ONE implementation and can never disagree.
+      // The helper rewrites the amount on the Julie bill row itself, so everything downstream —
+      // the account boxes, the bills total, the engine — picks it up with no further plumbing.
+      const billsEff = await App.applyJulieBasis(bills || []);
+      // For the Credit Card box we still want the Julie figure separately, as a monthly number.
+      const _jRows = billsEff.filter(b => b.julie_actual);
+      const julieMonthly = _jRows.length
+        ? _jRows.reduce((t, b) => t + (Number(b.total_annual) || 0), 0) / 12
+        : null;   // null = plan basis, or the lookup degraded -> creditCardParts() uses the bill rows
       let holidayFundingAcct = null;
       const potId = holSettings.savings_account ? String(holSettings.savings_account).trim() : '';
       if (potId) {
@@ -438,7 +411,7 @@
         diningFundingAcct = (dPotAcct && dPotAcct.funded_from != null && String(dPotAcct.funded_from).trim() !== '')
           ? String(dPotAcct.funded_from).trim() : dPotId;   // funding account, or the pot itself if not funded-from
       }
-      DATA = { names, members: members || [], gifts: gifts || [], bills: bills || [], tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct, diningMonthly: diningMonthly, diningFundingAcct: diningFundingAcct, fuelMonthly: fuelMonthly, julieMonthly: julieMonthly, holidayPotId: potId, diningPotId: dPotId, loans: prepLoans(loansRaw), schedule: contribSchedule || [] };
+      DATA = { names, members: members || [], gifts: gifts || [], bills: billsEff, tiers: tiers || [], incAmts: incAmts || [], otherInc: otherInc || [], pensContribs: pensContribs || [], bankAccts: bankAccts || [], billCats: billCats || [], diningAnnual: diningAnnual, holidayMonthly: holidayMonthly, holidayFundingAcct: holidayFundingAcct, diningMonthly: diningMonthly, diningFundingAcct: diningFundingAcct, fuelMonthly: fuelMonthly, julieMonthly: julieMonthly, holidayPotId: potId, diningPotId: dPotId, loans: prepLoans(loansRaw), schedule: contribSchedule || [] };
       status.style.display = 'none';
       initNav();
       rebuild();
