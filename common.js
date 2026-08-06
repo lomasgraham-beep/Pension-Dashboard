@@ -301,7 +301,7 @@
   // Drops the session-lifetime caches so the next read goes to the database. Call before a manual
   // in-page refresh: _discSettingsCache otherwise survives for the life of the tab, so a changed
   // Plan/Actual basis or adjustment would never show up without a full reload.
-  function clearCaches() { _discSettingsCache = null; }
+  function clearCaches() { _discSettingsCache = null; _julieCache = null; }
 
   async function loadDiscretionaryBasis(force) {
     if (_discSettingsCache && !force) return _discSettingsCache;
@@ -432,6 +432,123 @@
       fuelWorkAnnual: Math.round(fActual * workShare * 100) / 100,
       fuelAnnual: Math.round(fActual * (1 - workShare) * 100) / 100
     };
+  }
+
+  // ---- Julie (Hair & Nails) on the Actual basis ---------------------------------------
+  // Julie is NOT a discretionary domain like dining / holidays / fuel, and deliberately is not
+  // modelled as one. Those three have a planner, so resolveDiscretionary arbitrates between two
+  // independent sources. Julie has no planner: her bd_household_bills row IS the plan. So there is
+  // nothing to arbitrate — there is only an OVERRIDE of the amount on that row.
+  //
+  // Hence the shape below. applyJulieBasis() rewrites the bill row in the bills array, and every
+  // consumer (budget, bills summary, the engine feeds) simply passes its bills through it on load.
+  // Because the row is rewritten rather than replaced, spend_reduction and the age-taper flags set
+  // on it keep working untouched: the basis changes the AMOUNT, not the BEHAVIOUR. That also means
+  // no page needs derived-line plumbing the way Fuel and Holidays did.
+  //
+  // Apply this wherever bills are CONSUMED. Never on bills.html or bills_categories.html, where the
+  // row is EDITED — showing an actual figure in an editable field invites saving it back as the plan.
+
+  const JULIE_BILL_RE = /hair|nail/i;
+  let _julieCache = null;   // { annual: number|null } for the life of the tab; dropped by clearCaches()
+
+  // Resolve which bd_bill_category codes are the Julie bucket, by name then code, case-insensitive
+  // — the same rule discretionaryCodeSets uses, so renaming the category is picked up automatically.
+  function julieCodeSet(catRows) {
+    const set = {};
+    (catRows || []).forEach(function (c) {
+      const nm = String(c.description || '').trim().toLowerCase();
+      const cd = String(c.code || '').trim().toLowerCase();
+      if (nm === 'julie' || cd === 'julie') set[c.code] = true;
+    });
+    return set;
+  }
+
+  // Is this bill row the Julie Hair & Nails line? Category AND name, matching budget.html.
+  // Payment method is deliberately NOT part of the test — the row's identity is the spend, not the
+  // card it happens to be drawn on, and the engine sees every bill regardless of paid_by.
+  function isJulieBill(b, codeSet) {
+    if (!b) return false;
+    const cd = String(b.category_code || '').trim();
+    if (!cd) return false;
+    const inCat = (codeSet && Object.keys(codeSet).length) ? !!codeSet[b.category_code]
+                                                           : (cd.toLowerCase() === 'julie');
+    return inCat && JULIE_BILL_RE.test(String(b.bill_name || ''));
+  }
+
+  // Trailing-12-month actual card spend on the Julie category, as an ANNUAL figure.
+  // The window is the 12 calendar months ending at the LATEST month present in bd_card_txn — not
+  // the 12 months to today — which is exactly what actualDiscretionary12mo does, so Julie lines up
+  // with Dining / Holidays / Fuel and lags in the same way when statements are behind.
+  // Two small queries (latest date, then the Julie rows in range) rather than pulling 5,000 txns.
+  // Reimburse needs no exclusion: a txn carries one category code, so a Julie row cannot also be one.
+  //
+  // Returns null when the category cannot be resolved or the data cannot be read. Every caller
+  // treats null as "stay on the planned bill row" — NOT as "spent nothing". A genuine £0 (category
+  // exists, nothing coded to it) still returns 0, so a real zero is reported honestly.
+  async function julieActualAnnual(force) {
+    if (_julieCache && !force) return _julieCache.annual;
+    let out = null;
+    try {
+      const cats = await rest('bd_bill_category?select=code,description');
+      const codes = Object.keys(julieCodeSet(cats));
+      if (codes.length) {
+        const lastRow = await rest('bd_card_txn?select=txn_date&order=txn_date.desc&limit=1');
+        const endYm = (lastRow && lastRow[0]) ? String(lastRow[0].txn_date || '').slice(0, 7) : '';
+        if (/^\d{4}-\d{2}$/.test(endYm)) {
+          const ey = Number(endYm.slice(0, 4)), em = Number(endYm.slice(5, 7));
+          let sy = ey, sm = em - 11; while (sm <= 0) { sm += 12; sy -= 1; }
+          let ny = ey, nm = em + 1; if (nm > 12) { nm = 1; ny += 1; }
+          const pad = n => ('0' + n).slice(-2);
+          const from = sy + '-' + pad(sm) + '-01';
+          const upto = ny + '-' + pad(nm) + '-01';   // exclusive
+          const inList = codes.map(c => encodeURIComponent(String(c))).join(',');
+          const rows = await rest('bd_card_txn?select=amount&category_code=in.(' + inList + ')'
+            + '&txn_date=gte.' + from + '&txn_date=lt.' + upto);
+          const total = (rows || []).reduce((t, r) => t + (Number(r.amount) || 0), 0);
+          out = Math.max(0, Math.round(total * 100) / 100);
+        }
+      }
+    } catch (e) { out = null; }   // unreadable -> caller stays on plan
+    _julieCache = { annual: out };
+    return out;
+  }
+
+  // Returns a NEW bills array with the Julie row(s) carrying the actual figure, or the array
+  // unchanged on the plan basis / on any failure. The input is never mutated — several pages hand
+  // the same rows to more than one engine run, and a mutated row would compound across runs.
+  //
+  // frequency / pay_months are normalised to Annual / null on the rewritten row so the engine's
+  // mask-aware billEffectiveAnnual() returns the figure untouched. With more than one matching row
+  // the actual is split across them in proportion to their planned share, so each row keeps its own
+  // taper and spend_reduction flags; if the plan totals zero it all lands on the first row.
+  async function applyJulieBasis(bills) {
+    const src = bills || [];
+    let settings;
+    try { settings = await loadDiscretionaryBasis(); } catch (e) { return src; }
+    if (settings.basis !== 'actual') return src;
+    let cats = [];
+    try { cats = await rest('bd_bill_category?select=code,description'); } catch (e) { return src; }
+    const codeSet = julieCodeSet(cats);
+    const idx = [];
+    src.forEach(function (b, i) { if (isJulieBill(b, codeSet)) idx.push(i); });
+    if (!idx.length) return src;                       // nothing to override
+    const annual = await julieActualAnnual();
+    if (annual == null) return src;                    // unreadable -> stay on plan
+    const planTot = idx.reduce((t, i) => t + (Number(src[i].total_annual) || 0), 0);
+    const out = src.slice();
+    let assigned = 0;
+    idx.forEach(function (i, k) {
+      const share = planTot > 0 ? ((Number(src[i].total_annual) || 0) / planTot) : (k === 0 ? 1 : 0);
+      // last row takes the remainder, so independent rounding can never drift the total by a penny
+      const amt = (k === idx.length - 1) ? Math.round((annual - assigned) * 100) / 100
+                                         : Math.round(annual * share * 100) / 100;
+      assigned = Math.round((assigned + amt) * 100) / 100;
+      out[i] = Object.assign({}, src[i], {
+        frequency: 'Annual', pay_months: null, premium: amt, total_annual: amt, julie_actual: true
+      });
+    });
+    return out;
   }
 
   // ---- login (auth) gate ----
@@ -594,6 +711,8 @@
     loadDiscretionaryBasis: loadDiscretionaryBasis, saveDiscretionaryBasis: saveDiscretionaryBasis,
     actualDiscretionary12mo: actualDiscretionary12mo, resolveDiscretionary: resolveDiscretionary,
     discretionaryCodeSets: discretionaryCodeSets,
+    julieCodeSet: julieCodeSet, isJulieBill: isJulieBill,
+    julieActualAnnual: julieActualAnnual, applyJulieBasis: applyJulieBasis,
     requireLogin: requireLogin, doLogin: doLogin, doLogout: doLogout,
     token: () => authToken
   };
