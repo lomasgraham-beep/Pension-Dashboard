@@ -133,7 +133,7 @@
   </div>
   <div id="pageInfo" class="info-panel" hidden>
     <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. The working-days chip at the top of each person&rsquo;s card is read-only and follows the schedule in Basic Data against the month you&rsquo;re viewing &mdash; so a 3-day week starting in September shows 5-day in August and 3-day from September, and salary and pension contributions switch with it. Figures are shown in the money of the year you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr), stepping once each January rather than creeping every month, so amounts hold steady across a year. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel, Julie Hair &amp; Nails and Dogs spend, which is deducted in the Cash Summary. Hair &amp; Nails follows the same <b>Plan / Actual</b> basis as dining, holidays and fuel (set on the Weekly Plan page): on <em>Actual</em> it uses your real card spend on the <b>JULIE</b> category over the last 12 months, divided by 12, and the row is marked <em>actual</em>. If that category doesn&rsquo;t exist or can&rsquo;t be read it quietly falls back to the planned bill row. Xmas and Birthdays are not on the card here &mdash; they are saved monthly into a savings account (age-tapered gift values, inflated 0.5%/yr, managed on the Gift Savings page) and appear as a <em>Gift savings</em> set-aside against that account&rsquo;s paying account, smoothing the December peak. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from, and the <b>Loans</b> card lists what is still owed on each &mdash; the balance outstanding at the start of the viewed month and how many payments remain, counting that month. Settled loans drop off the card.</p>
-    <span class="info-build">Budget build: v50</span>
+    <span class="info-build">Budget build: v51</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -731,29 +731,40 @@
   // are a savings set-aside against a paying account (see giftFundingMap / the account boxes).
   // total = amount for the current view; avg = smoothed monthly (for the monthly-mode average reference row).
   function creditCardParts(d) {
+    // v51: the box is CATEGORY-DRIVEN. Until now it had four hardcoded buckets matched on bill
+    // NAME (grocer / hair|nail / dogs), which had two faults:
+    //   - a card bill in any other category never appeared AND was left out of the total, so it
+    //     was silently missing from the Cash Summary deduction as well;
+    //   - an Actual Costs row is named "<Category> (actual)", so it failed the name tests and
+    //     vanished entirely.
+    // Now every credit-card bill is grouped by its category, so anything you put on the card shows
+    // up and is deducted, whether it is planned or driven from actuals.
     const cardBills = (d.bills || []).filter(b => b.paid_by === 'Credit card');
-    const match = re => cardBills.filter(b => re.test(b.bill_name || '') || re.test(b.category_code || ''));
-    const grocB = match(/grocer/i);
-    // ann11: fuel is NO LONGER a household bill. It comes from the Weekly Plan via
-    // d.fuelMonthly (annual ÷ 12). The old /fuel|petrol|diesel/ bill match is deliberately gone —
-    // leaving it in place would double-count anyone who kept a stray fuel bill row.
-    const hairNailsB = cardBills.filter(b =>
-      /^julie$/i.test(String(b.category_code || '').trim()) && /hair|nail/i.test(b.bill_name || '')
-    );
-    const dogsB = cardBills.filter(b => /^dogs?$/i.test(String(b.category_code || '').trim()));
-    const sum = (arr, fn) => arr.reduce((s, b) => s + fn(b), 0);
-    const groc = sum(grocB, billView);
+    const label = {};
+    (d.billCats || []).forEach(c => { if (c && c.code) label[c.code] = c.description || c.code; });
+
+    const groups = {};
+    cardBills.forEach(b => {
+      const code = String(b.category_code || '').trim() || '\u2014';
+      const g = groups[code] || (groups[code] = { code: code, view: 0, avg: 0, actual: false });
+      g.view += billView(b);
+      g.avg += billViewAvg(b);
+      if (b.actual_basis) g.actual = true;
+    });
+
+    // Fuel is not a household bill (ann11) — it comes from the Weekly Plan as an annual / 12, and
+    // is already smoothed, so its average contribution equals its view figure.
     const fuel = (Number(d.fuelMonthly) || 0) * periodScale() * inflFactor();
-    // v50: rows already carry the actual figure when their category is flagged, so the ordinary
-    // billView path is correct for every row. actual_basis is only read to label the row.
-    const hairNails = sum(hairNailsB, billView);
-    const dogs = sum(dogsB, billView);
-    // fuel is already a smoothed annual ÷ 12, so its avg contribution equals its view figure
-    const avg = sum(grocB, billViewAvg) + fuel + sum(hairNailsB, billViewAvg) + sum(dogsB, billViewAvg);
-    const anyActual = arr => (arr || []).some(b => b.actual_basis);
-    return { groc: groc, fuel: fuel, hairNails: hairNails, dogs: dogs,
-             grocActual: anyActual(grocB), julieActual: anyActual(hairNailsB), dogsActual: anyActual(dogsB),
-             total: groc + fuel + hairNails + dogs, avg: avg };
+
+    const lines = Object.keys(groups).map(code => ({
+      label: label[code] || code, amt: groups[code].view, actual: groups[code].actual
+    })).filter(l => Math.abs(l.amt) > 0.005);
+    lines.sort((x, y) => y.amt - x.amt);
+    if (Math.abs(fuel) > 0.005) lines.push({ label: 'Fuel', amt: fuel, actual: false });
+
+    const billTotal = Object.keys(groups).reduce((t, c) => t + groups[c].view, 0);
+    const billAvg = Object.keys(groups).reduce((t, c) => t + groups[c].avg, 0);
+    return { lines: lines, fuel: fuel, total: billTotal + fuel, avg: billAvg + fuel };
   }
 
   function creditCardBox(d) {
@@ -762,10 +773,10 @@
       '<div class="blocktitle">Credit Card</div>' +
       '<div class="subtitle">Estimated ' + (isAnnual() ? 'for the year' : 'for ' + monthLabelShort()) + ' &mdash; deducted in Cash Summary</div>' +
       '<table><tbody>' +
-        '<tr><td>Groceries' + (p.grocActual ? ' <span class="muted2">actual</span>' : '') + '</td><td class="amt">' + fmt(p.groc) + '</td></tr>' +
-        '<tr><td>Fuel</td><td class="amt">' + fmt(p.fuel) + '</td></tr>' +
-        '<tr><td>Hair and Nails' + (p.julieActual ? ' <span class="muted2">actual</span>' : '') + '</td><td class="amt">' + fmt(p.hairNails) + '</td></tr>' +
-        '<tr><td>Dogs' + (p.dogsActual ? ' <span class="muted2">actual</span>' : '') + '</td><td class="amt">' + fmt(p.dogs) + '</td></tr>' +
+        (p.lines.length
+          ? p.lines.map(l => '<tr><td>' + esc(l.label) + (l.actual ? ' <span class="muted2">actual</span>' : '') +
+                             '</td><td class="amt">' + fmt(l.amt) + '</td></tr>').join('')
+          : '<tr><td class="muted2">Nothing on the card this month</td><td class="amt">' + fmt(0) + '</td></tr>') +
         '<tr class="total"><td>Total</td><td class="amt">' + fmt(p.total) + '</td></tr>' +
       '</tbody></table>' +
     '</div>';
@@ -789,7 +800,7 @@
         availRows +
         '<tr class="total"><td>Sum of available</td><td class="amt">' + fmt(sumAvail) + '</td></tr>' +
         '<tr class="total"><td>Less pensions</td><td class="amt neg">\u2212' + fmt(pens) + '</td></tr>' +
-        '<tr class="total"><td>Less credit card (Groceries, Fuel, Hair &amp; Nails, Dogs)</td><td class="amt neg">\u2212' + fmt(cardT) + '</td></tr>' +
+        '<tr class="total"><td>Less credit card' + ((card && card.lines && card.lines.length) ? ' (' + card.lines.map(l => esc(l.label)).join(', ') + ')' : '') + '</td><td class="amt neg">\u2212' + fmt(cardT) + '</td></tr>' +
         '<tr class="avail"><td>Total cash available ' + (isAnnual() ? '(annual)' : 'in ' + monthLabelShort()) + '</td><td class="amt">' + fmt(totalCash) + '</td></tr>' +
         avgRow +
       '</tbody></table>' +
