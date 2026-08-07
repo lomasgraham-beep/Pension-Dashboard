@@ -47,7 +47,7 @@
 </head>
 <body>
   <h1>Actual Costs</h1>
-  <p class="note">Categories driven by your real card spend instead of their planned bill rows. Each row takes the last 12 months of transactions in that category and divides by 12. When <strong>Override</strong> is ticked, every bill in that category is replaced by this figure across the budget, the bills summary and the whole retirement model &mdash; your planned bills are left untouched in the database, so unticking restores them exactly. The figure is recalculated every time it is read, so it always matches the transactions behind it. <span class="muted" id="winNote"></span> (actual costs build: v1)</p>
+  <p class="note">Categories driven by your real card spend instead of their planned bill rows. Each row takes the last 12 months of transactions in that category and divides by 12. When <strong>Override</strong> is ticked, every bill in that category is replaced by this figure across the budget, the bills summary and the whole retirement model &mdash; your planned bills are left untouched in the database, so unticking restores them exactly. The figure is recalculated every time it is read, so it always matches the transactions behind it. <span class="muted" id="winNote"></span> (actual costs build: v2)</p>
 
   <div id="status">Loading&hellip;</div>
 
@@ -95,6 +95,11 @@
       + '<option' + (sel === 'Credit card' ? ' selected' : '') + '>Credit card</option>'
       + '<option' + (sel === 'PayPal' ? ' selected' : '') + '>PayPal</option>';
   }
+  // v2: Credit card and PayPal don't come out of a bank account — the cost lands in the Credit
+  // Card box, not an account box — so the account field is meaningless for them. Disabled and
+  // cleared rather than left fillable, and harvest() forces it null so a value can't linger in the
+  // database from before the payer was changed.
+  function noAccount(paidBy) { return paidBy === 'Credit card' || paidBy === 'PayPal'; }
   function acctOpt(sel) {
     let o = '<option value="">\u2014</option>'
       + accounts.map(a => '<option' + (a === sel ? ' selected' : '') + '>' + escA(a) + '</option>').join('');
@@ -119,8 +124,10 @@
       if (r.active && !r.txn_count) spend += '<div class="warn">override would show \u00a30</div>';
       return '<tr data-i="' + i + '">' +
         '<td><strong>' + esc(r.category_code) + '</strong><div class="muted">' + esc(r.description) + '</div></td>' +
-        '<td><select class="f-paidby" onchange="mark()" style="min-width:110px;">' + payerOpt(r.paid_by) + '</select></td>' +
-        '<td><select class="f-acct" onchange="mark()" style="min-width:130px;">' + acctOpt(r.paid_account) + '</select></td>' +
+        '<td><select class="f-paidby" onchange="payerChanged(this)" style="min-width:110px;">' + payerOpt(r.paid_by) + '</select></td>' +
+        '<td>' + (noAccount(r.paid_by)
+            ? '<span class="muted">not needed</span>'
+            : '<select class="f-acct" onchange="mark()" style="min-width:130px;">' + acctOpt(r.paid_account) + '</select>') + '</td>' +
         '<td>' + spend + '</td>' +
         '<td class="num"><span class="big">' + fmt(r.monthly) + '</span></td>' +
         '<td><input type="checkbox" class="f-active" onchange="mark()" style="width:22px; height:22px;"' + (r.active ? ' checked' : '') + '></td>' +
@@ -140,12 +147,23 @@
 
   function mark() { setStatus('Unsaved changes \u2014 press Save changes.'); }
 
+  // Changing the payer can add or remove the account cell, so the row has to be redrawn. Harvest
+  // first or the other edits in the table would be lost by the re-render.
+  function payerChanged(el) {
+    const tr = el.closest('tr');
+    const i = Number(tr.getAttribute('data-i'));
+    harvest();
+    if (rows[i]) rows[i].paid_by = el.value.trim() || null;
+    render(); mark();
+  }
+
   function harvest() {
     document.querySelectorAll('#acTable tbody tr[data-i]').forEach(tr => {
       const i = Number(tr.getAttribute('data-i'));
       if (!rows[i]) return;
       rows[i].paid_by = tr.querySelector('.f-paidby').value.trim() || null;
-      rows[i].paid_account = tr.querySelector('.f-acct').value.trim() || null;
+      const acctEl = tr.querySelector('.f-acct');
+      rows[i].paid_account = (acctEl && !noAccount(rows[i].paid_by)) ? (acctEl.value.trim() || null) : null;
       rows[i].active = tr.querySelector('.f-active').checked;
       rows[i].spend_reduction = tr.querySelector('.f-red').checked;
       rows[i].taper_at_70 = Number(tr.querySelector('.f-t70').value) || 1;
