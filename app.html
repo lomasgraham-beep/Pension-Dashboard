@@ -6,7 +6,7 @@
   <title>My Pension Model</title>
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="common.js?v=cat1"></script>
+  <script src="common.js?v=act1"></script>
   <script src="engine.js?v=ann10"></script>
   <script src="optimiser.js?v=era02"></script>
   <style>
@@ -1570,7 +1570,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-492</span>
+      <span class="build-stamp">LC-493</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -2131,6 +2131,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       <button id="subbtn-BillsSummary" class="subtab-link" onclick="showSub(event,'BillsSummary')">Bills Summary</button>
       <button id="subbtn-SaveForecast" class="subtab-link" onclick="showSub(event,'SaveForecast')">What I Could Save</button>
       <button id="subbtn-BillCats" class="subtab-link" onclick="showSub(event,'BillCats')">Bill Categories</button>
+      <button id="subbtn-ActualCosts" class="subtab-link" onclick="showSub(event,'ActualCosts')">Actual Costs</button>
       <button id="subbtn-MealCosts" class="subtab-link" onclick="showSub(event,'MealCosts')">Meal Costs</button>
       <button id="subbtn-HolidayCosts" class="subtab-link" onclick="showSub(event,'HolidayCosts')">Holiday Costs</button>
       <button id="subbtn-FuelCosts" class="subtab-link" onclick="showSub(event,'FuelCosts')">Fuel Costs</button>
@@ -2167,6 +2168,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div id="sub-BillsSummary" class="subtabcontent"><iframe id="frame-BillsSummary" class="app-frame" title="Summary of Household Bills"></iframe></div>
     <div id="sub-SaveForecast" class="subtabcontent"><iframe id="frame-SaveForecast" class="app-frame" title="What I Could Save"></iframe></div>
     <div id="sub-BillCats" class="subtabcontent"><iframe id="frame-BillCats" class="app-frame" title="Bill Categories"></iframe></div>
+    <div id="sub-ActualCosts" class="subtabcontent"><iframe id="frame-ActualCosts" class="app-frame" title="Actual Costs"></iframe></div>
   </div>
 
 
@@ -5233,8 +5235,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front160';   // frame-file cache-buster: bump when any framed page changes
-    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', FuelCosts:'fuel_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', Backup:'backup.html' };
+    const FV = '?v=front161';   // frame-file cache-buster: bump when any framed page changes
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', ActualCosts:'actual_costs.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', FuelCosts:'fuel_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
@@ -5390,6 +5392,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
           { l: 'Budget', s: 'Budget' }, { l: 'Bills', s: 'Bills' }, { l: 'Weekly Plan', s: 'WeeklyPlan' }, { l: 'Loans', s: 'Loans' },
           { l: 'Bills Summary', s: 'BillsSummary' }, { l: 'What I Could Save', s: 'SaveForecast' },
           { l: 'Bill Categories', s: 'BillCats' }, { l: 'Meal Costs', s: 'MealCosts' },
+          { l: 'Actual Costs', s: 'ActualCosts' },
           { l: 'Holiday Costs', s: 'HolidayCosts' },
           { l: 'Fuel Costs', s: 'FuelCosts' },
           { l: 'Holiday Summary', s: 'HolidaySummary' }, { l: 'Insurance Savings', s: 'InsSavings' },
@@ -5667,7 +5670,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       const status = document.getElementById('status');
       try {
         const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases, crashes, savingsAccounts, contributionExceptions, contributionRateHistory, workingTiers, incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings, diningSettings] = await Promise.all([
-          App.rest('bd_members'), App.rest('bd_household_bills').then(App.applyCategoryBasis), App.rest('bd_dining_habits'),
+          App.rest('bd_members'), App.rest('bd_household_bills').then(App.applyActualCosts), App.rest('bd_dining_habits'),
           App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
           App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
           App.rest('bd_purchases?order=purchase_date.asc'),
@@ -6280,7 +6283,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-492';
+    if (stamp) stamp.textContent = 'LC-493';
   }
 
   function buildSubnav() {
