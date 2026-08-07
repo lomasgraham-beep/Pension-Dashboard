@@ -301,7 +301,7 @@
   // Drops the session-lifetime caches so the next read goes to the database. Call before a manual
   // in-page refresh: _discSettingsCache otherwise survives for the life of the tab, so a changed
   // Plan/Actual basis or adjustment would never show up without a full reload.
-  function clearCaches() { _discSettingsCache = null; _catBasisCache = null; _actualCache = null; }
+  function clearCaches() { _discSettingsCache = null; _actualCache = null; }
 
   async function loadDiscretionaryBasis(force) {
     if (_discSettingsCache && !force) return _discSettingsCache;
@@ -310,7 +310,7 @@
       const rows = await rest('bd_discretionary_basis?id=eq.1');
       const r = (rows && rows[0]) || {};
       out = {
-        basis: (r.basis === 'actual' || r.basis === 'mixed') ? r.basis : 'plan',
+        basis: (r.basis === 'actual') ? 'actual' : 'plan',
         dining_adjust: Number(r.dining_adjust) || 0,
         holiday_adjust: Number(r.holiday_adjust) || 0,
         fuel_adjust: Number(r.fuel_adjust) || 0
@@ -322,7 +322,7 @@
 
   async function saveDiscretionaryBasis(s) {
     const payload = {
-      basis: (s && (s.basis === 'actual' || s.basis === 'mixed')) ? s.basis : 'plan',
+      basis: (s && s.basis === 'actual') ? 'actual' : 'plan',
       dining_adjust: Number(s && s.dining_adjust) || 0,
       holiday_adjust: Number(s && s.holiday_adjust) || 0,
       fuel_adjust: Number(s && s.fuel_adjust) || 0,
@@ -330,7 +330,7 @@
     };
     await write('PATCH', 'bd_discretionary_basis?id=eq.1', payload);
     _discSettingsCache = { basis: payload.basis, dining_adjust: payload.dining_adjust, holiday_adjust: payload.holiday_adjust, fuel_adjust: payload.fuel_adjust };
-    _catBasisCache = null; _actualCache = null;   // basis changed -> per-category view is stale
+    _actualCache = null;   // basis changed -> the cached actuals view is stale
     return _discSettingsCache;
   }
 
@@ -392,113 +392,10 @@
              fuelTotal: sumSet(a.byCode, sets.fuel), endMonth: a.endMonth, months: 12 };
   }
 
-  // ---- Per-category basis (Plan / Actual / Mixed) ---------------------------------------
-  // basis 'plan'   -> nothing uses actuals, whatever the flags say
-  // basis 'actual' -> everything uses actuals, whatever the flags say (kept so you keep the
-  //                   one-tap whole-model comparison)
-  // basis 'mixed'  -> each category follows its own use_actual flag on bd_bill_category
-  //
-  // If the use_actual / actual_adjust columns do not exist yet the select fails, cats stays empty,
-  // and every category resolves to plan under 'mixed' — i.e. the app degrades to today's behaviour
-  // rather than erroring.
-  let _catBasisCache = null;
-  let _actualCache = null;
-
-  async function loadCategoryBasis(force) {
-    if (_catBasisCache && !force) return _catBasisCache;
-    let basis = 'plan';
-    const cats = {};
-    try {
-      const rows = await rest('bd_discretionary_basis?id=eq.1');
-      const r = (rows && rows[0]) || {};
-      basis = (r.basis === 'actual' || r.basis === 'mixed') ? r.basis : 'plan';
-    } catch (e) { /* unreadable -> plan */ }
-    try {
-      const cr = await rest('bd_bill_category?select=code,description,use_actual,actual_adjust');
-      (cr || []).forEach(function (c) {
-        if (c.code == null) return;
-        cats[c.code] = { code: c.code, description: c.description,
-                         use_actual: c.use_actual === true,
-                         actual_adjust: Number(c.actual_adjust) || 0 };
-      });
-    } catch (e) { /* columns missing -> every category stays on plan under 'mixed' */ }
-    _catBasisCache = { basis: basis, cats: cats };
-    return _catBasisCache;
-  }
-
-  function categoryUsesActual(code, s) {
-    if (!s || s.basis === 'plan') return false;
-    if (s.basis === 'actual') return true;
-    const c = s.cats && s.cats[code];
-    return !!(c && c.use_actual);
-  }
-  // Bill-backed categories follow their OWN FLAG ONLY, never the global 'actual'.
-  // The global switch has always meant "the three planner domains on actuals"; letting it also
-  // sweep every bill category would zero out every bill in a category with no card spend the
-  // instant you tapped Actual (council tax, mortgage, anything on direct debit). So:
-  //   plan   -> nothing
-  //   actual -> planner domains forced on; bill categories follow their flags
-  //   mixed  -> everything follows its flag
-  function categoryFlagged(code, s) {
-    if (!s || s.basis === 'plan') return false;
-    const c = s.cats && s.cats[code];
-    return !!(c && c.use_actual);
-  }
-  function categoryAdjust(code, s) {
-    const c = s && s.cats && s.cats[code];
-    return c ? (Number(c.actual_adjust) || 0) : 0;
-  }
-  // a whole domain (dining / holiday / fuel) is on actuals if ANY of its codes is
-  function setUsesActual(set, s) {
-    if (!s || s.basis === 'plan') return false;
-    if (s.basis === 'actual') return true;
-    return Object.keys(set || {}).some(function (c) { return categoryUsesActual(c, s); });
-  }
-  function setAdjust(set, s) {
-    let t = 0;
-    Object.keys(set || {}).forEach(function (c) { if (categoryUsesActual(c, s)) t += categoryAdjust(c, s); });
-    return t;
-  }
-
-  // cached read of categories + the last 5,000 txns, shared by every resolver below
-  async function loadActuals(force) {
-    if (_actualCache && !force) return _actualCache;
-    const res = await Promise.all([
-      rest('bd_bill_category?select=code,description'),
-      rest('bd_card_txn?select=txn_date,amount,category_code&order=txn_date.desc&limit=5000')
-    ]);
-    _actualCache = { cats: res[0] || [], txns: res[1] || [], agg: actualByCategory12mo(res[1] || [], res[0] || []) };
-    return _actualCache;
-  }
-
-  // Per-category coverage for the Bills Category page: 12-month total, txn count, and the flag.
-  // Lets you see BEFORE ticking whether a category has any card spend behind it.
-  async function categoryCoverage() {
-    const s = await loadCategoryBasis(true);
-    let a;
-    try { a = await loadActuals(true); } catch (e) { return { basis: s.basis, endMonth: null, rows: {} }; }
-    const rows = {};
-    Object.keys(s.cats).forEach(function (code) {
-      const e = a.agg.byCode[code];
-      rows[code] = { code: code, description: s.cats[code].description,
-                     use_actual: s.cats[code].use_actual, actual_adjust: s.cats[code].actual_adjust,
-                     total: e ? e.total : 0, count: e ? e.count : 0 };
-    });
-    return { basis: s.basis, endMonth: a.agg.endMonth, rows: rows };
-  }
-
-  // The single figures the engine / budget / bills should consume, honouring the
-  // saved basis. Callers pass the plan figures they already compute; on 'plan' those
-  // are returned unchanged (identical to today). On 'actual' the trailing-12-month
-  // totals + monthly adjustment×12 are used. If the actual data can't be read, it
-  // falls back to plan so nothing ever breaks (degraded:true flags that).
-  //
-  // FUEL AND THE ACTUAL BASIS (ann11). Card spend on fuel cannot tell commuting from leisure
-  // driving — it is one merchant category. But the engine needs the work/discretionary split,
-  // because only the discretionary half tapers and only the work half stops at a date. So on
-  // the 'actual' basis the combined actual figure is APPORTIONED using the plan's own
-  // work:discretionary ratio. The total honours what you really spent; the split honours how
-  // you said you drive. With no fuel plan keyed at all, it falls to discretionary.
+  // ---- Dining / Holidays / Fuel (planner-backed) ---------------------------------------
+  // These three keep the Plan / Actual switch on the Weekly Plan page. They have planners rather
+  // than bill rows, so there is nothing for the Actual Costs table to suppress — which is exactly
+  // why that page refuses to create rows for them.
   async function resolveDiscretionary(opts) {
     const planD = Number(opts && opts.diningPlanAnnual) || 0;
     const planH = Number(opts && opts.holidayPlanAnnual) || 0;
@@ -506,146 +403,164 @@
     const planFD = Number(opts && opts.fuelDiscPlanAnnual) || 0;
     const planOut = { basis: 'plan', diningActual: false, holidayActual: false, fuelActual: false,
                       diningAnnual: planD, holidayAnnual: planH, fuelWorkAnnual: planFW, fuelAnnual: planFD };
-    let s2;
-    try { s2 = await loadCategoryBasis(); } catch (e) { return planOut; }
-    if (s2.basis === 'plan') return planOut;
+    let settings;
+    try { settings = await loadDiscretionaryBasis(); } catch (e) { return planOut; }
+    if (settings.basis !== 'actual') return planOut;
 
-    let a, cats;
-    try { a = await loadActuals(); cats = a.cats; }
-    catch (e) { return Object.assign({}, planOut, { degraded: true }); }
-    const sets = discretionaryCodeSets(cats);
+    let cats, txns;
+    try {
+      const res = await Promise.all([
+        rest('bd_bill_category?select=code,description'),
+        rest('bd_card_txn?select=txn_date,amount,category_code&order=txn_date.desc&limit=5000')
+      ]);
+      cats = res[0]; txns = res[1];
+    } catch (e) { return Object.assign({}, planOut, { degraded: true }); }
 
-    // Each domain is resolved INDEPENDENTLY now. Under 'mixed' you can have dining on actuals
-    // while holidays stay on plan; under 'actual' all three are on, as before.
-    const dOn = setUsesActual(sets.dining, s2);
-    const hOn = setUsesActual(sets.holiday, s2);
-    const fOn = setUsesActual(sets.fuel, s2);
+    const act = actualDiscretionary12mo(txns, cats);
+    const dining = Math.max(0, Math.round(act.diningTotal / 12 + (Number(settings.dining_adjust) || 0)) * 12);
+    const holiday = Math.max(0, Math.round(act.holidayTotal / 12 + (Number(settings.holiday_adjust) || 0)) * 12);
 
-    const dining = dOn ? Math.max(0, Math.round(sumSet(a.agg.byCode, sets.dining) / 12 + setAdjust(sets.dining, s2)) * 12) : planD;
-    const holiday = hOn ? Math.max(0, Math.round(sumSet(a.agg.byCode, sets.holiday) / 12 + setAdjust(sets.holiday, s2)) * 12) : planH;
-
-    // Fuel keeps its apportionment: card spend can't tell commuting from leisure, so the actual
+    // Fuel keeps its apportionment: card spend cannot tell commuting from leisure, so the actual
     // total is split by the PLAN's own work:discretionary ratio.
-    let fW = planFW, fD = planFD;
-    if (fOn) {
-      const fActual = Math.max(0, Math.round(sumSet(a.agg.byCode, sets.fuel) / 12 + setAdjust(sets.fuel, s2)) * 12);
-      const planFT = planFW + planFD;
-      const workShare = planFT > 0 ? (planFW / planFT) : 0;
-      fW = Math.round(fActual * workShare * 100) / 100;
-      fD = Math.round(fActual * (1 - workShare) * 100) / 100;
-    }
+    const fActual = Math.max(0, Math.round(act.fuelTotal / 12 + (Number(settings.fuel_adjust) || 0)) * 12);
+    const planFT = planFW + planFD;
+    const workShare = planFT > 0 ? (planFW / planFT) : 0;
     return {
-      // 'basis' stays the SAVED mode. Callers that need to know whether a particular domain is on
-      // actuals must read diningActual / holidayActual / fuelActual — testing basis === 'actual'
-      // is wrong under 'mixed' and will silently skip the rescale.
-      basis: s2.basis,
-      diningActual: dOn, holidayActual: hOn, fuelActual: fOn,
-      diningAnnual: dining, holidayAnnual: holiday, fuelWorkAnnual: fW, fuelAnnual: fD
+      basis: 'actual', diningActual: true, holidayActual: true, fuelActual: true,
+      diningAnnual: dining, holidayAnnual: holiday,
+      fuelWorkAnnual: Math.round(fActual * workShare * 100) / 100,
+      fuelAnnual: Math.round(fActual * (1 - workShare) * 100) / 100
     };
   }
 
-  // ---- Bill-backed categories on the Actual basis -------------------------------------
-  // Two kinds of category exist and they differ in where the PLAN comes from:
-  //   planner-backed (dining / holidays / fuel) -> resolveDiscretionary arbitrates two sources
-  //   bill-backed    (everything else)          -> the bd_household_bills row IS the plan, so the
-  //                                                actual simply OVERRIDES the amount on that row
-  // This handles the second kind. It replaces the old hardcoded Julie special case: Julie is now
-  // just a category with use_actual ticked, and nothing here knows her name.
+  // ---- Actual costs (bd_actual_costs) --------------------------------------------------
+  // A row here says: "this category is driven by real card spend, not by its planned bill rows."
+  // One row per category. When active, applyActualCosts() DROPS every bill row in that category
+  // and substitutes ONE synthetic row carrying the 12-month card total / 12, the paid-by and
+  // account you chose, and the three age tapers set on the row.
   //
-  // Apply wherever bills are CONSUMED. NEVER on bills.html / bills_categories.html, where the row
-  // is EDITED — an actual figure in an editable field invites saving it back over the plan.
+  // Suppress-and-replace, not mutate. Two consequences that matter:
+  //   - No proportional split across rows, so a category's whole actual lands on one line.
+  //   - The real bill rows are untouched in the database, so deactivating a row restores the plan
+  //     instantly. Nothing is ever destroyed by switching a category to actuals.
+  //
+  // Dining / Holidays / Fuel are excluded by code — they are planner-backed and keep the Plan /
+  // Actual switch on the Weekly Plan page. A row for one of those would silently do nothing, so
+  // the Actual Costs page blocks them rather than letting you create one.
 
-  let _billOverrideWarn = null;   // codes flagged but with no bill row to override (diagnostic)
+  let _actualCache = null;   // { rows, cats, txns, agg } for the life of the tab
 
-  // Returns a NEW bills array; the input is never mutated, because several pages hand the same
-  // rows to more than one engine run and a mutated row would compound across runs.
-  //
-  // Rows are rewritten rather than replaced, so spend_reduction and the age-taper flags set on each
-  // row keep working: the basis changes the AMOUNT, not the BEHAVIOUR.
-  //
-  // The row is normalised to MONTHLY at annual/12 with a full pay_months mask — NOT to Annual.
-  // Annual looks tidier but is wrong: monthCharge() lands an annual bill entirely in its bill_month,
-  // so a rewritten row would dump the whole year into one month on Budget and What I Could Save, or
-  // show zero if the row has no bill_month at all. A full-mask monthly row costs premium x 12 in the
-  // engine (identical total) and spreads evenly in every month-by-month view, which is what
-  // "annual / 12" is supposed to mean.
-  //
-  // Where a category has several bill rows the actual is split across them in proportion to their
-  // planned share, with the last row absorbing the rounding remainder.
-  async function applyCategoryBasis(bills) {
-    const src = bills || [];
-    let s2;
-    try { s2 = await loadCategoryBasis(); } catch (e) { return src; }
-    if (s2.basis === 'plan') return src;
-
-    let a, cats;
-    try { a = await loadActuals(); cats = a.cats; } catch (e) { return src; }
-    const sets = discretionaryCodeSets(cats);
-    // planner-backed domains are handled by resolveDiscretionary, not here — overriding their bill
-    // rows too would double-count them
-    const skip = {};
+  // Codes that are planner-backed and must never be driven from this table.
+  function plannerCodes(catRows) {
+    const sets = discretionaryCodeSets(catRows);
+    const out = {};
     [sets.dining, sets.holiday, sets.fuel, sets.reimburse].forEach(function (st) {
-      Object.keys(st || {}).forEach(function (c) { skip[c] = true; });
+      Object.keys(st || {}).forEach(function (c) { out[c] = true; });
     });
-
-    // which flagged categories actually have bill rows?
-    const byCat = {};
-    src.forEach(function (b, i) {
-      const cd = b && b.category_code;
-      if (!cd || skip[cd]) return;
-      if (!categoryFlagged(cd, s2)) return;
-      (byCat[cd] = byCat[cd] || []).push(i);
-    });
-
-    // diagnostics surfaced on the Bills Category page
-    const warn = [];
-    Object.keys(s2.cats).forEach(function (cd) {
-      if (skip[cd] || !categoryFlagged(cd, s2)) return;
-      if (!byCat[cd] && a.agg.byCode[cd]) warn.push(cd);
-    });
-    if (!Object.keys(byCat).length) { _billOverrideWarn = warn; return src; }
-    const out = src.slice();
-    Object.keys(byCat).forEach(function (cd) {
-      const idx = byCat[cd];
-      const e = a.agg.byCode[cd];
-      // Flagged but not a single card transaction in the window? Leave the planned bill alone and
-      // warn. Zeroing a real cost on no evidence is far worse than under-reporting one — a genuine
-      // £0 is indistinguishable here from "you flagged a direct-debit category by mistake".
-      if (!e || !e.count) { warn.push(cd); return; }
-      const annual = Math.max(0, e.total + categoryAdjust(cd, s2) * 12);
-      const planTot = idx.reduce(function (t, i) { return t + (Number(src[i].total_annual) || 0); }, 0);
-      let assigned = 0;
-      idx.forEach(function (i, k) {
-        const share = planTot > 0 ? ((Number(src[i].total_annual) || 0) / planTot) : (k === 0 ? 1 : 0);
-        const amt = (k === idx.length - 1) ? Math.round((annual - assigned) * 100) / 100
-                                           : Math.round(annual * share * 100) / 100;
-        assigned = Math.round((assigned + amt) * 100) / 100;
-        out[i] = Object.assign({}, src[i], {
-          frequency: 'Monthly', pay_months: '111111111111',
-          premium: Math.round(amt / 12 * 100) / 100, total_annual: amt,
-          bill_month: null, actual_basis: true, actual_code: cd
-        });
-      });
-    });
-    _billOverrideWarn = warn;   // recorded last: the loop above adds no-evidence codes too
     return out;
   }
-  // codes flagged for actuals that either had no bill row to carry the spend, or no card
-  // transactions at all in the window — both mean the flag did nothing — populated by the
-  // last applyCategoryBasis() call, surfaced as a warning on the Bills Category page
-  function billOverrideWarnings() { return _billOverrideWarn || []; }
 
-  // Deprecated alias kept so a half-finished deploy can't break: pages still calling the old name
-  // get the general behaviour. Remove once every page is on applyCategoryBasis.
-  async function applyJulieBasis(bills) { return applyCategoryBasis(bills); }
+  async function loadActualCosts(force) {
+    if (_actualCache && !force) return _actualCache;
+    const res = await Promise.all([
+      rest('bd_actual_costs?order=category_code.asc'),
+      rest('bd_bill_category?select=code,description'),
+      rest('bd_card_txn?select=txn_date,amount,category_code&order=txn_date.desc&limit=5000')
+    ]);
+    const cats = res[1] || [], txns = res[2] || [];
+    _actualCache = { rows: res[0] || [], cats: cats, txns: txns,
+                     agg: actualByCategory12mo(txns, cats), planner: plannerCodes(cats) };
+    return _actualCache;
+  }
 
-  // Save one category's actual-basis settings. PATCH by code; the caller owns the UI state.
-  async function saveCategoryActual(code, useActual, adjust) {
-    await write('PATCH', 'bd_bill_category?code=eq.' + encodeURIComponent(code), {
-      use_actual: !!useActual,
-      actual_adjust: Number(adjust) || 0
+  // Everything the Actual Costs page needs to draw itself: each row plus its live 12-month total,
+  // transaction count and the window end. The figure is computed on every read, never stored — a
+  // saved snapshot would go stale the moment a statement is imported and silently disagree with
+  // the transactions behind it.
+  async function actualCostRows() {
+    const a = await loadActualCosts(true);
+    const desc = {};
+    (a.cats || []).forEach(function (c) { desc[c.code] = c.description; });
+    return {
+      endMonth: a.agg.endMonth,
+      planner: a.planner,
+      cats: a.cats,
+      rows: (a.rows || []).map(function (r) {
+        const e = a.agg.byCode[r.category_code];
+        const annual = e ? e.total : 0;
+        return Object.assign({}, r, {
+          description: desc[r.category_code] || r.category_code,
+          annual: annual, monthly: Math.round(annual / 12 * 100) / 100,
+          txn_count: e ? e.count : 0,
+          is_planner: !!a.planner[r.category_code]
+        });
+      })
+    };
+  }
+
+  // Returns a NEW bills array with every ACTIVE category's bill rows replaced by one synthetic
+  // row. Input is never mutated — several pages hand the same rows to more than one engine run.
+  //
+  // The synthetic row is shaped as MONTHLY at annual/12 with a full pay_months mask, never as
+  // Annual: monthCharge() lands an annual bill entirely in its bill_month, which would dump the
+  // whole year into one month on Budget and What I Could Save, or show zero for a row with no
+  // bill_month. A full-mask monthly row costs premium x 12 in the engine and spreads evenly in
+  // every month-by-month view, which is what "annual / 12" is supposed to mean.
+  async function applyActualCosts(bills) {
+    const src = bills || [];
+    let a;
+    try { a = await loadActualCosts(); } catch (e) { return src; }
+    const active = (a.rows || []).filter(function (r) {
+      return r.active === true && r.category_code && !a.planner[r.category_code];
     });
-    _catBasisCache = null; _actualCache = null;
+    if (!active.length) return src;
+
+    const desc = {};
+    (a.cats || []).forEach(function (c) { desc[c.code] = c.description; });
+    const drop = {};
+    active.forEach(function (r) { drop[r.category_code] = true; });
+
+    const out = src.filter(function (b) { return !(b && drop[b.category_code]); });
+    active.forEach(function (r) {
+      const e = a.agg.byCode[r.category_code];
+      const annual = Math.max(0, e ? e.total : 0);
+      out.push({
+        bill_name: (desc[r.category_code] || r.category_code) + ' (actual)',
+        category_code: r.category_code,
+        paid_by: r.paid_by || null,
+        paid_account: r.paid_account || null,
+        frequency: 'Monthly',
+        premium: Math.round(annual / 12 * 100) / 100,
+        total_annual: annual,
+        pay_months: '111111111111',
+        bill_month: null,
+        renewal_date: null,
+        spend_reduction: r.spend_reduction === true,
+        taper_at_70: r.taper_at_70 != null ? Number(r.taper_at_70) : 1,
+        taper_at_80: r.taper_at_80 != null ? Number(r.taper_at_80) : 1,
+        taper_at_90: r.taper_at_90 != null ? Number(r.taper_at_90) : 1,
+        actual_basis: true, actual_code: r.category_code, txn_count: e ? e.count : 0
+      });
+    });
+    return out;
+  }
+
+  async function saveActualCost(row) {
+    const payload = {
+      category_code: row.category_code, paid_by: row.paid_by || null,
+      paid_account: row.paid_account || null, active: !!row.active,
+      spend_reduction: !!row.spend_reduction,
+      taper_at_70: Number(row.taper_at_70) || 1,
+      taper_at_80: Number(row.taper_at_80) || 1,
+      taper_at_90: Number(row.taper_at_90) || 1
+    };
+    if (row.id) await write('PATCH', 'bd_actual_costs?id=eq.' + encodeURIComponent(row.id), payload);
+    else await write('POST', 'bd_actual_costs', payload);
+    _actualCache = null;
+  }
+  async function deleteActualCost(id) {
+    await write('DELETE', 'bd_actual_costs?id=eq.' + encodeURIComponent(id), null);
+    _actualCache = null;
   }
 
   // ---- login (auth) gate ----
@@ -809,10 +724,9 @@
     actualDiscretionary12mo: actualDiscretionary12mo, resolveDiscretionary: resolveDiscretionary,
     discretionaryCodeSets: discretionaryCodeSets,
     actualByCategory12mo: actualByCategory12mo,
-    loadCategoryBasis: loadCategoryBasis, categoryUsesActual: categoryUsesActual,
-    categoryAdjust: categoryAdjust, categoryCoverage: categoryCoverage,
-    applyCategoryBasis: applyCategoryBasis, billOverrideWarnings: billOverrideWarnings,
-    applyJulieBasis: applyJulieBasis, saveCategoryActual: saveCategoryActual,
+    loadActualCosts: loadActualCosts, actualCostRows: actualCostRows,
+    applyActualCosts: applyActualCosts, saveActualCost: saveActualCost,
+    deleteActualCost: deleteActualCost,
     requireLogin: requireLogin, doLogin: doLogin, doLogout: doLogout,
     token: () => authToken
   };
