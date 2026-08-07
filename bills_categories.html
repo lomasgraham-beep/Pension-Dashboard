@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bill Categories</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=cat1"></script>
+<script src="common.js?v=act1"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1500px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin-bottom:2px; }
@@ -58,7 +58,7 @@
 </head>
 <body>
   <h1>Bill Categories</h1>
-  <p class="note">Manage the category codes used by Household Bills. Add a category here first, then it becomes available in the bills dropdown. Descriptions are editable in the table below. <span style="color:#94a3b8;">(categories build: v6)</span></p>
+  <p class="note">Manage the category codes used by Household Bills. Add a category here first, then it becomes available in the bills dropdown. Descriptions are editable in the table below. <span style="color:#94a3b8;">(categories build: v7)</span></p>
   <div id="status">Loading…</div>
 
   <div class="panel" id="panel" style="display:none;">
@@ -83,14 +83,12 @@
       <button class="btn btn-save" onclick="saveDefs()">Save changes</button>
       <span class="inuse" id="defHint" style="margin-left:10px;">Edit any description or definition below, then Save. Codes can’t be changed — bills, card transactions and merchant keys all point at them.</span>
     </div>
-    <p class="note" style="margin-top:0;">Tick <strong>Use actual costs</strong> to drive a category from your real card spend instead of the planned figure &mdash; the trailing 12 months divided by 12. It only takes effect when the basis on the Weekly Plan page is <strong>Mixed</strong> (or <strong>Actual</strong>, which additionally forces dining, holidays and fuel on). <strong>Card spend (12mo)</strong> is your coverage check: a category with no card spend, or with no bill row to override, is flagged here because the tick would otherwise do nothing silently. Categories paid by direct debit &mdash; council tax, mortgage &mdash; have no card spend and should stay unticked. A ticked category with no card spend keeps its planned figure rather than dropping to zero. <span class="inuse" id="covWin"></span></p>
-    <table id="catTable"><thead><tr><th>Code</th><th>Description</th><th>Category Definition</th><th>Actual costs &amp; 12mo card spend</th><th>In use</th><th></th></tr></thead><tbody></tbody></table>
+    <p class="note" style="margin-top:0;">Categories driven by real card spend are set up on the <strong>Actual Costs</strong> page, not here.</p>
+    <table id="catTable"><thead><tr><th>Code</th><th>Description</th><th>Category Definition</th><th>In use</th><th></th></tr></thead><tbody></tbody></table>
   </div>
 
 <script>
   let cats = [], usage = {};
-  let coverage = {};   // code -> { total, count } trailing 12 months of card spend
-  const fmtGBP = v => '\u00a3' + (Number(v) || 0).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   function notify() { try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {} }
 
@@ -103,15 +101,6 @@
       ]);
       cats = (catRows || []).map(c => ({ code: c.code, description: c.description || '', definition: c.definition || '',
                                          use_actual: c.use_actual === true, actual_adjust: Number(c.actual_adjust) || 0 }));
-      // v4: coverage is advisory only — if it can't be read the page still works, you just lose the
-      // warnings. Never let a failed diagnostic block editing categories.
-      coverage = {};
-      try {
-        const cov = await App.categoryCoverage();
-        Object.keys(cov.rows || {}).forEach(k => { coverage[k] = { total: cov.rows[k].total, count: cov.rows[k].count }; });
-        const w = document.getElementById('covWin');
-        if (w) w.textContent = cov.endMonth ? ('card spend shown is the 12 months to ' + cov.endMonth) : '';
-      } catch (e) { coverage = {}; }
       usage = {};
       (bills || []).forEach(b => { if (b.category_code) usage[b.category_code] = (usage[b.category_code] || 0) + 1; });
       status.style.display = 'none';
@@ -122,23 +111,9 @@
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
-  // v4 helper: is this category one of the planner-backed domains? Those are driven by the
-  // Weekly Plan basis panel, not by a bill row, so their tick is shown read-only here to avoid
-  // implying you can override them from two places.
-  function isPlannerCat(c) {
-    const nm = String(c.description || '').trim().toLowerCase();
-    const cd = String(c.code || '').trim().toLowerCase();
-    return ['dining','holiday','holidays','fuel','petrol','diesel'].indexOf(nm) >= 0
-        || ['dining','holiday','holidays','fuel'].indexOf(cd) >= 0;
-  }
-  function isReimburseCat(c) {
-    return String(c.description || '').trim().toLowerCase() === 'reimburse'
-        || String(c.code || '').trim().toLowerCase() === 'reimburse';
-  }
-
   function renderRows() {
     const tb = document.querySelector('#catTable tbody');
-    if (!cats.length) { tb.innerHTML = '<tr><td colspan="6" style="color:#94a3b8;">No categories yet — add one above.</td></tr>'; return; }
+    if (!cats.length) { tb.innerHTML = '<tr><td colspan="4" style="color:#94a3b8;">No categories yet — add one above.</td></tr>'; return; }
     tb.innerHTML = cats.map(c => {
       const code = c.code;
       const n = usage[code] || 0;
@@ -155,44 +130,14 @@
         '<textarea class="def-input" data-code="' + safeCode + '" maxlength="1000" ' +
         'oninput="charCount(this, this.nextElementSibling.id)">' + esc(c.definition) + '</textarea>' +
         '<div class="charc" id="defc-' + safeCode + '">' + cnt + ' / 1000</div>';
-      // ---- v4: actual-costs flag, adjust, and coverage ----
-      const cov = coverage[code] || { total: 0, count: 0 };
-      const planner = isPlannerCat(c), reimb = isReimburseCat(c);
-      let actCell;
-      if (reimb) {
-        actCell = '<div class="covline">n/a &mdash; refunds are excluded from every category total</div>';
-      } else {
-        const chk = '<label class="actrow">' +
-          '<input type="checkbox" class="act-input" data-code="' + safeCode + '"' +
-          (c.use_actual ? ' checked' : '') + ' style="width:20px; height:20px; flex:none;">' +
-          '<span>Use actual' + (planner ? ' (planner)' : '') + '</span>' +
-          '<span class="inuse">adjust &pound;</span>' +
-          '<input type="number" step="0.01" class="adj-input" data-code="' + safeCode + '" ' +
-          'value="' + (Number(c.actual_adjust) || 0) + '" style="width:72px; flex:none;"></label>';
-        // coverage: the guard against ticking a category with nothing behind it
-        let cov1;
-        if (cov.count === 0) cov1 = '<span class="warncov">no card spend</span>';
-        else cov1 = '<b>' + fmtGBP(cov.total) + '</b> &middot; ' + cov.count + (cov.count === 1 ? ' txn' : ' txns') +
-                    ' &middot; ' + fmtGBP(cov.total / 12) + '/mo';
-        let warn = '';
-        if (c.use_actual && !planner && cov.count === 0) warn = '<div class="warncov">tick has no effect &mdash; planned figure kept</div>';
-        else if (c.use_actual && !planner && n === 0) warn = '<div class="warncov">no bill row to override</div>';
-        actCell = '<div class="actcell">' + chk + '<div class="covline">' + cov1 + '</div>' + warn + '</div>';
-      }
       return '<tr><td><strong>' + esc(code) + '</strong></td><td>' + descCell + '</td>' +
              '<td>' + defCell + '</td>' +
-             '<td>' + actCell + '</td>' +
              '<td class="inuse">' + useText + '</td>' +
              '<td style="text-align:right; white-space:nowrap;">' + delBtn + '</td></tr>';
     }).join('');
     // corrections should replace on typing rather than needing manual deletion first
     tb.querySelectorAll('.desc-input').forEach(el => {
       el.addEventListener('focus', function () { const x = this; setTimeout(() => { try { x.setSelectionRange(0, x.value.length); } catch (e) {} }, 0); });
-    });
-    // standing rule: data-entry fields blank on focus so a new value can be typed straight in
-    tb.querySelectorAll('.adj-input').forEach(el => {
-      el.addEventListener('focus', function () { this.dataset.prev = this.value; this.value = ''; });
-      el.addEventListener('blur', function () { if (this.value === '') this.value = this.dataset.prev || '0'; });
     });
   }
 
@@ -209,17 +154,6 @@
       const val = (el.value || '').trim();
       const orig = (cats.find(c => c.code === code) || {}).description || '';
       if (val !== orig) { (changed[code] = changed[code] || {}).description = val; }
-    });
-    [...document.querySelectorAll('#catTable .act-input')].forEach(el => {
-      const code = el.getAttribute('data-code');
-      const orig = !!(cats.find(c => c.code === code) || {}).use_actual;
-      if (!!el.checked !== orig) { (changed[code] = changed[code] || {}).use_actual = !!el.checked; }
-    });
-    [...document.querySelectorAll('#catTable .adj-input')].forEach(el => {
-      const code = el.getAttribute('data-code');
-      const val = Number(el.value) || 0;
-      const orig = Number((cats.find(c => c.code === code) || {}).actual_adjust) || 0;
-      if (Math.abs(val - orig) > 0.005) { (changed[code] = changed[code] || {}).actual_adjust = val; }
     });
     [...document.querySelectorAll('#catTable .def-input')].forEach(ta => {
       const code = ta.getAttribute('data-code');

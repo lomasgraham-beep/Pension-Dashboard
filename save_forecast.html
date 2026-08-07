@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>What I Could Save</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=cat1"></script>
+<script src="common.js?v=act1"></script>
 <style>
   :root { --accent:#1d3a63; --accent-dark:#14294a; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; --good:#15803d; --bad:#c0392b; --cost:#dc2626; --save:#16a34a; --grid:#e2e8f0; --axis:#94a3b8; }
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1500px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
@@ -166,7 +166,7 @@
 </head>
 <body>
   <h1>What I Could Save</h1>
-  <p class="note">Month-by-month for the rolling 12 months from the month you pick (this month on load; Prev steps back up to 24 months, Next forward): net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home. The working pattern is no longer a choice — each month uses the pattern in force that month from the working-days schedule, so a window spanning a change shows the old pattern before it and the new one after, and the 12-month total is the real blend. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months, as do Xmas and birthday gifts (age-tapered gift values inflated 0.5%/yr, from the Gift Savings page), sitting in the paying account's column. The last column is what's left to save after everything, including pension contributions (shown as their net cost, matching the budget). Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings) and general costs each April — not at the calendar-year line. Pension contributions follow their own dated schedule: a planned change (e.g. a September step) takes effect in its month and then stays flat, and is not inflated on top — exactly matching the Budget. The chart shows what's left to save each month as green bars (red if a month runs short) against the red cost line; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf23)</span></p>
+  <p class="note">Month-by-month for the rolling 12 months from the month you pick (this month on load; Prev steps back up to 24 months, Next forward): net income per person, then what actually leaves each account (annual bills land in their real month, weekly bills spread, dining follows the weekly rota), against your take-home. The working pattern is no longer a choice — each month uses the pattern in force that month from the working-days schedule, so a window spanning a change shows the old pattern before it and the new one after, and the 12-month total is the real blend. Bills funded from a savings pot (e.g. insurance) show as a level monthly set-aside across all months, as do Xmas and birthday gifts (age-tapered gift values inflated 0.5%/yr, from the Gift Savings page), sitting in the paying account's column. The last column is what's left to save after everything, including pension contributions (shown as their net cost, matching the budget). Take-home and costs both rise 2.5% a year, but the step lands in its real month — each person's pay rise in their salary-review month (taken from their contribution settings) and general costs each April — not at the calendar-year line. Pension contributions follow their own dated schedule: a planned change (e.g. a September step) takes effect in its month and then stays flat, and is not inflated on top — exactly matching the Budget. The chart shows what's left to save each month as green bars (red if a month runs short) against the red cost line; move across it for each month's figures. Tap any month row to see each bank account and card broken down by category (with an option to show individual bills), or the <span style="font-style:italic;">i</span> next to a month to see what changed from the month before. <span style="color:#94a3b8;">(save-forecast build: sf24)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="controls" class="navbar" style="display:none;">
@@ -264,7 +264,7 @@
     try {
       const [members, bills, incAmts, workTiers, otherInc, bankAccts, mealCost, diningRota, holidayPlan, holidayCost, holidaySettings, params, contribs, catRows, contribSchedule, gifts, fuelSettings, fuelLines] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
-        App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc').then(App.applyCategoryBasis),
+        App.rest('bd_household_bills?order=paid_account.asc,bill_name.asc').then(App.applyActualCosts),
         App.rest('bd_income_amounts?order=member_name.asc'),
         App.rest('bd_working_tiers?order=from_date.asc'),
         App.rest('bd_other_income?order=member_name.asc'),
@@ -323,8 +323,8 @@
         diningPlanAnnual: dinPlanAnnual, holidayPlanAnnual: holPlanAnnual,
         fuelWorkPlanAnnual: _fSplit.workAnnual, fuelDiscPlanAnnual: _fSplit.discAnnual
       });
-      // sf23: each domain now resolves independently, so test the per-domain flag rather than the
-      // saved mode — under 'mixed', basis === 'actual' is false while fuel may still be on actuals.
+      // Test the per-domain flag rather than the saved mode: resolveDiscretionary reports each
+      // domain separately, and that stays correct however the basis panel evolves.
       if (_eff.fuelActual) {
         const _fEff = (Number(_eff.fuelWorkAnnual) || 0) + (Number(_eff.fuelAnnual) || 0);
         if (fuelPlanAnnual > 0) { const _fsc = _fEff / fuelPlanAnnual; for (let m = 0; m < 12; m++) fuelMonth[m] *= _fsc; }

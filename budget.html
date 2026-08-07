@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monthly Budget</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=cat1"></script>
+<script src="common.js?v=act1"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1500px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin:0; }
@@ -387,7 +387,7 @@
       // helper rewrites the matching bill rows to a smoothed monthly actual, so Budget needs no
       // per-category code at all: the account boxes, the Credit Card box and the bills total all
       // read the rewritten rows through the normal billView path. The v49 Julie special case is gone.
-      const billsEff = await App.applyCategoryBasis(bills || []);
+      const billsEff = await App.applyActualCosts(bills || []);
       let holidayFundingAcct = null;
       const potId = holSettings.savings_account ? String(holSettings.savings_account).trim() : '';
       if (potId) {

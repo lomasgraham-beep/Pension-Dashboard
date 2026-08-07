@@ -5,7 +5,7 @@
 <title>Cash &amp; Purchases</title>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=cat1"></script>
+<script src="common.js?v=act1"></script>
 <script src="engine.js?v=ann10"></script>
 <style>
   :root { --accent:#1d3a63; --accent-dark:#14294a; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
@@ -474,7 +474,7 @@
         App.rest('bd_purchases?order=purchase_date.asc'),
         App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name) + '&order=updated_at.desc&limit=1'),
         App.rest('bd_members'),
-        App.rest('bd_household_bills').then(App.applyCategoryBasis), App.rest('bd_dining_habits'),
+        App.rest('bd_household_bills').then(App.applyActualCosts), App.rest('bd_dining_habits'),
         App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
         App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
         App.rest('bd_market_crashes?order=start_date.asc'),
