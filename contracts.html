@@ -83,7 +83,7 @@
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
   <h2>Contracts</h2>
-  <p class="note">Every dated commitment in one register &mdash; insurance, MOT, road tax, servicing, storage. <strong>End Date</strong> is what drives the reminders: an email goes out <strong>28, 14, 7 and 1 day</strong> before, and again <strong>on the day</strong>, for any row with <strong>Notify</strong> ticked. The <strong>Reminders</strong> chips light up as each one is sent &mdash; tap a chip to clear it (so it sends again) or to light it manually (so it does not) &mdash; chips save on the spot, no need to press Save. <strong>Renew</strong> moves both dates on by a year and clears the chips ready for the new term. Changing the End Date clears them automatically. Suppliers are held in their own list &mdash; open <strong>Suppliers</strong> to add a phone number or website, which then travels with every contract that uses it.</p>
+  <p class="note">Every dated commitment in one register &mdash; insurance, MOT, road tax, servicing, storage. <strong>End Date</strong> is what drives the reminders: an email goes out <strong>28, 14, 7 and 1 day</strong> before, and again <strong>on the day</strong>, for any row with <strong>Notify</strong> ticked. The <strong>Reminders</strong> chips light up as each one is sent &mdash; tap a chip to clear it (so it sends again) or to light it manually (so it does not) &mdash; chips save on the spot, no need to press Save. <strong>Renew</strong> moves both dates on by a year and clears the chips ready for the new term. Changing the End Date clears them automatically. <strong>Notes</strong> is free text and is carried into the reminder email, so anything you want in front of you when it lands &mdash; last year&rsquo;s premium, an excess, a rival quote &mdash; belongs there. Suppliers are held in their own list &mdash; open <strong>Suppliers</strong> to add a phone number or website, which then travels with every contract that uses it.</p>
 
   <div class="bar" style="align-items:flex-start;">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
@@ -124,8 +124,8 @@
 
   <div class="table-wrap">
     <table id="tbl">
-      <thead><tr><th>Category</th><th>Type</th><th>Supplier</th><th>Who</th><th>Account/Policy No.</th><th>Start Date</th><th>End Date</th><th>Status</th><th>Notify</th><th>Reminders<br><span style="font-weight:normal;font-size:11px;">28 &middot; 14 &middot; 7 &middot; 1 &middot; 0</span></th><th></th></tr></thead>
-      <tbody><tr><td colspan="11">Loading&hellip;</td></tr></tbody>
+      <thead><tr><th>Category</th><th>Type</th><th>Supplier</th><th>Who</th><th>Account/Policy No.</th><th>Start Date</th><th>End Date</th><th>Status</th><th>Notify</th><th>Reminders<br><span style="font-weight:normal;font-size:11px;">28 &middot; 14 &middot; 7 &middot; 1 &middot; 0</span></th><th>Notes<br><span style="font-weight:normal;font-size:11px;">(shown in the email)</span></th><th></th></tr></thead>
+      <tbody><tr><td colspan="12">Loading&hellip;</td></tr></tbody>
     </table>
   </div>
 
@@ -240,6 +240,7 @@
       '<td class="st-cell"><span class="pill ' + st.cls + '">' + st.label + '</span></td>' +
       '<td style="text-align:center;"><input type="checkbox" class="f-notify" ' + (r.notify === false ? '' : 'checked') + ' onchange="mark()" style="width:auto;"></td>' +
       '<td>' + chipsHtml(r, i) + '</td>' +
+      '<td><input type="text" class="f-notes" value="' + esc(r.notes) + '" onchange="mark()" oninput="mark()" style="min-width:190px;"></td>' +
       '<td><button class="renew" onclick="renewRow(' + i + ')" title="Move both dates on by a year and clear the reminders">Renew</button>' +
       '<button class="del" onclick="delRow(' + i + ')">Delete</button></td>' +
     '</tr>';
@@ -276,7 +277,7 @@
     });
 
     if (!idx.length) {
-      tbody.innerHTML = '<tr><td colspan="11" style="color:var(--ink-soft);">No contracts match this filter.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="12" style="color:var(--ink-soft);">No contracts match this filter.</td></tr>';
       return;
     }
 
@@ -285,7 +286,7 @@
       const cat = (rows[i].category || '').trim() || 'Uncategorised';
       if (cat !== lastCat) {
         const n = idx.filter(j => ((rows[j].category || '').trim() || 'Uncategorised') === cat).length;
-        html += '<tr class="grp"><td colspan="11">' + esc(cat) + '<span class="grp-count">' + n + '</span></td></tr>';
+        html += '<tr class="grp"><td colspan="12">' + esc(cat) + '<span class="grp-count">' + n + '</span></td></tr>';
         lastCat = cat;
       }
       html += rowHtml(rows[i], i);
@@ -307,6 +308,7 @@
       r.start_date = tr.querySelector('.f-start').value || null;
       r.end_date   = tr.querySelector('.f-end').value || null;
       r.notify     = tr.querySelector('.f-notify').checked;
+      r.notes      = tr.querySelector('.f-notes').value;
     });
   }
 
@@ -360,7 +362,7 @@
     syncDom();
     const cat = document.getElementById('filterCat').value;
     rows.push({ id: undefined, category: cat === 'All' ? '' : cat, ctype: '', supplier_id: null, who: '', policy_no: '',
-                start_date: null, end_date: null, notify: true, notes: null, bill_id: null,
+                start_date: null, end_date: null, notify: true, notes: '', bill_id: null,
                 sent_28: null, sent_14: null, sent_7: null, sent_1: null, sent_0: null });
     populateCatFilter(); render(); setDirty();
   }
