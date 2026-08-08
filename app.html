@@ -1570,7 +1570,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-497</span>
+      <span class="build-stamp">LC-498</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -2127,11 +2127,11 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       <button id="subbtn-Budget" class="subtab-link active-sub" onclick="showSub(event,'Budget')">Budget</button>
       <button id="subbtn-Bills" class="subtab-link" onclick="showSub(event,'Bills')">Bills</button>
       <button id="subbtn-WeeklyPlan" class="subtab-link" onclick="showSub(event,'WeeklyPlan')">Weekly Plan</button>
+      <button id="subbtn-ActualCosts" class="subtab-link" onclick="showSub(event,'ActualCosts')">Actual Costs</button>
       <button id="subbtn-Loans" class="subtab-link" onclick="showSub(event,'Loans')">Loans</button>
       <button id="subbtn-BillsSummary" class="subtab-link" onclick="showSub(event,'BillsSummary')">Bills Summary</button>
       <button id="subbtn-SaveForecast" class="subtab-link" onclick="showSub(event,'SaveForecast')">What I Could Save</button>
       <button id="subbtn-BillCats" class="subtab-link" onclick="showSub(event,'BillCats')">Bill Categories</button>
-      <button id="subbtn-ActualCosts" class="subtab-link" onclick="showSub(event,'ActualCosts')">Actual Costs</button>
       <button id="subbtn-MealCosts" class="subtab-link" onclick="showSub(event,'MealCosts')">Meal Costs</button>
       <button id="subbtn-HolidayCosts" class="subtab-link" onclick="showSub(event,'HolidayCosts')">Holiday Costs</button>
       <button id="subbtn-FuelCosts" class="subtab-link" onclick="showSub(event,'FuelCosts')">Fuel Costs</button>
@@ -5389,10 +5389,10 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         label: 'Living Costs', top: 'LivingCosts', kind: 'sub',
         items: [
           { g: 'Planned costs' },
-          { l: 'Budget', s: 'Budget' }, { l: 'Bills', s: 'Bills' }, { l: 'Weekly Plan', s: 'WeeklyPlan' }, { l: 'Loans', s: 'Loans' },
+          { l: 'Budget', s: 'Budget' }, { l: 'Bills', s: 'Bills' }, { l: 'Weekly Plan', s: 'WeeklyPlan' },
+          { l: 'Actual Costs', s: 'ActualCosts' }, { l: 'Loans', s: 'Loans' },
           { l: 'Bills Summary', s: 'BillsSummary' }, { l: 'What I Could Save', s: 'SaveForecast' },
           { l: 'Bill Categories', s: 'BillCats' }, { l: 'Meal Costs', s: 'MealCosts' },
-          { l: 'Actual Costs', s: 'ActualCosts' },
           { l: 'Holiday Costs', s: 'HolidayCosts' },
           { l: 'Fuel Costs', s: 'FuelCosts' },
           { l: 'Holiday Summary', s: 'HolidaySummary' }, { l: 'Insurance Savings', s: 'InsSavings' },
@@ -6283,7 +6283,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-497';
+    if (stamp) stamp.textContent = 'LC-498';
   }
 
   function buildSubnav() {
