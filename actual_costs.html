@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Actual Costs</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=act1"></script>
+<script src="common.js?v=act2"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1500px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin-bottom:2px; }
@@ -25,6 +25,8 @@
   .warn { color:#b45309; font-weight:bold; font-size:12px; }
   .big { font-weight:bold; color:#2c3e50; }
   .tap { width:74px; }
+  .adj { width:96px; }
+  .net { color:#64748b; font-size:12px; }
   #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
   .s-err { background:#fdecea !important; color:#c0392b !important; }
   .s-ok { background:#d1fae5 !important; color:#065f46 !important; }
@@ -40,6 +42,7 @@
     th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
     td { border-color:#334155 !important; color:#cbd5e1 !important; }
     .big { color:#f1f5f9 !important; }
+    .net { color:#94a3b8 !important; }
     .btn-del { background:#3a1a1a !important; color:#f87171 !important; border-color:#7f1d1d !important; }
     #status { background:#1e293b !important; color:#93c5fd !important; }
   }
@@ -47,7 +50,7 @@
 </head>
 <body>
   <h1>Actual Costs</h1>
-  <p class="note">Categories driven by your real card spend instead of their planned bill rows. Each row takes the last 12 months of transactions in that category and divides by 12. When <strong>Override</strong> is ticked, every bill in that category is replaced by this figure across the budget, the bills summary and the whole retirement model &mdash; your planned bills are left untouched in the database, so unticking restores them exactly. The figure is recalculated every time it is read, so it always matches the transactions behind it. <span class="muted" id="winNote"></span> (actual costs build: v2)</p>
+  <p class="note">Categories driven by your real card spend instead of their planned bill rows. Each row takes the last 12 months of transactions in that category and divides by 12. When <strong>Override</strong> is ticked, every bill in that category is replaced by this figure across the budget, the bills summary and the whole retirement model &mdash; your planned bills are left untouched in the database, so unticking restores them exactly. The figure is recalculated every time it is read, so it always matches the transactions behind it. <strong>Adjust</strong> is an annual amount added to (or, if negative, taken off) the card total before it is used &mdash; for a category that is part cash, carries a cost with no card trail, or contains a one-off you do not want projected forward. The adjusted total can never go below zero. <span class="muted" id="winNote"></span> (actual costs build: v3)</p>
 
   <div id="status">Loading&hellip;</div>
 
@@ -67,7 +70,7 @@
     <table id="acTable">
       <thead><tr>
         <th>Category</th><th>Paid by</th><th>Account</th>
-        <th>Card spend (12mo)</th><th class="num">Per month</th>
+        <th>Card spend (12mo)</th><th class="num">Adjust (£/yr)</th><th class="num">Per month</th>
         <th>Override bills</th><th>Reduce</th>
         <th class="num">At 70</th><th class="num">At 80</th><th class="num">At 90</th><th></th>
       </tr></thead>
@@ -110,18 +113,29 @@
   function render() {
     const tb = document.querySelector('#acTable tbody');
     if (!rows.length) {
-      tb.innerHTML = '<tr><td colspan="11" class="muted">No categories on actual costs yet. Pick one above and press Add category.</td></tr>';
+      tb.innerHTML = '<tr><td colspan="12" class="muted">No categories on actual costs yet. Pick one above and press Add category.</td></tr>';
       return;
     }
     tb.innerHTML = rows.map((r, i) => {
+      // Adjust is an ANNUAL figure applied to the card total before anything else, floored at
+      // zero. Recomputed here rather than trusted from the last load, so typing in the box moves
+      // the Per month figure immediately instead of waiting for a save.
+      const adj = Number(r.adjust) || 0;
+      const net = Math.max(0, (Number(r.annual) || 0) + adj);
+      const monthly = Math.round(net / 12 * 100) / 100;
       // Evidence first: a category with no transactions behind it must not look like a real figure.
       let spend;
       if (!r.txn_count) spend = '<span class="warn">no card spend</span>';
       else spend = '<span class="big">' + fmt(r.annual) + '</span> <span class="muted">\u00b7 ' + r.txn_count
                  + (r.txn_count === 1 ? ' txn' : ' txns') + '</span>';
+      // Show the arithmetic when an adjust is set, so the figure the model uses is never a number
+      // that appears from nowhere next to a card total it doesn't match.
+      if (adj) spend += '<div class="net">' + (adj > 0 ? '+' : '\u2212') + fmt(Math.abs(adj))
+                      + ' adjust \u2192 ' + fmt(net) + ' a year</div>';
       // Ticking Override with nothing behind it would wipe the planned bills and replace them with
       // zero, so the row says so plainly rather than leaving it to be discovered in the Budget.
-      if (r.active && !r.txn_count) spend += '<div class="warn">override would show \u00a30</div>';
+      // An adjust alone is enough to make a row legitimate, so the test is the NET, not the count.
+      if (r.active && net <= 0) spend += '<div class="warn">override would show \u00a30</div>';
       return '<tr data-i="' + i + '">' +
         '<td><strong>' + esc(r.category_code) + '</strong><div class="muted">' + esc(r.description) + '</div></td>' +
         '<td><select class="f-paidby" onchange="payerChanged(this)" style="min-width:110px;">' + payerOpt(r.paid_by) + '</select></td>' +
@@ -129,7 +143,8 @@
             ? '<span class="muted">not needed</span>'
             : '<select class="f-acct" onchange="mark()" style="min-width:130px;">' + acctOpt(r.paid_account) + '</select>') + '</td>' +
         '<td>' + spend + '</td>' +
-        '<td class="num"><span class="big">' + fmt(r.monthly) + '</span></td>' +
+        '<td class="num"><input type="number" step="1" class="adj f-adj" onchange="adjChanged(this)" value="' + adj + '"></td>' +
+        '<td class="num"><span class="big">' + fmt(monthly) + '</span></td>' +
         '<td><input type="checkbox" class="f-active" onchange="mark()" style="width:22px; height:22px;"' + (r.active ? ' checked' : '') + '></td>' +
         '<td><input type="checkbox" class="f-red" onchange="mark()" style="width:22px; height:22px;"' + (r.spend_reduction ? ' checked' : '') + '></td>' +
         '<td class="num"><input type="number" step="0.01" class="tap f-t70" onchange="mark()" value="' + (r.taper_at_70 != null ? r.taper_at_70 : 1) + '"></td>' +
@@ -143,9 +158,20 @@
       el.addEventListener('focus', function () { this.dataset.prev = this.value; this.value = ''; });
       el.addEventListener('blur', function () { if (this.value === '') this.value = this.dataset.prev || '1'; });
     });
+    tb.querySelectorAll('.adj').forEach(el => {
+      el.addEventListener('focus', function () { this.dataset.prev = this.value; this.value = ''; });
+      el.addEventListener('blur', function () { if (this.value === '') this.value = this.dataset.prev || '0'; });
+    });
   }
 
   function mark() { setStatus('Unsaved changes \u2014 press Save changes.'); }
+
+  // The adjust feeds the Per month figure on the same row, so the row is redrawn to show the new
+  // total straight away. Harvest first or the other edits in the table would be lost.
+  function adjChanged(el) {
+    harvest();
+    render(); mark();
+  }
 
   // Changing the payer can add or remove the account cell, so the row has to be redrawn. Harvest
   // first or the other edits in the table would be lost by the re-render.
@@ -166,6 +192,7 @@
       rows[i].paid_account = (acctEl && !noAccount(rows[i].paid_by)) ? (acctEl.value.trim() || null) : null;
       rows[i].active = tr.querySelector('.f-active').checked;
       rows[i].spend_reduction = tr.querySelector('.f-red').checked;
+      rows[i].adjust = Number(tr.querySelector('.f-adj').value) || 0;
       rows[i].taper_at_70 = Number(tr.querySelector('.f-t70').value) || 1;
       rows[i].taper_at_80 = Number(tr.querySelector('.f-t80').value) || 1;
       rows[i].taper_at_90 = Number(tr.querySelector('.f-t90').value) || 1;
@@ -191,8 +218,8 @@
     const c = cats.find(x => x.code === code) || {};
     rows.push({ id: null, category_code: code, description: c.description || code,
                 paid_by: null, paid_account: null, active: false, spend_reduction: false,
-                taper_at_70: 1, taper_at_80: 1, taper_at_90: 1,
-                annual: 0, monthly: 0, txn_count: 0 });
+                adjust: 0, taper_at_70: 1, taper_at_80: 1, taper_at_90: 1,
+                annual: 0, net_annual: 0, monthly: 0, txn_count: 0 });
     render(); refreshPicker();
     setStatus('Added \u2014 press Save changes to keep it, then reopen the dashboard.');
   }
