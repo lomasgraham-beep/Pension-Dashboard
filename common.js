@@ -439,6 +439,12 @@
   // and substitutes ONE synthetic row carrying the 12-month card total / 12, the paid-by and
   // account you chose, and the three age tapers set on the row.
   //
+  // Each row also carries an ANNUAL `adjust` (default 0) which is added to the 12-month card
+  // total before anything else happens. It exists because the card is not always the whole story:
+  // a category may be part cash, or carry a known cost with no card trail, or contain a one-off
+  // that should not be projected forward. The adjusted total is floored at zero — a negative
+  // adjust bigger than the spend gives £0, never a negative bill.
+  //
   // Suppress-and-replace, not mutate. Two consequences that matter:
   //   - No proportional split across rows, so a category's whole actual lands on one line.
   //   - The real bill rows are untouched in the database, so deactivating a row restores the plan
@@ -488,9 +494,15 @@
       rows: (a.rows || []).map(function (r) {
         const e = a.agg.byCode[r.category_code];
         const annual = e ? e.total : 0;
+        const adjust = Number(r.adjust) || 0;
+        const net = Math.max(0, annual + adjust);
+        // `annual` stays the RAW card total so the page can always show what the transactions
+        // actually said; `net_annual` / `monthly` are what the model will use.
         return Object.assign({}, r, {
           description: desc[r.category_code] || r.category_code,
-          annual: annual, monthly: Math.round(annual / 12 * 100) / 100,
+          annual: annual, adjust: adjust,
+          net_annual: Math.round(net * 100) / 100,
+          monthly: Math.round(net / 12 * 100) / 100,
           txn_count: e ? e.count : 0,
           is_planner: !!a.planner[r.category_code]
         });
@@ -523,7 +535,9 @@
     const out = src.filter(function (b) { return !(b && drop[b.category_code]); });
     active.forEach(function (r) {
       const e = a.agg.byCode[r.category_code];
-      const annual = Math.max(0, e ? e.total : 0);
+      // Annual adjust applied before the floor, so a category with no card trail at all can still
+      // be stated purely from the adjust, and a negative adjust can only take a cost down to zero.
+      const annual = Math.max(0, (e ? e.total : 0) + (Number(r.adjust) || 0));
       out.push({
         bill_name: (desc[r.category_code] || r.category_code) + ' (actual)',
         category_code: r.category_code,
@@ -539,7 +553,8 @@
         taper_at_70: r.taper_at_70 != null ? Number(r.taper_at_70) : 1,
         taper_at_80: r.taper_at_80 != null ? Number(r.taper_at_80) : 1,
         taper_at_90: r.taper_at_90 != null ? Number(r.taper_at_90) : 1,
-        actual_basis: true, actual_code: r.category_code, txn_count: e ? e.count : 0
+        actual_basis: true, actual_code: r.category_code, txn_count: e ? e.count : 0,
+        actual_adjust: Number(r.adjust) || 0
       });
     });
     return out;
@@ -550,6 +565,7 @@
       category_code: row.category_code, paid_by: row.paid_by || null,
       paid_account: row.paid_account || null, active: !!row.active,
       spend_reduction: !!row.spend_reduction,
+      adjust: Number(row.adjust) || 0,
       taper_at_70: Number(row.taper_at_70) || 1,
       taper_at_80: Number(row.taper_at_80) || 1,
       taper_at_90: Number(row.taper_at_90) || 1
