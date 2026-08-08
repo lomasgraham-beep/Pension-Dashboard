@@ -281,58 +281,15 @@
     }
   }
 
-  // ---- discretionary basis: Plan vs Actual last-12-months (shared) ----
-  // ONE saved choice governs the dining & holiday annual figures handed to the
-  // budget, the bills page and the whole modelling engine, so every surface agrees.
-  //
-  //   basis 'plan'   -> the planned figures (dining rota / holiday plan). This is
-  //                     today's behaviour, reproduced byte-for-byte: resolveDiscretionary
-  //                     just returns the plan numbers the caller already computed.
-  //   basis 'actual' -> the trailing-12-month spend on the card categories named
-  //                     "Dining" / "Holidays", each ± a saved MONTHLY adjustment
-  //                     (annualised ×12). Reimburse is excluded, matching Cost Analysis.
-  //
-  // Persisted in bd_discretionary_basis (single row, id=1) so the choice and the two
-  // adjustments follow the user to any device. Category resolution is by name so a
-  // rename of the category is picked up automatically; no code list is stored.
-  const DISCRETIONARY_DEFAULT = { basis: 'plan', dining_adjust: 0, holiday_adjust: 0, fuel_adjust: 0 };
-  let _discSettingsCache = null;
-
+  // ---- session caches ------------------------------------------------------------------
   // Drops the session-lifetime caches so the next read goes to the database. Call before a manual
-  // in-page refresh: _discSettingsCache otherwise survives for the life of the tab, so a changed
-  // Plan/Actual basis or adjustment would never show up without a full reload.
-  function clearCaches() { _discSettingsCache = null; _actualCache = null; }
-
-  async function loadDiscretionaryBasis(force) {
-    if (_discSettingsCache && !force) return _discSettingsCache;
-    let out = Object.assign({}, DISCRETIONARY_DEFAULT);
-    try {
-      const rows = await rest('bd_discretionary_basis?id=eq.1');
-      const r = (rows && rows[0]) || {};
-      out = {
-        basis: (r.basis === 'actual') ? 'actual' : 'plan',
-        dining_adjust: Number(r.dining_adjust) || 0,
-        holiday_adjust: Number(r.holiday_adjust) || 0,
-        fuel_adjust: Number(r.fuel_adjust) || 0
-      };
-    } catch (e) { /* table missing or unreadable -> safe default (plan) */ }
-    _discSettingsCache = out;
-    return out;
-  }
-
-  async function saveDiscretionaryBasis(s) {
-    const payload = {
-      basis: (s && s.basis === 'actual') ? 'actual' : 'plan',
-      dining_adjust: Number(s && s.dining_adjust) || 0,
-      holiday_adjust: Number(s && s.holiday_adjust) || 0,
-      fuel_adjust: Number(s && s.fuel_adjust) || 0,
-      updated_at: new Date().toISOString()
-    };
-    await write('PATCH', 'bd_discretionary_basis?id=eq.1', payload);
-    _discSettingsCache = { basis: payload.basis, dining_adjust: payload.dining_adjust, holiday_adjust: payload.holiday_adjust, fuel_adjust: payload.fuel_adjust };
-    _actualCache = null;   // basis changed -> the cached actuals view is stale
-    return _discSettingsCache;
-  }
+  // in-page refresh: the actuals cache otherwise survives for the life of the tab, so a changed
+  // Use-actual tick or adjust would never show up without a full reload.
+  //
+  // bd_discretionary_basis is RETIRED as of this build. Dining, Holidays and Fuel are rows in
+  // bd_actual_costs like everything else, each with its own `active` tick, so the single global
+  // basis flag no longer exists. The table is left in place, inert, so the change is revertible.
+  function clearCaches() { _actualCache = null; }
 
   // Resolve which bd_bill_category codes are the Dining / Holidays (and Reimburse)
   // buckets, by name (description first, then code), case-insensitive.
@@ -393,9 +350,20 @@
   }
 
   // ---- Dining / Holidays / Fuel (planner-backed) ---------------------------------------
-  // These three keep the Plan / Actual switch on the Weekly Plan page. They have planners rather
-  // than bill rows, so there is nothing for the Actual Costs table to suppress — which is exactly
-  // why that page refuses to create rows for them.
+  // These three are now rows in bd_actual_costs alongside every other category, one row each,
+  // each with its own `active` tick — so Dining can be driven by real card spend while Holidays
+  // stays on the plan. That independence is the whole reason the old single global `basis` flag
+  // was retired.
+  //
+  // They are NOT handled by applyActualCosts, and that asymmetry is deliberate — do not "tidy"
+  // it away. applyActualCosts works by dropping a category's bill rows and pushing one synthetic
+  // row in their place. These three have no bill rows, they have planners, so there would be
+  // nothing to drop and the synthetic row would be ADDED ON TOP of the planner figure. Double
+  // counting. The plannerCodes guard inside applyActualCosts is what prevents that.
+  //
+  // They are resolved here instead. Every consumer already passes its plan figures in and reads
+  // diningActual / holidayActual / fuelActual back, so switching a domain to actuals needs no
+  // change on any calling page.
   async function resolveDiscretionary(opts) {
     const planD = Number(opts && opts.diningPlanAnnual) || 0;
     const planH = Number(opts && opts.holidayPlanAnnual) || 0;
@@ -403,33 +371,46 @@
     const planFD = Number(opts && opts.fuelDiscPlanAnnual) || 0;
     const planOut = { basis: 'plan', diningActual: false, holidayActual: false, fuelActual: false,
                       diningAnnual: planD, holidayAnnual: planH, fuelWorkAnnual: planFW, fuelAnnual: planFD };
-    let settings;
-    try { settings = await loadDiscretionaryBasis(); } catch (e) { return planOut; }
-    if (settings.basis !== 'actual') return planOut;
 
-    let cats, txns;
-    try {
-      const res = await Promise.all([
-        rest('bd_bill_category?select=code,description'),
-        rest('bd_card_txn?select=txn_date,amount,category_code&order=txn_date.desc&limit=5000')
-      ]);
-      cats = res[0]; txns = res[1];
-    } catch (e) { return Object.assign({}, planOut, { degraded: true }); }
+    let a;
+    try { a = await loadActualCosts(); } catch (e) { return Object.assign({}, planOut, { degraded: true }); }
+    const sets = discretionaryCodeSets(a.cats || []);
 
-    const act = actualDiscretionary12mo(txns, cats);
-    const dining = Math.max(0, Math.round(act.diningTotal / 12 + (Number(settings.dining_adjust) || 0)) * 12);
-    const holiday = Math.max(0, Math.round(act.holidayTotal / 12 + (Number(settings.holiday_adjust) || 0)) * 12);
+    // An ACTIVE row on any code in the domain's set switches that domain to actuals. The adjust is
+    // ANNUAL — the same unit as every other row on the Actual Costs page — and is applied to the
+    // 12-month card total before the floor, so a domain can legitimately be stated from the adjust
+    // alone when there is no card trail. Floored at zero: never a negative cost.
+    function domain(set) {
+      let on = false, adjust = 0, total = 0, count = 0;
+      (a.rows || []).forEach(function (r) {
+        if (!r.category_code || !set[r.category_code] || r.active !== true) return;
+        on = true;
+        adjust += Number(r.adjust) || 0;
+        const e = a.agg.byCode[r.category_code];
+        if (e) { total += e.total; count += e.count; }
+      });
+      return { on: on, annual: Math.max(0, Math.round((total + adjust) * 100) / 100), count: count };
+    }
+
+    const d = domain(sets.dining), h = domain(sets.holiday), f = domain(sets.fuel);
+    if (!d.on && !h.on && !f.on) return planOut;
 
     // Fuel keeps its apportionment: card spend cannot tell commuting from leisure, so the actual
     // total is split by the PLAN's own work:discretionary ratio.
-    const fActual = Math.max(0, Math.round(act.fuelTotal / 12 + (Number(settings.fuel_adjust) || 0)) * 12);
     const planFT = planFW + planFD;
     const workShare = planFT > 0 ? (planFW / planFT) : 0;
+
     return {
-      basis: 'actual', diningActual: true, holidayActual: true, fuelActual: true,
-      diningAnnual: dining, holidayAnnual: holiday,
-      fuelWorkAnnual: Math.round(fActual * workShare * 100) / 100,
-      fuelAnnual: Math.round(fActual * (1 - workShare) * 100) / 100
+      // DIAGNOSTIC ONLY. Nothing may branch on this string — the three flags below are the
+      // contract. A scattered comparison against a mode string is exactly how 'mixed' broke
+      // before; the per-domain flags cannot drift the same way.
+      basis: (d.on && h.on && f.on) ? 'actual' : 'mixed',
+      diningActual: d.on, holidayActual: h.on, fuelActual: f.on,
+      diningAnnual: d.on ? d.annual : planD,
+      holidayAnnual: h.on ? h.annual : planH,
+      fuelWorkAnnual: f.on ? Math.round(f.annual * workShare * 100) / 100 : planFW,
+      fuelAnnual: f.on ? Math.round(f.annual * (1 - workShare) * 100) / 100 : planFD,
+      diningTxns: d.count, holidayTxns: h.count, fuelTxns: f.count
     };
   }
 
@@ -736,7 +717,6 @@
     fuelWeekBreakdown: fuelWeekBreakdown, fuelWeekTotal: fuelWeekTotal, fuelAnnual: fuelAnnual,
     loadFuelForEngine: loadFuelForEngine, clearCaches: clearCaches,
     FUEL_PURPOSES: FUEL_PURPOSES, FUEL_WORK: FUEL_WORK,
-    loadDiscretionaryBasis: loadDiscretionaryBasis, saveDiscretionaryBasis: saveDiscretionaryBasis,
     actualDiscretionary12mo: actualDiscretionary12mo, resolveDiscretionary: resolveDiscretionary,
     discretionaryCodeSets: discretionaryCodeSets,
     actualByCategory12mo: actualByCategory12mo,
