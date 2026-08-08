@@ -83,7 +83,7 @@
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
   <h2>Contracts</h2>
-  <p class="note">Every dated commitment in one register &mdash; insurance, MOT, road tax, servicing, storage. <strong>End Date</strong> is what drives the reminders: an email goes out <strong>28, 14, 7 and 1 day</strong> before, and again <strong>on the day</strong>, for any row with <strong>Notify</strong> ticked. The <strong>Reminders</strong> chips light up as each one is sent &mdash; tap a chip to clear it (so it sends again) or to light it manually (so it does not). <strong>Renew</strong> moves both dates on by a year and clears the chips ready for the new term. Changing the End Date clears them automatically. Suppliers are held in their own list &mdash; open <strong>Suppliers</strong> to add a phone number or website, which then travels with every contract that uses it.</p>
+  <p class="note">Every dated commitment in one register &mdash; insurance, MOT, road tax, servicing, storage. <strong>End Date</strong> is what drives the reminders: an email goes out <strong>28, 14, 7 and 1 day</strong> before, and again <strong>on the day</strong>, for any row with <strong>Notify</strong> ticked. The <strong>Reminders</strong> chips light up as each one is sent &mdash; tap a chip to clear it (so it sends again) or to light it manually (so it does not) &mdash; chips save on the spot, no need to press Save. <strong>Renew</strong> moves both dates on by a year and clears the chips ready for the new term. Changing the End Date clears them automatically. Suppliers are held in their own list &mdash; open <strong>Suppliers</strong> to add a phone number or website, which then travels with every contract that uses it.</p>
 
   <div class="bar" style="align-items:flex-start;">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
@@ -335,12 +335,25 @@
     renderSuppliers(); render(); setDirty();
   }
 
-  function toggleChip(i, tier) {
+  // Written straight to the database, on its own, rather than waiting for Save changes.
+  // The reminder columns belong to the nightly job; if the page held them and pushed them
+  // back on a later save it would erase a stamp the job had written and the mail would repeat.
+  async function toggleChip(i, tier) {
     syncDom();
     const r = rows[i]; if (!r) return;
     const col = SENT_COL[tier];
-    r[col] = r[col] ? null : new Date().toISOString().slice(0, 10);
-    render(); setDirty();
+    const val = r[col] ? null : new Date().toISOString().slice(0, 10);
+    if (r.id == null) { r[col] = val; render(); setDirty(); return; }   // new row — rides along with the insert
+    const msg = document.getElementById('msg');
+    try {
+      const patch = {}; patch[col] = val;
+      await App.write('PATCH', 'bd_contracts?id=eq.' + r.id, patch);
+      r[col] = val; render();
+      msg.style.color = '#065f46';
+      msg.textContent = '\u2713 ' + tier + '-day reminder ' + (val ? 'marked as done.' : 'cleared \u2014 it will send again.');
+    } catch (e) {
+      msg.style.color = '#c0392b'; msg.textContent = 'Could not update the reminder: ' + e.message;
+    }
   }
 
   function addRow() {
@@ -468,11 +481,20 @@
           category: r.category || null, ctype: r.ctype || null, supplier_id: (r.supplier_id != null && r.supplier_id > 0) ? r.supplier_id : null,
           who: r.who || null, policy_no: r.policy_no || null,
           start_date: r.start_date || null, end_date: r.end_date || null,
-          notify: r.notify !== false, notes: r.notes || null, bill_id: r.bill_id != null ? r.bill_id : null,
-          sent_28: r.sent_28 || null, sent_14: r.sent_14 || null, sent_7: r.sent_7 || null, sent_1: r.sent_1 || null, sent_0: r.sent_0 || null
+          notify: r.notify !== false, notes: r.notes || null, bill_id: r.bill_id != null ? r.bill_id : null
         };
-        if (r.id != null) await App.write('PATCH', 'bd_contracts?id=eq.' + r.id, payload);
-        else await App.write('POST', 'bd_contracts', payload);
+        if (r.id != null) {
+          // Deliberately no sent_* here. The nightly job owns those columns, and a page open
+          // since before it ran holds a stale copy — writing it back would un-send a reminder.
+          // Moving the End Date still clears them, but the database trigger does that, not us.
+          await App.write('PATCH', 'bd_contracts?id=eq.' + r.id, payload);
+        } else {
+          // A brand new row cannot be stale, so any chips set before the first save ride along.
+          payload.sent_28 = r.sent_28 || null; payload.sent_14 = r.sent_14 || null;
+          payload.sent_7  = r.sent_7  || null; payload.sent_1  = r.sent_1  || null;
+          payload.sent_0  = r.sent_0  || null;
+          await App.write('POST', 'bd_contracts', payload);
+        }
       }
       dirty = false; document.getElementById('unsaved').style.display = 'none';
       msg.style.color = '#065f46'; msg.textContent = '\u2713 Saved.';
