@@ -27,7 +27,13 @@
   // Supabase silently issues a new access token roughly hourly; without this,
   // requests would keep using the original (now expired) snapshot and get 401s.
   sb.auth.onAuthStateChange(function (_event, session) {
-    if (session && session.access_token) authToken = session.access_token;
+    if (!session || !session.access_token) return;
+    authToken = session.access_token;
+    // A session that turns up AFTER the sign-in box went on screen now dismisses the box itself.
+    // Without this, a slow token renewal stranded you on a login form you didn't actually need —
+    // the cause of having to sign in twice. Guarded on onReadyCb so this can't fire before the
+    // page has told us what to run once signed in.
+    if (!started && onReadyCb) begin(session);
   });
 
   // Force a fresh token, used to self-heal a 401 (e.g. after an iPad tab was
@@ -567,6 +573,8 @@
     '<div id="loginOverlay" style="position:fixed;inset:0;background:#f4f7f6;display:flex;align-items:center;justify-content:center;z-index:2000;font-family:\'Segoe UI\',Tahoma,sans-serif;">' +
       '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:30px;width:100%;max-width:360px;box-shadow:0 4px 16px rgba(0,0,0,0.08);">' +
         '<h2 id="loginTitle" style="margin:0 0 6px;color:#2c3e50;">Sign in</h2>' +
+        '<div id="cmnChecking" style="font-size:13px;color:#64748b;margin:0;">Checking your sign-in\u2026</div>' +
+        '<div id="cmnForm" style="display:none;">' +
         '<p style="font-size:13px;color:#64748b;margin:0 0 20px;">Please sign in to view your data.</p>' +
         '<label style="display:block;font-weight:bold;font-size:13px;color:#2c3e50;margin-bottom:5px;">Email</label>' +
         '<input type="email" id="cmnEmail" autocomplete="username" inputmode="email" style="width:100%;padding:11px;border:1px solid #ccc;border-radius:6px;font-size:15px;box-sizing:border-box;margin-bottom:16px;">' +
@@ -574,15 +582,22 @@
         '<input type="password" id="cmnPass" autocomplete="current-password" style="width:100%;padding:11px;border:1px solid #ccc;border-radius:6px;font-size:15px;box-sizing:border-box;margin-bottom:16px;">' +
         '<button id="cmnBtn" style="width:100%;background:#3498db;color:#fff;border:none;padding:12px;border-radius:6px;font-weight:bold;font-size:15px;cursor:pointer;">Sign in</button>' +
         '<div id="cmnErr" style="color:#c0392b;font-size:13px;font-weight:bold;margin-top:14px;min-height:18px;"></div>' +
+        '</div>' +
       '</div>' +
     '</div>';
 
   let onReadyCb = null;
   let started = false;
 
-  function showOverlay(show) {
+  // mode 'checking' = "hold on, we're looking"; mode 'form' = "we looked, please sign in".
+  // Splitting these is what stops the box appearing before the answer is actually known.
+  function showOverlay(show, mode) {
     const o = document.getElementById('loginOverlay');
     if (o) o.style.display = show ? 'flex' : 'none';
+    const chk = document.getElementById('cmnChecking');
+    const frm = document.getElementById('cmnForm');
+    if (chk) chk.style.display = (show && mode !== 'form') ? 'block' : 'none';
+    if (frm) frm.style.display = (show && mode === 'form') ? 'block' : 'none';
   }
 
   function begin(session) {
@@ -690,6 +705,49 @@
     relayActivityToFrames();
   }
 
+  // ---- resuming an existing session -----------------------------------------------------
+  // This used to be a single un-caught getSession() call. Access tokens last about an hour, so on
+  // almost any return visit the stored one is expired and has to be renewed over the network. If
+  // that renewal hadn't landed by the time the one check resolved — or it threw — the sign-in box
+  // went up anyway. Signing in then minted a fresh token, which is exactly why the SECOND attempt
+  // always worked. Two separate faults produced the same symptom and both are handled here:
+  //
+  //   1. Shell asks too early  -> ask again, and fall back to an explicit refreshSession().
+  //   2. Framed page asks before the shell has written the token to storage -> keep asking
+  //      quietly in the background; the token lands within a second or two and the box goes away
+  //      on its own.
+  //
+  // The form is only shown once we have actually looked and come back empty, and retries continue
+  // behind it, so a late session still dismisses it without you typing anything.
+  const RESUME_TRIES = 12;       // ~6 seconds of grace in total
+  const RESUME_GAP_MS = 500;
+
+  async function currentSession() {
+    try {
+      const r = await sb.auth.getSession();
+      if (r && r.data && r.data.session) return r.data.session;
+    } catch (e) { /* fall through to an explicit refresh */ }
+    try {
+      const r = await sb.auth.refreshSession();
+      if (r && r.data && r.data.session) return r.data.session;
+    } catch (e) { /* genuinely not signed in, or offline */ }
+    return null;
+  }
+
+  async function resumeSession() {
+    showOverlay(true, 'checking');
+    for (let i = 0; i < RESUME_TRIES; i++) {
+      if (started) return;                       // signed in by another route; nothing to do
+      const s = await currentSession();
+      if (s) { begin(s); return; }
+      // First miss: show the form so a genuine first-time visitor isn't left staring at
+      // "Checking..." for six seconds. Retries carry on behind it regardless.
+      if (i === 0) showOverlay(true, 'form');
+      await new Promise(function (r) { setTimeout(r, RESUME_GAP_MS); });
+    }
+    if (!started) showOverlay(true, 'form');
+  }
+
   function requireLogin(onReady, opts) {
     onReadyCb = onReady;
     // inject overlay if the page hasn't supplied its own
@@ -702,7 +760,7 @@
     const pass = document.getElementById('cmnPass');
     if (pass) pass.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
     // resume an existing session (shared across all pages on this site)
-    sb.auth.getSession().then((r) => { if (r && r.data && r.data.session) begin(r.data.session); });
+    resumeSession();
   }
 
   global.App = {
