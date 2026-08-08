@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contracts</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=act4"></script>
+<style>
+  :root { --accent:#1d3a63; --accent-dark:#14294a; --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1; --surface-2:#f7f9fa; }
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
+  h2 { color:var(--ink); margin-top:0; }
+  .note { color:var(--ink-soft); font-size:13px; margin:-4px 0 14px; line-height:1.55; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
+  .btn { border:none; border-radius:8px; font-weight:bold; font-size:14px; cursor:pointer; padding:11px 18px; color:#fff; }
+  .btn-save { background:var(--accent); } .btn-save:hover { background:var(--accent-dark); }
+  .btn-reload { background:#64748b; } .btn-add { background:#475569; }
+  .btn-sup { background:#0f766e; }
+  .unsaved { display:none; background:#fef3c7; color:#92400e; font-weight:bold; font-size:13px; padding:6px 12px; border-radius:6px; }
+  .msg { font-weight:bold; font-size:14px; }
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th,td { padding:8px 9px; border-bottom:1px solid var(--line); text-align:left; vertical-align:middle; white-space:nowrap; }
+  th { background:var(--surface-2); color:var(--ink); font-size:12px; text-transform:uppercase; letter-spacing:0.03em; }
+  input, select { padding:8px; border:1px solid var(--line-strong); border-radius:6px; font-size:14px; font-family:inherit; box-sizing:border-box; }
+  input[type=text] { width:100%; min-width:110px; }
+  input[type=date] { min-width:132px; }
+  .del { background:#fdecea; color:#c0392b; border:none; border-radius:6px; padding:7px 11px; font-weight:bold; cursor:pointer; }
+  .renew { background:#e0f2fe; color:#075985; border:none; border-radius:6px; padding:7px 11px; font-weight:bold; cursor:pointer; margin-right:6px; }
+  #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; }
+  .s-load { background:#eff6ff; color:#1e3a8a; } .s-err { background:#fdecea; color:#c0392b; } .s-ok { background:#d1fae5; color:#065f46; }
+
+  /* group header rows, one per category */
+  tr.grp td { background:#eef2f7; font-weight:800; font-size:13px; letter-spacing:.02em; color:var(--accent-dark); border-bottom:1px solid var(--line-strong); }
+  .grp-count { display:inline-block; background:var(--line-strong); color:var(--ink); font-size:11px; font-weight:700; border-radius:10px; padding:1px 8px; margin-left:8px; }
+
+  /* derived status pill */
+  .pill { display:inline-block; font-size:12px; font-weight:700; border-radius:10px; padding:3px 9px; }
+  .p-active { background:#d1fae5; color:#065f46; }
+  .p-soon   { background:#fef3c7; color:#92400e; }
+  .p-exp    { background:#fdecea; color:#c0392b; }
+  .p-none   { background:var(--surface-2); color:var(--ink-soft); }
+
+  /* reminder chips — one per tier, lit when that mail has gone out */
+  .chips { display:flex; gap:4px; }
+  .chip { border:1px solid var(--line-strong); background:#fff; color:var(--ink-soft); border-radius:6px; padding:5px 7px; font-size:11px; font-weight:700; cursor:pointer; min-width:26px; }
+  .chip.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+  /* suppliers panel */
+  .sup-panel { display:none; border:1px solid var(--line); border-left:4px solid #0f766e; border-radius:8px; background:var(--surface-2); padding:12px 14px; margin:0 0 16px; }
+  .sup-panel h3 { margin:0 0 4px; font-size:15px; color:var(--ink); }
+  .sup-panel .note { margin:0 0 10px; }
+  .sup-panel table { background:transparent; }
+  .sup-panel th { background:transparent; border-bottom:1px solid var(--line-strong); }
+
+  /* ---- Automatic dark mode (follows device setting) ---- */
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1, h2, h3, h4 { color:#f1f5f9 !important; }
+    .sup-panel { background:#1e293b !important; border-color:#334155 !important; border-left-color:#2dd4bf !important; }
+    .note { color:#94a3b8 !important; }
+    label { color:#cbd5e1 !important; }
+    input, select, textarea { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    input::placeholder { color:#64748b !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    .sup-panel th { background:transparent !important; border-bottom-color:#475569 !important; }
+    tr.grp td { background:#162132 !important; color:#7dd3fc !important; border-bottom-color:#334155 !important; }
+    .grp-count { background:#334155 !important; color:#cbd5e1 !important; }
+    .chip { background:#0f172a !important; color:#94a3b8 !important; border-color:#475569 !important; }
+    .chip.on { background:#1d3a63 !important; color:#fff !important; border-color:#38d6e6 !important; }
+    .renew { background:#0f172a !important; color:#7dd3fc !important; }
+    .del { background:#3b1d1d !important; color:#f87171 !important; }
+    .p-active { background:#064e3b !important; color:#4ade80 !important; }
+    .p-soon   { background:#4a3410 !important; color:#fbbf24 !important; }
+    .p-exp    { background:#4a1d1d !important; color:#f87171 !important; }
+    .p-none   { background:#162132 !important; color:#94a3b8 !important; }
+    #status.s-load, .s-load { background:#1e293b !important; color:#93c5fd !important; }
+    a { color:#60a5fa !important; }
+  }
+</style>
+</head>
+<body>
+  <div id="status" class="s-load">Loading&hellip;</div>
+  <h2>Contracts</h2>
+  <p class="note">Every dated commitment in one register &mdash; insurance, MOT, road tax, servicing, storage. <strong>End Date</strong> is what drives the reminders: an email goes out <strong>28, 14, 7 and 1 day</strong> before, and again <strong>on the day</strong>, for any row with <strong>Notify</strong> ticked. The <strong>Reminders</strong> chips light up as each one is sent &mdash; tap a chip to clear it (so it sends again) or to light it manually (so it does not). <strong>Renew</strong> moves both dates on by a year and clears the chips ready for the new term. Changing the End Date clears them automatically. Suppliers are held in their own list &mdash; open <strong>Suppliers</strong> to add a phone number or website, which then travels with every contract that uses it.</p>
+
+  <div class="bar" style="align-items:flex-start;">
+    <button class="btn btn-save" onclick="saveAll()">Save changes</button>
+    <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
+    <button class="btn btn-add" onclick="addRow()">+ Add contract</button>
+    <button class="btn btn-sup" onclick="toggleSuppliers()">Suppliers</button>
+    <span class="unsaved" id="unsaved">&#9679; Unsaved changes</span>
+    <span class="msg" id="msg"></span>
+  </div>
+
+  <div class="sup-panel" id="supPanel">
+    <h3>Suppliers</h3>
+    <p class="note">Renaming a supplier here fixes it on every contract at once. <strong>Active</strong> unticked keeps the supplier on existing contracts but hides it from the picker. Deleting one leaves its contracts in place with no supplier set.</p>
+    <table id="supTbl">
+      <thead><tr><th>Name</th><th>Phone</th><th>Website</th><th>Notes</th><th>Active</th><th></th></tr></thead>
+      <tbody><tr><td colspan="6">Loading&hellip;</td></tr></tbody>
+    </table>
+    <div class="bar" style="margin:12px 0 0;">
+      <button class="btn btn-add" onclick="addSupplier()">+ Add supplier</button>
+    </div>
+  </div>
+
+  <div class="bar" style="margin-top:-4px;">
+    <label style="font-size:13px; font-weight:bold; color:var(--ink-soft);">Category:</label>
+    <select id="filterCat" onchange="render()"><option value="All">All categories</option></select>
+    <label style="font-size:13px; font-weight:bold; color:var(--ink-soft);">Show:</label>
+    <select id="filterState" onchange="render()">
+      <option value="All">All</option>
+      <option value="Live">Active only</option>
+      <option value="Soon">Due within 28 days</option>
+      <option value="Expired">Expired only</option>
+    </select>
+  </div>
+
+  <datalist id="catList"></datalist>
+  <datalist id="typeList"></datalist>
+  <datalist id="whoList"></datalist>
+
+  <div class="table-wrap">
+    <table id="tbl">
+      <thead><tr><th>Category</th><th>Type</th><th>Supplier</th><th>Who</th><th>Account/Policy No.</th><th>Start Date</th><th>End Date</th><th>Status</th><th>Notify</th><th>Reminders<br><span style="font-weight:normal;font-size:11px;">28 &middot; 14 &middot; 7 &middot; 1 &middot; 0</span></th><th></th></tr></thead>
+      <tbody><tr><td colspan="11">Loading&hellip;</td></tr></tbody>
+    </table>
+  </div>
+
+<script>
+  (function(){
+    window.addEventListener('message', function(ev){
+      if (ev && ev.data === 'refresh-data') {
+        try { if (typeof reload === 'function') return reload(true); } catch(e){}
+      }
+    });
+  })();
+
+  (function(){
+    const _f = window.fetch;
+    window.fetch = async function(u, o){
+      const r = await _f(u, o);
+      try {
+        const m = (o && o.method || 'GET').toUpperCase();
+        if (r.ok && (m==='POST'||m==='PATCH'||m==='DELETE'||m==='PUT') && String(u).indexOf('/rest/v1/')>=0) {
+          if (window.parent && window.parent !== window) window.parent.postMessage('data-saved','*');
+        }
+      } catch(e){}
+      return r;
+    };
+  })();
+
+  // ---- state ---------------------------------------------------------------
+  let rows = [], suppliers = [], deleted = [], deletedSups = [], dirty = false;
+  let tempId = -1;                       // negative ids for suppliers not yet saved
+  const TIERS = [28, 14, 7, 1, 0];       // must match send_contract_reminders() in the database
+  const SENT_COL = { 28:'sent_28', 14:'sent_14', 7:'sent_7', 1:'sent_1', 0:'sent_0' };
+  const tbody = document.querySelector('#tbl tbody');
+  const supBody = document.querySelector('#supTbl tbody');
+  const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
+  function mark() { setDirty(); }
+
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // ---- dates ---------------------------------------------------------------
+  // Whole-day arithmetic in UTC so British Summer Time can never shift a boundary.
+  function dayNum(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+    return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 86400000 : null;
+  }
+  function todayNum() { const n = new Date(); return Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) / 86400000; }
+  function daysLeft(iso) { const d = dayNum(iso); return d == null ? null : d - todayNum(); }
+  function addYear(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+    if (!m) return iso || null;
+    const d = new Date(Date.UTC(Number(m[1]) + 1, Number(m[2]) - 1, Number(m[3])));
+    return d.toISOString().slice(0, 10);
+  }
+  function ukDate(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+    return m ? Number(m[3]) + '/' + Number(m[2]) + '/' + m[1] : '';
+  }
+
+  // Status is derived from End Date every time it is drawn — never stored, so it cannot go stale.
+  function statusOf(r) {
+    const dl = daysLeft(r.end_date);
+    if (dl == null) return { label: '\u2014', cls: 'p-none' };
+    if (dl < 0) return { label: 'Expired', cls: 'p-exp' };
+    if (dl === 0) return { label: 'Today', cls: 'p-soon' };
+    if (dl <= 28) return { label: dl + ' day' + (dl === 1 ? '' : 's'), cls: 'p-soon' };
+    return { label: 'Active', cls: 'p-active' };
+  }
+
+  // ---- pickers -------------------------------------------------------------
+  function distinct(field) {
+    const seen = {};
+    rows.forEach(r => { const v = (r[field] || '').trim(); if (v) seen[v] = true; });
+    return Object.keys(seen).sort((a, b) => a.localeCompare(b));
+  }
+  function fillDatalist(id, values) {
+    document.getElementById(id).innerHTML = values.map(v => '<option value="' + esc(v) + '"></option>').join('');
+  }
+  function supplierName(id) {
+    const s = suppliers.find(x => String(x.id) === String(id));
+    return s ? s.name : '';
+  }
+  // Active suppliers, plus this row's own even if retired, plus the "new" sentinel.
+  function supplierOptions(selectedId) {
+    const list = suppliers.filter(s => s.active !== false || String(s.id) === String(selectedId));
+    list.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    let html = '<option value="">\u2014</option>';
+    html += list.map(s => '<option value="' + esc(s.id) + '"' + (String(s.id) === String(selectedId) ? ' selected' : '') + '>' + esc(s.name || '(unnamed)') + '</option>').join('');
+    html += '<option value="__new">\uFF0B New supplier\u2026</option>';
+    return html;
+  }
+
+  // ---- main table ----------------------------------------------------------
+  function chipsHtml(r, i) {
+    return '<div class="chips">' + TIERS.map(t => {
+      const v = r[SENT_COL[t]];
+      const on = !!v;
+      const title = on ? ('Sent ' + ukDate(v) + ' \u2014 tap to clear so it sends again')
+                       : ('Not sent \u2014 tap to mark as done so it never sends');
+      return '<button type="button" class="chip' + (on ? ' on' : '') + '" title="' + esc(title) + '" onclick="toggleChip(' + i + ',' + t + ')">' + t + '</button>';
+    }).join('') + '</div>';
+  }
+
+  function rowHtml(r, i) {
+    const st = statusOf(r);
+    return '<tr data-i="' + i + '">' +
+      '<td><input type="text" class="f-cat" list="catList" value="' + esc(r.category) + '" onchange="onCatChange(this)"></td>' +
+      '<td><input type="text" class="f-type" list="typeList" value="' + esc(r.ctype) + '" onchange="mark()" oninput="mark()"></td>' +
+      '<td><select class="f-sup" onchange="onSupPick(this)">' + supplierOptions(r.supplier_id) + '</select></td>' +
+      '<td><input type="text" class="f-who" list="whoList" value="' + esc(r.who) + '" onchange="mark()" oninput="mark()"></td>' +
+      '<td><input type="text" class="f-pol" value="' + esc(r.policy_no) + '" onchange="mark()" oninput="mark()"></td>' +
+      '<td><input type="date" class="f-start" value="' + esc(r.start_date || '') + '" onchange="mark()"></td>' +
+      '<td><input type="date" class="f-end" value="' + esc(r.end_date || '') + '" onchange="onEndChange(this)"></td>' +
+      '<td class="st-cell"><span class="pill ' + st.cls + '">' + st.label + '</span></td>' +
+      '<td style="text-align:center;"><input type="checkbox" class="f-notify" ' + (r.notify === false ? '' : 'checked') + ' onchange="mark()" style="width:auto;"></td>' +
+      '<td>' + chipsHtml(r, i) + '</td>' +
+      '<td><button class="renew" onclick="renewRow(' + i + ')" title="Move both dates on by a year and clear the reminders">Renew</button>' +
+      '<button class="del" onclick="delRow(' + i + ')">Delete</button></td>' +
+    '</tr>';
+  }
+
+  function passesFilter(r) {
+    const cat = document.getElementById('filterCat').value;
+    if (cat !== 'All' && (r.category || '') !== cat) return false;
+    const state = document.getElementById('filterState').value;
+    if (state === 'All') return true;
+    const dl = daysLeft(r.end_date);
+    if (state === 'Live') return dl != null && dl >= 0;
+    if (state === 'Soon') return dl != null && dl >= 0 && dl <= 28;
+    if (state === 'Expired') return dl != null && dl < 0;
+    return true;
+  }
+
+  function render() {
+    fillDatalist('catList', distinct('category'));
+    fillDatalist('typeList', distinct('ctype'));
+    fillDatalist('whoList', distinct('who'));
+
+    // index rows first, so a row's data-i still points at its slot in `rows` after filtering
+    const idx = rows.map((r, i) => i).filter(i => passesFilter(rows[i]));
+    idx.sort((a, b) => {
+      const ra = rows[a], rb = rows[b];
+      const ca = (ra.category || '\uFFFF').toLowerCase(), cb = (rb.category || '\uFFFF').toLowerCase();
+      if (ca !== cb) return ca < cb ? -1 : 1;
+      const ea = dayNum(ra.end_date), eb = dayNum(rb.end_date);
+      if (ea == null && eb == null) return 0;
+      if (ea == null) return 1;
+      if (eb == null) return -1;
+      return ea - eb;
+    });
+
+    if (!idx.length) {
+      tbody.innerHTML = '<tr><td colspan="11" style="color:var(--ink-soft);">No contracts match this filter.</td></tr>';
+      return;
+    }
+
+    let html = '', lastCat = null;
+    idx.forEach(i => {
+      const cat = (rows[i].category || '').trim() || 'Uncategorised';
+      if (cat !== lastCat) {
+        const n = idx.filter(j => ((rows[j].category || '').trim() || 'Uncategorised') === cat).length;
+        html += '<tr class="grp"><td colspan="11">' + esc(cat) + '<span class="grp-count">' + n + '</span></td></tr>';
+        lastCat = cat;
+      }
+      html += rowHtml(rows[i], i);
+    });
+    tbody.innerHTML = html;
+  }
+
+  // Read every visible input back onto the model, by its real index in `rows`.
+  function syncDom() {
+    tbody.querySelectorAll('tr[data-i]').forEach(tr => {
+      const r = rows[Number(tr.dataset.i)];
+      if (!r) return;
+      r.category   = tr.querySelector('.f-cat').value.trim();
+      r.ctype      = tr.querySelector('.f-type').value.trim();
+      const sv     = tr.querySelector('.f-sup').value;
+      r.supplier_id = (sv === '' || sv === '__new') ? null : Number(sv);
+      r.who        = tr.querySelector('.f-who').value.trim();
+      r.policy_no  = tr.querySelector('.f-pol').value.trim();
+      r.start_date = tr.querySelector('.f-start').value || null;
+      r.end_date   = tr.querySelector('.f-end').value || null;
+      r.notify     = tr.querySelector('.f-notify').checked;
+    });
+  }
+
+  // Redraw only the status pill, so typing a date does not tear down the row you are in.
+  function onEndChange(el) {
+    const tr = el.closest('tr'); const r = rows[Number(tr.dataset.i)];
+    if (r) {
+      r.end_date = el.value || null;
+      const st = statusOf(r);
+      tr.querySelector('.st-cell').innerHTML = '<span class="pill ' + st.cls + '">' + st.label + '</span>';
+    }
+    mark();
+  }
+  function onCatChange(el) { syncDom(); populateCatFilter(); render(); setDirty(); }
+
+  function onSupPick(el) {
+    if (el.value !== '__new') { mark(); return; }
+    const name = (prompt('New supplier name') || '').trim();
+    if (!name) { el.value = ''; syncDom(); mark(); return; }
+    const existing = suppliers.find(s => (s.name || '').toLowerCase() === name.toLowerCase());
+    const id = existing ? existing.id : tempId--;
+    if (!existing) suppliers.push({ id: id, name: name, phone: '', website: '', notes: '', active: true, __new: true });
+    const tr = el.closest('tr'); const r = rows[Number(tr.dataset.i)];
+    syncDom();
+    if (r) r.supplier_id = id;
+    renderSuppliers(); render(); setDirty();
+  }
+
+  function toggleChip(i, tier) {
+    syncDom();
+    const r = rows[i]; if (!r) return;
+    const col = SENT_COL[tier];
+    r[col] = r[col] ? null : new Date().toISOString().slice(0, 10);
+    render(); setDirty();
+  }
+
+  function addRow() {
+    syncDom();
+    const cat = document.getElementById('filterCat').value;
+    rows.push({ id: undefined, category: cat === 'All' ? '' : cat, ctype: '', supplier_id: null, who: '', policy_no: '',
+                start_date: null, end_date: null, notify: true, notes: null, bill_id: null,
+                sent_28: null, sent_14: null, sent_7: null, sent_1: null, sent_0: null });
+    populateCatFilter(); render(); setDirty();
+  }
+  function delRow(i) {
+    syncDom();
+    const r = rows[i]; if (!r) return;
+    if (r.id != null) deleted.push(r.id);
+    rows.splice(i, 1); populateCatFilter(); render(); setDirty();
+  }
+
+  // Renew: both dates move on by exactly a year, so the length and shape of the term is kept
+  // whether it ran 1 Feb to 1 Feb or 1 Nov to 31 Oct. Chips clear ready for the new term.
+  function renewRow(i) {
+    syncDom();
+    const r = rows[i]; if (!r) return;
+    if (!r.end_date) { alert('This contract has no End Date to renew from.'); return; }
+    r.start_date = r.start_date ? addYear(r.start_date) : null;
+    r.end_date = addYear(r.end_date);
+    TIERS.forEach(t => { r[SENT_COL[t]] = null; });
+    render(); setDirty();
+  }
+
+  // ---- suppliers -----------------------------------------------------------
+  function toggleSuppliers() {
+    const p = document.getElementById('supPanel');
+    p.style.display = (p.style.display === 'block') ? 'none' : 'block';
+  }
+  function renderSuppliers() {
+    if (!suppliers.length) {
+      supBody.innerHTML = '<tr><td colspan="6" style="color:var(--ink-soft);">No suppliers yet. Add one below, or pick &#65291; New supplier&hellip; on any contract.</td></tr>';
+      return;
+    }
+    const order = suppliers.map((s, i) => i).sort((a, b) => String(suppliers[a].name || '').localeCompare(String(suppliers[b].name || '')));
+    supBody.innerHTML = order.map(i => {
+      const s = suppliers[i];
+      return '<tr data-si="' + i + '">' +
+        '<td><input type="text" class="s-name" value="' + esc(s.name) + '" oninput="mark()"></td>' +
+        '<td><input type="text" class="s-phone" value="' + esc(s.phone) + '" oninput="mark()"></td>' +
+        '<td><input type="text" class="s-web" value="' + esc(s.website) + '" oninput="mark()"></td>' +
+        '<td><input type="text" class="s-notes" value="' + esc(s.notes) + '" oninput="mark()"></td>' +
+        '<td style="text-align:center;"><input type="checkbox" class="s-active" ' + (s.active === false ? '' : 'checked') + ' onchange="mark()" style="width:auto;"></td>' +
+        '<td><button class="del" onclick="delSupplier(' + i + ')">Delete</button></td>' +
+      '</tr>';
+    }).join('');
+  }
+  function syncSupDom() {
+    supBody.querySelectorAll('tr[data-si]').forEach(tr => {
+      const s = suppliers[Number(tr.dataset.si)];
+      if (!s) return;
+      s.name = tr.querySelector('.s-name').value.trim();
+      s.phone = tr.querySelector('.s-phone').value.trim();
+      s.website = tr.querySelector('.s-web').value.trim();
+      s.notes = tr.querySelector('.s-notes').value.trim();
+      s.active = tr.querySelector('.s-active').checked;
+    });
+  }
+  function addSupplier() {
+    syncSupDom();
+    document.getElementById('supPanel').style.display = 'block';
+    suppliers.push({ id: tempId--, name: '', phone: '', website: '', notes: '', active: true, __new: true });
+    renderSuppliers(); setDirty();
+    const last = supBody.querySelector('tr:last-child .s-name');
+    if (last) last.focus();
+  }
+  function delSupplier(i) {
+    syncSupDom(); syncDom();
+    const s = suppliers[i]; if (!s) return;
+    const used = rows.filter(r => String(r.supplier_id) === String(s.id)).length;
+    if (used && !confirm('"' + (s.name || 'This supplier') + '" is used by ' + used + ' contract' + (used === 1 ? '' : 's') + '. Delete it anyway? Those contracts will be left with no supplier.')) return;
+    if (s.id != null && s.id > 0) deletedSups.push(s.id);
+    rows.forEach(r => { if (String(r.supplier_id) === String(s.id)) r.supplier_id = null; });
+    suppliers.splice(i, 1);
+    renderSuppliers(); render(); setDirty();
+  }
+
+  // ---- filters -------------------------------------------------------------
+  function populateCatFilter() {
+    const sel = document.getElementById('filterCat');
+    const cur = sel.value || 'All';
+    const cats = distinct('category');
+    sel.innerHTML = '<option value="All">All categories</option>' + cats.map(c => '<option' + (c === cur ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
+    if (cur !== 'All' && cats.indexOf(cur) < 0) sel.value = 'All';
+  }
+
+  // ---- save ----------------------------------------------------------------
+  // Suppliers go first, because a contract can point at one that does not exist yet. New suppliers
+  // carry a negative placeholder id; after the insert we re-read the table and remap by name, which
+  // is safe because name is UNIQUE in the database.
+  async function saveAll() {
+    const msg = document.getElementById('msg'); msg.style.color = '#1e3a8a'; msg.textContent = 'Saving\u2026';
+    syncSupDom(); syncDom();
+
+    for (const s of suppliers) if (!s.name) { msg.style.color = '#c0392b'; msg.textContent = 'Every supplier needs a name.'; document.getElementById('supPanel').style.display = 'block'; return; }
+    const names = suppliers.map(s => s.name.toLowerCase());
+    const dupe = names.find((n, i) => names.indexOf(n) !== i);
+    if (dupe) { msg.style.color = '#c0392b'; msg.textContent = 'Two suppliers are both called "' + dupe + '".'; document.getElementById('supPanel').style.display = 'block'; return; }
+    for (const r of rows) if (r.start_date && r.end_date && dayNum(r.end_date) < dayNum(r.start_date)) { msg.style.color = '#c0392b'; msg.textContent = 'A contract ends before it starts \u2014 check the dates.'; return; }
+
+    try {
+      for (const id of deletedSups) await App.write('DELETE', 'bd_contract_suppliers?id=eq.' + id, undefined);
+      deletedSups = [];
+      for (const s of suppliers) {
+        const payload = { name: s.name, phone: s.phone || null, website: s.website || null, notes: s.notes || null, active: s.active !== false };
+        if (s.id != null && s.id > 0) await App.write('PATCH', 'bd_contract_suppliers?id=eq.' + s.id, payload);
+        else await App.write('POST', 'bd_contract_suppliers', payload);
+      }
+      // remap the placeholder ids now the real ones exist
+      const fresh = await App.rest('bd_contract_suppliers?order=name.asc');
+      const byName = {}; (fresh || []).forEach(s => { byName[(s.name || '').toLowerCase()] = s.id; });
+      const remap = {};
+      suppliers.forEach(s => { if (s.id != null && s.id < 0) { const real = byName[s.name.toLowerCase()]; if (real != null) remap[s.id] = real; } });
+      rows.forEach(r => { if (r.supplier_id != null && remap[r.supplier_id] != null) r.supplier_id = remap[r.supplier_id]; });
+
+      for (const id of deleted) await App.write('DELETE', 'bd_contracts?id=eq.' + id, undefined);
+      deleted = [];
+      for (const r of rows) {
+        const payload = {
+          category: r.category || null, ctype: r.ctype || null, supplier_id: (r.supplier_id != null && r.supplier_id > 0) ? r.supplier_id : null,
+          who: r.who || null, policy_no: r.policy_no || null,
+          start_date: r.start_date || null, end_date: r.end_date || null,
+          notify: r.notify !== false, notes: r.notes || null, bill_id: r.bill_id != null ? r.bill_id : null,
+          sent_28: r.sent_28 || null, sent_14: r.sent_14 || null, sent_7: r.sent_7 || null, sent_1: r.sent_1 || null, sent_0: r.sent_0 || null
+        };
+        if (r.id != null) await App.write('PATCH', 'bd_contracts?id=eq.' + r.id, payload);
+        else await App.write('POST', 'bd_contracts', payload);
+      }
+      dirty = false; document.getElementById('unsaved').style.display = 'none';
+      msg.style.color = '#065f46'; msg.textContent = '\u2713 Saved.';
+      // reload, because the database clears the reminder chips itself when an End Date moves
+      await reload(true);
+    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
+  }
+
+  async function reload(quiet) {
+    if (!quiet && dirty && !confirm('Discard unsaved changes and reload?')) return;
+    const status = document.getElementById('status');
+    try {
+      status.style.display = ''; status.className = 's-load'; status.textContent = 'Loading\u2026';
+      const [cs, sp] = await Promise.all([
+        App.rest('bd_contracts?order=category.asc,end_date.asc'),
+        App.rest('bd_contract_suppliers?order=name.asc')
+      ]);
+      rows = cs || [];
+      suppliers = sp || [];
+      deleted = []; deletedSups = []; dirty = false; tempId = -1;
+      document.getElementById('unsaved').style.display = 'none';
+      populateCatFilter(); renderSuppliers(); render();
+      status.style.display = 'none';
+    } catch (e) { status.style.display = ''; status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
+  }
+
+  window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+  App.requireLogin(() => reload(true), { title: 'Contracts' });
+</script>
+</body>
+</html>
