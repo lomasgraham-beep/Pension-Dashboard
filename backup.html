@@ -94,7 +94,7 @@
   async function doBackup() {
     const btn = document.getElementById('dlBtn'), msg = document.getElementById('msg');
     btn.disabled = true; msg.className = ''; msg.textContent = 'Fetching\u2026';
-    const out = { app: 'My Pension Project', kind: 'full-backup', exported_at: new Date().toISOString(), tables: {} };
+    const out = { app: 'Household Finances', kind: 'full-backup', exported_at: new Date().toISOString(), tables: {} };
     const counts = [];
     try {
       for (const t of TABLES) {

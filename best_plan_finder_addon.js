@@ -2,7 +2,7 @@
    best_plan_finder_addon.js — Best Plan Finder v2
    build tag: bpf2 / intended app build LC-319
 
-   Additive browser-side feature for My Pension Project.
+   Additive browser-side feature for Household Finances.
    - Does not replace engine.js or optimiser.js.
    - Does not write directly to Supabase.
    - Finds earliest safe retirement using explicit scenario inputs.
