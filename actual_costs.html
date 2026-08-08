@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Actual Costs</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=act2"></script>
+<script src="common.js?v=act3"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1500px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin-bottom:2px; }
@@ -26,6 +26,8 @@
   .big { font-weight:bold; color:#2c3e50; }
   .tap { width:74px; }
   .adj { width:96px; }
+  .plab { display:inline-block; background:#e0e7ff; color:#3730a3; border-radius:4px; padding:1px 6px; font-size:11px; font-weight:bold; margin-left:6px; vertical-align:middle; }
+  .dash { color:#94a3b8; }
   .net { color:#64748b; font-size:12px; }
   #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
   .s-err { background:#fdecea !important; color:#c0392b !important; }
@@ -43,6 +45,8 @@
     td { border-color:#334155 !important; color:#cbd5e1 !important; }
     .big { color:#f1f5f9 !important; }
     .net { color:#94a3b8 !important; }
+    .plab { background:#312e81 !important; color:#c7d2fe !important; }
+    .dash { color:#64748b !important; }
     .btn-del { background:#3a1a1a !important; color:#f87171 !important; border-color:#7f1d1d !important; }
     #status { background:#1e293b !important; color:#93c5fd !important; }
   }
@@ -50,7 +54,7 @@
 </head>
 <body>
   <h1>Actual Costs</h1>
-  <p class="note">Categories driven by your real card spend instead of their planned bill rows. Each row takes the last 12 months of transactions in that category and divides by 12. When <strong>Override</strong> is ticked, every bill in that category is replaced by this figure across the budget, the bills summary and the whole retirement model &mdash; your planned bills are left untouched in the database, so unticking restores them exactly. The figure is recalculated every time it is read, so it always matches the transactions behind it. <strong>Adjust</strong> is an annual amount added to (or, if negative, taken off) the card total before it is used &mdash; for a category that is part cash, carries a cost with no card trail, or contains a one-off you do not want projected forward. The adjusted total can never go below zero. <span class="muted" id="winNote"></span> (actual costs build: v3)</p>
+  <p class="note">Categories driven by your real card spend instead of their planned bill rows. Each row takes the last 12 months of transactions in that category and divides by 12. When <strong>Use actual</strong> is ticked, that category is driven by this figure across the budget, the bills summary and the whole retirement model &mdash; your plan is left untouched in the database, so unticking restores it exactly. The figure is recalculated every time it is read, so it always matches the transactions behind it. <strong>Adjust</strong> is an annual amount added to (or, if negative, taken off) the card total before it is used &mdash; for a category that is part cash, carries a cost with no card trail, or contains a one-off you do not want projected forward. The adjusted total can never go below zero. <span class="muted" id="winNote"></span> (actual costs build: v4)</p>
 
   <div id="status">Loading&hellip;</div>
 
@@ -63,7 +67,7 @@
       <div><button class="btn btn-add" onclick="addRow()">Add category</button></div>
       <div style="margin-left:auto;"><button class="btn btn-save" onclick="saveAll()">Save changes</button></div>
     </div>
-    <p class="muted" style="margin:6px 0 0;">Dining, Holidays and Fuel are not listed &mdash; they are driven by their planners and keep the Plan / Actual switch on the Weekly Plan page. <strong>Card spend</strong> is your evidence check: a category with only a handful of transactions behind it should be treated with more caution than one with forty.</p>
+    <p class="muted" style="margin:6px 0 0;"><strong>Dining, Holidays and Fuel</strong> now live here too, tagged <span class="plab">planner</span>. Ticking one replaces its planner figure with real card spend, and each is independent &mdash; Dining can be on actuals while Holidays stays on plan. They have no bill rows, so Paid by, Account, Reduce and the age tapers stay with their own planner pages and are shown as &mdash; here. Fuel keeps its work / other split, apportioned by the plan's own ratio. <strong>Card spend</strong> is your evidence check: a category with only a handful of transactions behind it should be treated with more caution than one with forty.</p>
   </div>
 
   <div class="panel">
@@ -71,7 +75,7 @@
       <thead><tr>
         <th>Category</th><th>Paid by</th><th>Account</th>
         <th>Card spend (12mo)</th><th class="num">Adjust (£/yr)</th><th class="num">Per month</th>
-        <th>Override bills</th><th>Reduce</th>
+        <th>Use actual</th><th>Reduce</th>
         <th class="num">At 70</th><th class="num">At 80</th><th class="num">At 90</th><th></th>
       </tr></thead>
       <tbody></tbody>
@@ -135,21 +139,33 @@
       // Ticking Override with nothing behind it would wipe the planned bills and replace them with
       // zero, so the row says so plainly rather than leaving it to be discovered in the Budget.
       // An adjust alone is enough to make a row legitimate, so the test is the NET, not the count.
-      if (r.active && net <= 0) spend += '<div class="warn">override would show \u00a30</div>';
+      if (r.active && net <= 0) spend += '<div class="warn">'
+        + (r.is_planner ? 'actual would show \u00a30 \u2014 the planner figure is not used while this is ticked'
+                        : 'override would show \u00a30') + '</div>';
       return '<tr data-i="' + i + '">' +
-        '<td><strong>' + esc(r.category_code) + '</strong><div class="muted">' + esc(r.description) + '</div></td>' +
-        '<td><select class="f-paidby" onchange="payerChanged(this)" style="min-width:110px;">' + payerOpt(r.paid_by) + '</select></td>' +
-        '<td>' + (noAccount(r.paid_by)
+        '<td><strong>' + esc(r.category_code) + '</strong>' + (r.is_planner ? '<span class="plab">planner</span>' : '') +
+          '<div class="muted">' + esc(r.description) + '</div></td>' +
+        // A planner-backed domain is not a bill: it never lands in an account box or the Credit
+        // Card box as a bill row, so a payer here would be a control that does nothing.
+        '<td>' + (r.is_planner ? '<span class="dash">\u2014</span>'
+            : '<select class="f-paidby" onchange="payerChanged(this)" style="min-width:110px;">' + payerOpt(r.paid_by) + '</select>') + '</td>' +
+        '<td>' + (r.is_planner ? '<span class="dash">\u2014</span>' : (noAccount(r.paid_by)
             ? '<span class="muted">not needed</span>'
-            : '<select class="f-acct" onchange="mark()" style="min-width:130px;">' + acctOpt(r.paid_account) + '</select>') + '</td>' +
+            : '<select class="f-acct" onchange="mark()" style="min-width:130px;">' + acctOpt(r.paid_account) + '</select>')) + '</td>' +
         '<td>' + spend + '</td>' +
         '<td class="num"><input type="number" step="1" class="adj f-adj" onchange="adjChanged(this)" value="' + adj + '"></td>' +
         '<td class="num"><span class="big">' + fmt(monthly) + '</span></td>' +
         '<td><input type="checkbox" class="f-active" onchange="mark()" style="width:22px; height:22px;"' + (r.active ? ' checked' : '') + '></td>' +
-        '<td><input type="checkbox" class="f-red" onchange="mark()" style="width:22px; height:22px;"' + (r.spend_reduction ? ' checked' : '') + '></td>' +
-        '<td class="num"><input type="number" step="0.01" class="tap f-t70" onchange="mark()" value="' + (r.taper_at_70 != null ? r.taper_at_70 : 1) + '"></td>' +
-        '<td class="num"><input type="number" step="0.01" class="tap f-t80" onchange="mark()" value="' + (r.taper_at_80 != null ? r.taper_at_80 : 1) + '"></td>' +
-        '<td class="num"><input type="number" step="0.01" class="tap f-t90" onchange="mark()" value="' + (r.taper_at_90 != null ? r.taper_at_90 : 1) + '"></td>' +
+        // Dining routines carry their own spend_reduction per routine and holidays always scale
+        // with the slider, so a Reduce tick or a taper here would be inert. Shown as a dash rather
+        // than a live-looking control that changes nothing.
+        '<td>' + (r.is_planner ? '<span class="dash">\u2014</span>'
+            : '<input type="checkbox" class="f-red" onchange="mark()" style="width:22px; height:22px;"' + (r.spend_reduction ? ' checked' : '') + '>') + '</td>' +
+        (r.is_planner
+          ? '<td class="num dash">\u2014</td><td class="num dash">\u2014</td><td class="num dash">\u2014</td>'
+          : '<td class="num"><input type="number" step="0.01" class="tap f-t70" onchange="mark()" value="' + (r.taper_at_70 != null ? r.taper_at_70 : 1) + '"></td>' +
+            '<td class="num"><input type="number" step="0.01" class="tap f-t80" onchange="mark()" value="' + (r.taper_at_80 != null ? r.taper_at_80 : 1) + '"></td>' +
+            '<td class="num"><input type="number" step="0.01" class="tap f-t90" onchange="mark()" value="' + (r.taper_at_90 != null ? r.taper_at_90 : 1) + '"></td>') +
         '<td class="num"><button class="btn-del" onclick="delRow(' + i + ')">Delete</button></td>' +
         '</tr>';
     }).join('');
@@ -187,27 +203,36 @@
     document.querySelectorAll('#acTable tbody tr[data-i]').forEach(tr => {
       const i = Number(tr.getAttribute('data-i'));
       if (!rows[i]) return;
-      rows[i].paid_by = tr.querySelector('.f-paidby').value.trim() || null;
+      // Planner rows render dashes instead of these controls, so read only what is actually there
+      // and leave the stored values alone rather than harvesting null over them.
+      const byEl = tr.querySelector('.f-paidby');
+      if (byEl) rows[i].paid_by = byEl.value.trim() || null;
       const acctEl = tr.querySelector('.f-acct');
-      rows[i].paid_account = (acctEl && !noAccount(rows[i].paid_by)) ? (acctEl.value.trim() || null) : null;
+      if (byEl) rows[i].paid_account = (acctEl && !noAccount(rows[i].paid_by)) ? (acctEl.value.trim() || null) : null;
       rows[i].active = tr.querySelector('.f-active').checked;
-      rows[i].spend_reduction = tr.querySelector('.f-red').checked;
+      const redEl = tr.querySelector('.f-red');
+      if (redEl) rows[i].spend_reduction = redEl.checked;
       rows[i].adjust = Number(tr.querySelector('.f-adj').value) || 0;
-      rows[i].taper_at_70 = Number(tr.querySelector('.f-t70').value) || 1;
-      rows[i].taper_at_80 = Number(tr.querySelector('.f-t80').value) || 1;
-      rows[i].taper_at_90 = Number(tr.querySelector('.f-t90').value) || 1;
+      const t70 = tr.querySelector('.f-t70');
+      if (t70) {
+        rows[i].taper_at_70 = Number(t70.value) || 1;
+        rows[i].taper_at_80 = Number(tr.querySelector('.f-t80').value) || 1;
+        rows[i].taper_at_90 = Number(tr.querySelector('.f-t90').value) || 1;
+      }
     });
   }
 
   function refreshPicker() {
     const used = {};
     rows.forEach(r => { used[r.category_code] = true; });
-    // Planner-backed categories are excluded here rather than rejected on save: a row for Dining
-    // would be accepted by the table and then silently ignored by the resolver, which is worse.
-    const avail = cats.filter(c => !used[c.code] && !planner[c.code]);
+    // Planner-backed categories ARE offered now: resolveDiscretionary reads their rows out of this
+    // same table, per domain. applyActualCosts still skips them — see the comment there; that guard
+    // is what stops a synthetic bill row landing on top of the planner figure.
+    const avail = cats.filter(c => !used[c.code]);
     const sel = document.getElementById('newCat');
     sel.innerHTML = avail.length
-      ? avail.map(c => '<option value="' + escA(c.code) + '">' + esc(c.code) + ' \u2014 ' + esc(c.description || '') + '</option>').join('')
+      ? avail.map(c => '<option value="' + escA(c.code) + '">' + esc(c.code) + ' \u2014 ' + esc(c.description || '')
+                     + (planner[c.code] ? ' (planner)' : '') + '</option>').join('')
       : '<option value="">(every eligible category already listed)</option>';
   }
 
@@ -219,7 +244,8 @@
     rows.push({ id: null, category_code: code, description: c.description || code,
                 paid_by: null, paid_account: null, active: false, spend_reduction: false,
                 adjust: 0, taper_at_70: 1, taper_at_80: 1, taper_at_90: 1,
-                annual: 0, net_annual: 0, monthly: 0, txn_count: 0 });
+                annual: 0, net_annual: 0, monthly: 0, txn_count: 0,
+                is_planner: !!planner[code] });
     render(); refreshPicker();
     setStatus('Added \u2014 press Save changes to keep it, then reopen the dashboard.');
   }
@@ -228,7 +254,8 @@
     harvest();
     const r = rows[i];
     if (!r) return;
-    if (!confirm('Remove ' + r.category_code + ' from actual costs? Its planned bills are untouched and will be used again.')) return;
+    const back = r.is_planner ? 'Its planner figure will be used again.' : 'Its planned bills are untouched and will be used again.';
+    if (!confirm('Remove ' + r.category_code + ' from actual costs? ' + back)) return;
     if (r.id) deleted.push(r.id);
     rows.splice(i, 1);
     render(); refreshPicker(); mark();
@@ -264,7 +291,7 @@
       const w = document.getElementById('winNote');
       if (w) w.textContent = endMonth ? ('Card spend shown is the 12 months to ' + endMonth + '.') : '';
       render(); refreshPicker();
-      setStatus(rows.length ? (rows.filter(r => r.active).length + ' of ' + rows.length + ' overriding bills.')
+      setStatus(rows.length ? (rows.filter(r => r.active).length + ' of ' + rows.length + ' on actual costs.')
                             : 'No categories on actual costs yet.');
     } catch (e) {
       setStatus('Could not load: ' + (e && e.message ? e.message : e), 'err');

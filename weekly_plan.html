@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Weekly Plan</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=act2"></script>
+<script src="common.js?v=act3"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1560px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin-bottom:2px; }
@@ -101,29 +101,6 @@
   .taper-row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; }
   .taper-row .fld input[type=number] { width:80px; }
 
-  .basis-card { border:1px solid #bfdbfe; border-radius:8px; background:#eff6ff; padding:12px 14px; margin-bottom:14px; }
-  .basis-head { font-weight:bold; color:#1e3a8a; font-size:15px; }
-  .basis-win { font-weight:normal; color:#64748b; font-size:12px; margin-left:6px; }
-  .basis-sub { color:#64748b; font-size:13px; margin:4px 0 10px; }
-  .basis-toggle { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
-  .basis-opt { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:8px; padding:9px 16px; font-size:14px; font-weight:bold; cursor:pointer; min-height:44px; }
-  .basis-opt.on { background:#17a2b4; color:#fff; border-color:#17a2b4; }
-  .basis-tablewrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  table.basis-table { border-collapse:collapse; width:100%; min-width:560px; }
-  table.basis-table th, table.basis-table td { padding:8px 10px; border:1px solid #e2e8f0; text-align:right; font-size:14px; }
-  table.basis-table th { background:#dbeafe; color:#1e3a8a; font-size:12px; text-transform:uppercase; letter-spacing:0.03em; }
-  table.basis-table th:first-child, table.basis-table td.bc-cat { text-align:left; }
-  table.basis-table td.bc-cat { font-weight:bold; color:#2c3e50; white-space:nowrap; }
-  table.basis-table .dot { width:10px; height:10px; border-radius:3px; display:inline-block; margin-right:6px; vertical-align:middle; }
-  table.basis-table input[type=number] { width:92px; text-align:right; padding:7px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; background:#fff; }
-  .bc-after { font-weight:bold; color:#0f766e; }
-  .basis-planref { font-size:12px; color:#94a3b8; margin-top:8px; }
-  #basisFeed { font-size:13px; font-weight:bold; color:#1e3a8a; margin-top:4px; }
-  .basis-actions { display:flex; gap:12px; align-items:center; margin-top:10px; flex-wrap:wrap; }
-  .basis-card.mode-plan table.basis-table th:nth-child(4),
-  .basis-card.mode-plan table.basis-table th:nth-child(5),
-  .basis-card.mode-plan table.basis-table td:nth-child(4),
-  .basis-card.mode-plan table.basis-table td:nth-child(5) { opacity:0.5; }
 
   .strip-card { border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:10px 12px; margin-bottom:14px; }
   .strip-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
@@ -194,23 +171,12 @@
     .strip-leg { color:#94a3b8 !important; }
     .sc-none { background:#0f172a !important; border-color:#475569 !important; }
     .mlabel { color:#94a3b8 !important; }
-    .basis-card { background:#0b1f3a !important; border-color:#1e3a5f !important; }
-    .basis-head { color:#93c5fd !important; }
-    .basis-sub, .basis-win, .basis-planref { color:#94a3b8 !important; }
-    .basis-opt { background:#0f172a !important; color:#cbd5e1 !important; border-color:#475569 !important; }
-    .basis-opt.on { background:#17a2b4 !important; color:#fff !important; border-color:#17a2b4 !important; }
-    table.basis-table th { background:#12294a !important; color:#93c5fd !important; }
-    table.basis-table th, table.basis-table td { border-color:#334155 !important; }
-    table.basis-table td.bc-cat { color:#f1f5f9 !important; }
-    table.basis-table input[type=number] { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
-    .bc-after { color:#5eead4 !important; }
-    #basisFeed { color:#93c5fd !important; }
   }
 </style>
 </head>
 <body>
   <h1>Weekly Plan <span style="font-size:14px;color:#94a3b8;font-weight:normal;">(52-week dining &amp; holidays)</span></h1>
-  <p class="note">Both planners in one place: each week shows home dining and the holiday side by side, and the year strip flags where they overlap. Dining and holiday costs feed the retirement model &mdash; choose <b>Plan</b> or <b>Actual (last 12 months)</b> in the Budget basis panel below, and it applies to the budget, the bills page and the model on any device. <span style="color:#94a3b8;">(weekly build: v7)</span></p>
+  <p class="note">Both planners in one place: each week shows home dining and the holiday side by side, and the year strip flags where they overlap. Dining and holiday costs feed the retirement model. Whether the model uses these planned figures or your real card spend is now set per category on the <b>Actual Costs</b> page &mdash; Dining, Holidays and Fuel each switch independently there. <span style="color:#94a3b8;">(weekly build: v8)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div class="taper-card" id="taperCard" style="display:none;">
@@ -228,49 +194,6 @@
       <div class="fld"><label>At 70</label><input type="number" id="htap70" step="0.05" min="0" max="1" value="1" onfocus="tapBlank(this)" onblur="tapRestore(this)"></div>
       <div class="fld"><label>At 80</label><input type="number" id="htap80" step="0.05" min="0" max="1" value="1" onfocus="tapBlank(this)" onblur="tapRestore(this)"></div>
       <div class="fld"><label>At 90</label><input type="number" id="htap90" step="0.05" min="0" max="1" value="1" onfocus="tapBlank(this)" onblur="tapRestore(this)"></div>
-    </div>
-  </div>
-
-  <div class="basis-card mode-plan" id="basisCard" style="display:none;">
-    <div class="basis-head">Budget basis <span class="basis-win" id="basisWin"></span></div>
-    <div class="basis-sub">Choose whether the budget, the bills page and the whole retirement model use your <b>planned</b> dining &amp; holiday costs (the 52 weeks below), or your <b>actual</b> spend over the last 12 months on the <b>Dining</b> and <b>Holidays</b> card categories. In Actual mode you can nudge each monthly average up or down. Saved to your account, so it applies on any device.</div>
-    <div class="basis-toggle">
-      <button type="button" class="basis-opt" id="optPlan" onclick="setBasis('plan')">Plan</button>
-      <button type="button" class="basis-opt" id="optActual" onclick="setBasis('actual')">Actual &mdash; last 12 months</button>
-    </div>
-    <div class="basis-tablewrap">
-      <table class="basis-table">
-        <thead><tr><th>Category</th><th>12-month total</th><th>Avg / month</th><th>Adjust &pound;/mo</th><th>After adjust / month</th></tr></thead>
-        <tbody>
-          <tr>
-            <td class="bc-cat"><span class="dot dot-din"></span>Dining</td>
-            <td id="bDin12">&pound;0</td>
-            <td id="bDinAvg">&pound;0</td>
-            <td><input type="number" id="dinAdj" step="10" value="0" inputmode="numeric" onfocus="adjBlank(this)" onblur="adjRestore(this)" oninput="renderBasis()"></td>
-            <td id="bDinAfter" class="bc-after">&pound;0</td>
-          </tr>
-          <tr>
-            <td class="bc-cat"><span class="dot dot-hol"></span>Holidays</td>
-            <td id="bHol12">&pound;0</td>
-            <td id="bHolAvg">&pound;0</td>
-            <td><input type="number" id="holAdj" step="10" value="0" inputmode="numeric" onfocus="adjBlank(this)" onblur="adjRestore(this)" oninput="renderBasis()"></td>
-            <td id="bHolAfter" class="bc-after">&pound;0</td>
-          </tr>
-          <tr>
-            <td class="bc-cat"><span class="dot dot-fuel"></span>Fuel</td>
-            <td id="bFuel12">&pound;0</td>
-            <td id="bFuelAvg">&pound;0</td>
-            <td><input type="number" id="fuelAdj" step="10" value="0" inputmode="numeric" onfocus="adjBlank(this)" onblur="adjRestore(this)" oninput="renderBasis()"></td>
-            <td id="bFuelAfter" class="bc-after">&pound;0</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="basis-planref" id="basisPlanRef"></div>
-    <div id="basisFeed"></div>
-    <div class="basis-actions">
-      <button class="btn" onclick="saveBasis()">Save basis</button>
-      <span id="basisMsg" style="font-weight:bold;"></span>
     </div>
   </div>
 
@@ -330,9 +253,6 @@
   let delFuel = [];       // ids removed this session
   let tmpFuelId = -1;     // negative ids for unsaved rows
   const collapsed = {};   // week_no -> true(collapsed); default collapsed
-  let discSettings = { basis: 'plan', dining_adjust: 0, holiday_adjust: 0, fuel_adjust: 0 }; // bd_discretionary_basis
-ctual = { diningTotal: 0, holidayTotal: 0, fuelTotal: 0, endMonth: null, months: 12 }; // trailing-12mo actuals
-  let curBasis = 'plan';  // live selection in the Budget basis panel
 
   function tnum(v, d) { return v != null && isFinite(Number(v)) ? Number(v) : d; }
   function readTaper(id) { let v = parseFloat(document.getElementById(id).value); if (!isFinite(v)) v = 1; v = Math.max(0, Math.min(1, v)); return Math.round(v * 100) / 100; }
@@ -340,51 +260,11 @@ ctual = { diningTotal: 0, holidayTotal: 0, fuelTotal: 0, endMonth: null, months:
   function tapRestore(el) { if (el.value === '') el.value = (el.dataset.prev != null ? el.dataset.prev : '1'); }
   function holBlankZero(el) { if (el.value === '0') el.value = ''; }
   function holRestoreZero(el) { if (el.value.trim() === '') el.value = '0'; }
-  // Budget-basis adjustment inputs: blank on focus (touch-friendly), restore prev/0 on blur.
-  function adjBlank(el) { el.dataset.prev = el.value; el.value = ''; }
-  function adjRestore(el) { if (el.value.trim() === '') el.value = (el.dataset.prev != null ? el.dataset.prev : '0'); renderBasis(); }
   function fmtMonth(ym) { if (!ym) return ''; return MONTHS_SHORT[Number(ym.slice(5, 7)) - 1] + ' ' + ym.slice(0, 4); }
-  // v7: two modes again. Bill-backed categories moved to the Actual Costs page, so this panel
-  // governs only the three planner-backed domains it always did.
-  function setBasis(b) { curBasis = (b === 'actual') ? 'actual' : 'plan'; renderBasis(); }
-  function domainOn() { return curBasis === 'actual'; }
-
-  function renderBasis() {
-    const din12 = discActual ? (Number(discActual.diningTotal) || 0) : 0;
-    const hol12 = discActual ? (Number(discActual.holidayTotal) || 0) : 0;
-    const fuel12 = discActual ? (Number(discActual.fuelTotal) || 0) : 0;
-    const dinAvg = Math.round(din12 / 12), holAvg = Math.round(hol12 / 12), fuelAvg = Math.round(fuel12 / 12);
-    const dAdj = Number(document.getElementById('dinAdj').value) || 0;
-    const hAdj = Number(document.getElementById('holAdj').value) || 0;
-    const fAdj = Number(document.getElementById('fuelAdj').value) || 0;
-    // Round each monthly figure to whole pounds (matching the display) so after × 12 = the model feed.
-    const dinAfter = Math.max(0, Math.round(din12 / 12 + dAdj)), holAfter = Math.max(0, Math.round(hol12 / 12 + hAdj));
-    const fuelAfter = Math.max(0, Math.round(fuel12 / 12 + fAdj));
-    setText('bDin12', fmt(din12)); setText('bDinAvg', fmt(dinAvg)); setText('bDinAfter', fmt(dinAfter));
-    setText('bHol12', fmt(hol12)); setText('bHolAvg', fmt(holAvg)); setText('bHolAfter', fmt(holAfter));
-    setText('bFuel12', fmt(fuel12)); setText('bFuelAvg', fmt(fuelAvg)); setText('bFuelAfter', fmt(fuelAfter));
-    setText('basisWin', discActual && discActual.endMonth ? '(12 months to ' + fmtMonth(discActual.endMonth) + ')' : '(no card data yet)');
-    document.getElementById('optPlan').classList.toggle('on', curBasis === 'plan');
-    document.getElementById('optActual').classList.toggle('on', curBasis === 'actual');
-
-    const card = document.getElementById('basisCard');
-    card.classList.toggle('mode-actual', curBasis === 'actual');
-    card.classList.toggle('mode-plan', curBasis === 'plan');
-    const planDin = rota.reduce((s, r) => s + rowTotal(r), 0);
-    const planHol = plan.reduce((s, w) => s + App.holidayWeekTotal(w, ctx), 0);
-    const planFuel = fuelYearSplit();
-    setText('basisPlanRef', 'Plan year totals for reference \u2014 Dining ' + fmt(planDin) + ' \u00b7 Holidays ' + fmt(planHol) +
-      ' \u00b7 Fuel ' + fmt(planFuel.total) + ' (work ' + fmt(planFuel.work) + ', other ' + fmt(planFuel.disc) + ').');
-    const feedDin = domainOn() ? dinAfter * 12 : planDin;
-    const feedHol = domainOn() ? holAfter * 12 : planHol;
-    // On Actual, the single card figure is apportioned by the plan's work:other ratio — the card
-    // cannot tell commuting from leisure driving, but the engine needs the split.
-    const feedFuel = domainOn() ? fuelAfter * 12 : planFuel.total;
-    const tag = () => domainOn() ? ' (actual)' : ' (plan)';
-    const modeName = curBasis === 'actual' ? 'Actual' : 'Plan';
-    setText('basisFeed', 'Feeding the model (' + modeName + '): Dining ' + fmt(feedDin) + '/yr' + tag() +
-      ' \u00b7 Holidays ' + fmt(feedHol) + '/yr' + tag() + ' \u00b7 Fuel ' + fmt(feedFuel) + '/yr' + tag());
-  }
+  // v8: the Plan / Actual choice has moved to the Actual Costs page, where Dining, Holidays and
+  // Fuel are rows in bd_actual_costs with their own independent ticks. This page is the PLANNER
+  // only now. It deliberately no longer writes any basis setting: the old panel wrote on every
+  // save, which is how a saved mode got silently downgraded once before.
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function setText(id, t) { const el = document.getElementById(id); if (el) el.textContent = t; }
   function notify() { try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {} }
@@ -400,9 +280,7 @@ ctual = { diningTotal: 0, holidayTotal: 0, fuelTotal: 0, endMonth: null, months:
   async function load() {
     const status = document.getElementById('status');
     try {
-      const _cut = new Date(); _cut.setDate(_cut.getDate() - 400);
-      const cutoff = _cut.getFullYear() + '-' + ('0' + (_cut.getMonth() + 1)).slice(-2) + '-' + ('0' + _cut.getDate()).slice(-2);
-      const [rotaRows, costRows, planRows, holCostRows, mealRows, dsRows, hsRows, aRows, catRows, cardTxns, discRow, fsRows, flRows] = await Promise.all([
+      const [rotaRows, costRows, planRows, holCostRows, mealRows, dsRows, hsRows, aRows, fsRows, flRows] = await Promise.all([
         App.rest('bd_dining_rota?order=week_no.asc,meal_type.asc'),
         App.rest('bd_meal_cost'),
         App.rest('bd_holiday_plan?phase=eq.' + PHASE + '&order=week_no.asc'),
@@ -411,9 +289,6 @@ ctual = { diningTotal: 0, holidayTotal: 0, fuelTotal: 0, endMonth: null, months:
         App.rest('bd_dining_settings?id=eq.1'),
         App.rest('bd_holiday_settings?id=eq.1'),
         App.rest('bd_bank_account?order=bank_name.asc,account_id.asc'),
-        App.rest('bd_bill_category?select=code,description'),
-        App.rest('bd_card_txn?select=txn_date,amount,category_code&txn_date=gte.' + cutoff + '&order=txn_date.desc&limit=5000'),
-        App.loadDiscretionaryBasis(),
         App.rest('bd_fuel_settings?id=eq.1'),
         App.rest('bd_fuel_line?phase=eq.' + PHASE + '&order=sort_order.asc')
       ]);
@@ -438,20 +313,11 @@ ctual = { diningTotal: 0, holidayTotal: 0, fuelTotal: 0, endMonth: null, months:
       document.getElementById('htap80').value = tnum(settingsHol.taper_at_80, 1);
       document.getElementById('htap90').value = tnum(settingsHol.taper_at_90, 1);
       renderPot();
-      discSettings = discRow || { basis: 'plan', dining_adjust: 0, holiday_adjust: 0, fuel_adjust: 0 };
-      // Two modes only, as of v7 — bill-backed categories moved to the Actual Costs page.
-      curBasis = (discSettings.basis === 'actual') ? 'actual' : 'plan';
-      discActual = App.actualDiscretionary12mo(cardTxns || [], catRows || []);
-      document.getElementById('dinAdj').value = Number(discSettings.dining_adjust) || 0;
-      document.getElementById('holAdj').value = Number(discSettings.holiday_adjust) || 0;
-      document.getElementById('fuelAdj').value = Number(discSettings.fuel_adjust) || 0;
       dirtyDin = {}; dirtyHol = {};
       status.style.display = 'none';
       document.getElementById('taperCard').style.display = 'block';
-      document.getElementById('basisCard').style.display = 'block';
       document.getElementById('stripCard').style.display = 'block';
       document.getElementById('bar').style.display = 'flex';
-      renderBasis();
       render();
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
@@ -1009,21 +875,6 @@ ctual = { diningTotal: 0, holidayTotal: 0, fuelTotal: 0, endMonth: null, months:
       // `collapsed` is module-level, so the open/closed state of each week survives the reload.
       if (fuelChanged) await load();
     } catch (e) { setMsg('Save failed: ' + e.message, '#c0392b'); }
-  }
-
-  // ---- save the budget basis (separate global setting; applies everywhere on any device) ----
-  async function saveBasis() {
-    const msg = document.getElementById('basisMsg');
-    const dAdj = Number(document.getElementById('dinAdj').value) || 0;
-    const hAdj = Number(document.getElementById('holAdj').value) || 0;
-    const fAdj = Number(document.getElementById('fuelAdj').value) || 0;
-    msg.style.color = '#1e3a8a'; msg.textContent = 'Saving\u2026';
-    try {
-      await App.saveDiscretionaryBasis({ basis: curBasis, dining_adjust: dAdj, holiday_adjust: hAdj, fuel_adjust: fAdj });
-      discSettings = { basis: curBasis, dining_adjust: dAdj, holiday_adjust: hAdj, fuel_adjust: fAdj };
-      msg.style.color = '#065f46'; msg.textContent = '\u2713 Saved. Reopen the dashboard to update projections.';
-      notify();
-    } catch (e) { msg.style.color = '#c0392b'; msg.textContent = 'Save failed: ' + e.message; }
   }
 
   window.addEventListener('message', e => { if (e && e.data === 'refresh-data') load(); });
