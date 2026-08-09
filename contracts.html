@@ -128,9 +128,9 @@
 
   <div class="bar" style="margin-top:-4px;">
     <label style="font-size:13px; font-weight:bold; color:var(--ink-soft);">Category:</label>
-    <select id="filterCat" onchange="render()"><option value="All">All categories</option></select>
+    <select id="filterCat" onchange="onFilterChange()"><option value="All">All categories</option></select>
     <label style="font-size:13px; font-weight:bold; color:var(--ink-soft);">Show:</label>
-    <select id="filterState" onchange="render()">
+    <select id="filterState" onchange="onFilterChange()">
       <option value="All">All</option>
       <option value="Live">Active only</option>
       <option value="Soon">Due within 28 days</option>
@@ -311,6 +311,10 @@
   }
 
   function passesFilter(r) {
+    // A row that has never been saved always stays on screen. Hiding one would tear its inputs
+    // out of the DOM before anything typed into them had been read back, and the row would then
+    // save empty — the filter must never be able to swallow work in progress.
+    if (r.id == null) return true;
     const cat = document.getElementById('filterCat').value;
     if (cat !== 'All' && (r.category || '') !== cat) return false;
     const state = document.getElementById('filterState').value;
@@ -321,6 +325,10 @@
     if (state === 'Expired') return dl != null && dl < 0;
     return true;
   }
+
+  // render() rebuilds the table from scratch, so every caller must read the DOM back into `rows`
+  // first or anything typed since the last redraw is lost. The filters go through here for that.
+  function onFilterChange() { syncDom(); render(); }
 
   function render() {
     const catHints = activeCategories();
@@ -696,6 +704,10 @@
 
       for (const id of deleted) await App.write('DELETE', 'bd_contracts?id=eq.' + id, undefined);
       deleted = [];
+      // An unsaved row with nothing in it at all is an accidental "+ Add contract" — drop it
+      // rather than filing an empty contract that then has to be found and deleted.
+      rows = rows.filter(r => r.id != null || r.category || r.ctype || r.supplier_id || r.who ||
+                              r.policy_no || r.start_date || r.end_date || r.notes);
       for (const r of rows) {
         const payload = {
           category: r.category || null, ctype: r.ctype || null, supplier_id: (r.supplier_id != null && r.supplier_id > 0) ? r.supplier_id : null,
