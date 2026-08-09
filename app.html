@@ -5467,6 +5467,12 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
 
       // ---- Household ----
       HhOverview:  { label: 'Overview', kind: 'page', top: 'LivingCosts', sub: 'HouseOverview' },
+      // Budget is the page reached most often, so it sits on the row in its own right
+      // rather than behind the Money dropdown. It stays listed under Money as well —
+      // a dropdown that quietly omitted the most-used page would look broken — and the
+      // NAV_OWNER build below makes the promoted entry win, so the row lights Budget
+      // rather than Money when it is open.
+      Budget:      { label: 'Budget', kind: 'page', top: 'LivingCosts', sub: 'Budget' },
       Money: {
         label: 'Money', top: 'LivingCosts', kind: 'sub',
         items: [
@@ -5543,8 +5549,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       Household: {
         label: 'Household',
         blurb: 'The money coming in and going out: budget, bills, contracts, cards and the plans behind them.',
-        holds: 'Overview · Money · Commitments · Spending · Plans · Reference',
-        order: ['HhOverview', 'Money', 'Commitments', 'Spending', 'Plans', 'Reference'],
+        holds: 'Overview · Budget · Money · Commitments · Spending · Plans · Reference',
+        order: ['HhOverview', 'Budget', 'Money', 'Commitments', 'Spending', 'Plans', 'Reference'],
         landing: ['LivingCosts', 'HouseOverview'],
         icon: 'M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3l9-8z'
       },
@@ -5565,11 +5571,18 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     // reverse index: which category (and therefore which stream) owns a given page.
     // Built from NAV so it cannot drift out of step with the toolbar.
     const NAV_OWNER = {};      // page id (sub name or tab id) -> category key
+    // Categories first, promoted single pages second: where a page appears both on the
+    // row in its own right and inside a dropdown (Budget), the promoted entry wins, so
+    // the row lights the page's own button rather than the category it also lives in.
     Object.keys(NAV).forEach(key => {
       const s = NAV[key];
-      if (s.kind === 'page') { NAV_OWNER[s.sub] = key; return; }
+      if (s.kind === 'page') return;
       if (s.kind === 'leaf') { NAV_OWNER[s.top] = key; return; }
       (s.items || []).forEach(it => { if (!it.g) NAV_OWNER[it.t || it.s] = key; });
+    });
+    Object.keys(NAV).forEach(key => {
+      const s = NAV[key];
+      if (s.kind === 'page') NAV_OWNER[s.sub] = key;
     });
     const CAT_STREAM = {};     // category key -> stream key
     STREAM_ORDER.forEach(sk => { STREAMS[sk].order.forEach(cat => { CAT_STREAM[cat] = sk; }); });
