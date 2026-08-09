@@ -32,6 +32,7 @@
 
   /* group header rows, one per category */
   tr.grp td { background:#eef2f7; font-weight:800; font-size:13px; letter-spacing:.02em; color:var(--accent-dark); border-bottom:1px solid var(--line-strong); }
+  tr.grp.grp-new td { background:#fef3c7; color:#92400e; border-bottom:1px solid #fcd34d; }
   .grp-count { display:inline-block; background:var(--line-strong); color:var(--ink); font-size:11px; font-weight:700; border-radius:10px; padding:1px 8px; margin-left:8px; }
 
   /* derived status pill */
@@ -73,6 +74,7 @@
     td { border-color:#334155 !important; color:#cbd5e1 !important; }
     .sup-panel th, .typ-panel th { background:transparent !important; border-bottom-color:#475569 !important; }
     tr.grp td { background:#162132 !important; color:#7dd3fc !important; border-bottom-color:#334155 !important; }
+    tr.grp.grp-new td { background:#4a3410 !important; color:#fbbf24 !important; border-bottom-color:#a16207 !important; }
     .grp-count { background:#334155 !important; color:#cbd5e1 !important; }
     .chip { background:#0f172a !important; color:#94a3b8 !important; border-color:#475569 !important; }
     .chip.on { background:#1d3a63 !important; color:#fff !important; border-color:#38d6e6 !important; }
@@ -337,7 +339,11 @@
     fillDatalist('whoList', distinct('who'));
 
     // index rows first, so a row's data-i still points at its slot in `rows` after filtering
-    const idx = rows.map((r, i) => i).filter(i => passesFilter(rows[i]));
+    const all = rows.map((r, i) => i).filter(i => passesFilter(rows[i]));
+    // Anything not yet saved is pinned to the top in insertion order, so a row you have just
+    // added is under your hand rather than sorted away to the foot of its category.
+    const fresh = all.filter(i => rows[i].id == null);
+    const idx = all.filter(i => rows[i].id != null);
     idx.sort((a, b) => {
       const ra = rows[a], rb = rows[b];
       const ca = (ra.category || '\uFFFF').toLowerCase(), cb = (rb.category || '\uFFFF').toLowerCase();
@@ -349,12 +355,16 @@
       return ea - eb;
     });
 
-    if (!idx.length) {
+    if (!idx.length && !fresh.length) {
       tbody.innerHTML = '<tr><td colspan="12" style="color:var(--ink-soft);">No contracts match this filter.</td></tr>';
       return;
     }
 
     let html = '', lastCat = null;
+    if (fresh.length) {
+      html += '<tr class="grp grp-new"><td colspan="12">New \u2014 not saved yet<span class="grp-count">' + fresh.length + '</span></td></tr>';
+      fresh.forEach(i => { html += rowHtml(rows[i], i); });
+    }
     idx.forEach(i => {
       const cat = (rows[i].category || '').trim() || 'Uncategorised';
       if (cat !== lastCat) {
@@ -499,6 +509,8 @@
                 start_date: null, end_date: null, notify: true, notes: '', bill_id: null,
                 sent_28: null, sent_14: null, sent_7: null, sent_1: null, sent_0: null });
     populateCatFilter(); render(); setDirty();
+    const first = tbody.querySelector('tr[data-i="' + (rows.length - 1) + '"] .f-cat');
+    if (first) { first.focus(); if (first.scrollIntoView) first.scrollIntoView({ block: 'nearest' }); }
   }
   function delRow(i) {
     syncDom();
