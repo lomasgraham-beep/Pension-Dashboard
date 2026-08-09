@@ -124,7 +124,7 @@
 
   <div class="table-wrap">
     <table id="tbl">
-      <thead><tr><th>Category</th><th>Type</th><th>Supplier</th><th>Who</th><th>Account/Policy No.</th><th>Start Date</th><th>End Date</th><th>Status</th><th>Notify</th><th>Reminders<br><span style="font-weight:normal;font-size:11px;">28 &middot; 14 &middot; 7 &middot; 1 &middot; 0</span></th><th>Notes<br><span style="font-weight:normal;font-size:11px;">(shown in the email)</span></th><th></th></tr></thead>
+      <thead><tr><th>Category</th><th>Type</th><th>Supplier</th><th>Who</th><th>Account/Policy No.</th><th>Start Date</th><th>End Date<br><span style="font-weight:normal;font-size:11px;">(auto: 1 year less a day)</span></th><th>Status</th><th>Notify</th><th>Reminders<br><span style="font-weight:normal;font-size:11px;">28 &middot; 14 &middot; 7 &middot; 1 &middot; 0</span></th><th>Notes<br><span style="font-weight:normal;font-size:11px;">(shown in the email)</span></th><th></th></tr></thead>
       <tbody><tr><td colspan="12">Loading&hellip;</td></tr></tbody>
     </table>
   </div>
@@ -177,6 +177,13 @@
     if (!m) return iso || null;
     const d = new Date(Date.UTC(Number(m[1]) + 1, Number(m[2]) - 1, Number(m[3])));
     return d.toISOString().slice(0, 10);
+  }
+  // Annual term: cover runs to the day before the anniversary, so 1 Feb 2026 ends 31 Jan 2027.
+  // Derived from addYear rather than a flat +364 so a term spanning 29 February keeps its
+  // calendar shape instead of slipping a day.
+  function annualEnd(iso) {
+    const d = dayNum(addYear(iso));
+    return d == null ? null : new Date((d - 1) * 86400000).toISOString().slice(0, 10);
   }
   function ukDate(iso) {
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
@@ -235,7 +242,7 @@
       '<td><select class="f-sup" onchange="onSupPick(this)">' + supplierOptions(r.supplier_id) + '</select></td>' +
       '<td><input type="text" class="f-who" list="whoList" value="' + esc(r.who) + '" onchange="mark()" oninput="mark()"></td>' +
       '<td><input type="text" class="f-pol" value="' + esc(r.policy_no) + '" onchange="mark()" oninput="mark()"></td>' +
-      '<td><input type="date" class="f-start" value="' + esc(r.start_date || '') + '" onchange="mark()"></td>' +
+      '<td><input type="date" class="f-start" value="' + esc(r.start_date || '') + '" onchange="onStartChange(this)"></td>' +
       '<td><input type="date" class="f-end" value="' + esc(r.end_date || '') + '" onchange="onEndChange(this)"></td>' +
       '<td class="st-cell"><span class="pill ' + st.cls + '">' + st.label + '</span></td>' +
       '<td style="text-align:center;"><input type="checkbox" class="f-notify" ' + (r.notify === false ? '' : 'checked') + ' onchange="mark()" style="width:auto;"></td>' +
@@ -310,6 +317,24 @@
       r.notify     = tr.querySelector('.f-notify').checked;
       r.notes      = tr.querySelector('.f-notes').value;
     });
+  }
+
+  // Most contracts run a year, so setting the Start Date fills the End Date with the day before
+  // the anniversary. Overwrite the End Date by hand for anything that is not a twelve-month term.
+  function onStartChange(el) {
+    const tr = el.closest('tr'); const r = rows[Number(tr.dataset.i)];
+    if (r) {
+      r.start_date = el.value || null;
+      const end = r.start_date ? annualEnd(r.start_date) : null;
+      if (end) {
+        r.end_date = end;
+        const endEl = tr.querySelector('.f-end');
+        if (endEl) endEl.value = end;
+      }
+      const st = statusOf(r);
+      tr.querySelector('.st-cell').innerHTML = '<span class="pill ' + st.cls + '">' + st.label + '</span>';
+    }
+    mark();
   }
 
   // Redraw only the status pill, so typing a date does not tear down the row you are in.
