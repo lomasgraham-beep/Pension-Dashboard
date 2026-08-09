@@ -15,6 +15,7 @@
   .btn-save { background:var(--accent); } .btn-save:hover { background:var(--accent-dark); }
   .btn-reload { background:#64748b; } .btn-add { background:#475569; }
   .btn-sup { background:#0f766e; }
+  .btn-typ { background:#6d28d9; }
   .unsaved { display:none; background:#fef3c7; color:#92400e; font-weight:bold; font-size:13px; padding:6px 12px; border-radius:6px; }
   .msg { font-weight:bold; font-size:14px; }
   .table-wrap { overflow-x:auto; }
@@ -45,7 +46,12 @@
   .chip { border:1px solid var(--line-strong); background:#fff; color:var(--ink-soft); border-radius:6px; padding:5px 7px; font-size:11px; font-weight:700; cursor:pointer; min-width:26px; }
   .chip.on { background:var(--accent); color:#fff; border-color:var(--accent); }
 
-  /* suppliers panel */
+  /* suppliers / vocabulary panels */
+  .typ-panel { display:none; border:1px solid var(--line); border-left:4px solid #6d28d9; border-radius:8px; background:var(--surface-2); padding:12px 14px; margin:0 0 16px; }
+  .typ-panel h3 { margin:0 0 4px; font-size:15px; color:var(--ink); }
+  .typ-panel .note { margin:0 0 10px; }
+  .typ-panel table { background:transparent; }
+  .typ-panel th { background:transparent; border-bottom:1px solid var(--line-strong); }
   .sup-panel { display:none; border:1px solid var(--line); border-left:4px solid #0f766e; border-radius:8px; background:var(--surface-2); padding:12px 14px; margin:0 0 16px; }
   .sup-panel h3 { margin:0 0 4px; font-size:15px; color:var(--ink); }
   .sup-panel .note { margin:0 0 10px; }
@@ -57,6 +63,7 @@
     html, body { background:#0f172a !important; color:#cbd5e1 !important; }
     h1, h2, h3, h4 { color:#f1f5f9 !important; }
     .sup-panel { background:#1e293b !important; border-color:#334155 !important; border-left-color:#2dd4bf !important; }
+    .typ-panel { background:#1e293b !important; border-color:#334155 !important; border-left-color:#a78bfa !important; }
     .note { color:#94a3b8 !important; }
     label { color:#cbd5e1 !important; }
     input, select, textarea { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
@@ -64,7 +71,7 @@
     table { color:#cbd5e1 !important; }
     th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
     td { border-color:#334155 !important; color:#cbd5e1 !important; }
-    .sup-panel th { background:transparent !important; border-bottom-color:#475569 !important; }
+    .sup-panel th, .typ-panel th { background:transparent !important; border-bottom-color:#475569 !important; }
     tr.grp td { background:#162132 !important; color:#7dd3fc !important; border-bottom-color:#334155 !important; }
     .grp-count { background:#334155 !important; color:#cbd5e1 !important; }
     .chip { background:#0f172a !important; color:#94a3b8 !important; border-color:#475569 !important; }
@@ -83,15 +90,28 @@
 <body>
   <div id="status" class="s-load">Loading&hellip;</div>
   <h2>Contracts</h2>
-  <p class="note">Every dated commitment in one register &mdash; insurance, MOT, road tax, servicing, storage. <strong>End Date</strong> is what drives the reminders: an email goes out <strong>28, 14, 7 and 1 day</strong> before, and again <strong>on the day</strong>, for any row with <strong>Notify</strong> ticked. The <strong>Reminders</strong> chips light up as each one is sent &mdash; tap a chip to clear it (so it sends again) or to light it manually (so it does not) &mdash; chips save on the spot, no need to press Save. <strong>Renew</strong> moves both dates on by a year and clears the chips ready for the new term. Changing the End Date clears them automatically. <strong>Notes</strong> is free text and is carried into the reminder email, so anything you want in front of you when it lands &mdash; last year&rsquo;s premium, an excess, a rival quote &mdash; belongs there. Suppliers are held in their own list &mdash; open <strong>Suppliers</strong> to add a phone number or website, which then travels with every contract that uses it.</p>
+  <p class="note">Every dated commitment in one register &mdash; insurance, MOT, road tax, servicing, storage. <strong>End Date</strong> is what drives the reminders: an email goes out <strong>28, 14, 7 and 1 day</strong> before, and again <strong>on the day</strong>, for any row with <strong>Notify</strong> ticked. The <strong>Reminders</strong> chips light up as each one is sent &mdash; tap a chip to clear it (so it sends again) or to light it manually (so it does not) &mdash; chips save on the spot, no need to press Save. <strong>Renew</strong> moves both dates on by a year and clears the chips ready for the new term. Changing the End Date clears them automatically. <strong>Notes</strong> is free text and is carried into the reminder email, so anything you want in front of you when it lands &mdash; last year&rsquo;s premium, an excess, a rival quote &mdash; belongs there. <strong>Category</strong> and <strong>Type</strong> are picked from a fixed list &mdash; choosing a category narrows Type to just that category&rsquo;s types &mdash; and both offer <strong>&#65291; New</strong> if what you want is not there yet. Open <strong>Categories &amp; types</strong> to rename, reorder or retire them. Suppliers are held in their own list &mdash; open <strong>Suppliers</strong> to add a phone number or website, which then travels with every contract that uses it.</p>
 
   <div class="bar" style="align-items:flex-start;">
     <button class="btn btn-save" onclick="saveAll()">Save changes</button>
     <button class="btn btn-reload" onclick="reload()">&#8634; Reload</button>
     <button class="btn btn-add" onclick="addRow()">+ Add contract</button>
     <button class="btn btn-sup" onclick="toggleSuppliers()">Suppliers</button>
+    <button class="btn btn-typ" onclick="toggleTypes()">Categories &amp; types</button>
     <span class="unsaved" id="unsaved">&#9679; Unsaved changes</span>
     <span class="msg" id="msg"></span>
+  </div>
+
+  <div class="typ-panel" id="typPanel">
+    <h3>Categories &amp; types</h3>
+    <p class="note">The vocabulary behind the two pickers on every contract. A row here is a <strong>category and one type within it</strong>, so choosing a category on a contract narrows the Type picker to just that category&rsquo;s types. A row with the Type left blank simply declares the category. <strong>Renaming</strong> a pair here renames it on every contract that uses it. <strong>Active</strong> unticked keeps a value on the contracts already using it but hides it from the pickers. <strong>Order</strong> lifts the ones you use most to the top &mdash; equal numbers fall back to alphabetical.</p>
+    <table id="typTbl">
+      <thead><tr><th>Category</th><th>Type</th><th>Active</th><th>Order</th><th></th></tr></thead>
+      <tbody><tr><td colspan="5">Loading&hellip;</td></tr></tbody>
+    </table>
+    <div class="bar" style="margin:12px 0 0;">
+      <button class="btn btn-add" onclick="addType()">+ Add category / type</button>
+    </div>
   </div>
 
   <div class="sup-panel" id="supPanel">
@@ -119,7 +139,6 @@
   </div>
 
   <datalist id="catList"></datalist>
-  <datalist id="typeList"></datalist>
   <datalist id="whoList"></datalist>
 
   <div class="table-wrap">
@@ -153,12 +172,15 @@
   })();
 
   // ---- state ---------------------------------------------------------------
-  let rows = [], suppliers = [], deleted = [], deletedSups = [], dirty = false;
+  let rows = [], suppliers = [], types = [], deleted = [], deletedSups = [], deletedTypes = [], dirty = false;
   let tempId = -1;                       // negative ids for suppliers not yet saved
+  let tempTypeId = -1;                   // and for category/type pairs not yet saved
+  const typeOrig = {};                   // id -> key as loaded, so a rename can be carried onto the contracts
   const TIERS = [28, 14, 7, 1, 0];       // must match send_contract_reminders() in the database
   const SENT_COL = { 28:'sent_28', 14:'sent_14', 7:'sent_7', 1:'sent_1', 0:'sent_0' };
   const tbody = document.querySelector('#tbl tbody');
   const supBody = document.querySelector('#supTbl tbody');
+  const typBody = document.querySelector('#typTbl tbody');
   const setDirty = () => { dirty = true; document.getElementById('unsaved').style.display = 'inline-block'; document.getElementById('msg').textContent = ''; };
   function mark() { setDirty(); }
 
@@ -209,6 +231,41 @@
   function fillDatalist(id, values) {
     document.getElementById(id).innerHTML = values.map(v => '<option value="' + esc(v) + '"></option>').join('');
   }
+  // ---- vocabulary ----------------------------------------------------------
+  // bd_contract_types holds one row per category/type pair. A row with ctype blank declares the
+  // category on its own, so a category can exist before you have decided what lives inside it.
+  function typeKey(cat, ct) { return String(cat == null ? '' : cat).trim().toLowerCase() + '\u0000' + String(ct == null ? '' : ct).trim().toLowerCase(); }
+  function sortOf(t) { const n = Number(t.sort); return isFinite(n) ? n : 0; }
+
+  function activeCategories() {
+    const m = {};
+    types.forEach(t => {
+      const c = (t.category || '').trim();
+      if (!c || t.active === false) return;
+      const s = sortOf(t);
+      if (m[c] == null || s < m[c]) m[c] = s;
+    });
+    return Object.keys(m).sort((a, b) => (m[a] - m[b]) || a.localeCompare(b));
+  }
+  function typesFor(cat) {
+    const c = String(cat == null ? '' : cat).trim().toLowerCase();
+    if (!c) return [];
+    const list = types.filter(t => (t.category || '').trim().toLowerCase() === c && t.active !== false && (t.ctype || '').trim());
+    list.sort((a, b) => (sortOf(a) - sortOf(b)) || String(a.ctype).localeCompare(String(b.ctype)));
+    return list.map(t => (t.ctype || '').trim());
+  }
+  // The row's own value is always offered, even if it has been retired or was never in the list,
+  // so tidying the vocabulary can never silently blank a contract that is already filed under it.
+  function vocabOptions(list, selected, newLabel) {
+    const sel = String(selected == null ? '' : selected).trim();
+    const all = list.slice();
+    if (sel && all.indexOf(sel) < 0) all.push(sel);
+    let html = '<option value="">\u2014</option>';
+    html += all.map(v => '<option value="' + esc(v) + '"' + (v === sel ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
+    html += '<option value="__new">\uFF0B ' + newLabel + '\u2026</option>';
+    return html;
+  }
+
   function supplierName(id) {
     const s = suppliers.find(x => String(x.id) === String(id));
     return s ? s.name : '';
@@ -237,8 +294,8 @@
   function rowHtml(r, i) {
     const st = statusOf(r);
     return '<tr data-i="' + i + '">' +
-      '<td><input type="text" class="f-cat" list="catList" value="' + esc(r.category) + '" onchange="onCatChange(this)"></td>' +
-      '<td><input type="text" class="f-type" list="typeList" value="' + esc(r.ctype) + '" onchange="mark()" oninput="mark()"></td>' +
+      '<td><select class="f-cat" onchange="onCatPick(this)">' + vocabOptions(activeCategories(), r.category, 'New category') + '</select></td>' +
+      '<td><select class="f-type" onchange="onTypePick(this)">' + vocabOptions(typesFor(r.category), r.ctype, 'New type') + '</select></td>' +
       '<td><select class="f-sup" onchange="onSupPick(this)">' + supplierOptions(r.supplier_id) + '</select></td>' +
       '<td><input type="text" class="f-who" list="whoList" value="' + esc(r.who) + '" onchange="mark()" oninput="mark()"></td>' +
       '<td><input type="text" class="f-pol" value="' + esc(r.policy_no) + '" onchange="mark()" oninput="mark()"></td>' +
@@ -266,8 +323,9 @@
   }
 
   function render() {
-    fillDatalist('catList', distinct('category'));
-    fillDatalist('typeList', distinct('ctype'));
+    const catHints = activeCategories();
+    distinct('category').forEach(c => { if (catHints.indexOf(c) < 0) catHints.push(c); });
+    fillDatalist('catList', catHints);
     fillDatalist('whoList', distinct('who'));
 
     // index rows first, so a row's data-i still points at its slot in `rows` after filtering
@@ -306,8 +364,11 @@
     tbody.querySelectorAll('tr[data-i]').forEach(tr => {
       const r = rows[Number(tr.dataset.i)];
       if (!r) return;
-      r.category   = tr.querySelector('.f-cat').value.trim();
-      r.ctype      = tr.querySelector('.f-type').value.trim();
+      // "__new" is a sentinel the picker handlers resolve, never a value to store.
+      const cv = tr.querySelector('.f-cat').value;
+      const tv = tr.querySelector('.f-type').value;
+      if (cv !== '__new') r.category = cv.trim();
+      if (tv !== '__new') r.ctype = tv.trim();
       const sv     = tr.querySelector('.f-sup').value;
       r.supplier_id = (sv === '' || sv === '__new') ? null : Number(sv);
       r.who        = tr.querySelector('.f-who').value.trim();
@@ -347,7 +408,47 @@
     }
     mark();
   }
-  function onCatChange(el) { syncDom(); populateCatFilter(); render(); setDirty(); }
+  // Category and Type are drawn from bd_contract_types. Picking "+ New" adds to that vocabulary
+  // there and then, so a contract can be filed without breaking off to open the panel.
+  function onCatPick(el) {
+    const i = Number(el.closest('tr').dataset.i);
+    syncDom();
+    const r = rows[i]; if (!r) return;
+    if (el.value === '__new') {
+      const name = (prompt('New category name') || '').trim();
+      if (name) {
+        if (!types.some(t => (t.category || '').trim().toLowerCase() === name.toLowerCase())) {
+          types.push({ id: tempTypeId--, category: name, ctype: null, active: true, sort: 0 });
+        }
+        r.category = name; r.ctype = '';
+      }
+    } else {
+      r.category = el.value.trim();
+      // A type belongs to its category, so one that no longer fits is dropped rather than left lying.
+      if (r.ctype && typesFor(r.category).indexOf(r.ctype) < 0) r.ctype = '';
+    }
+    populateCatFilter(); renderTypes(); render(); setDirty();
+  }
+
+  function onTypePick(el) {
+    const i = Number(el.closest('tr').dataset.i);
+    syncDom();
+    const r = rows[i]; if (!r) return;
+    if (el.value === '__new') {
+      const cat = (r.category || '').trim();
+      if (!cat) { alert('Pick a category first \u2014 every type belongs to one.'); render(); return; }
+      const name = (prompt('New type in "' + cat + '"') || '').trim();
+      if (name) {
+        if (!types.some(t => typeKey(t.category, t.ctype) === typeKey(cat, name))) {
+          types.push({ id: tempTypeId--, category: cat, ctype: name, active: true, sort: 0 });
+        }
+        r.ctype = name;
+      }
+    } else {
+      r.ctype = el.value.trim();
+    }
+    renderTypes(); render(); setDirty();
+  }
 
   function onSupPick(el) {
     if (el.value !== '__new') { mark(); return; }
@@ -410,6 +511,67 @@
     render(); setDirty();
   }
 
+  // ---- categories & types --------------------------------------------------
+  function toggleTypes() {
+    const p = document.getElementById('typPanel');
+    p.style.display = (p.style.display === 'block') ? 'none' : 'block';
+  }
+  function renderTypes() {
+    if (!types.length) {
+      typBody.innerHTML = '<tr><td colspan="5" style="color:var(--ink-soft);">Nothing yet. Add a category below, or pick &#65291; New category&hellip; on any contract.</td></tr>';
+      return;
+    }
+    const order = types.map((t, i) => i).sort((a, b) => {
+      const ta = types[a], tb = types[b];
+      const ca = (ta.category || '').toLowerCase(), cb = (tb.category || '').toLowerCase();
+      if (ca !== cb) return ca < cb ? -1 : 1;
+      const sa = sortOf(ta), sb = sortOf(tb);
+      if (sa !== sb) return sa - sb;
+      return String(ta.ctype || '').localeCompare(String(tb.ctype || ''));
+    });
+    typBody.innerHTML = order.map(i => {
+      const t = types[i];
+      const used = rows.filter(r => typeKey(r.category, r.ctype) === typeKey(t.category, t.ctype)).length;
+      return '<tr data-ti="' + i + '">' +
+        '<td><input type="text" class="t-cat" list="catList" value="' + esc(t.category || '') + '" onchange="mark()" oninput="mark()"></td>' +
+        '<td><input type="text" class="t-type" value="' + esc(t.ctype || '') + '" placeholder="(category only)" onchange="mark()" oninput="mark()"></td>' +
+        '<td style="text-align:center;"><input type="checkbox" class="t-active" ' + (t.active === false ? '' : 'checked') + ' onchange="mark()" style="width:auto;"></td>' +
+        '<td><input type="number" class="t-sort" value="' + esc(sortOf(t)) + '" step="1" style="width:76px;" onchange="mark()" oninput="mark()"></td>' +
+        '<td><span style="color:var(--ink-soft); font-size:12px; margin-right:8px;">' + (used ? used + ' in use' : '') + '</span>' +
+        '<button class="del" onclick="delType(' + i + ')">Delete</button></td>' +
+      '</tr>';
+    }).join('');
+  }
+  function syncTypDom() {
+    typBody.querySelectorAll('tr[data-ti]').forEach(tr => {
+      const t = types[Number(tr.dataset.ti)];
+      if (!t) return;
+      t.category = tr.querySelector('.t-cat').value.trim();
+      t.ctype    = tr.querySelector('.t-type').value.trim() || null;
+      t.active   = tr.querySelector('.t-active').checked;
+      const n = Number(tr.querySelector('.t-sort').value);
+      t.sort = isFinite(n) ? n : 0;
+    });
+  }
+  function addType() {
+    syncTypDom();
+    document.getElementById('typPanel').style.display = 'block';
+    types.push({ id: tempTypeId--, category: '', ctype: null, active: true, sort: 0 });
+    renderTypes(); setDirty();
+    const last = typBody.querySelector('tr:last-child .t-cat');
+    if (last) last.focus();
+  }
+  function delType(i) {
+    syncTypDom(); syncDom();
+    const t = types[i]; if (!t) return;
+    const used = rows.filter(r => typeKey(r.category, r.ctype) === typeKey(t.category, t.ctype)).length;
+    const label = ((t.category || '') + (t.ctype ? ' \u2014 ' + t.ctype : '')).trim() || 'This entry';
+    if (used && !confirm('"' + label + '" is used by ' + used + ' contract' + (used === 1 ? '' : 's') + '. Delete it from the list anyway? Those contracts keep the value \u2014 it just stops being offered to new ones.')) return;
+    if (t.id != null && t.id > 0) deletedTypes.push(t.id);
+    types.splice(i, 1);
+    renderTypes(); render(); setDirty();
+  }
+
   // ---- suppliers -----------------------------------------------------------
   function toggleSuppliers() {
     const p = document.getElementById('supPanel');
@@ -467,7 +629,8 @@
   function populateCatFilter() {
     const sel = document.getElementById('filterCat');
     const cur = sel.value || 'All';
-    const cats = distinct('category');
+    const cats = activeCategories();
+    distinct('category').forEach(c => { if (cats.indexOf(c) < 0) cats.push(c); });
     sel.innerHTML = '<option value="All">All categories</option>' + cats.map(c => '<option' + (c === cur ? ' selected' : '') + '>' + esc(c) + '</option>').join('');
     if (cur !== 'All' && cats.indexOf(cur) < 0) sel.value = 'All';
   }
@@ -478,7 +641,17 @@
   // is safe because name is UNIQUE in the database.
   async function saveAll() {
     const msg = document.getElementById('msg'); msg.style.color = '#1e3a8a'; msg.textContent = 'Saving\u2026';
-    syncSupDom(); syncDom();
+    syncSupDom(); syncTypDom(); syncDom();
+
+    for (const t of types) if (!t.category) { msg.style.color = '#c0392b'; msg.textContent = 'Every category / type row needs a category.'; document.getElementById('typPanel').style.display = 'block'; return; }
+    const tkeys = types.map(t => typeKey(t.category, t.ctype));
+    const tdupe = tkeys.find((k, i) => tkeys.indexOf(k) !== i);
+    if (tdupe) {
+      const t = types[tkeys.indexOf(tdupe)];
+      msg.style.color = '#c0392b';
+      msg.textContent = 'The same category / type pair is listed twice: "' + (t.category || '') + (t.ctype ? ' \u2014 ' + t.ctype : '') + '".';
+      document.getElementById('typPanel').style.display = 'block'; return;
+    }
 
     for (const s of suppliers) if (!s.name) { msg.style.color = '#c0392b'; msg.textContent = 'Every supplier needs a name.'; document.getElementById('supPanel').style.display = 'block'; return; }
     const names = suppliers.map(s => s.name.toLowerCase());
@@ -500,6 +673,26 @@
       const remap = {};
       suppliers.forEach(s => { if (s.id != null && s.id < 0) { const real = byName[s.name.toLowerCase()]; if (real != null) remap[s.id] = real; } });
       rows.forEach(r => { if (r.supplier_id != null && remap[r.supplier_id] != null) r.supplier_id = remap[r.supplier_id]; });
+
+      // Categories and types are plain text on a contract, not a foreign key, so a rename in the
+      // panel has to be carried across by hand before the contracts are written back.
+      for (const t of types) {
+        if (t.id == null || t.id <= 0) continue;
+        const was = typeOrig[t.id];
+        if (!was || was === typeKey(t.category, t.ctype)) continue;
+        rows.forEach(r => {
+          if (typeKey(r.category, r.ctype) !== was) return;
+          r.category = t.category;
+          r.ctype = t.ctype || '';
+        });
+      }
+      for (const id of deletedTypes) await App.write('DELETE', 'bd_contract_types?id=eq.' + id, undefined);
+      deletedTypes = [];
+      for (const t of types) {
+        const payload = { category: t.category, ctype: t.ctype || null, active: t.active !== false, sort: sortOf(t) };
+        if (t.id != null && t.id > 0) await App.write('PATCH', 'bd_contract_types?id=eq.' + t.id, payload);
+        else await App.write('POST', 'bd_contract_types', payload);
+      }
 
       for (const id of deleted) await App.write('DELETE', 'bd_contracts?id=eq.' + id, undefined);
       deleted = [];
@@ -535,15 +728,20 @@
     const status = document.getElementById('status');
     try {
       status.style.display = ''; status.className = 's-load'; status.textContent = 'Loading\u2026';
-      const [cs, sp] = await Promise.all([
+      const [cs, sp, tp] = await Promise.all([
         App.rest('bd_contracts?order=category.asc,end_date.asc'),
-        App.rest('bd_contract_suppliers?order=name.asc')
+        App.rest('bd_contract_suppliers?order=name.asc'),
+        App.rest('bd_contract_types?order=category.asc,sort.asc,ctype.asc')
       ]);
       rows = cs || [];
       suppliers = sp || [];
-      deleted = []; deletedSups = []; dirty = false; tempId = -1;
+      types = tp || [];
+      // snapshot every pair as loaded, so a rename can be told apart from a new entry on save
+      Object.keys(typeOrig).forEach(k => { delete typeOrig[k]; });
+      types.forEach(t => { if (t.id != null) typeOrig[t.id] = typeKey(t.category, t.ctype); });
+      deleted = []; deletedSups = []; deletedTypes = []; dirty = false; tempId = -1; tempTypeId = -1;
       document.getElementById('unsaved').style.display = 'none';
-      populateCatFilter(); renderSuppliers(); render();
+      populateCatFilter(); renderSuppliers(); renderTypes(); render();
       status.style.display = 'none';
     } catch (e) { status.style.display = ''; status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
