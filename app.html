@@ -68,6 +68,47 @@
     .navdrop-item:hover { background:var(--accent-soft); color:var(--accent-dark); }
     .navdrop-group { font-size:11px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-soft); padding:8px 12px 4px; }
     .navdrop-group:first-child { padding-top:4px; }
+
+    /* ---- LC-508: the stream hub ------------------------------------------
+       The app has two functions plus its setup, and the top level now says so.
+       The hub is the front door: three boxes, no toolbar. Choosing one enters
+       that stream and lands on its own overview; the house button comes back
+       here. All colours come from the CSS variables, so dark mode is free. */
+    .hub { max-width:1140px; margin:6px auto 0; }
+    .hub-lead { margin:0 0 20px; font-size:15px; line-height:1.5; color:var(--ink-soft); }
+    .hub-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+    @media (max-width: 860px) { .hub-grid { grid-template-columns:1fr; } }
+    .hub-box { display:block; width:100%; text-align:left; font-family:inherit; cursor:pointer;
+               background:var(--surface); border:1px solid var(--line-strong); border-radius:16px;
+               padding:24px 22px 20px; box-shadow:var(--shadow);
+               transition:transform .12s, box-shadow .12s, border-color .12s; }
+    .hub-box:hover { border-color:var(--accent); transform:translateY(-2px);
+                     box-shadow:0 8px 22px rgba(20,40,50,0.16), 0 2px 6px rgba(20,40,50,0.10); }
+    .hub-box:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+    .hub-box .hb-ic { width:46px; height:46px; border-radius:13px; display:flex; align-items:center;
+                      justify-content:center; background:var(--accent-soft); color:var(--accent-dark); margin-bottom:15px; }
+    .hub-box .hb-ttl { font-size:20px; font-weight:800; letter-spacing:-0.01em; color:var(--ink); }
+    .hub-box .hb-sub { margin-top:7px; font-size:13.5px; line-height:1.5; color:var(--ink-soft); }
+    .hub-box .hb-list { margin-top:14px; padding-top:11px; border-top:1px solid var(--line);
+                        font-size:12px; line-height:1.5; color:var(--ink-soft); }
+
+    /* ---- LC-508: in-shell index pages (Household landing, Setup landing) ----
+       Rendered from NAV itself so a page added to the toolbar cannot go missing
+       from the index, and vice versa. */
+    .idx-wrap { padding:2px 0 6px; }
+    .idx-head { margin:0 0 4px; font-size:21px; font-weight:800; letter-spacing:-0.01em; color:var(--ink); }
+    .idx-lead { margin:0 0 20px; font-size:14px; line-height:1.5; color:var(--ink-soft); }
+    .idx-group { margin:0 0 22px; }
+    .idx-group h3 { margin:0 0 10px; font-size:11.5px; font-weight:800; letter-spacing:0.06em;
+                    text-transform:uppercase; color:var(--ink-soft); border:none; padding:0; }
+    .idx-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(215px,1fr)); gap:10px; }
+    .idx-card { text-align:left; font-family:inherit; cursor:pointer; background:var(--surface-2);
+                border:1px solid var(--line); border-radius:12px; padding:13px 15px;
+                transition:background .12s, border-color .12s; }
+    .idx-card:hover { background:var(--accent-soft); border-color:var(--accent-border); }
+    .idx-card:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    .idx-card b { display:block; font-size:15px; font-weight:700; color:var(--ink); }
+    .idx-card span { display:block; margin-top:4px; font-size:12px; line-height:1.4; color:var(--ink-soft); }
     /* the old always-on second-row subnav is superseded by the dropdowns above; hidden
        above phone width only, so the ≤600px select+row fallback keeps working untouched */
     @media (min-width: 601px) {
@@ -1570,24 +1611,27 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-507</span>
+      <span class="build-stamp">LC-508</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
 
   <div class="shell">
-  <select id="tabSelect" class="tab-select" onchange="showTab(null, this.value)" aria-label="Choose section">
+  <!-- LC-508: the front door. Rendered by renderHub() from STREAMS so the boxes and
+       the toolbar can never describe different things. -->
+  <div id="hub" class="hub"></div>
+  <select id="tabSelect" class="tab-select" onchange="showTab(null, this.value)" aria-label="Choose section" style="display:none;">
     <option value="Overview">Overview</option>
     <option value="LogEntry">Log Entry</option>
     <option value="Forecast">Forecast</option>
-    <option value="LivingCosts">Living Costs</option>
+    <option value="LivingCosts">Household</option>
     <option value="Modelling">Modelling</option>
     <option value="Intelligent">Intelligent Modelling</option>
-    <option value="BasicData">Basic Data</option>
+    <option value="BasicData">Setup</option>
   </select>
-  <div class="tab-buttons" id="navBar"><!-- LC-465: rendered by renderNav() --></div>
+  <div class="tab-buttons" id="navBar" style="display:none;"><!-- LC-465: rendered by renderNav() --></div>
 
-  <div id="Overview" class="tabcontent active">
+  <div id="Overview" class="tabcontent">
     <div class="subtab-buttons">
       <button id="subbtn-PerfKPIs" class="subtab-link active-sub" onclick="showSub(event,'PerfKPIs')">Overview</button>
       <button id="subbtn-OverviewDash" class="subtab-link" onclick="showSub(event,'OverviewDash')">Old dashboard</button>
@@ -2124,7 +2168,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="subtab-buttons lc-nav">
       <span class="subtab-group-label">Planned costs</span>
       <div class="subtab-row">
-      <button id="subbtn-Budget" class="subtab-link active-sub" onclick="showSub(event,'Budget')">Budget</button>
+      <button id="subbtn-HouseOverview" class="subtab-link active-sub" onclick="showSub(event,'HouseOverview')">Overview</button>
+      <button id="subbtn-Budget" class="subtab-link" onclick="showSub(event,'Budget')">Budget</button>
       <button id="subbtn-Bills" class="subtab-link" onclick="showSub(event,'Bills')">Bills</button>
       <button id="subbtn-Contracts" class="subtab-link" onclick="showSub(event,'Contracts')">Contracts</button>
       <button id="subbtn-WeeklyPlan" class="subtab-link" onclick="showSub(event,'WeeklyPlan')">Weekly Plan</button>
@@ -2150,6 +2195,9 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       <button id="subbtn-PayPal" class="subtab-link" onclick="showSub(event,'PayPal')">PayPal</button>
       </div>
     </div>
+    <!-- LC-508: Household landing. Rendered in-shell (no iframe) by renderIndex().
+         This is the placeholder the household dashboard will grow into. -->
+    <div id="sub-HouseOverview" class="subtabcontent"></div>
     <div id="sub-Budget" class="subtabcontent"><iframe id="frame-Budget" class="app-frame" title="Monthly Budget"></iframe></div>
     <div id="sub-Bills" class="subtabcontent"><iframe id="frame-Bills" class="app-frame" title="Household Bills"></iframe></div>
     <div id="sub-Contracts" class="subtabcontent"><iframe id="frame-Contracts" class="app-frame" title="Contracts"></iframe></div>
@@ -2176,7 +2224,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
 
   <div id="BasicData" class="tabcontent">
     <div class="subtab-buttons">
-      <button id="subbtn-Members" class="subtab-link active-sub" onclick="showSub(event,'Members')">Members</button>
+      <button id="subbtn-SetupIndex" class="subtab-link active-sub" onclick="showSub(event,'SetupIndex')">Setup</button>
+      <button id="subbtn-Members" class="subtab-link" onclick="showSub(event,'Members')">Members</button>
       <button id="subbtn-Pensions" class="subtab-link" onclick="showSub(event,'Pensions')">Pensions</button>
       <button id="subbtn-Contributions" class="subtab-link" onclick="showSub(event,'Contributions')">Contributions</button>
       <button id="subbtn-Income" class="subtab-link" onclick="showSub(event,'Income')">Workplace Income</button>
@@ -2186,6 +2235,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       <button id="subbtn-Backup" class="subtab-link" onclick="showSub(event,'Backup')">Backup</button>
     </div>
     <p class="note">Edit your reference data. Saving here updates the plan; reopen this dashboard to see new projections.</p>
+    <!-- LC-508: Setup landing. Rendered in-shell (no iframe) by renderIndex(). -->
+    <div id="sub-SetupIndex" class="subtabcontent"></div>
     <div id="sub-Members" class="subtabcontent"><iframe id="frame-Members" class="app-frame" title="Members"></iframe></div>
     <div id="sub-Pensions" class="subtabcontent"><iframe id="frame-Pensions" class="app-frame" title="Pensions"></iframe></div>
     <div id="sub-Contributions" class="subtabcontent"><iframe id="frame-Contributions" class="app-frame" title="Contributions"></iframe></div>
@@ -5292,10 +5343,14 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       panel.querySelectorAll('.subtab-link').forEach(el => el.classList.remove('active-sub'));
       document.getElementById('sub-' + name).style.display = 'block';
       if (evt) evt.currentTarget.classList.add('active-sub'); else { const b = document.getElementById('subbtn-' + name); if (b) b.classList.add('active-sub'); }
-      ensureFrame('frame-' + name, SUB_SRC[name] + FV);
-      // the frame may already be loaded (re-showing a hidden sub-tab) → re-measure now it's visible
-      const f = document.getElementById('frame-' + name);
-      if (f && f.getAttribute('src')) { setTimeout(() => sizeFrame(f), 50); }
+      // LC-508: some sub-tabs (the Household and Setup landings) are rendered by the
+      // shell itself and have no iframe. SUB_SRC is the test — no entry, no frame.
+      if (SUB_SRC[name]) {
+        ensureFrame('frame-' + name, SUB_SRC[name] + FV);
+        // the frame may already be loaded (re-showing a hidden sub-tab) → re-measure now it's visible
+        const f = document.getElementById('frame-' + name);
+        if (f && f.getAttribute('src')) { setTimeout(() => sizeFrame(f), 50); }
+      }
       if (typeof navSyncSub === 'function') navSyncSub(name);   // LC-465: refresh contextual row
     }
 
@@ -5368,43 +5423,35 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       if (id === 'PotTable') { ensureFrame('frame-PotTable', 'pot_table.html' + FV); pingFrame('frame-PotTable'); }
       if (id === 'Sensitivity') { ensureFrame('frame-Sensitivity', 'sensitivity.html' + FV); pingFrame('frame-Sensitivity'); }
       if (id === 'MonthlyAudit') { ensureFrame('frame-MonthlyAudit', 'monthly_audit.html' + FV); pingFrame('frame-MonthlyAudit'); }
-      if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Budget'); }
-      if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'Members'); }
+      if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'HouseOverview'); }
+      if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'SetupIndex'); }
+      if (id === 'Overview' && !window.__ov) { window.__ov = true; showSub(null, 'PerfKPIs'); }
       if (typeof navSyncTab === 'function') navSyncTab(id);   // LC-465: refresh contextual row
     }
 
     // ---- LC-465: contextual toolbar ----------------------------------------
-    // Home (Overview) shows the top-level categories, each with a dropdown.
-    // Once you are inside a section the row becomes that section's own pages;
-    // the house button returns home. Buttons that do not fit collapse into a
+    // LC-508 — THREE STREAMS.
+    //
+    // The app does two jobs (retirement planning and household finance) plus its
+    // own setup, and the navigation now says so at the top level. The hub is the
+    // front door; choosing a stream enters it and lands on that stream's own
+    // overview; the house button returns to the hub.
+    //
+    // Inside a stream the toolbar is STABLE: it always shows that stream's
+    // categories, each with a dropdown, and never swaps into a second
+    // "pages of this section" mode. Two taps reach any page and the row never
+    // changes shape underneath you. Buttons that do not fit collapse into a
     // trailing "…" dropdown, recomputed on resize.
+    //
+    // `top` is the DOM tab that physically holds a category's pages — every
+    // household page is still a sub-tab of #LivingCosts and every setup page of
+    // #BasicData. The categories are a navigation construct only; no panel moved.
     // Dropdowns are position:fixed because .tab-buttons has overflow (LC-465).
-    const NAV_ORDER = ['Overview', 'LogEntry', 'Forecast', 'LivingCosts', 'Modelling', 'Intelligent', 'BasicData'];
     const NAV = {
-      Overview: {
-        label: 'Overview', top: 'Overview', kind: 'sub',
-        items: [ { l: 'Overview', s: 'PerfKPIs' }, { l: 'Old Dashboard', s: 'OverviewDash' } ]
-      },
-      LogEntry: { label: 'Log Entry', top: 'LogEntry', kind: 'leaf' },
-      Forecast: { label: 'Forecast', top: 'Forecast', kind: 'leaf' },
-      LivingCosts: {
-        label: 'Living Costs', top: 'LivingCosts', kind: 'sub',
-        items: [
-          { g: 'Planned costs' },
-          { l: 'Budget', s: 'Budget' }, { l: 'Bills', s: 'Bills' }, { l: 'Contracts', s: 'Contracts' }, { l: 'Weekly Plan', s: 'WeeklyPlan' },
-          { l: 'Actual Costs', s: 'ActualCosts' }, { l: 'Loans', s: 'Loans' },
-          { l: 'Bills Summary', s: 'BillsSummary' }, { l: 'What I Could Save', s: 'SaveForecast' },
-          { l: 'Bill Categories', s: 'BillCats' }, { l: 'Meal Costs', s: 'MealCosts' },
-          { l: 'Holiday Costs', s: 'HolidayCosts' },
-          { l: 'Fuel Costs', s: 'FuelCosts' },
-          { l: 'Holiday Summary', s: 'HolidaySummary' }, { l: 'Insurance Savings', s: 'InsSavings' },
-          { l: 'Gift Savings', s: 'GiftSavings' }, { l: 'Credit Card', s: 'CreditCard' },
-          { g: 'Actual costs' },
-          { l: 'Card Entry', s: 'CardEntry' }, { l: 'Card Statements', s: 'CardStatements' },
-          { l: 'Cost Analysis', s: 'CostAnalysis' }, { l: 'Card Categories', s: 'CardCats' },
-          { l: 'PayPal', s: 'PayPal' }
-        ]
-      },
+      // ---- Retirement planning ----
+      RetOverview: { label: 'Overview', kind: 'page', top: 'Overview', sub: 'PerfKPIs' },
+      LogEntry:    { label: 'Log Entry', kind: 'leaf', top: 'LogEntry' },
+      Forecast:    { label: 'Forecast', kind: 'leaf', top: 'Forecast' },
       Modelling: {
         label: 'Modelling', top: 'Modelling', kind: 'tabs',
         items: [
@@ -5416,22 +5463,124 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
           { l: 'Monthly Audit', t: 'MonthlyAudit' }
         ]
       },
-      Intelligent: { label: 'Intelligent Modelling', top: 'Intelligent', kind: 'leaf' },
-      BasicData: {
-        label: 'Basic Data', top: 'BasicData', kind: 'sub',
+      Intelligent: { label: 'Intelligent Modelling', kind: 'leaf', top: 'Intelligent' },
+
+      // ---- Household ----
+      HhOverview:  { label: 'Overview', kind: 'page', top: 'LivingCosts', sub: 'HouseOverview' },
+      Money: {
+        label: 'Money', top: 'LivingCosts', kind: 'sub',
         items: [
-          { l: 'Members', s: 'Members' }, { l: 'Pensions', s: 'Pensions' },
-          { l: 'Contributions', s: 'Contributions' }, { l: 'Workplace Income', s: 'Income' },
-          { l: 'Guaranteed Incomes', s: 'Guaranteed' }, { l: 'Defaults', s: 'Defaults' },
-          { l: 'Bank Accounts', s: 'BankAccts' }, { l: 'Backup', s: 'Backup' }
+          { l: 'Budget', s: 'Budget', d: 'Income in, bills out, what is left each month' },
+          { l: 'What I Could Save', s: 'SaveForecast', d: 'Month-by-month surplus for the years ahead' },
+          { l: 'Bills Summary', s: 'BillsSummary', d: 'The whole bill book totalled and grouped' }
+        ]
+      },
+      Commitments: {
+        label: 'Commitments', top: 'LivingCosts', kind: 'sub',
+        items: [
+          { l: 'Bills', s: 'Bills', d: 'Every recurring bill and how it is paid' },
+          { l: 'Contracts', s: 'Contracts', d: 'Renewal dates, suppliers and expiry reminders' },
+          { l: 'Loans', s: 'Loans', d: 'Balances outstanding and payments remaining' },
+          { l: 'Insurance Savings', s: 'InsSavings', d: 'Set-asides for policies funded from savings' },
+          { l: 'Gift Savings', s: 'GiftSavings', d: 'Xmas and birthday money, smoothed monthly' }
+        ]
+      },
+      Spending: {
+        label: 'Spending', top: 'LivingCosts', kind: 'sub',
+        items: [
+          { l: 'Card Entry', s: 'CardEntry', d: 'Enter card transactions, by hand or by photo' },
+          { l: 'Card Statements', s: 'CardStatements', d: 'Statements as recorded, month by month' },
+          { l: 'Credit Card', s: 'CreditCard', d: 'The card estimate used by the budget' },
+          { l: 'Cost Analysis', s: 'CostAnalysis', d: 'Where the money actually went, by category' },
+          { l: 'PayPal', s: 'PayPal', d: 'PayPal spend, as one line in its funding account' },
+          { l: 'Actual Costs', s: 'ActualCosts', d: 'Which categories are stated from real spend' }
+        ]
+      },
+      Plans: {
+        label: 'Plans', top: 'LivingCosts', kind: 'sub',
+        items: [
+          { l: 'Weekly Plan', s: 'WeeklyPlan', d: 'The week as planned: meals, fuel, plan-or-actual basis' },
+          { l: 'Meal Costs', s: 'MealCosts', d: 'What each kind of meal is assumed to cost' },
+          { l: 'Holiday Costs', s: 'HolidayCosts', d: 'The cost model behind a holiday week' },
+          { l: 'Fuel Costs', s: 'FuelCosts', d: 'Commuting and leisure mileage, priced' },
+          { l: 'Holiday Summary', s: 'HolidaySummary', d: 'The planned holiday year, totalled' }
+        ]
+      },
+      Reference: {
+        label: 'Reference', top: 'LivingCosts', kind: 'sub',
+        items: [
+          { l: 'Bill Categories', s: 'BillCats', d: 'The category vocabulary bills are filed under' },
+          { l: 'Card Categories', s: 'CardCats', d: 'How card transactions are classified' }
+        ]
+      },
+
+      // ---- Setup ----
+      SetupIdx: { label: 'Overview', kind: 'page', top: 'BasicData', sub: 'SetupIndex' },
+      SetupPages: {
+        label: 'Setup', top: 'BasicData', kind: 'sub',
+        items: [
+          { l: 'Members', s: 'Members', d: 'Who is in the household, and their dates' },
+          { l: 'Pensions', s: 'Pensions', d: 'Each pot, its provider and its settings' },
+          { l: 'Contributions', s: 'Contributions', d: 'The dated contribution schedule' },
+          { l: 'Workplace Income', s: 'Income', d: 'Salaries, tiers and review months' },
+          { l: 'Guaranteed Incomes', s: 'Guaranteed', d: 'State pension and other fixed incomes' },
+          { l: 'Defaults', s: 'Defaults', d: 'Growth, inflation and modelling assumptions' },
+          { l: 'Bank Accounts', s: 'BankAccts', d: 'The accounts bills and income run through' },
+          { l: 'Backup', s: 'Backup', d: 'Export everything, or restore from a file' }
         ]
       }
     };
+
+    const STREAMS = {
+      Retirement: {
+        label: 'Retirement planning',
+        blurb: 'Track the pots, log their values, and model what retirement looks like from here.',
+        holds: 'Overview · Log Entry · Forecast · Modelling · Intelligent Modelling',
+        order: ['RetOverview', 'LogEntry', 'Forecast', 'Modelling', 'Intelligent'],
+        landing: ['Overview', 'PerfKPIs'],
+        icon: 'M3 20h18M6 20V10m5 10V4m5 16v-7m5 7V8'
+      },
+      Household: {
+        label: 'Household',
+        blurb: 'The money coming in and going out: budget, bills, contracts, cards and the plans behind them.',
+        holds: 'Overview · Money · Commitments · Spending · Plans · Reference',
+        order: ['HhOverview', 'Money', 'Commitments', 'Spending', 'Plans', 'Reference'],
+        landing: ['LivingCosts', 'HouseOverview'],
+        icon: 'M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3l9-8z'
+      },
+      Setup: {
+        label: 'Setup',
+        blurb: 'The reference data both streams are built on, and the backup that protects it.',
+        holds: 'Members · Pensions · Contributions · Income · Accounts · Backup',
+        order: ['SetupIdx', 'SetupPages'],
+        landing: ['BasicData', 'SetupIndex'],
+        icon: 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-1.8-.3 1.6 1.6 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.6 1.6 0 00-1-1.5 1.6 1.6 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.6 1.6 0 00.3-1.8 1.6 1.6 0 00-1.5-1H3a2 2 0 110-4h.1a1.6 1.6 0 001.5-1 1.6 1.6 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.6 1.6 0 001.8.3H9a1.6 1.6 0 001-1.5V3a2 2 0 114 0v.1a1.6 1.6 0 001 1.5 1.6 1.6 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00-.3 1.8V9a1.6 1.6 0 001.5 1H21a2 2 0 110 4h-.1a1.6 1.6 0 00-1.5 1z'
+      }
+    };
+    const STREAM_ORDER = ['Retirement', 'Household', 'Setup'];
+
     // the eleven Modelling pages are separate top-level tabs in the DOM, not sub-tabs
     const NAV_MODEL_TABS = NAV.Modelling.items.map(i => i.t);
-    function navSectionOf(tabId) { return NAV_MODEL_TABS.indexOf(tabId) >= 0 ? 'Modelling' : tabId; }
 
-    let navSection = 'Overview';   // which section's row is on screen
+    // reverse index: which category (and therefore which stream) owns a given page.
+    // Built from NAV so it cannot drift out of step with the toolbar.
+    const NAV_OWNER = {};      // page id (sub name or tab id) -> category key
+    Object.keys(NAV).forEach(key => {
+      const s = NAV[key];
+      if (s.kind === 'page') { NAV_OWNER[s.sub] = key; return; }
+      if (s.kind === 'leaf') { NAV_OWNER[s.top] = key; return; }
+      (s.items || []).forEach(it => { if (!it.g) NAV_OWNER[it.t || it.s] = key; });
+    });
+    const CAT_STREAM = {};     // category key -> stream key
+    STREAM_ORDER.forEach(sk => { STREAMS[sk].order.forEach(cat => { CAT_STREAM[cat] = sk; }); });
+
+    function navSectionOf(tabId) {
+      if (NAV_MODEL_TABS.indexOf(tabId) >= 0) return 'Modelling';
+      return NAV_OWNER[tabId] || null;
+    }
+
+    let navStream = null;          // which stream is open; null = the hub
+    let navSection = 'RetOverview';// which category the current page belongs to
     let navCurrent = 'PerfKPIs';   // active page (sub name, or tab id for Modelling)
 
     function navCloseAll() {
@@ -5509,87 +5658,45 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       return o;
     }
 
-    // split a section's item list on its { g: '...' } group markers.
-    // Sections with no markers come back as a single unnamed group.
-    function navGroupsOf(sectionKey) {
-      const sec = NAV[sectionKey];
-      if (!sec || !sec.items) return [];
-      const out = [];
-      let cur = null;
-      sec.items.forEach(raw => {
-        if (raw.g) { cur = { name: raw.g, items: [] }; out.push(cur); return; }
-        if (!cur) { cur = { name: sec.label, items: [] }; out.push(cur); }
-        cur.items.push(raw);
-      });
-      return out;
-    }
-
     function renderNav() {
       const bar = document.getElementById('navBar');
       if (!bar) return;
       navCloseAll();
       bar.innerHTML = '';
+      if (!navStream) { bar.style.display = 'none'; return; }
+      bar.style.display = '';
 
-      // house — always first; one tap returns to Overview
-      const home = navBtn('', () => navGoSub('Overview', 'PerfKPIs'), navSection === 'Overview', 'padding:11px 14px');
+      // house — always first; one tap returns to the hub
+      const home = navBtn('', goHub, false, 'padding:11px 14px');
       home.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:block;pointer-events:none"><path d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3l9-8z"/></svg>';
-      home.setAttribute('aria-label', 'Overview (home)');
-      home.setAttribute('title', 'Overview');
+      home.setAttribute('aria-label', 'Back to the home screen');
+      home.setAttribute('title', 'Home');
       bar.appendChild(home);
 
-      // house companion "▾" — Overview's own pages, reachable from anywhere.
-      // Without this, Old Dashboard has no home: the row shows categories when
-      // on Overview, and Overview is skipped in NAV_ORDER because it IS the house.
-      const ovPrepped = NAV.Overview.items.map(raw => navPrep('Overview', raw));
-      const ovBtn = navBtn('\u25BE', () => navToggle('Overview'), false, 'padding:11px 8px');
-      ovBtn.setAttribute('aria-label', 'Overview pages');
-      bar.appendChild(navWrap(ovBtn, navDropdownFor('Overview', ovPrepped, navCurrent)));
+      // the stream's own name, so it is always clear which half of the app you are in
+      const tag = document.createElement('span');
+      tag.className = 'nav-stream';
+      tag.textContent = STREAMS[navStream].label;
+      tag.setAttribute('style', 'flex:0 0 auto; align-self:center; padding:0 12px 0 4px; font-size:12px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-soft); white-space:nowrap;');
+      bar.appendChild(tag);
 
-      const sec = NAV[navSection];
-      const inSection = sec && sec.kind !== 'leaf' && navSection !== 'Overview';
+      // this stream's categories, in order — the row never changes shape inside a stream
       const items = [];   // measurable flex children, in order, that may collapse
-
-      if (inSection) {
-        // section mode: this section's own pages.
-        // LC-465: where a section is split into groups (Living Costs → Planned /
-        // Actual), show only the group the current page belongs to, and lead with
-        // a group-selector dropdown so the other group is still one tap away.
-        const groups = navGroupsOf(navSection);
-        if (groups.length > 1) {
-          let g = groups.find(gr => gr.items.some(i => (i.t || i.s) === navCurrent)) || groups[0];
-          const all = [];
-          groups.forEach(gr => {
-            all.push({ g: gr.name });
-            gr.items.forEach(raw => all.push(navPrep(navSection, raw)));
-          });
-          const gBtn = navBtn(g.name + ' \u25BE', () => navToggle('Group'), false);
-          gBtn.setAttribute('aria-label', 'Switch cost group');
-          bar.appendChild(navWrap(gBtn, navDropdownFor('Group', all, navCurrent)));
-          g.items.forEach(raw => {
-            const it = navPrep(navSection, raw);
-            items.push(navBtn(it.l, it.__go, it.__id === navCurrent));
-          });
-        } else {
-          sec.items.forEach(raw => {
-            if (raw.g) return;
-            const it = navPrep(navSection, raw);
-            items.push(navBtn(it.l, it.__go, it.__id === navCurrent));
-          });
+      STREAMS[navStream].order.forEach(key => {
+        const s = NAV[key];
+        if (!s) return;
+        if (s.kind === 'page') {
+          items.push(navBtn(s.label, () => navGoSub(s.top, s.sub), navCurrent === s.sub));
+          return;
         }
-      } else {
-        // home mode: the top-level categories, each with its own dropdown
-        NAV_ORDER.forEach(key => {
-          const s = NAV[key];
-          if (key === 'Overview') return;          // Overview is the house button
-          if (s.kind === 'leaf') {
-            items.push(navBtn(s.label, () => navGoTab(s.top), navSection === key));
-            return;
-          }
-          const prepped = s.items.map(raw => navPrep(key, raw));
-          const btn = navBtn(s.label + ' \u25BE', () => navToggle(key), navSection === key);
-          items.push(navWrap(btn, navDropdownFor(key, prepped, navCurrent)));
-        });
-      }
+        if (s.kind === 'leaf') {
+          items.push(navBtn(s.label, () => navGoTab(s.top), navCurrent === s.top));
+          return;
+        }
+        const prepped = s.items.map(raw => navPrep(key, raw));
+        const btn = navBtn(s.label + ' \u25BE', () => navToggle(key), navSection === key);
+        items.push(navWrap(btn, navDropdownFor(key, prepped, navCurrent)));
+      });
       items.forEach(el => bar.appendChild(el));
 
       // trailing "…" — holds whatever does not fit
@@ -5636,16 +5743,112 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       });
     }
 
-    // called from showTab / showSub so the row always reflects where you are
-    function navSyncTab(tabId) {
-      const s = navSectionOf(tabId);
-      if (!NAV[s]) return;
-      navSection = s;
-      if (NAV[s].kind === 'tabs') navCurrent = tabId;
-      else if (NAV[s].kind === 'leaf') navCurrent = tabId;
+    // called from showTab / showSub so the row always reflects where you are.
+    // A page always knows its own category, and a category its stream, so landing
+    // anywhere — including from the phone <select> — puts the right toolbar up.
+    function navSyncTo(pageId) {
+      const cat = navSectionOf(pageId);
+      if (!cat || !NAV[cat]) return;
+      navSection = cat;
+      navCurrent = pageId;
+      if (CAT_STREAM[cat]) navStream = CAT_STREAM[cat];
       renderNav();
     }
-    function navSyncSub(name) { navCurrent = name; renderNav(); }
+    function navSyncTab(tabId) {
+      // a container tab (LivingCosts / BasicData) is reported by its own sub-tab instead
+      if (tabId === 'LivingCosts' || tabId === 'BasicData' || tabId === 'Overview') return;
+      navSyncTo(tabId);
+    }
+    function navSyncSub(name) { navSyncTo(name); }
+
+    // ---- LC-508: the hub -------------------------------------------------
+    function goHub() {
+      navCloseAll();
+      navStream = null;
+      document.querySelectorAll('.tabcontent').forEach(el => { el.style.display = 'none'; el.classList.remove('active'); });
+      const hub = document.getElementById('hub'); if (hub) hub.style.display = 'block';
+      const bar = document.getElementById('navBar'); if (bar) { bar.innerHTML = ''; bar.style.display = 'none'; }
+      const sel = document.getElementById('tabSelect'); if (sel) sel.style.display = 'none';
+      const title = document.getElementById('appTitle'); if (title) title.style.display = '';
+      window.scrollTo(0, 0);
+    }
+    function enterStream(key) {
+      const st = STREAMS[key];
+      if (!st) return;
+      navStream = key;
+      const hub = document.getElementById('hub'); if (hub) hub.style.display = 'none';
+      const sel = document.getElementById('tabSelect'); if (sel) sel.style.display = '';
+      showTab(null, st.landing[0]);
+      if (st.landing[1]) showSub(null, st.landing[1]);
+      renderNav();
+      window.scrollTo(0, 0);
+    }
+    function renderHub() {
+      const host = document.getElementById('hub');
+      if (!host) return;
+      host.innerHTML = '';
+      const lead = document.createElement('p');
+      lead.className = 'hub-lead';
+      lead.textContent = 'Two jobs and the data behind them. Pick one to begin \u2014 the house button brings you back here.';
+      host.appendChild(lead);
+      const grid = document.createElement('div');
+      grid.className = 'hub-grid';
+      STREAM_ORDER.forEach(key => {
+        const st = STREAMS[key];
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'hub-box';
+        b.innerHTML =
+          '<div class="hb-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+          'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="' + st.icon + '"/></svg></div>' +
+          '<div class="hb-ttl"></div><div class="hb-sub"></div><div class="hb-list"></div>';
+        b.querySelector('.hb-ttl').textContent = st.label;
+        b.querySelector('.hb-sub').textContent = st.blurb;
+        b.querySelector('.hb-list').textContent = st.holds;
+        b.addEventListener('click', () => enterStream(key));
+        grid.appendChild(b);
+      });
+      host.appendChild(grid);
+    }
+
+    // ---- LC-508: in-shell index pages ------------------------------------
+    // Built from NAV, so the index and the toolbar always list the same pages.
+    function renderIndex(hostId, streamKey, heading, lead) {
+      const host = document.getElementById(hostId);
+      if (!host) return;
+      host.innerHTML = '';
+      const wrap = document.createElement('div');
+      wrap.className = 'idx-wrap';
+      const h = document.createElement('div'); h.className = 'idx-head'; h.textContent = heading; wrap.appendChild(h);
+      const p = document.createElement('p'); p.className = 'idx-lead'; p.textContent = lead; wrap.appendChild(p);
+      STREAMS[streamKey].order.forEach(key => {
+        const s = NAV[key];
+        if (!s || s.kind === 'page' || !s.items) return;
+        const g = document.createElement('div'); g.className = 'idx-group';
+        const gh = document.createElement('h3'); gh.textContent = s.label; g.appendChild(gh);
+        const grid = document.createElement('div'); grid.className = 'idx-grid';
+        s.items.forEach(raw => {
+          if (raw.g) return;
+          const it = navPrep(key, raw);
+          const c = document.createElement('button');
+          c.type = 'button';
+          c.className = 'idx-card';
+          const b = document.createElement('b'); b.textContent = it.l; c.appendChild(b);
+          if (raw.d) { const sp = document.createElement('span'); sp.textContent = raw.d; c.appendChild(sp); }
+          c.addEventListener('click', it.__go);
+          grid.appendChild(c);
+        });
+        g.appendChild(grid);
+        wrap.appendChild(g);
+      });
+      host.appendChild(wrap);
+    }
+    function renderLandings() {
+      renderIndex('sub-HouseOverview', 'Household', 'Household',
+        'The household dashboard will live here. Until it does, every household page is one tap away.');
+      renderIndex('sub-SetupIndex', 'Setup', 'Setup',
+        'Reference data both streams are built on. Changes here feed the budget and the model alike.');
+    }
 
     document.addEventListener('click', function (e) {
       if (!e.target.closest('.navwrap')) navCloseAll();
@@ -6192,14 +6395,24 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
 </script>
 
 <script>
-/* LC-455: the Overview tab opens on the KPI page. The previous dashboard is parked as a
-   second sub-tab while the compact overview is built out on kpis.html. */
+/* LC-508: the app opens on the hub, not on a page. The three stream boxes and the two
+   in-shell landing pages are all rendered from NAV/STREAMS, so they cannot drift apart
+   from the toolbar. Supersedes LC-455, which opened the Overview tab on the KPI page —
+   that page is now the Retirement stream's landing and is reached by choosing the stream.
+
+   The Overview tab still holds sub-OverviewDash, whose hero computes the readiness
+   metrics pushed into kpis.html. It renders hidden exactly as it did before, and the
+   frame's own 'kpi-ready' handshake covers the case where the frame loads later than
+   the last metrics push — which is now the normal case, since the frame is not created
+   until the Retirement stream is entered. */
 (function () {
-  function openKpiOverview() {
-    if (typeof showSub === 'function') showSub(null, 'PerfKPIs');
+  function boot() {
+    if (typeof renderHub === 'function') renderHub();
+    if (typeof renderLandings === 'function') renderLandings();
+    if (typeof goHub === 'function') goHub();
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', openKpiOverview, { once:true });
-  else openKpiOverview();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once:true });
+  else boot();
 })();
 </script>
 <script>
@@ -6285,7 +6498,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-507';
+    if (stamp) stamp.textContent = 'LC-508';
   }
 
   function buildSubnav() {
