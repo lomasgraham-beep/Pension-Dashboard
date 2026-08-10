@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Household Overview</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=act4"></script>
+<style>
+  :root {
+    --accent:#1d3a63; --accent-dark:#14294a; --aqua:#0891b2;
+    --ink:#26333a; --ink-soft:#64748b; --line:#e2e8f0; --line-strong:#cbd5e1;
+    --surface:#ffffff; --surface-2:#f7f9fa;
+    --over:#c0392b; --under:#15803d; --warn:#b45309;
+  }
+  body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:16px; background:#fff; color:var(--ink); }
+  h1 { font-size:22px; margin:0 0 4px; color:var(--ink); }
+  h2 { font-size:16px; margin:0; color:var(--accent-dark); }
+  .note { color:var(--ink-soft); font-size:13px; margin:0 0 14px; max-width:900px; }
+  #status { padding:8px 12px; border-radius:6px; font-weight:bold; margin-bottom:12px; font-size:14px; background:#eff6ff; color:#1e3a8a; }
+  #status.s-err { background:#fdecea; color:#c0392b; }
+
+  .panel { background:var(--surface); border:1px solid var(--line); border-radius:12px;
+           box-shadow:0 2px 6px rgba(0,0,0,0.06); padding:14px 16px; margin-bottom:14px; }
+  .phead { display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+  .sub { font-size:12px; color:var(--ink-soft); margin:2px 0 0; }
+
+  /* --- KPI strip --- */
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:14px; }
+  .kpi { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 14px;
+         box-shadow:0 2px 6px rgba(0,0,0,0.06); }
+  .kpi .lbl { font-size:11px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; }
+  .kpi .val { font-size:24px; font-weight:bold; color:var(--accent-dark); font-variant-numeric:tabular-nums; margin-top:4px; }
+  .kpi .val.sm { font-size:17px; }
+  .kpi .foot { font-size:12px; color:var(--ink-soft); margin-top:2px; }
+  .val.over { color:var(--over); } .val.under { color:var(--under); }
+
+  /* --- two-column body --- */
+  .cols { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(0,1fr); gap:14px; align-items:start; }
+  @media (max-width:900px) { .cols { grid-template-columns:1fr; } }
+
+  /* --- month picker --- */
+  select { padding:8px 10px; border:1px solid var(--line-strong); border-radius:8px; font-size:14px;
+           background:#fff; color:var(--ink); font-family:inherit; }
+
+  /* --- variance table --- */
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  th,td { padding:8px 10px; border-bottom:1px solid var(--line); text-align:right; vertical-align:middle; }
+  th { background:var(--surface-2); font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-soft); font-weight:bold; }
+  th:first-child, td:first-child { text-align:left; }
+  td.cat { font-weight:600; }
+  td.num { font-variant-numeric:tabular-nums; white-space:nowrap; }
+  td.var.over { color:var(--over); font-weight:bold; }
+  td.var.under { color:var(--under); }
+  tr.total-row td { font-weight:bold; border-top:2px solid var(--line-strong); background:var(--surface-2); }
+  .bars { width:130px; }
+  .bar-track { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin:3px 0; }
+  .bar-fill { height:100%; border-radius:3px; }
+  .bar-plan { background:var(--ink-soft); }
+  .bar-act  { background:var(--aqua); }
+  .bar-act.over { background:var(--over); }
+  .barkey { font-size:11px; color:var(--ink-soft); margin-top:8px; }
+  .barkey i { display:inline-block; width:10px; height:6px; border-radius:3px; margin:0 4px 0 12px; vertical-align:middle; font-style:normal; }
+  .barkey i:first-child { margin-left:0; }
+
+  /* --- contracts strip --- */
+  .crow { display:flex; align-items:center; gap:10px; padding:9px 2px; border-bottom:1px solid var(--line); }
+  .crow:last-child { border-bottom:none; }
+  .cmain { flex:1 1 auto; min-width:0; }
+  .cname { font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cmeta { font-size:12px; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cbadge { flex:0 0 auto; font-size:12px; font-weight:bold; padding:4px 9px; border-radius:999px; white-space:nowrap; }
+  .b-exp  { background:#fdecea; color:#c0392b; }
+  .b-soon { background:#fef2f2; color:#b91c1c; }
+  .b-warn { background:#fff7ed; color:#b45309; }
+  .b-ok   { background:#f1f5f9; color:#475569; }
+  .empty { color:var(--ink-soft); font-size:13px; padding:10px 2px; }
+
+  .foot-note { font-size:12px; color:var(--ink-soft); margin-top:10px; line-height:1.5; }
+  .flag { display:inline-block; background:#fff7ed; color:#b45309; border:1px solid #fed7aa;
+          border-radius:8px; padding:6px 10px; font-size:12px; margin-top:10px; }
+
+  @media (prefers-color-scheme: dark) {
+    :root { --accent:#38d6e6; --accent-dark:#22c4d6; --aqua:#38d6e6;
+            --ink:#cbd5e1; --ink-soft:#94a3b8; --line:#334155; --line-strong:#475569;
+            --surface:#1e293b; --surface-2:#0f172a; --over:#f87171; --under:#4ade80; --warn:#fbbf24; }
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1 { color:#f1f5f9 !important; }
+    .panel, .kpi { background:#1e293b !important; border-color:#334155 !important; box-shadow:0 2px 4px rgba(0,0,0,0.4) !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+    #status.s-err { background:#3f1d1d !important; color:#fca5a5 !important; }
+    select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    th { background:#0f172a !important; color:#94a3b8 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; }
+    tr.total-row td { background:#0f172a !important; }
+    .bar-track { background:#334155 !important; }
+    .b-exp  { background:#3f1d1d !important; color:#fca5a5 !important; }
+    .b-soon { background:#3f1d1d !important; color:#fca5a5 !important; }
+    .b-warn { background:#3a2a10 !important; color:#fcd34d !important; }
+    .b-ok   { background:#0f172a !important; color:#94a3b8 !important; }
+    .flag { background:#3a2a10 !important; color:#fcd34d !important; border-color:#78350f !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Household Overview</h1>
+  <p class="note">What the card actually cost last month against what was planned, and which contracts are about to
+    renew. Categories shown are those with card activity in the last 12 months &mdash; <strong>Bills</strong> and
+    <strong>Reimburse</strong> are excluded. Planned figures are the annual cost divided by twelve, so a once-a-year
+    bill does not show up as a spike in the month it lands.
+    <span style="color:#94a3b8;">(household overview build: v1)</span></p>
+
+  <div id="status">Loading&hellip;</div>
+
+  <div id="kpiGrid" class="kpi-grid" style="display:none;">
+    <div class="kpi"><div class="lbl">Planned</div><div class="val" id="kPlan">&pound;0</div><div class="foot" id="kPlanFoot">&nbsp;</div></div>
+    <div class="kpi"><div class="lbl">Actual on card</div><div class="val" id="kAct">&pound;0</div><div class="foot" id="kActFoot">&nbsp;</div></div>
+    <div class="kpi"><div class="lbl">Variance</div><div class="val" id="kVar">&pound;0</div><div class="foot" id="kVarFoot">&nbsp;</div></div>
+    <div class="kpi"><div class="lbl">Contracts ending</div><div class="val" id="kCon">0</div><div class="foot" id="kConFoot">within 60 days</div></div>
+  </div>
+
+  <div class="cols" id="cols" style="display:none;">
+    <div class="panel">
+      <div class="phead">
+        <div>
+          <h2>Planned vs actual by category</h2>
+          <p class="sub" id="pvaSub">&nbsp;</p>
+        </div>
+        <select id="monthSel" onchange="onMonth()"></select>
+      </div>
+      <table>
+        <thead><tr><th>Category</th><th>Planned</th><th>Actual</th><th>Variance</th><th style="text-align:left;">Plan / actual</th></tr></thead>
+        <tbody id="pvaBody"></tbody>
+      </table>
+      <div class="barkey"><i class="bar-plan"></i>planned<i class="bar-act"></i>actual</div>
+      <div id="uncatFlag"></div>
+      <p class="foot-note" id="pvaFoot">&nbsp;</p>
+    </div>
+
+    <div class="panel">
+      <div class="phead">
+        <div>
+          <h2>Contracts ending soon</h2>
+          <p class="sub">Next 60 days, soonest first</p>
+        </div>
+      </div>
+      <div id="conBody"></div>
+    </div>
+  </div>
+
+<script>
+  const fmt = App.fmt, fmtDiff = App.fmtDiff;
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthName = ym => MONTHS[Number(ym.slice(5, 7)) - 1] + ' ' + ym.slice(0, 4);
+  const CONTRACT_WINDOW = 60;   // days ahead the attention strip covers
+
+  // Categories excluded from the comparison by name. Reimburse is already dropped by
+  // actualByCategory12mo; Bills is excluded here because those are direct debits with their own
+  // plan, and counting card-coded bill rows against the same plan would double the figure.
+  const isBills = (code, desc) => /^bills?$/i.test(String(code || '').trim()) || /^bills?$/i.test(String(desc || '').trim());
+
+  let txns = [];            // every card transaction { ym, code, amount }
+  let planByCode = {};      // category code -> planned MONTHLY run-rate
+  let scope = [];           // category codes in scope, from the 12-month card footprint
+  let months = [];          // months present in the card data, newest first
+  let catDesc = {};
+
+  // ---- dates (UTC whole days, so BST cannot shift a boundary) --------------------------
+  function dayNum(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+    return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 86400000 : null;
+  }
+  function todayNum() { const n = new Date(); return Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) / 86400000; }
+  function daysLeft(iso) { const d = dayNum(iso); return d == null ? null : d - todayNum(); }
+  function ukDate(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+    return m ? Number(m[3]) + '/' + Number(m[2]) + '/' + m[1] : '';
+  }
+  function prevCalendarMonth() {
+    const n = new Date();
+    let y = n.getFullYear(), m = n.getMonth();   // 0-based; this IS last month once decremented
+    if (m === 0) { m = 12; y -= 1; }
+    return y + '-' + ('0' + m).slice(-2);
+  }
+
+  // ---- planned side --------------------------------------------------------------------
+  // Identical to bills_summary.html: monthly bills honour the "paid in months" mask, weekly
+  // bills count 52 times. No age taper — "now" is always 1.0.
+  function annualOf(premium, frequency, payMonths) {
+    const p = Number(premium) || 0;
+    if (frequency === 'Weekly') return p * 52;
+    if (frequency === 'Annual') return p * 1;
+    const pm = payMonths;
+    const n = (pm && /^[01]{12}$/.test(pm)) ? (pm.match(/1/g) || []).length : 12;
+    return p * n;
+  }
+
+  // ---- transactions --------------------------------------------------------------------
+  // Paged, because a single large limit is capped server-side and silently loses rows.
+  async function fetchAllTxns() {
+    const page = 1000; let off = 0, all = [];
+    for (let i = 0; i < 500; i++) {
+      const chunk = await App.rest('bd_card_txn?select=txn_date,amount,category_code&order=txn_date.asc&limit=' + page + '&offset=' + off);
+      if (!chunk || !chunk.length) break;
+      all = all.concat(chunk);
+      if (chunk.length < page) break;
+      off += page;
+    }
+    return all;
+  }
+
+  // ---- load ----------------------------------------------------------------------------
+  async function load() {
+    const status = document.getElementById('status');
+    status.className = ''; status.style.display = 'block'; status.textContent = 'Loading\u2026';
+    try {
+      const [contracts, sups, cats, bills, tx,
+             hPlan, hCost, hMeal, hSet, dRota, fSet, fLines] = await Promise.all([
+        App.rest('bd_contracts?order=end_date.asc'),
+        App.rest('bd_contract_suppliers?order=name.asc'),
+        App.rest('bd_bill_category?select=code,description&order=code.asc'),
+        App.rest('bd_household_bills?order=bill_name.asc'),
+        fetchAllTxns(),
+        App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
+        App.rest('bd_holiday_cost'),
+        App.rest('bd_meal_cost'),
+        App.rest('bd_holiday_settings?id=eq.1'),
+        App.rest('bd_dining_rota'),
+        App.rest('bd_fuel_settings?id=eq.1'),
+        App.rest('bd_fuel_line?phase=eq.retired&order=sort_order.asc')
+      ]);
+
+      catDesc = {};
+      (cats || []).forEach(c => { catDesc[c.code] = c.description || ''; });
+      const sets = App.discretionaryCodeSets(cats || []);
+
+      // ---- scope: the card's own 12-month footprint ------------------------------------
+      // actualByCategory12mo already drops Reimburse and rows with no category. A category
+      // earns a place here by being spent on, not by being listed — so nothing has to be
+      // maintained by hand and a category that is not a card category never appears.
+      const agg = App.actualByCategory12mo(tx || [], cats || []);
+      scope = Object.keys(agg.byCode)
+        .filter(code => agg.byCode[code].count > 0 && !isBills(code, catDesc[code]))
+        .sort();
+
+      // ---- planned run-rate per category ------------------------------------------------
+      // RAW bills, deliberately NOT put through App.applyActualCosts(). That helper replaces a
+      // category's bill rows with its own card total whenever the category is switched to
+      // actuals on the Actual Costs page — which would make the plan equal the actual and the
+      // variance identically zero for exactly the categories most worth watching.
+      planByCode = {};
+      (bills || []).forEach(b => {
+        const code = b.category_code;
+        if (!code) return;
+        planByCode[code] = (planByCode[code] || 0) + annualOf(b.premium, b.frequency, b.pay_months) / 12;
+      });
+
+      // Dining / Holidays / Fuel have no bill rows — they are planner-backed. Add the PLAN
+      // annuals (not App.resolveDiscretionary, for the same reason as above), matching how
+      // bills_summary merges them into their categories.
+      try {
+        const ctx = App.holidayCtx(hCost || [], hMeal || [], (hSet && hSet[0]) || {});
+        const holPlanAnnual = App.holidayAnnual(hPlan || [], ctx, 'retired');
+        const mealMap = {};
+        (hMeal || []).forEach(c => { mealMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
+        const DAY_COLS = ['mon','tue','wed','thu','fri','sat','sun'];
+        const dinPlanAnnual = (dRota || []).reduce((sum, r) =>
+          sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
+        const fPlan = App.fuelAnnual(fLines || [], App.fuelCtx((fSet && fSet[0]) || {}));
+        addPlanner(sets.dining, 'Dining', dinPlanAnnual);
+        addPlanner(sets.holiday, 'Holiday', holPlanAnnual);
+        addPlanner(sets.fuel, 'Fuel', (Number(fPlan.workAnnual) || 0) + (Number(fPlan.discAnnual) || 0));
+      } catch (e) { /* planners unavailable — those rows simply show no plan */ }
+
+      // ---- transactions, flattened -------------------------------------------------------
+      txns = [];
+      (tx || []).forEach(t => {
+        const ym = String(t.txn_date || '').slice(0, 7);
+        if (ym.length !== 7) return;
+        const code = t.category_code || null;
+        if (code && sets.reimburse[code]) return;
+        txns.push({ ym: ym, code: code, amount: Number(t.amount) || 0 });
+      });
+
+      const seen = {};
+      txns.forEach(t => { seen[t.ym] = true; });
+      months = Object.keys(seen).sort().reverse().slice(0, 24);
+
+      status.style.display = 'none';
+      document.getElementById('kpiGrid').style.display = 'grid';
+      document.getElementById('cols').style.display = 'grid';
+
+      buildMonthPicker();
+      renderContracts(contracts || [], sups || []);
+      renderComparison();
+    } catch (e) {
+      status.className = 's-err'; status.style.display = 'block';
+      status.textContent = 'Could not load: ' + (e && e.message ? e.message : e);
+    }
+  }
+
+  // Add a planner annual to whichever code the category actually uses; fall back to the
+  // conventional label when the set is empty (no such bill category defined yet).
+  function addPlanner(set, fallbackCode, annual) {
+    if (!(Number(annual) > 0)) return;
+    const keys = Object.keys(set || {});
+    const code = keys.length ? keys[0] : fallbackCode;
+    planByCode[code] = (planByCode[code] || 0) + Number(annual) / 12;
+  }
+
+  // ---- month picker ---------------------------------------------------------------------
+  function buildMonthPicker() {
+    const sel = document.getElementById('monthSel');
+    if (!months.length) { sel.innerHTML = '<option>No card data</option>'; return; }
+    const prev = prevCalendarMonth();
+    const want = months.indexOf(prev) >= 0 ? prev : months[0];
+    sel.innerHTML = months.map(m => '<option value="' + m + '"' + (m === want ? ' selected' : '') + '>' + esc(monthName(m)) + '</option>').join('');
+  }
+  function onMonth() { renderComparison(); }
+
+  // ---- planned vs actual ------------------------------------------------------------------
+  function renderComparison() {
+    const body = document.getElementById('pvaBody');
+    const sel = document.getElementById('monthSel');
+    const ym = sel.value;
+    const prev = prevCalendarMonth();
+
+    document.getElementById('pvaSub').textContent = !ym ? 'No card transactions found.'
+      : (ym === prev ? 'Last complete month'
+                     : 'Showing ' + monthName(ym) + (months.indexOf(prev) < 0 ? ' \u2014 no transactions yet for ' + monthName(prev) : ''));
+
+    if (!ym) {
+      body.innerHTML = '<tr><td colspan="5" style="text-align:left;color:var(--ink-soft);">Nothing to compare. Import a card statement first.</td></tr>';
+      document.getElementById('uncatFlag').innerHTML = '';
+      setKpis(0, 0, null);
+      return;
+    }
+
+    // aggregate the selected month
+    const actByCode = {}; let uncat = 0;
+    txns.forEach(t => {
+      if (t.ym !== ym) return;
+      if (!t.code) { uncat += t.amount; return; }
+      actByCode[t.code] = (actByCode[t.code] || 0) + t.amount;
+    });
+
+    const rows = scope.map(code => {
+      const plan = Math.round((planByCode[code] || 0) * 100) / 100;
+      const act = Math.round((actByCode[code] || 0) * 100) / 100;
+      return { code: code, plan: plan, act: act, diff: act - plan };
+    });
+
+    // Biggest surprises first — the point of the panel is the gap, not the size.
+    rows.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff) || b.act - a.act);
+
+    const totPlan = rows.reduce((s, r) => s + r.plan, 0);
+    const totAct = rows.reduce((s, r) => s + r.act, 0);
+    const scale = Math.max(1, ...rows.map(r => Math.max(r.plan, r.act)));
+
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="5" style="text-align:left;color:var(--ink-soft);">No categories in scope. Categories qualify by having card activity in the last 12 months.</td></tr>';
+    } else {
+      body.innerHTML = rows.map(r => {
+        const cls = r.diff > 0.5 ? 'over' : (r.diff < -0.5 ? 'under' : '');
+        const pw = Math.max(0, Math.min(100, (r.plan / scale) * 100));
+        const aw = Math.max(0, Math.min(100, (r.act / scale) * 100));
+        const desc = catDesc[r.code] && catDesc[r.code].toLowerCase() !== String(r.code).toLowerCase()
+          ? '<div class="cmeta">' + esc(catDesc[r.code]) + '</div>' : '';
+        return '<tr>' +
+          '<td class="cat">' + esc(r.code) + desc + '</td>' +
+          '<td class="num">' + (r.plan > 0 ? fmt(r.plan) : '<span style="color:var(--ink-soft);">no plan</span>') + '</td>' +
+          '<td class="num">' + fmt(r.act) + '</td>' +
+          '<td class="num var ' + cls + '">' + fmtDiff(r.diff) + '</td>' +
+          '<td class="bars">' +
+            '<div class="bar-track"><div class="bar-fill bar-plan" style="width:' + pw.toFixed(1) + '%"></div></div>' +
+            '<div class="bar-track"><div class="bar-fill bar-act ' + (r.diff > 0.5 ? 'over' : '') + '" style="width:' + aw.toFixed(1) + '%"></div></div>' +
+          '</td>' +
+        '</tr>';
+      }).join('') +
+      '<tr class="total-row">' +
+        '<td>Total</td>' +
+        '<td class="num">' + fmt(totPlan) + '</td>' +
+        '<td class="num">' + fmt(totAct) + '</td>' +
+        '<td class="num var ' + (totAct - totPlan > 0.5 ? 'over' : (totAct - totPlan < -0.5 ? 'under' : '')) + '">' + fmtDiff(totAct - totPlan) + '</td>' +
+        '<td></td>' +
+      '</tr>';
+    }
+
+    // Uncategorised card spend is invisible to every per-category figure on this page, so say
+    // so rather than quietly understating the actual.
+    document.getElementById('uncatFlag').innerHTML = (Math.round(uncat) !== 0)
+      ? '<div class="flag">' + fmt(uncat) + ' of ' + esc(monthName(ym)) + ' card spend has no category and is not counted above. Set categories on the Card Entry page.</div>'
+      : '';
+
+    document.getElementById('pvaFoot').innerHTML =
+      esc(String(scope.length)) + ' categor' + (scope.length === 1 ? 'y' : 'ies') +
+      ' in scope. Plan is the annual figure &divide; 12 and is read straight from Household Bills and the planners, ' +
+      'so switching a category to actuals on the Actual Costs page does not move it.';
+
+    setKpis(totPlan, totAct, ym);
+  }
+
+  function setKpis(plan, act, ym) {
+    document.getElementById('kPlan').textContent = fmt(plan);
+    document.getElementById('kPlanFoot').textContent = ym ? monthName(ym) + ' run-rate' : '\u2014';
+    document.getElementById('kAct').textContent = fmt(act);
+    document.getElementById('kActFoot').textContent = ym ? monthName(ym) : '\u2014';
+    const d = act - plan;
+    const v = document.getElementById('kVar');
+    v.textContent = fmtDiff(d);
+    v.className = 'val ' + (d > 0.5 ? 'over' : (d < -0.5 ? 'under' : ''));
+    document.getElementById('kVarFoot').textContent = plan > 0
+      ? (Math.round(Math.abs(d) / plan * 100) + '% ' + (d >= 0 ? 'over plan' : 'under plan'))
+      : 'no plan to compare';
+  }
+
+  // ---- contracts ---------------------------------------------------------------------------
+  function renderContracts(contracts, sups) {
+    const supName = {};
+    (sups || []).forEach(s => { supName[String(s.id)] = s.name || ''; });
+
+    const list = (contracts || [])
+      .filter(c => c.end_date)
+      .map(c => ({ c: c, dl: daysLeft(c.end_date) }))
+      .filter(x => x.dl != null && x.dl <= CONTRACT_WINDOW)
+      .sort((a, b) => a.dl - b.dl);
+
+    // The tile counts exactly what the strip lists, expired included — an expired contract is
+    // more urgent than one ending next week, not less, so hiding it from the count would be the
+    // wrong way round. It is called out separately in the foot.
+    const expired = list.filter(x => x.dl < 0).length;
+    document.getElementById('kCon').textContent = String(list.length);
+    document.getElementById('kConFoot').textContent = expired
+      ? ('within ' + CONTRACT_WINDOW + ' days \u00b7 ' + expired + ' already expired')
+      : ('within ' + CONTRACT_WINDOW + ' days');
+
+    const host = document.getElementById('conBody');
+    if (!list.length) {
+      host.innerHTML = '<div class="empty">Nothing ending in the next ' + CONTRACT_WINDOW + ' days.</div>';
+      return;
+    }
+    host.innerHTML = list.map(x => {
+      const c = x.c, dl = x.dl;
+      let cls, label;
+      if (dl < 0) { cls = 'b-exp'; label = 'Expired ' + Math.abs(dl) + 'd ago'; }
+      else if (dl === 0) { cls = 'b-soon'; label = 'Today'; }
+      else if (dl <= 7) { cls = 'b-soon'; label = dl + ' day' + (dl === 1 ? '' : 's'); }
+      else if (dl <= 28) { cls = 'b-warn'; label = dl + ' days'; }
+      else { cls = 'b-ok'; label = dl + ' days'; }
+      const title = (c.ctype || c.category || 'Contract');
+      const bits = [];
+      if (supName[String(c.supplier_id)]) bits.push(supName[String(c.supplier_id)]);
+      if (c.who) bits.push(c.who);
+      bits.push(ukDate(c.end_date));
+      return '<div class="crow">' +
+        '<div class="cmain"><div class="cname">' + esc(title) + '</div>' +
+        '<div class="cmeta">' + esc(bits.join(' \u00b7 ')) + '</div></div>' +
+        '<div class="cbadge ' + cls + '">' + esc(label) + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  window.addEventListener('message', e => { if (e && e.data === 'refresh-data') { App.clearCaches(); load(); } });
+  App.requireLogin(load);
+</script>
+</body>
+</html>
