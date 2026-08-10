@@ -445,10 +445,11 @@
     const meta = buildAccountMeta(d);
     const shown = {};   // bill row index -> true, so we can detect leftovers
 
-    const avails = {}, avgAvails = {};
+    const avails = {}, avgAvails = {}, incomeLedger = [];
     const blocks = d.names.map(name => {
       const r = personBlock(name, d, meta, shown);
       avails[name] = r.avail; avgAvails[name] = r.availAvg;
+      incomeLedger.push(r.income);
       return r.html;
     });
 
@@ -491,7 +492,7 @@
     const extraPeople = blocks.filter((html, i) => !used.has(i) && html).join('');
 
     document.getElementById('colOne').innerHTML = graham;
-    document.getElementById('colTwo').innerHTML = julie + cash;
+    document.getElementById('colTwo').innerHTML = julie + totalIncomeBox(incomeLedger) + cash;
     document.getElementById('colThree').innerHTML = insurancesDueBox(d) + cc + pens.html + loansBlock(d.loans) + extraPeople + leftoverHtml;
     document.getElementById('cols').style.display = 'grid';
   }
@@ -500,14 +501,20 @@
     // --- IN: salary at selected tier + other income ---
     const days = currentTierDays(name, d.tiers);
     let inRows = '', totalIn = 0;
+    // incLines is the same set of figures this card is about to print, captured as data so the
+    // household Total Income panel can be built from it rather than recomputing the tier and
+    // inflation rules a second time — two implementations of one truth is how they drift apart.
+    const incLines = [];
     const salaryRows = d.incAmts.filter(a => a.member_name === name && (days == null || Number(a.working_days) === Number(days)));
     const useRows = salaryRows.length ? salaryRows : d.incAmts.filter(a => a.member_name === name);
     useRows.forEach(a => {
       const v = (Number(a.net_monthly) || 0) * periodScale() * inflFactor(); totalIn += v;
+      incLines.push({ label: a.source_name || 'Salary', value: v, kind: 'salary' });
       inRows += '<tr><td>' + esc(a.source_name || 'Salary') + '</td><td class="amt">' + fmt(v) + '</td></tr>';
     });
     (d.otherInc || []).filter(o => o.member_name === name).forEach(o => {
       const v = (Number(o.net_monthly) || 0) * periodScale() * inflFactor(); totalIn += v;
+      incLines.push({ label: o.source_name || 'Other', value: v, kind: 'other' });
       inRows += '<tr><td>' + esc(o.source_name || 'Other') + '</td><td class="amt">' + fmt(v) + '</td></tr>';
     });
     if (!inRows) inRows = '<tr><td colspan="2" style="color:#94a3b8;">No income set</td></tr>';
@@ -612,7 +619,8 @@
           '<tr class="total"><td>Total bills' + billsAvgNote + '</td><td class="amt">' + fmt(totalBills) + '</td></tr>' +
         '</tbody></table>' +
       '</div>';
-    return { html: html, avail: avail, availAvg: availAvg };
+    return { html: html, avail: avail, availAvg: availAvg,
+             income: { name: name, days: days, lines: incLines, total: totalIn } };
   }
 
   // Contribution in force for the pension in the VIEWED month, from the dated schedule
@@ -778,6 +786,43 @@
                              '</td><td class="amt">' + fmt(l.amt) + '</td></tr>').join('')
           : '<tr><td class="muted2">Nothing on the card this month</td><td class="amt">' + fmt(0) + '</td></tr>') +
         '<tr class="total"><td>Total</td><td class="amt">' + fmt(p.total) + '</td></tr>' +
+      '</tbody></table>' +
+    '</div>';
+  }
+
+  // Total income — the household's whole net income for the period being viewed, gathered
+  // from the per-person cards rather than recomputed. Every figure here has already had the
+  // working-days tier, the Monthly/Annual scale and the inflation step applied by personBlock,
+  // so this panel cannot disagree with the "Total In" line on each person's card.
+  //
+  // Net, not gross: these are the amounts that actually land in the bank, which is what the
+  // rest of this page is denominated in. A person with no income set still gets a row, because
+  // a silently absent member is exactly how a missing salary goes unnoticed.
+  function totalIncomeBox(ledger) {
+    const people = (ledger || []).filter(Boolean);
+    if (!people.length) return '';
+    let rows = '', grand = 0;
+    people.forEach(p => {
+      const tier = (p.days == null) ? 'not working' : p.days + '-day week';
+      rows += '<tr><td colspan="2" class="subtitle" style="padding-top:8px;">' + esc(p.name) +
+              ' <span class="muted2">\u00b7 ' + tier + '</span></td></tr>';
+      if (!p.lines.length) {
+        rows += '<tr><td colspan="2" style="color:#94a3b8;">No income set</td></tr>';
+        return;
+      }
+      p.lines.forEach(l => {
+        rows += '<tr><td>' + esc(l.label) + '</td><td class="amt">' + fmt(l.value) + '</td></tr>';
+      });
+      if (p.lines.length > 1) {
+        rows += '<tr class="total"><td>' + esc(p.name) + ' total</td><td class="amt">' + fmt(p.total) + '</td></tr>';
+      }
+      grand += p.total;
+    });
+    return '<div class="panelcard">' +
+      '<div class="blocktitle">Total Income</div>' +
+      '<div class="subtitle">Net, as it lands \u2014 ' + (isAnnual() ? 'whole year' : monthLabelShort()) + '</div>' +
+      '<table><tbody>' + rows +
+        '<tr class="avail"><td>Total household income</td><td class="amt">' + fmt(grand) + '</td></tr>' +
       '</tbody></table>' +
     '</div>';
   }
