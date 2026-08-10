@@ -104,10 +104,11 @@
 <body>
   <h1>Household Overview</h1>
   <p class="note">What the card actually cost last month against what was planned, and which contracts are about to
-    renew. Categories shown are those with card activity in the last 12 months &mdash; <strong>Bills</strong> and
-    <strong>Reimburse</strong> are excluded. Planned figures are the annual cost divided by twelve, so a once-a-year
-    bill does not show up as a spike in the month it lands.
-    <span style="color:#94a3b8;">(household overview build: v1)</span></p>
+    renew. Categories shown are those with card activity in the last 12 months. <strong>Bills</strong>,
+    <strong>Reimburse</strong> and anything <strong>funded from a savings pot</strong> (insurance, Xmas, birthdays)
+    are excluded &mdash; those are saved for month by month and spent in a lump, so a monthly comparison says
+    nothing. Planned figures are the annual cost divided by twelve.
+    <span style="color:#94a3b8;">(household overview build: v2)</span></p>
 
   <div id="status">Loading&hellip;</div>
 
@@ -159,9 +160,15 @@
   // plan, and counting card-coded bill rows against the same plan would double the figure.
   const isBills = (code, desc) => /^bills?$/i.test(String(code || '').trim()) || /^bills?$/i.test(String(desc || '').trim());
 
+  // Gift categories are savings-funded by construction: bills_summary.html drops their bill rows
+  // and substitutes the bd_gift_savings totals, so the money is set aside all year and spent in
+  // one lump. Matched by the same expression that page uses.
+  const isGift = code => /^(xmas|christmas|birthdays?)$/i.test(String(code || '').trim());
+
   let txns = [];            // every card transaction { ym, code, amount }
   let planByCode = {};      // category code -> planned MONTHLY run-rate
   let scope = [];           // category codes in scope, from the 12-month card footprint
+  let excluded = [];        // codes dropped from scope as savings-funded, kept for the footnote
   let months = [];          // months present in the card data, newest first
   let catDesc = {};
 
@@ -214,12 +221,13 @@
     const status = document.getElementById('status');
     status.className = ''; status.style.display = 'block'; status.textContent = 'Loading\u2026';
     try {
-      const [contracts, sups, cats, bills, tx,
+      const [contracts, sups, cats, bills, accts, tx,
              hPlan, hCost, hMeal, hSet, dRota, fSet, fLines] = await Promise.all([
         App.rest('bd_contracts?order=end_date.asc'),
         App.rest('bd_contract_suppliers?order=name.asc'),
         App.rest('bd_bill_category?select=code,description&order=code.asc'),
         App.rest('bd_household_bills?order=bill_name.asc'),
+        App.rest('bd_bank_account?select=account_id,funded_from&order=account_id.asc'),
         fetchAllTxns(),
         App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
         App.rest('bd_holiday_cost'),
@@ -239,9 +247,30 @@
       // earns a place here by being spent on, not by being listed — so nothing has to be
       // maintained by hand and a category that is not a card category never appears.
       const agg = App.actualByCategory12mo(tx || [], cats || []);
-      scope = Object.keys(agg.byCode)
+      const eligible = Object.keys(agg.byCode)
         .filter(code => agg.byCode[code].count > 0 && !isBills(code, catDesc[code]))
         .sort();
+
+      // ---- savings-funded categories come out -------------------------------------------
+      // A savings pot is an account with "Funded from" set on the Bank Accounts page — the same
+      // definition the Insurance Savings page uses. A category with ANY bill paid from a pot is
+      // dropped: the money is set aside monthly and spent in a lump, so comparing one month's
+      // card spend against a smoothed plan reports a variance that means nothing. "Any" rather
+      // than "all" deliberately — one pot-funded bill is enough to make the month lumpy.
+      const potIds = {};
+      (accts || []).forEach(a => {
+        const id = String(a.account_id || '').trim();
+        if (id && a.funded_from != null && String(a.funded_from).trim() !== '') potIds[id] = true;
+      });
+      const savingsCode = {};
+      (bills || []).forEach(b => {
+        const code = b.category_code;
+        if (code && potIds[String(b.paid_account || '').trim()]) savingsCode[code] = true;
+      });
+      eligible.forEach(code => { if (isGift(code)) savingsCode[code] = true; });
+
+      scope = eligible.filter(code => !savingsCode[code]);
+      excluded = eligible.filter(code => savingsCode[code]);
 
       // ---- planned run-rate per category ------------------------------------------------
       // RAW bills, deliberately NOT put through App.applyActualCosts(). That helper replaces a
@@ -392,10 +421,18 @@
       ? '<div class="flag">' + fmt(uncat) + ' of ' + esc(monthName(ym)) + ' card spend has no category and is not counted above. Set categories on the Card Entry page.</div>'
       : '';
 
+    // Savings-funded categories are named, never silently dropped — an exclusion you cannot see
+    // is how a category quietly stops being watched.
+    let exFoot = '';
+    if (excluded.length) {
+      const exSpend = excluded.reduce((s, c) => s + (actByCode[c] || 0), 0);
+      exFoot = ' Excluded as savings-funded: ' + esc(excluded.join(', ')) + ' \u2014 ' +
+               fmt(exSpend) + ' on the card in ' + esc(monthName(ym)) + '.';
+    }
     document.getElementById('pvaFoot').innerHTML =
       esc(String(scope.length)) + ' categor' + (scope.length === 1 ? 'y' : 'ies') +
       ' in scope. Plan is the annual figure &divide; 12 and is read straight from Household Bills and the planners, ' +
-      'so switching a category to actuals on the Actual Costs page does not move it.';
+      'so switching a category to actuals on the Actual Costs page does not move it.' + exFoot;
 
     setKpis(totPlan, totAct, ym);
   }
