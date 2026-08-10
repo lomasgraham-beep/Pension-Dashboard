@@ -654,13 +654,19 @@
       const ownerDays = currentTierDays(owner, d.tiers);
       if (p.working_days != null && ownerDays != null && Number(p.working_days) !== Number(ownerDays)) return;
       const cost = contribForViewedMonth(p, d);
-      if (cost === 0) return;
       const costV = cost * periodScale();
+      // Anything that would print as £0.00 in the view being shown is not a commitment this
+      // period, so it earns no line. Tested on the scaled figure rather than the raw monthly
+      // one, so the annual view judges the annual amount.
+      if (Math.round(costV * 100) === 0) return;
       total += costV;
       const whose = owner ? owner + ' ' : '';
       rows += '<tr><td>' + esc(whose + (p.pension_name || 'Pension')) + ' <span class="muted">(' + esc(acct) + ')</span></td><td class="amt">' + fmt(costV) + '</td></tr>';
     });
-    if (!rows) rows = '<tr><td colspan="2" style="color:#94a3b8;">No pension contributions</td></tr>';
+    // Nothing due this period → no panel at all. An empty Pensions card reading £0.00 is a
+    // reference to a commitment that isn't there, and the Cash Summary drops its deduction to
+    // match, so the two never disagree about whether pensions exist this month.
+    if (!rows) return { html: '', total: 0 };
     const html =
       '<div class="panelcard">' +
         '<div class="blocktitle">Pensions</div>' +
@@ -844,7 +850,8 @@
       '<table><tbody>' +
         availRows +
         '<tr class="total"><td>Sum of available</td><td class="amt">' + fmt(sumAvail) + '</td></tr>' +
-        '<tr class="total"><td>Less pensions</td><td class="amt neg">\u2212' + fmt(pens) + '</td></tr>' +
+        (Math.round(pens * 100) === 0 ? '' :
+          '<tr class="total"><td>Less pensions</td><td class="amt neg">\u2212' + fmt(pens) + '</td></tr>') +
         '<tr class="total"><td>Less credit card' + ((card && card.lines && card.lines.length) ? ' (' + card.lines.map(l => esc(l.label)).join(', ') + ')' : '') + '</td><td class="amt neg">\u2212' + fmt(cardT) + '</td></tr>' +
         '<tr class="avail"><td>Total cash available ' + (isAnnual() ? '(annual)' : 'in ' + monthLabelShort()) + '</td><td class="amt">' + fmt(totalCash) + '</td></tr>' +
         avgRow +
