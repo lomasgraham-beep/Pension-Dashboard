@@ -140,9 +140,11 @@
     renew. Categories shown are those with card activity in the last 12 months. <strong>Bills</strong>,
     <strong>Reimburse</strong> and anything <strong>funded from a savings pot</strong> (insurance, Xmas, birthdays)
     are excluded &mdash; those are saved for month by month and spent in a lump, so a monthly comparison says
-    nothing. Planned figures are the annual cost divided by twelve; a category ticked on the Actual Costs page
-    takes its plan from its 12-month card run-rate instead, matching the budget.
-    <span style="color:#94a3b8;">(household overview build: v5)</span></p>
+    nothing. Only bills marked <strong>Paid by: Credit card</strong> count towards the plan &mdash; direct debits
+    leaving a bank account have no card trail, so including them would bury the outliers. Planned figures are the
+    annual cost divided by twelve; a category ticked on the Actual Costs page takes its plan from its 12-month
+    card run-rate instead, matching the budget.
+    <span style="color:#94a3b8;">(household overview build: v6)</span></p>
 
   <div id="status">Loading&hellip;</div>
 
@@ -198,10 +200,14 @@
   // one lump. Matched by the same expression that page uses.
   const isGift = code => /^(xmas|christmas|birthdays?)$/i.test(String(code || '').trim());
 
+  // The "Paid by" value that marks a bill as charged to the credit card, as set on the Bills page.
+  const CARD_PAYER = 'Credit card';
+
   let txns = [];            // every card transaction { ym, code, amount }
   let planByCode = {};      // category code -> planned MONTHLY run-rate
   let planParts = {};       // category code -> the individual bills/planners making up that plan
   let actualBasis = {};     // category code -> annual adjust, for categories budgeted from actuals
+  let offCard = {};         // category code -> { monthly, n } for bills paid from a bank account
   let scope = [];           // category codes in scope, from the 12-month card footprint
   let excluded = [];        // codes dropped from scope as savings-funded, kept for the footnote
   let months = [];          // months present in the card data, newest first
@@ -327,12 +333,24 @@
 
       // Kept as PARTS, not just a total: the drawer has to be able to answer "which bill", and a
       // running sum cannot be taken apart again afterwards.
+      // Only what is actually charged to the card belongs in this comparison. A bill leaving a
+      // bank account by direct debit has no card trail, so counting it in the plan inflates every
+      // category it touches and buries the real outliers. "Paid by" carries the answer already —
+      // it is a member name, PayPal, or the literal 'Credit card'.
       planParts = {};
+      offCard = {};
       (bills || []).forEach(b => {
         const code = b.category_code;
         if (!code || code in actualBasis) return;      // suppressed, same as applyActualCosts
         const an = annualOf(b.premium, b.frequency, b.pay_months);
         if (!an) return;
+        if (String(b.paid_by || '').trim() !== CARD_PAYER) {
+          // Kept, not discarded: the drawer names what was set aside so a mis-tagged bill is
+          // findable instead of showing up as a phantom overspend.
+          const o = offCard[code] || (offCard[code] = { monthly: 0, n: 0 });
+          o.monthly += an / 12; o.n += 1;
+          return;
+        }
         (planParts[code] || (planParts[code] = [])).push({
           label: b.bill_name || '\u2014',
           sub: (b.frequency || 'Monthly') + ' \u00b7 ' + fmt(an) + '/yr',
@@ -512,9 +530,9 @@
     }
     document.getElementById('pvaFoot').innerHTML =
       esc(String(scope.length)) + ' categor' + (scope.length === 1 ? 'y' : 'ies') +
-      ' in scope. Plan is the annual figure &divide; 12, taken from Household Bills and the planners &mdash; ' +
-      'or, for a category ticked on the Actual Costs page, from its 12-month card total plus adjust, ' +
-      'which is the figure the budget itself uses.' + exFoot;
+      ' in scope. Plan counts only bills marked &ldquo;Paid by: Credit card&rdquo;, at the annual figure &divide; 12, ' +
+      'plus the Dining, Holiday and Fuel planners; a category ticked on the Actual Costs page uses its ' +
+      '12-month card total plus adjust instead, which is the figure the budget itself uses.' + exFoot;
 
     setKpis(totPlan, totAct, ym);
   }
@@ -533,11 +551,18 @@
           '<div class="dl-sub">' + esc(x.sub) + '</div></div>' +
           '<div class="dl-num">' + fmt(x.monthly) + '</div></div>').join('') + '</div>' +
         '<div class="dtot"><span>Monthly run-rate</span><span>' + fmt(r.plan) + '</span></div>'
-      : '<div class="dnone">No bill or planner feeds this category, so there is nothing to spend against.</div>';
+      : '<div class="dnone">Nothing in this category is budgeted to the card, so every pound spent on it counts as over.</div>';
 
     // The selected month sits inside the 12-month window, so it pulls its own plan a little way
     // towards itself. Said out loud rather than left for you to discover from a variance that
     // looks smaller than it should.
+    const off = offCard[r.code];
+    const offNote = off && off.monthly > 0.5
+      ? '<div class="dl-sub" style="margin-top:6px;">' + fmt(off.monthly) + '/mo across ' + off.n +
+        ' bill' + (off.n === 1 ? '' : 's') + ' in this category is paid from a bank account, not the card, ' +
+        'so it is left out. If something here should be on the card, its &ldquo;Paid by&rdquo; needs changing on the Bills page.</div>'
+      : '';
+
     const damping = (r.code in actualBasis)
       ? '<div class="dl-sub" style="margin-top:6px;">Budgeted from card spend, so ' + esc(monthName(ym)) +
         ' is one of the twelve months behind its own plan and nudges it by about a twelfth.</div>'
@@ -558,7 +583,7 @@
 
     return '<div class="vdet-head">' + esc(verdict) + '</div>' +
       '<div class="vdet-cols">' +
-        '<div><h4>Planned \u2014 what builds the run-rate</h4>' + planList + damping + '</div>' +
+        '<div><h4>Planned \u2014 what builds the run-rate</h4>' + planList + damping + offNote + '</div>' +
         '<div><h4>Spent \u2014 what hit the card</h4>' + spendList + '</div>' +
       '</div>';
   }
