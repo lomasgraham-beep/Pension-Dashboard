@@ -35,36 +35,43 @@
   .val.over { color:var(--over); } .val.under { color:var(--under); }
 
   /* --- two-column body --- */
-  .cols { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(0,1fr); gap:14px; align-items:start; }
-  @media (max-width:900px) { .cols { grid-template-columns:1fr; } }
+  /* A diverging chart needs room to read, so it takes the full width and the contracts sit
+     underneath as a card grid rather than a squeezed right-hand column. */
+  .con-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:8px 16px; }
 
   /* --- month picker --- */
   select { padding:8px 10px; border:1px solid var(--line-strong); border-radius:8px; font-size:14px;
            background:#fff; color:var(--ink); font-family:inherit; }
 
-  /* --- variance table --- */
-  table { border-collapse:collapse; width:100%; font-size:14px; }
-  th,td { padding:8px 10px; border-bottom:1px solid var(--line); text-align:right; vertical-align:middle; }
-  th { background:var(--surface-2); font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-soft); font-weight:bold; }
-  th:first-child, td:first-child { text-align:left; }
-  td.cat { font-weight:600; }
-  td.num { font-variant-numeric:tabular-nums; white-space:nowrap; }
-  td.var.over { color:var(--over); font-weight:bold; }
-  td.var.under { color:var(--under); }
-  tr.total-row td { font-weight:bold; border-top:2px solid var(--line-strong); background:var(--surface-2); }
-  .bars { width:130px; }
-  .bar-track { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin:3px 0; }
-  .bar-fill { height:100%; border-radius:3px; }
-  .bar-plan { background:var(--ink-soft); }
-  .bar-act  { background:var(--aqua); }
-  .bar-act.over { background:var(--over); }
-  .barkey { font-size:11px; color:var(--ink-soft); margin-top:8px; }
-  .barkey i { display:inline-block; width:10px; height:6px; border-radius:3px; margin:0 4px 0 12px; vertical-align:middle; font-style:normal; }
-  .barkey i:first-child { margin-left:0; }
+  /* --- variance chart: diverging bars about a zero line --- */
+  /* Over budget runs LEFT in red, under budget runs RIGHT in green. Hand-built rather than
+     charted: a Google Charts plot area is always white regardless of dark mode, and a two-sided
+     bar with the label outside the bar is not something its bar chart will draw. */
+  .vaxis { display:flex; align-items:center; font-size:11px; font-weight:bold; letter-spacing:0.04em;
+           text-transform:uppercase; color:var(--ink-soft); margin-bottom:6px; }
+  .vaxis .vlab { visibility:hidden; }
+  .vaxis .ax-l { flex:1 1 0; text-align:right; padding-right:10px; color:var(--over); }
+  .vaxis .ax-r { flex:1 1 0; text-align:left; padding-left:10px; color:var(--under); }
+  .vrow { display:flex; align-items:center; gap:10px; padding:5px 0; }
+  .vlab { flex:0 0 160px; min-width:0; }
+  .vlab b { display:block; font-size:15px; font-weight:700; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .vlab span { display:block; font-size:11px; color:var(--ink-soft); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .vplot { flex:1 1 auto; display:flex; align-items:center; min-width:0; }
+  .vhalf { flex:1 1 0; display:flex; align-items:center; min-width:0; height:30px; }
+  .vhalf.left  { justify-content:flex-end; }
+  .vhalf.right { justify-content:flex-start; border-left:2px solid var(--line-strong); }
+  .vbar { height:24px; border-radius:4px; flex:0 0 auto; }
+  .vbar.over  { background:var(--over);  border-radius:4px 0 0 4px; }
+  .vbar.under { background:var(--under); border-radius:0 4px 4px 0; }
+  .vval { font-size:14px; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; padding:0 8px; }
+  .vval.over { color:var(--over); } .vval.under { color:var(--under); }
+  .vval.flat { color:var(--ink-soft); font-weight:600; }
+  .vscale { font-size:11px; color:var(--ink-soft); margin-top:8px; text-align:center; }
+  @media (max-width:640px) { .vlab { flex:0 0 108px; } .vlab b { font-size:13px; } .vval { font-size:12px; padding:0 5px; } }
 
   /* --- contracts strip --- */
-  .crow { display:flex; align-items:center; gap:10px; padding:9px 2px; border-bottom:1px solid var(--line); }
-  .crow:last-child { border-bottom:none; }
+  .crow { display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid var(--line);
+          border-radius:10px; background:var(--surface-2); }
   .cmain { flex:1 1 auto; min-width:0; }
   .cname { font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .cmeta { font-size:12px; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -89,10 +96,9 @@
     #status { background:#1e293b !important; color:#93c5fd !important; }
     #status.s-err { background:#3f1d1d !important; color:#fca5a5 !important; }
     select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
-    th { background:#0f172a !important; color:#94a3b8 !important; border-color:#334155 !important; }
-    td { border-color:#334155 !important; }
-    tr.total-row td { background:#0f172a !important; }
-    .bar-track { background:#334155 !important; }
+    .vhalf.right { border-left-color:#475569 !important; }
+    .vlab b { color:#f1f5f9 !important; }
+    .crow { background:#0f172a !important; border-color:#334155 !important; }
     .b-exp  { background:#3f1d1d !important; color:#fca5a5 !important; }
     .b-soon { background:#3f1d1d !important; color:#fca5a5 !important; }
     .b-warn { background:#3a2a10 !important; color:#fcd34d !important; }
@@ -108,7 +114,7 @@
     <strong>Reimburse</strong> and anything <strong>funded from a savings pot</strong> (insurance, Xmas, birthdays)
     are excluded &mdash; those are saved for month by month and spent in a lump, so a monthly comparison says
     nothing. Planned figures are the annual cost divided by twelve.
-    <span style="color:#94a3b8;">(household overview build: v2)</span></p>
+    <span style="color:#94a3b8;">(household overview build: v3)</span></p>
 
   <div id="status">Loading&hellip;</div>
 
@@ -119,7 +125,7 @@
     <div class="kpi"><div class="lbl">Contracts ending</div><div class="val" id="kCon">0</div><div class="foot" id="kConFoot">within 60 days</div></div>
   </div>
 
-  <div class="cols" id="cols" style="display:none;">
+  <div id="cols" style="display:none;">
     <div class="panel">
       <div class="phead">
         <div>
@@ -128,11 +134,9 @@
         </div>
         <select id="monthSel" onchange="onMonth()"></select>
       </div>
-      <table>
-        <thead><tr><th>Category</th><th>Planned</th><th>Actual</th><th>Variance</th><th style="text-align:left;">Plan / actual</th></tr></thead>
-        <tbody id="pvaBody"></tbody>
-      </table>
-      <div class="barkey"><i class="bar-plan"></i>planned<i class="bar-act"></i>actual</div>
+      <div class="vaxis"><span class="vlab">x</span><span class="ax-l">over budget</span><span class="ax-r">under budget</span></div>
+      <div id="pvaBody"></div>
+      <div class="vscale" id="vScale">&nbsp;</div>
       <div id="uncatFlag"></div>
       <p class="foot-note" id="pvaFoot">&nbsp;</p>
     </div>
@@ -144,7 +148,7 @@
           <p class="sub">Next 60 days, soonest first</p>
         </div>
       </div>
-      <div id="conBody"></div>
+      <div id="conBody" class="con-grid"></div>
     </div>
   </div>
 
@@ -359,7 +363,8 @@
                      : 'Showing ' + monthName(ym) + (months.indexOf(prev) < 0 ? ' \u2014 no transactions yet for ' + monthName(prev) : ''));
 
     if (!ym) {
-      body.innerHTML = '<tr><td colspan="5" style="text-align:left;color:var(--ink-soft);">Nothing to compare. Import a card statement first.</td></tr>';
+      body.innerHTML = '<div class="empty">Nothing to compare. Import a card statement first.</div>';
+      document.getElementById('vScale').innerHTML = '&nbsp;';
       document.getElementById('uncatFlag').innerHTML = '';
       setKpis(0, 0, null);
       return;
@@ -379,40 +384,36 @@
       return { code: code, plan: plan, act: act, diff: act - plan };
     });
 
-    // Biggest surprises first — the point of the panel is the gap, not the size.
-    rows.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff) || b.act - a.act);
+    // Worst overspend at the top, deepest underspend at the bottom — so the chart reads as one
+    // continuous shape from red down to green rather than alternating sides.
+    rows.sort((a, b) => b.diff - a.diff || b.act - a.act);
 
     const totPlan = rows.reduce((s, r) => s + r.plan, 0);
     const totAct = rows.reduce((s, r) => s + r.act, 0);
-    const scale = Math.max(1, ...rows.map(r => Math.max(r.plan, r.act)));
+    // Both wings share one scale, so a bar's length means the same thing on either side.
+    const scale = Math.max(1, ...rows.map(r => Math.abs(r.diff)));
 
     if (!rows.length) {
-      body.innerHTML = '<tr><td colspan="5" style="text-align:left;color:var(--ink-soft);">No categories in scope. Categories qualify by having card activity in the last 12 months.</td></tr>';
+      body.innerHTML = '<div class="empty">No categories in scope. Categories qualify by having card activity in the last 12 months.</div>';
+      document.getElementById('vScale').innerHTML = '&nbsp;';
     } else {
       body.innerHTML = rows.map(r => {
-        const cls = r.diff > 0.5 ? 'over' : (r.diff < -0.5 ? 'under' : '');
-        const pw = Math.max(0, Math.min(100, (r.plan / scale) * 100));
-        const aw = Math.max(0, Math.min(100, (r.act / scale) * 100));
-        const desc = catDesc[r.code] && catDesc[r.code].toLowerCase() !== String(r.code).toLowerCase()
-          ? '<div class="cmeta">' + esc(catDesc[r.code]) + '</div>' : '';
-        return '<tr>' +
-          '<td class="cat">' + esc(r.code) + desc + '</td>' +
-          '<td class="num">' + (r.plan > 0 ? fmt(r.plan) : '<span style="color:var(--ink-soft);">no plan</span>') + '</td>' +
-          '<td class="num">' + fmt(r.act) + '</td>' +
-          '<td class="num var ' + cls + '">' + fmtDiff(r.diff) + '</td>' +
-          '<td class="bars">' +
-            '<div class="bar-track"><div class="bar-fill bar-plan" style="width:' + pw.toFixed(1) + '%"></div></div>' +
-            '<div class="bar-track"><div class="bar-fill bar-act ' + (r.diff > 0.5 ? 'over' : '') + '" style="width:' + aw.toFixed(1) + '%"></div></div>' +
-          '</td>' +
-        '</tr>';
-      }).join('') +
-      '<tr class="total-row">' +
-        '<td>Total</td>' +
-        '<td class="num">' + fmt(totPlan) + '</td>' +
-        '<td class="num">' + fmt(totAct) + '</td>' +
-        '<td class="num var ' + (totAct - totPlan > 0.5 ? 'over' : (totAct - totPlan < -0.5 ? 'under' : '')) + '">' + fmtDiff(totAct - totPlan) + '</td>' +
-        '<td></td>' +
-      '</tr>';
+        const over = r.diff > 0.5, under = r.diff < -0.5;
+        // A 3px floor keeps a small-but-real variance visible instead of vanishing to nothing.
+        const w = (Math.abs(r.diff) / scale) * 100;
+        const bar = '<div class="vbar ' + (over ? 'over' : 'under') + '" style="width:' + Math.max(w, 1.2).toFixed(1) + '%;min-width:3px;"></div>';
+        const val = '<span class="vval ' + (over ? 'over' : (under ? 'under' : 'flat')) + '">' + (over || under ? fmtDiff(r.diff) : 'on plan') + '</span>';
+        const sub = (r.plan > 0 ? 'plan ' + fmt(r.plan) : 'no plan') + ' \u00b7 spent ' + fmt(r.act);
+        return '<div class="vrow">' +
+          '<div class="vlab"><b>' + esc(r.code) + '</b><span>' + esc(sub) + '</span></div>' +
+          '<div class="vplot">' +
+            '<div class="vhalf left">'  + (over  ? val + bar : '') + '</div>' +
+            '<div class="vhalf right">' + (under ? bar + val : (over ? '' : val)) + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+      document.getElementById('vScale').innerHTML =
+        'Bars are the gap against plan. Full width either side = ' + fmt(scale) + '.';
     }
 
     // Uncategorised card spend is invisible to every per-category figure on this page, so say
@@ -473,7 +474,7 @@
 
     const host = document.getElementById('conBody');
     if (!list.length) {
-      host.innerHTML = '<div class="empty">Nothing ending in the next ' + CONTRACT_WINDOW + ' days.</div>';
+      host.innerHTML = '<div class="empty" style="grid-column:1/-1;">Nothing ending in the next ' + CONTRACT_WINDOW + ' days.</div>';
       return;
     }
     host.innerHTML = list.map(x => {
