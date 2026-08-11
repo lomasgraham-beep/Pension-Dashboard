@@ -67,7 +67,31 @@
   .vval.over { color:var(--over); } .vval.under { color:var(--under); }
   .vval.flat { color:var(--ink-soft); font-weight:600; }
   .vscale { font-size:11px; color:var(--ink-soft); margin-top:8px; text-align:center; }
+  .vcar { flex:0 0 12px; color:var(--ink-soft); font-size:11px; user-select:none; }
+  .vrow { cursor:pointer; border-radius:8px; }
+  .vrow:hover { background:var(--surface-2); }
+  .vrow.open { background:var(--surface-2); }
+  .vrow:focus-visible { outline:2px solid var(--aqua); outline-offset:2px; }
+
+  /* --- why-drawer: the bills behind the plan, the transactions behind the spend --- */
+  .vdet { display:none; margin:0 0 10px 182px; border:1px solid var(--line); border-radius:10px;
+          background:var(--surface-2); padding:12px 14px; }
+  .vdet.open { display:block; }
+  .vdet-head { font-size:13px; font-weight:700; margin-bottom:10px; }
+  .vdet-cols { display:grid; grid-template-columns:1fr 1fr; gap:8px 22px; }
+  .vdet h4 { margin:0 0 5px; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-soft); font-weight:bold; }
+  .dscroll { max-height:230px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .dline { display:flex; gap:10px; align-items:baseline; font-size:13px; padding:4px 0; border-bottom:1px dotted var(--line); }
+  .dline:last-child { border-bottom:none; }
+  .dl-main { flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dl-num { flex:0 0 auto; font-variant-numeric:tabular-nums; }
+  .dl-sub { color:var(--ink-soft); font-size:11px; }
+  .dtot { display:flex; justify-content:space-between; gap:10px; font-weight:700; font-size:13px;
+          margin-top:6px; padding-top:6px; border-top:1px solid var(--line-strong); font-variant-numeric:tabular-nums; }
+  .dnone { color:var(--ink-soft); font-size:13px; padding:4px 0; }
+  @media (max-width:700px) { .vdet { margin-left:0; } .vdet-cols { grid-template-columns:1fr; } }
   @media (max-width:640px) { .vlab { flex:0 0 108px; } .vlab b { font-size:13px; } .vval { font-size:12px; padding:0 5px; } }
+  .hint { font-size:12px; color:var(--ink-soft); margin:0 0 8px; }
 
   /* --- contracts strip --- */
   .crow { display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid var(--line);
@@ -97,6 +121,9 @@
     #status.s-err { background:#3f1d1d !important; color:#fca5a5 !important; }
     select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
     .vhalf.right { border-left-color:#475569 !important; }
+    .vrow:hover, .vrow.open { background:#0f172a !important; }
+    .vdet { background:#0f172a !important; border-color:#334155 !important; }
+    .dline { border-bottom-color:#334155 !important; }
     .vlab b { color:#f1f5f9 !important; }
     .crow { background:#0f172a !important; border-color:#334155 !important; }
     .b-exp  { background:#3f1d1d !important; color:#fca5a5 !important; }
@@ -114,7 +141,7 @@
     <strong>Reimburse</strong> and anything <strong>funded from a savings pot</strong> (insurance, Xmas, birthdays)
     are excluded &mdash; those are saved for month by month and spent in a lump, so a monthly comparison says
     nothing. Planned figures are the annual cost divided by twelve.
-    <span style="color:#94a3b8;">(household overview build: v3)</span></p>
+    <span style="color:#94a3b8;">(household overview build: v4)</span></p>
 
   <div id="status">Loading&hellip;</div>
 
@@ -134,7 +161,8 @@
         </div>
         <select id="monthSel" onchange="onMonth()"></select>
       </div>
-      <div class="vaxis"><span class="vlab">x</span><span class="ax-l">over budget</span><span class="ax-r">under budget</span></div>
+      <p class="hint">Tap a bar to see the bills behind the plan and every transaction behind the spend.</p>
+      <div class="vaxis"><span class="vcar" style="visibility:hidden;">&#9656;</span><span class="vlab">x</span><span class="ax-l">over budget</span><span class="ax-r">under budget</span></div>
       <div id="pvaBody"></div>
       <div class="vscale" id="vScale">&nbsp;</div>
       <div id="uncatFlag"></div>
@@ -171,6 +199,7 @@
 
   let txns = [];            // every card transaction { ym, code, amount }
   let planByCode = {};      // category code -> planned MONTHLY run-rate
+  let planParts = {};       // category code -> the individual bills/planners making up that plan
   let scope = [];           // category codes in scope, from the 12-month card footprint
   let excluded = [];        // codes dropped from scope as savings-funded, kept for the footnote
   let months = [];          // months present in the card data, newest first
@@ -211,7 +240,7 @@
   async function fetchAllTxns() {
     const page = 1000; let off = 0, all = [];
     for (let i = 0; i < 500; i++) {
-      const chunk = await App.rest('bd_card_txn?select=txn_date,amount,category_code&order=txn_date.asc&limit=' + page + '&offset=' + off);
+      const chunk = await App.rest('bd_card_txn?select=txn_date,description,amount,category_code&order=txn_date.asc&limit=' + page + '&offset=' + off);
       if (!chunk || !chunk.length) break;
       all = all.concat(chunk);
       if (chunk.length < page) break;
@@ -281,11 +310,19 @@
       // category's bill rows with its own card total whenever the category is switched to
       // actuals on the Actual Costs page — which would make the plan equal the actual and the
       // variance identically zero for exactly the categories most worth watching.
-      planByCode = {};
+      // Kept as PARTS, not just a total: the drawer has to be able to answer "which bill", and a
+      // running sum cannot be taken apart again afterwards.
+      planParts = {};
       (bills || []).forEach(b => {
         const code = b.category_code;
         if (!code) return;
-        planByCode[code] = (planByCode[code] || 0) + annualOf(b.premium, b.frequency, b.pay_months) / 12;
+        const an = annualOf(b.premium, b.frequency, b.pay_months);
+        if (!an) return;
+        (planParts[code] || (planParts[code] = [])).push({
+          label: b.bill_name || '\u2014',
+          sub: (b.frequency || 'Monthly') + ' \u00b7 ' + fmt(an) + '/yr',
+          monthly: an / 12
+        });
       });
 
       // Dining / Holidays / Fuel have no bill rows — they are planner-backed. Add the PLAN
@@ -300,10 +337,15 @@
         const dinPlanAnnual = (dRota || []).reduce((sum, r) =>
           sum + DAY_COLS.reduce((s, col) => s + (r[col] ? (mealMap[r.meal_type + '|' + r[col]] || 0) : 0), 0), 0);
         const fPlan = App.fuelAnnual(fLines || [], App.fuelCtx((fSet && fSet[0]) || {}));
-        addPlanner(sets.dining, 'Dining', dinPlanAnnual);
-        addPlanner(sets.holiday, 'Holiday', holPlanAnnual);
-        addPlanner(sets.fuel, 'Fuel', (Number(fPlan.workAnnual) || 0) + (Number(fPlan.discAnnual) || 0));
+        addPlanner(sets.dining, 'Dining', 'Dining rota', dinPlanAnnual);
+        addPlanner(sets.holiday, 'Holiday', 'Holiday planner', holPlanAnnual);
+        addPlanner(sets.fuel, 'Fuel', 'Weekly plan fuel', (Number(fPlan.workAnnual) || 0) + (Number(fPlan.discAnnual) || 0));
       } catch (e) { /* planners unavailable — those rows simply show no plan */ }
+
+      planByCode = {};
+      Object.keys(planParts).forEach(code => {
+        planByCode[code] = planParts[code].reduce((t, x) => t + x.monthly, 0);
+      });
 
       // ---- transactions, flattened -------------------------------------------------------
       txns = [];
@@ -312,7 +354,8 @@
         if (ym.length !== 7) return;
         const code = t.category_code || null;
         if (code && sets.reimburse[code]) return;
-        txns.push({ ym: ym, code: code, amount: Number(t.amount) || 0 });
+        txns.push({ ym: ym, d: String(t.txn_date || '').slice(0, 10), desc: t.description || '',
+                    code: code, amount: Number(t.amount) || 0 });
       });
 
       const seen = {};
@@ -334,11 +377,13 @@
 
   // Add a planner annual to whichever code the category actually uses; fall back to the
   // conventional label when the set is empty (no such bill category defined yet).
-  function addPlanner(set, fallbackCode, annual) {
+  function addPlanner(set, fallbackCode, label, annual) {
     if (!(Number(annual) > 0)) return;
     const keys = Object.keys(set || {});
     const code = keys.length ? keys[0] : fallbackCode;
-    planByCode[code] = (planByCode[code] || 0) + Number(annual) / 12;
+    (planParts[code] || (planParts[code] = [])).push({
+      label: label, sub: 'planner \u00b7 ' + fmt(annual) + '/yr', monthly: Number(annual) / 12
+    });
   }
 
   // ---- month picker ---------------------------------------------------------------------
@@ -404,13 +449,15 @@
         const bar = '<div class="vbar ' + (over ? 'over' : 'under') + '" style="width:' + Math.max(w, 1.2).toFixed(1) + '%;min-width:3px;"></div>';
         const val = '<span class="vval ' + (over ? 'over' : (under ? 'under' : 'flat')) + '">' + (over || under ? fmtDiff(r.diff) : 'on plan') + '</span>';
         const sub = (r.plan > 0 ? 'plan ' + fmt(r.plan) : 'no plan') + ' \u00b7 spent ' + fmt(r.act);
-        return '<div class="vrow">' +
+        return '<div class="vrow" data-code="' + esc(r.code) + '" role="button" tabindex="0" aria-expanded="false">' +
+          '<span class="vcar">&#9656;</span>' +
           '<div class="vlab"><b>' + esc(r.code) + '</b><span>' + esc(sub) + '</span></div>' +
           '<div class="vplot">' +
             '<div class="vhalf left">'  + (over  ? val + bar : '') + '</div>' +
             '<div class="vhalf right">' + (under ? bar + val : (over ? '' : val)) + '</div>' +
           '</div>' +
-        '</div>';
+        '</div>' +
+        '<div class="vdet" data-det="' + esc(r.code) + '">' + detailHtml(r, ym) + '</div>';
       }).join('');
       document.getElementById('vScale').innerHTML =
         'Bars are the gap against plan. Full width either side = ' + fmt(scale) + '.';
@@ -437,6 +484,71 @@
 
     setKpis(totPlan, totAct, ym);
   }
+
+  // ---- why-drawer -------------------------------------------------------------------------
+  // Answers the only question the chart raises: what is actually in this bar? Left side is the
+  // plan taken apart into the bills (and planner) that built it; right side is every card
+  // transaction in that category that month, largest first, because the outlier is the reason.
+  function detailHtml(r, ym) {
+    const parts = (planParts[r.code] || []).slice().sort((a, b) => b.monthly - a.monthly);
+    const tx = txns.filter(t => t.ym === ym && t.code === r.code).sort((a, b) => b.amount - a.amount);
+
+    const planList = parts.length
+      ? '<div class="dscroll">' + parts.map(x =>
+          '<div class="dline"><div class="dl-main">' + esc(x.label) +
+          '<div class="dl-sub">' + esc(x.sub) + '</div></div>' +
+          '<div class="dl-num">' + fmt(x.monthly) + '</div></div>').join('') + '</div>' +
+        '<div class="dtot"><span>Monthly run-rate</span><span>' + fmt(r.plan) + '</span></div>'
+      : '<div class="dnone">No bill or planner feeds this category, so there is nothing to spend against.</div>';
+
+    const spendList = tx.length
+      ? '<div class="dscroll">' + tx.map(t =>
+          '<div class="dline"><div class="dl-main">' + esc(t.desc || '\u2014') +
+          '<div class="dl-sub">' + esc(ukDate(t.d)) + '</div></div>' +
+          '<div class="dl-num">' + fmt(t.amount) + '</div></div>').join('') + '</div>' +
+        '<div class="dtot"><span>' + tx.length + ' transaction' + (tx.length === 1 ? '' : 's') + '</span><span>' + fmt(r.act) + '</span></div>'
+      : '<div class="dnone">Nothing charged to the card in ' + esc(monthName(ym)) + '.</div>';
+
+    const verdict = r.diff > 0.5
+      ? fmtDiff(r.diff) + ' over the run-rate in ' + monthName(ym)
+      : (r.diff < -0.5 ? fmtDiff(r.diff) + ' under the run-rate in ' + monthName(ym)
+                       : 'On plan in ' + monthName(ym));
+
+    return '<div class="vdet-head">' + esc(verdict) + '</div>' +
+      '<div class="vdet-cols">' +
+        '<div><h4>Planned \u2014 what builds the run-rate</h4>' + planList + '</div>' +
+        '<div><h4>Spent \u2014 what hit the card</h4>' + spendList + '</div>' +
+      '</div>';
+  }
+
+  // One delegated listener, bound once. Binding inside render() would stack a new handler on
+  // every month change and fire the toggle two, three, four times per tap.
+  function toggleRow(row) {
+    if (!row) return;
+    const host = document.getElementById('pvaBody');
+    const open = row.classList.contains('open');
+    host.querySelectorAll('.vrow.open').forEach(el => {
+      el.classList.remove('open');
+      el.setAttribute('aria-expanded', 'false');
+      const c = el.querySelector('.vcar'); if (c) c.innerHTML = '&#9656;';
+    });
+    host.querySelectorAll('.vdet.open').forEach(el => el.classList.remove('open'));
+    if (open) return;                                   // second tap closes
+    row.classList.add('open');
+    row.setAttribute('aria-expanded', 'true');
+    const car = row.querySelector('.vcar'); if (car) car.innerHTML = '&#9662;';
+    const det = row.nextElementSibling;
+    if (det && det.classList.contains('vdet')) det.classList.add('open');
+  }
+  document.addEventListener('click', function (e) {
+    const row = e.target.closest ? e.target.closest('#pvaBody .vrow') : null;
+    if (row) toggleRow(row);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const row = e.target && e.target.closest ? e.target.closest('#pvaBody .vrow') : null;
+    if (row) { e.preventDefault(); toggleRow(row); }
+  });
 
   function setKpis(plan, act, ym) {
     document.getElementById('kPlan').textContent = fmt(plan);
