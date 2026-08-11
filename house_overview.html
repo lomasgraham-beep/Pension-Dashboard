@@ -140,8 +140,9 @@
     renew. Categories shown are those with card activity in the last 12 months. <strong>Bills</strong>,
     <strong>Reimburse</strong> and anything <strong>funded from a savings pot</strong> (insurance, Xmas, birthdays)
     are excluded &mdash; those are saved for month by month and spent in a lump, so a monthly comparison says
-    nothing. Planned figures are the annual cost divided by twelve.
-    <span style="color:#94a3b8;">(household overview build: v4)</span></p>
+    nothing. Planned figures are the annual cost divided by twelve; a category ticked on the Actual Costs page
+    takes its plan from its 12-month card run-rate instead, matching the budget.
+    <span style="color:#94a3b8;">(household overview build: v5)</span></p>
 
   <div id="status">Loading&hellip;</div>
 
@@ -200,6 +201,7 @@
   let txns = [];            // every card transaction { ym, code, amount }
   let planByCode = {};      // category code -> planned MONTHLY run-rate
   let planParts = {};       // category code -> the individual bills/planners making up that plan
+  let actualBasis = {};     // category code -> annual adjust, for categories budgeted from actuals
   let scope = [];           // category codes in scope, from the 12-month card footprint
   let excluded = [];        // codes dropped from scope as savings-funded, kept for the footnote
   let months = [];          // months present in the card data, newest first
@@ -254,13 +256,14 @@
     const status = document.getElementById('status');
     status.className = ''; status.style.display = 'block'; status.textContent = 'Loading\u2026';
     try {
-      const [contracts, sups, cats, bills, accts, tx,
+      const [contracts, sups, cats, bills, accts, acRows, tx,
              hPlan, hCost, hMeal, hSet, dRota, fSet, fLines] = await Promise.all([
         App.rest('bd_contracts?order=end_date.asc'),
         App.rest('bd_contract_suppliers?order=name.asc'),
         App.rest('bd_bill_category?select=code,description&order=code.asc'),
         App.rest('bd_household_bills?order=bill_name.asc'),
         App.rest('bd_bank_account?select=account_id,funded_from&order=account_id.asc'),
+        App.rest('bd_actual_costs?order=category_code.asc'),
         fetchAllTxns(),
         App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
         App.rest('bd_holiday_cost'),
@@ -310,12 +313,24 @@
       // category's bill rows with its own card total whenever the category is switched to
       // actuals on the Actual Costs page — which would make the plan equal the actual and the
       // variance identically zero for exactly the categories most worth watching.
+      // A category with an ACTIVE row on the Actual Costs page does not take its plan from bill
+      // rows at all — its budgeted figure IS the trailing 12-month card total plus the annual
+      // adjust, floored at zero, exactly as applyActualCosts() and resolveDiscretionary() build
+      // it. Reading bills for such a category gives either zero (no bill rows exist) or a figure
+      // that is suppressed everywhere else in the app. Both are wrong, so those categories are
+      // resolved from bd_actual_costs and their bill rows and planner totals are skipped.
+      actualBasis = {};
+      (acRows || []).forEach(r => {
+        if (r.active !== true || !r.category_code) return;
+        actualBasis[r.category_code] = Number(r.adjust) || 0;
+      });
+
       // Kept as PARTS, not just a total: the drawer has to be able to answer "which bill", and a
       // running sum cannot be taken apart again afterwards.
       planParts = {};
       (bills || []).forEach(b => {
         const code = b.category_code;
-        if (!code) return;
+        if (!code || code in actualBasis) return;      // suppressed, same as applyActualCosts
         const an = annualOf(b.premium, b.frequency, b.pay_months);
         if (!an) return;
         (planParts[code] || (planParts[code] = [])).push({
@@ -341,6 +356,22 @@
         addPlanner(sets.holiday, 'Holiday', 'Holiday planner', holPlanAnnual);
         addPlanner(sets.fuel, 'Fuel', 'Weekly plan fuel', (Number(fPlan.workAnnual) || 0) + (Number(fPlan.discAnnual) || 0));
       } catch (e) { /* planners unavailable — those rows simply show no plan */ }
+
+      // Actual-basis categories, built from the same 12-month window every other page uses.
+      Object.keys(actualBasis).forEach(code => {
+        const e = agg.byCode[code];
+        const total = e ? e.total : 0;
+        const adjust = actualBasis[code];
+        const annual = Math.max(0, total + adjust);    // floored: never a negative cost
+        planParts[code] = [{
+          label: 'Actual-cost basis',
+          sub: adjust
+            ? ('card ' + fmt(total) + '/yr \u00b7 adjust ' + fmtDiff(adjust))
+            : ('12 months to ' + (agg.endMonth ? monthName(agg.endMonth) : 'now') + ' \u00b7 ' + (e ? e.count : 0) + ' txns'),
+          monthly: annual / 12,
+          fromActuals: true
+        }];
+      });
 
       planByCode = {};
       Object.keys(planParts).forEach(code => {
@@ -381,6 +412,7 @@
     if (!(Number(annual) > 0)) return;
     const keys = Object.keys(set || {});
     const code = keys.length ? keys[0] : fallbackCode;
+    if (code in actualBasis) return;   // driven by card spend instead; adding this would double it
     (planParts[code] || (planParts[code] = [])).push({
       label: label, sub: 'planner \u00b7 ' + fmt(annual) + '/yr', monthly: Number(annual) / 12
     });
@@ -448,7 +480,8 @@
         const w = (Math.abs(r.diff) / scale) * 100;
         const bar = '<div class="vbar ' + (over ? 'over' : 'under') + '" style="width:' + Math.max(w, 1.2).toFixed(1) + '%;min-width:3px;"></div>';
         const val = '<span class="vval ' + (over ? 'over' : (under ? 'under' : 'flat')) + '">' + (over || under ? fmtDiff(r.diff) : 'on plan') + '</span>';
-        const sub = (r.plan > 0 ? 'plan ' + fmt(r.plan) : 'no plan') + ' \u00b7 spent ' + fmt(r.act);
+        const basis = (r.code in actualBasis) ? ' (actuals)' : '';
+        const sub = (r.plan > 0 ? 'plan ' + fmt(r.plan) + basis : 'no plan') + ' \u00b7 spent ' + fmt(r.act);
         return '<div class="vrow" data-code="' + esc(r.code) + '" role="button" tabindex="0" aria-expanded="false">' +
           '<span class="vcar">&#9656;</span>' +
           '<div class="vlab"><b>' + esc(r.code) + '</b><span>' + esc(sub) + '</span></div>' +
@@ -479,8 +512,9 @@
     }
     document.getElementById('pvaFoot').innerHTML =
       esc(String(scope.length)) + ' categor' + (scope.length === 1 ? 'y' : 'ies') +
-      ' in scope. Plan is the annual figure &divide; 12 and is read straight from Household Bills and the planners, ' +
-      'so switching a category to actuals on the Actual Costs page does not move it.' + exFoot;
+      ' in scope. Plan is the annual figure &divide; 12, taken from Household Bills and the planners &mdash; ' +
+      'or, for a category ticked on the Actual Costs page, from its 12-month card total plus adjust, ' +
+      'which is the figure the budget itself uses.' + exFoot;
 
     setKpis(totPlan, totAct, ym);
   }
@@ -501,6 +535,14 @@
         '<div class="dtot"><span>Monthly run-rate</span><span>' + fmt(r.plan) + '</span></div>'
       : '<div class="dnone">No bill or planner feeds this category, so there is nothing to spend against.</div>';
 
+    // The selected month sits inside the 12-month window, so it pulls its own plan a little way
+    // towards itself. Said out loud rather than left for you to discover from a variance that
+    // looks smaller than it should.
+    const damping = (r.code in actualBasis)
+      ? '<div class="dl-sub" style="margin-top:6px;">Budgeted from card spend, so ' + esc(monthName(ym)) +
+        ' is one of the twelve months behind its own plan and nudges it by about a twelfth.</div>'
+      : '';
+
     const spendList = tx.length
       ? '<div class="dscroll">' + tx.map(t =>
           '<div class="dline"><div class="dl-main">' + esc(t.desc || '\u2014') +
@@ -516,7 +558,7 @@
 
     return '<div class="vdet-head">' + esc(verdict) + '</div>' +
       '<div class="vdet-cols">' +
-        '<div><h4>Planned \u2014 what builds the run-rate</h4>' + planList + '</div>' +
+        '<div><h4>Planned \u2014 what builds the run-rate</h4>' + planList + damping + '</div>' +
         '<div><h4>Spent \u2014 what hit the card</h4>' + spendList + '</div>' +
       '</div>';
   }
