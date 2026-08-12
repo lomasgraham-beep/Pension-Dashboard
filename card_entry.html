@@ -112,7 +112,7 @@
 </head>
 <body>
   <h1>Card Entry</h1>
-  <p class="note">Import a CSV, read a screenshot, or key a line in by hand. Either way the saved transactions appear on the Card Statements page. <span class="mini">(card entry build: v8)</span></p>
+  <p class="note">Import a CSV, read a screenshot, or key a line in by hand. Either way the saved transactions appear on the Card Statements page. Amazon and any other merchant marked as hand-categorised is left uncategorised on purpose &mdash; file those on the Amazon Transactions page. <span class="mini">(card entry build: v9)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="importPanel" class="panel" style="display:none;">
@@ -409,7 +409,20 @@
       if (hit) conceptCode[concept] = hit.code;
     });
   }
+  // v9: merchants listed in bd_manual_merchant are hand-categorised on the Amazon
+  // Transactions page. Their statement descriptors say nothing about what was bought, so a
+  // single learned mapping is always wrong for most of them. Two consequences: they are never
+  // auto-categorised on import, and correcting one of them never teaches the merchant map —
+  // otherwise one correction would retarget every future charge from that merchant.
+  let manualKeys = [];
+  function isManualMerchant(desc) {
+    if (!manualKeys.length) return false;
+    const nd = normDesc(desc);
+    const key = merchantKey(desc);
+    return manualKeys.some(m => key === m || nd.indexOf(m) !== -1);
+  }
   function suggestCategory(desc) {
+    if (isManualMerchant(desc)) return { code: '', source: '' };
     const key = merchantKey(desc);
     if (merchantMap[key]) return { code: merchantMap[key], source: 'learned' };
     const nd = normDesc(desc);
@@ -634,7 +647,7 @@
         const found = await App.rest('bd_card_txn?select=id&limit=1&dedupe_hash=eq.' + encodeURIComponent(hash));
         if (found && found.length) newId = found[0].id;
       } catch (e) { /* non-fatal: the row is saved, we just cannot offer Remove */ }
-      if (code) {
+      if (code && !isManualMerchant(desc)) {
         const key = merchantKey(desc);
         if (key) {
           if (!(key in merchantMap)) { await App.write('POST', 'bd_merchant_map', { match_text: key, category_code: code }); merchantMap[key] = code; }
@@ -659,12 +672,14 @@
   async function load() {
     try {
       setStatus('Loading\u2026');
-      const [cats, hashes, mm, mem] = await Promise.all([
+      const [cats, hashes, mm, mem, man] = await Promise.all([
         App.rest('bd_bill_category?order=code.asc'),
         App.rest('bd_card_txn?select=dedupe_hash'),
         App.rest('bd_merchant_map'),
-        App.memberNames().catch(() => ({ all: [] }))
+        App.memberNames().catch(() => ({ all: [] })),
+        App.rest('bd_manual_merchant').catch(() => [])
       ]);
+      manualKeys = (man || []).map(r => normDesc(r.match_text)).filter(Boolean);
       billCats = cats || [];
       // v8: card pages label categories by CODE, not description — codes are short, stable
       // and fit the narrow pickers; descriptions are editable on Bill Categories.
@@ -1198,6 +1213,7 @@
       await App.write('POST', 'bd_card_txn', payload);
       for (const p of rows) {
         if (!p.code) continue;
+        if (isManualMerchant(p.desc)) continue;
         const key = merchantKey(p.desc); if (!key) continue;
         if (!(key in merchantMap)) { await App.write('POST', 'bd_merchant_map', { match_text: key, category_code: p.code }); merchantMap[key] = p.code; }
         else if (merchantMap[key] !== p.code) { await App.write('PATCH', 'bd_merchant_map?match_text=eq.' + encodeURIComponent(key), { category_code: p.code, updated_at: new Date().toISOString() }); merchantMap[key] = p.code; }

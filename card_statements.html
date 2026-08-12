@@ -75,7 +75,7 @@
 </head>
 <body>
   <h1>Card Statements</h1>
-  <p class="note">Saved card transactions, by month. Change a category or mark a row to delete, then press <strong>Save changes</strong> &mdash; nothing is written until you do. Add transactions on the Card Entry page. Use <strong>Find</strong> to pull up every row matching a word &mdash; comma-separate for alternatives, e.g. <em>petrol, shell, bp</em>. The category totals above follow the filter, so you can see what a search is costing you before re-categorising. <span class="mini">(card statements build: v4)</span></p>
+  <p class="note">Saved card transactions, by month. Change a category or mark a row to delete, then press <strong>Save changes</strong> &mdash; nothing is written until you do. Add transactions on the Card Entry page. Use <strong>Find</strong> to pull up every row matching a word &mdash; comma-separate for alternatives, e.g. <em>petrol, shell, bp</em>. The category totals above follow the filter, so you can see what a search is costing you before re-categorising. <span class="mini">(card statements build: v5)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="ledgerPanel" class="panel" style="display:none;">
@@ -120,6 +120,7 @@
   let catByCode = {};
   let txns = [];
   let merchantMap = {};
+  let manualKeys = [];           // match strings that must never be learned from
   let searchTerms = [];           // comma-separated OR terms, lower-cased; empty = no filter
   let pendingCat = {};            // String(id) -> new code (or null), only when differs from saved
   let pendingDel = new Set();     // String(id) marked for deletion
@@ -148,6 +149,16 @@
     if (key.length <= 3 && toks[1]) key += ' ' + toks[1];
     return key;
   }
+  // v5: merchants listed in bd_manual_merchant (Amazon and anything else whose descriptor
+  // says nothing about what was bought) must never teach the merchant map. Without this, one
+  // correction here silently retargets every future charge from that merchant, and the
+  // category it lands in wanders month to month with no change in spending behaviour.
+  function isManualMerchant(desc) {
+    if (!manualKeys.length) return false;
+    const nd = normDesc(desc);
+    const key = merchantKey(desc);
+    return manualKeys.some(m => key === m || nd.indexOf(m) !== -1);
+  }
   function catOptions(selected) {
     let html = '<option value="">\u2014</option>';
     billCats.forEach(c => {
@@ -167,11 +178,13 @@
   async function load() {
     try {
       setStatus('Loading\u2026');
-      const [cats, tx, mm] = await Promise.all([
+      const [cats, tx, mm, man] = await Promise.all([
         App.rest('bd_bill_category?order=code.asc'),
         App.rest('bd_card_txn?order=txn_date.desc&limit=2000'),
-        App.rest('bd_merchant_map')
+        App.rest('bd_merchant_map'),
+        App.rest('bd_manual_merchant').catch(() => [])
       ]);
+      manualKeys = (man || []).map(r => normDesc(r.match_text)).filter(Boolean);
       billCats = cats || [];
       // v3: label categories by CODE, not description.
       catByCode = {}; billCats.forEach(c => { catByCode[c.code] = c.code; });
@@ -364,7 +377,7 @@
       try {
         await App.write('PATCH', 'bd_card_txn?id=eq.' + id, { category_code: code });
         if (t) t.category_code = code;
-        if (code && t) {
+        if (code && t && !isManualMerchant(t.description)) {
           const key = merchantKey(t.description);
           if (key) {
             if (!(key in merchantMap)) { await App.write('POST', 'bd_merchant_map', { match_text: key, category_code: code }); merchantMap[key] = code; }
