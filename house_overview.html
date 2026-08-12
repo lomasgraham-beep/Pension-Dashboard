@@ -53,9 +53,11 @@
   .vaxis .ax-l { flex:1 1 0; text-align:right; padding-right:10px; color:var(--over); }
   .vaxis .ax-r { flex:1 1 0; text-align:left; padding-left:10px; color:var(--under); }
   .vrow { display:flex; align-items:center; gap:10px; padding:5px 0; }
-  .vlab { flex:0 0 160px; min-width:0; }
+  .vlab { flex:0 0 230px; min-width:0; }
   .vlab b { display:block; font-size:15px; font-weight:700; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .vlab span { display:block; font-size:11px; color:var(--ink-soft); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .vlab em { font-style:normal; font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:0.04em;
+             background:var(--line); color:var(--ink-soft); border-radius:4px; padding:1px 4px; margin-left:5px; }
   .vplot { flex:1 1 auto; display:flex; align-items:center; min-width:0; }
   .vhalf { flex:1 1 0; display:flex; align-items:center; min-width:0; height:30px; }
   .vhalf.left  { justify-content:flex-end; }
@@ -67,6 +69,7 @@
   .vval.over { color:var(--over); } .vval.under { color:var(--under); }
   .vval.flat { color:var(--ink-soft); font-weight:600; }
   .vscale { font-size:11px; color:var(--ink-soft); margin-top:8px; text-align:center; }
+  .vdormant { font-size:12px; color:var(--ink-soft); padding:9px 0 2px; border-top:1px dotted var(--line); margin-top:6px; }
   .vcar { flex:0 0 12px; color:var(--ink-soft); font-size:11px; user-select:none; }
   .vrow { cursor:pointer; border-radius:8px; }
   .vrow:hover { background:var(--surface-2); }
@@ -74,7 +77,7 @@
   .vrow:focus-visible { outline:2px solid var(--aqua); outline-offset:2px; }
 
   /* --- why-drawer: the bills behind the plan, the transactions behind the spend --- */
-  .vdet { display:none; margin:0 0 10px 182px; border:1px solid var(--line); border-radius:10px;
+  .vdet { display:none; margin:0 0 10px 252px; border:1px solid var(--line); border-radius:10px;
           background:var(--surface-2); padding:12px 14px; }
   .vdet.open { display:block; }
   .vdet-head { font-size:13px; font-weight:700; margin-bottom:10px; }
@@ -90,6 +93,7 @@
           margin-top:6px; padding-top:6px; border-top:1px solid var(--line-strong); font-variant-numeric:tabular-nums; }
   .dnone { color:var(--ink-soft); font-size:13px; padding:4px 0; }
   @media (max-width:700px) { .vdet { margin-left:0; } .vdet-cols { grid-template-columns:1fr; } }
+  @media (max-width:900px) { .vlab { flex:0 0 160px; } }
   @media (max-width:640px) { .vlab { flex:0 0 108px; } .vlab b { font-size:13px; } .vval { font-size:12px; padding:0 5px; } }
   .hint { font-size:12px; color:var(--ink-soft); margin:0 0 8px; }
 
@@ -122,6 +126,7 @@
     select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
     .vhalf.right { border-left-color:#475569 !important; }
     .vrow:hover, .vrow.open { background:#0f172a !important; }
+    .vlab em { background:#334155 !important; color:#cbd5e1 !important; }
     .vdet { background:#0f172a !important; border-color:#334155 !important; }
     .dline { border-bottom-color:#334155 !important; }
     .vlab b { color:#f1f5f9 !important; }
@@ -144,7 +149,7 @@
     leaving a bank account have no card trail, so including them would bury the outliers. Planned figures are the
     annual cost divided by twelve; a category ticked on the Actual Costs page takes its plan from its 12-month
     card run-rate instead, matching the budget.
-    <span style="color:#94a3b8;">(household overview build: v6)</span></p>
+    <span style="color:#94a3b8;">(household overview build: v7)</span></p>
 
   <div id="status">Loading&hellip;</div>
 
@@ -152,7 +157,6 @@
     <div class="kpi"><div class="lbl">Planned</div><div class="val" id="kPlan">&pound;0</div><div class="foot" id="kPlanFoot">&nbsp;</div></div>
     <div class="kpi"><div class="lbl">Actual on card</div><div class="val" id="kAct">&pound;0</div><div class="foot" id="kActFoot">&nbsp;</div></div>
     <div class="kpi"><div class="lbl">Variance</div><div class="val" id="kVar">&pound;0</div><div class="foot" id="kVarFoot">&nbsp;</div></div>
-    <div class="kpi"><div class="lbl">Contracts ending</div><div class="val" id="kCon">0</div><div class="foot" id="kConFoot">within 60 days</div></div>
   </div>
 
   <div id="cols" style="display:none;">
@@ -461,7 +465,7 @@
       body.innerHTML = '<div class="empty">Nothing to compare. Import a card statement first.</div>';
       document.getElementById('vScale').innerHTML = '&nbsp;';
       document.getElementById('uncatFlag').innerHTML = '';
-      setKpis(0, 0, null);
+      setKpis(0, 0, null, 0, 0);
       return;
     }
 
@@ -473,18 +477,31 @@
       actByCode[t.code] = (actByCode[t.code] || 0) + t.amount;
     });
 
-    const rows = scope.map(code => {
+    const all = scope.map(code => {
       const plan = Math.round((planByCode[code] || 0) * 100) / 100;
       const act = Math.round((actByCode[code] || 0) * 100) / 100;
       return { code: code, plan: plan, act: act, diff: act - plan };
     });
 
+    // A category with no plan AND no spend has nothing to say — nothing was expected and nothing
+    // happened. Drawing it costs a row to report an absence. Counted on one line instead. Note
+    // this is NOT "no variance": a category that spent exactly its plan is a real result and
+    // keeps its row.
+    const rows = all.filter(r => !(r.plan === 0 && r.act === 0));
+    const dormant = all.filter(r => r.plan === 0 && r.act === 0);
+
     // Worst overspend at the top, deepest underspend at the bottom — so the chart reads as one
     // continuous shape from red down to green rather than alternating sides.
     rows.sort((a, b) => b.diff - a.diff || b.act - a.act);
 
-    const totPlan = rows.reduce((s, r) => s + r.plan, 0);
-    const totAct = rows.reduce((s, r) => s + r.act, 0);
+    // Totals stay over EVERY category, dormant included, so the KPI strip cannot disagree with
+    // itself just because a row was folded away. Dormant rows contribute zero to both anyway.
+    const totPlan = all.reduce((s, r) => s + r.plan, 0);
+    const totAct = all.reduce((s, r) => s + r.act, 0);
+    // The net variance hides its own size: £970 over less £469 under nets to £501, and only the
+    // net is visible. Both sides are carried to the KPI foot.
+    const grossOver = rows.reduce((s, r) => s + (r.diff > 0 ? r.diff : 0), 0);
+    const grossUnder = rows.reduce((s, r) => s + (r.diff < 0 ? -r.diff : 0), 0);
     // Both wings share one scale, so a bar's length means the same thing on either side.
     const scale = Math.max(1, ...rows.map(r => Math.abs(r.diff)));
 
@@ -498,18 +515,21 @@
         const w = (Math.abs(r.diff) / scale) * 100;
         const bar = '<div class="vbar ' + (over ? 'over' : 'under') + '" style="width:' + Math.max(w, 1.2).toFixed(1) + '%;min-width:3px;"></div>';
         const val = '<span class="vval ' + (over ? 'over' : (under ? 'under' : 'flat')) + '">' + (over || under ? fmtDiff(r.diff) : 'on plan') + '</span>';
-        const basis = (r.code in actualBasis) ? ' (actuals)' : '';
-        const sub = (r.plan > 0 ? 'plan ' + fmt(r.plan) + basis : 'no plan') + ' \u00b7 spent ' + fmt(r.act);
+        const basis = (r.code in actualBasis) ? '<em>actuals</em>' : '';
+        const sub = (r.plan > 0 ? 'plan ' + fmt(r.plan) : 'no plan') + ' \u00b7 spent ' + fmt(r.act) + basis;
         return '<div class="vrow" data-code="' + esc(r.code) + '" role="button" tabindex="0" aria-expanded="false">' +
           '<span class="vcar">&#9656;</span>' +
-          '<div class="vlab"><b>' + esc(r.code) + '</b><span>' + esc(sub) + '</span></div>' +
+          '<div class="vlab"><b>' + esc(r.code) + '</b><span>' + sub + '</span></div>' +
           '<div class="vplot">' +
             '<div class="vhalf left">'  + (over  ? val + bar : '') + '</div>' +
             '<div class="vhalf right">' + (under ? bar + val : (over ? '' : val)) + '</div>' +
           '</div>' +
         '</div>' +
         '<div class="vdet" data-det="' + esc(r.code) + '">' + detailHtml(r, ym) + '</div>';
-      }).join('');
+      }).join('') + (dormant.length
+        ? '<div class="vdormant">' + dormant.length + ' categor' + (dormant.length === 1 ? 'y' : 'ies') +
+          ' with no plan and nothing spent in ' + esc(monthName(ym)) + ': ' + esc(dormant.map(r => r.code).join(', ')) + '.</div>'
+        : '');
       document.getElementById('vScale').innerHTML =
         'Bars are the gap against plan. Full width either side = ' + fmt(scale) + '.';
     }
@@ -534,7 +554,7 @@
       'plus the Dining, Holiday and Fuel planners; a category ticked on the Actual Costs page uses its ' +
       '12-month card total plus adjust instead, which is the figure the budget itself uses.' + exFoot;
 
-    setKpis(totPlan, totAct, ym);
+    setKpis(totPlan, totAct, ym, grossOver, grossUnder);
   }
 
   // ---- why-drawer -------------------------------------------------------------------------
@@ -617,7 +637,7 @@
     if (row) { e.preventDefault(); toggleRow(row); }
   });
 
-  function setKpis(plan, act, ym) {
+  function setKpis(plan, act, ym, grossOver, grossUnder) {
     document.getElementById('kPlan').textContent = fmt(plan);
     document.getElementById('kPlanFoot').textContent = ym ? monthName(ym) + ' run-rate' : '\u2014';
     document.getElementById('kAct').textContent = fmt(act);
@@ -626,9 +646,11 @@
     const v = document.getElementById('kVar');
     v.textContent = fmtDiff(d);
     v.className = 'val ' + (d > 0.5 ? 'over' : (d < -0.5 ? 'under' : ''));
-    document.getElementById('kVarFoot').textContent = plan > 0
-      ? (Math.round(Math.abs(d) / plan * 100) + '% ' + (d >= 0 ? 'over plan' : 'under plan'))
-      : 'no plan to compare';
+    // The net is the headline, but the two sides are what you act on: a small net can hide a
+    // large overspend cancelled by a large underspend somewhere unrelated.
+    document.getElementById('kVarFoot').textContent = (grossOver || grossUnder)
+      ? (fmt(grossOver) + ' over, ' + fmt(grossUnder) + ' under')
+      : (plan > 0 ? 'on plan' : 'no plan to compare');
   }
 
   // ---- contracts ---------------------------------------------------------------------------
@@ -642,14 +664,6 @@
       .filter(x => x.dl != null && x.dl <= CONTRACT_WINDOW)
       .sort((a, b) => a.dl - b.dl);
 
-    // The tile counts exactly what the strip lists, expired included — an expired contract is
-    // more urgent than one ending next week, not less, so hiding it from the count would be the
-    // wrong way round. It is called out separately in the foot.
-    const expired = list.filter(x => x.dl < 0).length;
-    document.getElementById('kCon').textContent = String(list.length);
-    document.getElementById('kConFoot').textContent = expired
-      ? ('within ' + CONTRACT_WINDOW + ' days \u00b7 ' + expired + ' already expired')
-      : ('within ' + CONTRACT_WINDOW + ' days');
 
     const host = document.getElementById('conBody');
     if (!list.length) {
