@@ -6,7 +6,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=act4"></script>
 <style>
-  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:960px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1600px; padding:20px 16px; background:#f4f7f6; color:#333; font-size:16px; }
+  /* Prose stays at a readable measure even though the table now runs the full width. */
+  h1, .note, .setup, #status { max-width:1000px; }
   h1 { color:#2c3e50; margin-bottom:2px; }
   .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
   .mini { color:#94a3b8; font-size:12px; }
@@ -24,12 +26,17 @@
   .btn[disabled], .btn-small[disabled] { opacity:0.5; cursor:default; }
   table { border-collapse:collapse; width:100%; margin-top:6px; }
   th, td { padding:8px 10px; border-bottom:1px solid #e2e8f0; text-align:right; vertical-align:middle; }
+  /* Date, Amount and Category shrink to fit so every spare pixel goes to the two columns
+     that carry meaning. The note column claims the slack at 100%. */
+  th.fit, td.fit { width:1%; white-space:nowrap; }
+  th.grow, td.grow { width:auto; }
+  th.note-col, td.note-col { width:100%; }
   th:first-child, td:first-child, th.l, td.l { text-align:left; }
   th { background:#f8fafc; color:#475569; font-size:13px; }
-  td.desc { max-width:210px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; color:#64748b; }
+  td.desc { min-width:200px; max-width:400px; white-space:normal; overflow-wrap:anywhere; font-size:13px; color:#64748b; line-height:1.35; }
   td.empty { text-align:left; color:#94a3b8; font-style:italic; }
   tr.pedit td.markcell { box-shadow: inset 3px 0 0 #f59e0b; }
-  input.itemnote { width:100%; min-width:150px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:14px; box-sizing:border-box; background:#fff; }
+  input.itemnote { width:100%; min-width:260px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:14px; box-sizing:border-box; background:#fff; }
   input.itemnote:focus { outline:none; border-color:#3498db; box-shadow:0 0 0 3px rgba(52,152,219,0.15); }
   select.cat { font-size:14px; padding:6px; max-width:170px; }
   textarea { width:100%; box-sizing:border-box; min-height:120px; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; background:#fff; color:#333; }
@@ -96,7 +103,7 @@
 </head>
 <body>
   <h1>Amazon Transactions</h1>
-  <p class="note">Amazon charges say nothing about what was bought, so they are never categorised automatically &mdash; they wait here until you say what they were. Type straight into the table for a handful, use an Amazon data export to fill the descriptions in for you, or use the clipboard round-trip to clear a backlog in Google Sheets. Nothing is written until you press <strong>Save changes</strong>. <span class="mini">(amazon transactions build: v5)</span></p>
+  <p class="note">Amazon charges say nothing about what was bought, so they are never categorised automatically &mdash; they wait here until you say what they were. Type straight into the table for a handful, use an Amazon data export to fill the descriptions in for you, or use the clipboard round-trip to clear a backlog in Google Sheets. Nothing is written until you press <strong>Save changes</strong>. <span class="mini">(amazon transactions build: v6)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="setupPanel" class="panel" style="display:none;">
@@ -160,11 +167,11 @@
 
       <table id="txnTable">
         <thead><tr>
-          <th class="l">Date</th>
-          <th>Amount</th>
-          <th class="l">Statement text</th>
-          <th class="l">What was it?</th>
-          <th class="l">Category</th>
+          <th class="l fit">Date</th>
+          <th class="fit">Amount</th>
+          <th class="l grow">Statement text</th>
+          <th class="l note-col">What was it?</th>
+          <th class="l fit">Category</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -403,11 +410,11 @@
       const id = String(t.id);
       const cls = isEdited(id) ? 'pedit' : '';
       return '<tr data-row="' + escapeHtml(id) + '" class="' + cls + '">' +
-        '<td class="l">' + escapeHtml(t.txn_date) + '</td>' +
-        '<td>' + money(t.amount) + '</td>' +
-        '<td class="l desc" title="' + escapeHtml(t.description) + '">' + escapeHtml(t.description) + '</td>' +
-        '<td class="l markcell"><input type="text" class="itemnote" data-id="' + escapeHtml(id) + '" value="' + escapeHtml(effNote(t)) + '" placeholder="e.g. dog food, printer ink" autocomplete="off" autocapitalize="none" spellcheck="false"></td>' +
-        '<td class="l"><select class="cat" data-id="' + escapeHtml(id) + '">' + catOptions(effCat(t)) + '</select></td>' +
+        '<td class="l fit">' + escapeHtml(t.txn_date) + '</td>' +
+        '<td class="fit">' + money(t.amount) + '</td>' +
+        '<td class="l desc grow" title="' + escapeHtml(t.description) + '">' + escapeHtml(t.description) + '</td>' +
+        '<td class="l markcell note-col"><input type="text" class="itemnote" data-id="' + escapeHtml(id) + '" value="' + escapeHtml(effNote(t)) + '" placeholder="e.g. dog food, printer ink" autocomplete="off" autocapitalize="none" spellcheck="false"></td>' +
+        '<td class="l fit"><select class="cat" data-id="' + escapeHtml(id) + '">' + catOptions(effCat(t)) + '</select></td>' +
         '</tr>';
     }).join('');
   }
