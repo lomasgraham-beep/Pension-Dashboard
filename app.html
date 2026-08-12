@@ -1611,7 +1611,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-517</span>
+      <span class="build-stamp">LC-518</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -2195,7 +2195,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       <button id="subbtn-PayPal" class="subtab-link" onclick="showSub(event,'PayPal')">PayPal</button>
       </div>
     </div>
-    <!-- LC-517: Household landing is now a framed page (house_overview.html). It was an
+    <!-- LC-518: Household landing is now a framed page (house_overview.html). It was an
          in-shell renderIndex() placeholder in LC-508..LC-510; it now carries the real
          dashboard, so it needs its own file and its own cache-buster. -->
     <div id="sub-HouseOverview" class="subtabcontent"><iframe id="frame-HouseOverview" class="app-frame" title="Household Overview"></iframe></div>
@@ -5289,7 +5289,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front183';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front184';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { HouseOverview:'house_overview.html', Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', ActualCosts:'actual_costs.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', FuelCosts:'fuel_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Contracts:'contracts.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -5858,7 +5858,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       host.appendChild(wrap);
     }
     function renderLandings() {
-      // LC-517: Household no longer has an in-shell index — its landing is house_overview.html,
+      // LC-518: Household no longer has an in-shell index — its landing is house_overview.html,
       // reached through SUB_SRC like any other framed page. Setup keeps its NAV-built index.
       renderIndex('sub-SetupIndex', 'Setup', 'Setup',
         'Reference data both streams are built on. Changes here feed the budget and the model alike.');
@@ -6512,7 +6512,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-517';
+    if (stamp) stamp.textContent = 'LC-518';
   }
 
   function buildSubnav() {

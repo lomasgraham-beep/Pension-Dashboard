@@ -38,6 +38,10 @@
   /* A diverging chart needs room to read, so it takes the full width and the contracts sit
      underneath as a card grid rather than a squeezed right-hand column. */
   .con-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:8px 16px; }
+  /* Nothing expiring still deserves saying, but not a full panel's worth of prime space at the
+     top of the page — it collapses to one quiet line. */
+  .panel.quiet { padding:9px 16px; }
+  .panel.quiet .phead { display:none; }
 
   /* --- month picker --- */
   select { padding:8px 10px; border:1px solid var(--line-strong); border-radius:8px; font-size:14px;
@@ -149,9 +153,21 @@
     leaving a bank account have no card trail, so including them would bury the outliers. Planned figures are the
     annual cost divided by twelve; a category ticked on the Actual Costs page takes its plan from its 12-month
     card run-rate instead, matching the budget.
-    <span style="color:#94a3b8;">(household overview build: v7)</span></p>
+    <span style="color:#94a3b8;">(household overview build: v8)</span></p>
 
   <div id="status">Loading&hellip;</div>
+
+  <!-- Contracts sit above the numbers deliberately: an expiring contract is the only thing on
+       this page with a deadline attached, so it must not be something you have to scroll to. -->
+  <div class="panel" id="conPanel" style="display:none;">
+    <div class="phead">
+      <div>
+        <h2>Contracts ending soon</h2>
+        <p class="sub">Next 60 days, soonest first</p>
+      </div>
+    </div>
+    <div id="conBody" class="con-grid"></div>
+  </div>
 
   <div id="kpiGrid" class="kpi-grid" style="display:none;">
     <div class="kpi"><div class="lbl">Planned</div><div class="val" id="kPlan">&pound;0</div><div class="foot" id="kPlanFoot">&nbsp;</div></div>
@@ -176,15 +192,6 @@
       <p class="foot-note" id="pvaFoot">&nbsp;</p>
     </div>
 
-    <div class="panel">
-      <div class="phead">
-        <div>
-          <h2>Contracts ending soon</h2>
-          <p class="sub">Next 60 days, soonest first</p>
-        </div>
-      </div>
-      <div id="conBody" class="con-grid"></div>
-    </div>
   </div>
 
 <script>
@@ -416,6 +423,7 @@
       months = Object.keys(seen).sort().reverse().slice(0, 24);
 
       status.style.display = 'none';
+      document.getElementById('conPanel').style.display = 'block';
       document.getElementById('kpiGrid').style.display = 'grid';
       document.getElementById('cols').style.display = 'grid';
 
@@ -666,10 +674,13 @@
 
 
     const host = document.getElementById('conBody');
+    const panel = document.getElementById('conPanel');
     if (!list.length) {
-      host.innerHTML = '<div class="empty" style="grid-column:1/-1;">Nothing ending in the next ' + CONTRACT_WINDOW + ' days.</div>';
+      panel.classList.add('quiet');
+      host.innerHTML = '<div class="empty" style="grid-column:1/-1;padding:0;">No contracts ending in the next ' + CONTRACT_WINDOW + ' days.</div>';
       return;
     }
+    panel.classList.remove('quiet');
     host.innerHTML = list.map(x => {
       const c = x.c, dl = x.dl;
       let cls, label;
