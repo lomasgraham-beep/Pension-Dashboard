@@ -52,6 +52,10 @@
   .setup { font-size:14px; color:#475569; }
   .setup ol { padding-left:22px; }
   .setup li { margin:5px 0; }
+  #bulkWrap { border:1px solid #e2e8f0; border-radius:8px; margin:6px 0 14px; background:#f8fafc; }
+  #bulkWrap summary { cursor:pointer; padding:11px 14px; font-weight:bold; font-size:14px; color:#475569; }
+  #bulkWrap .bulkbody { padding:0 14px 14px; }
+  #bulkWrap select.cat { max-width:200px; }
   .chk { display:flex; align-items:center; gap:8px; font-weight:normal; font-size:14px; color:#475569; margin:10px 0; }
   .chk input { width:20px; height:20px; }
   input[type=file] { font-size:14px; padding:8px 0; max-width:100%; }
@@ -84,13 +88,15 @@
     .report .good { color:#6ee7b7 !important; }
     .setup { color:#cbd5e1 !important; }
     .chk { color:#cbd5e1 !important; }
+    #bulkWrap { background:#0f172a !important; border-color:#334155 !important; }
+    #bulkWrap summary { color:#cbd5e1 !important; }
     code { background:#0f172a !important; border-color:#334155 !important; color:#e2e8f0 !important; }
   }
 </style>
 </head>
 <body>
   <h1>Amazon Transactions</h1>
-  <p class="note">Amazon charges say nothing about what was bought, so they are never categorised automatically &mdash; they wait here until you say what they were. Type straight into the table for a handful, use an Amazon data export to fill the descriptions in for you, or use the clipboard round-trip to clear a backlog in Google Sheets. Nothing is written until you press <strong>Save changes</strong>. <span class="mini">(amazon transactions build: v4)</span></p>
+  <p class="note">Amazon charges say nothing about what was bought, so they are never categorised automatically &mdash; they wait here until you say what they were. Type straight into the table for a handful, use an Amazon data export to fill the descriptions in for you, or use the clipboard round-trip to clear a backlog in Google Sheets. Nothing is written until you press <strong>Save changes</strong>. <span class="mini">(amazon transactions build: v5)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="setupPanel" class="panel" style="display:none;">
@@ -107,6 +113,10 @@
         <div>
           <label for="monthSel">Month</label>
           <select id="monthSel"></select>
+        </div>
+        <div>
+          <label for="maxAmt">At most (£)</label>
+          <input type="number" id="maxAmt" inputmode="decimal" step="0.01" min="0" placeholder="any" style="width:110px;">
         </div>
         <div>
           <label for="statusSel">Show</label>
@@ -129,6 +139,24 @@
         <button class="btn btn-save" id="saveBtn" type="button">Save changes</button>
         <button class="btn btn-ghost" id="discardBtn" type="button">Discard</button>
       </div>
+
+      <details id="bulkWrap">
+        <summary>Set every row shown at once</summary>
+        <div class="bulkbody">
+          <p class="note" style="margin:8px 0 10px;">Fills the rows currently on screen &mdash; narrow the filters first. Leave a field blank to leave it alone. Like everything else here it only stages the change; nothing is written until <strong>Save changes</strong>.</p>
+          <div class="row">
+            <div style="flex:1 1 220px;">
+              <label for="bulkNote">Description for all</label>
+              <input type="text" id="bulkNote" class="itemnote" placeholder="e.g. Kindle book" autocomplete="off" autocapitalize="none" spellcheck="false">
+            </div>
+            <div>
+              <label for="bulkCat">Category for all</label>
+              <select id="bulkCat" class="cat"></select>
+            </div>
+            <button class="btn btn-go" id="bulkApplyBtn" type="button">Apply to rows shown</button>
+          </div>
+        </div>
+      </details>
 
       <table id="txnTable">
         <thead><tr>
@@ -321,6 +349,7 @@
       document.getElementById('status').style.display = 'none';
       document.getElementById('setupPanel').style.display = 'none';
       document.getElementById('mainPanel').style.display = 'block';
+      document.getElementById('bulkCat').innerHTML = catOptions(null);
       renderMonths();
     } catch (e) {
       setStatus('Could not load: ' + (e && e.message ? e.message : e), 's-err');
@@ -340,10 +369,16 @@
   // The status filter is applied against the SAVED category, not the pending one, so a row
   // does not vanish from under the cursor the moment it is categorised. It leaves the list
   // on the next redraw or on save, which is when you expect it to.
+  function currentMax() {
+    const v = parseFloat(document.getElementById('maxAmt').value);
+    return isFinite(v) && v > 0 ? v : null;
+  }
   function rowsShown() {
-    const ym = currentMonth(), st = currentStatus();
+    const ym = currentMonth(), st = currentStatus(), mx = currentMax();
     return txns.filter(t => {
       if (ym !== 'ALL' && monthOf(t.txn_date) !== ym) return false;
+      // Compared on the absolute amount so a refund is filtered by its size, not its sign.
+      if (mx !== null && Math.abs(Number(t.amount) || 0) > mx + 0.005) return false;
       const saved = t.category_code || null;
       if (st === 'uncat' && saved) return false;
       if (st === 'cat' && !saved) return false;
@@ -435,6 +470,37 @@
     document.querySelectorAll('#txnTable tbody select.cat').forEach(stageCat);
   }
   function redraw() { syncDom(); draw(); }
+
+  // The only control here that changes many rows on one tap. It acts strictly on what is
+  // currently on screen, stages rather than writes, and reports the count — so Discard is
+  // always a way back out.
+  function bulkApply() {
+    syncDom();
+    const note = document.getElementById('bulkNote').value;
+    const cat = document.getElementById('bulkCat').value;
+    const setNote = note.trim().length > 0;
+    const setCat = cat.length > 0;
+    if (!setNote && !setCat) { setStatus('Nothing to apply \u2014 fill in a description, a category, or both.', 's-err'); return; }
+    const list = rowsShown();
+    if (!list.length) { setStatus('No rows are on screen to apply to.', 's-err'); return; }
+    if (!confirm('Set ' + (setNote && setCat ? 'the description and category' : (setNote ? 'the description' : 'the category')) +
+                 ' on all ' + list.length + ' row(s) currently shown?')) return;
+    let n = 0;
+    list.forEach(t => {
+      const id = String(t.id);
+      let touched = false;
+      if (setNote) {
+        const saved = t.item_note == null ? '' : String(t.item_note);
+        if (note !== saved) { pendingNote[id] = note; touched = true; } else delete pendingNote[id];
+      }
+      if (setCat) {
+        if (cat !== (t.category_code || null)) { pendingCat[id] = cat; touched = true; } else delete pendingCat[id];
+      }
+      if (touched) n++;
+    });
+    draw();
+    setStatus(n + ' row(s) changed. Review them, then press Save changes.', 's-ok');
+  }
 
   function discardChanges() {
     if (!pendingTotal()) return;
@@ -888,6 +954,58 @@
     document.getElementById('csvReport').innerHTML = html;
   }
 
+  // Gift cards pay part of an order, so the export's total EXCEEDS what the card was debited
+  // and no amount will ever tie. The inference is: an unmatched charge with a gift-card
+  // shipment a day or two away whose total is larger. Assigned strictly one-to-one — without
+  // that, a single £76 order "explains" three unrelated charges. Marked probable, never certain.
+  const GIFT_DAYS = 2;
+  function assignGiftCard(pool, leftovers) {
+    const gifts = pool.filter(sh => sh.gift);
+    if (!gifts.length || !leftovers.length) return {};
+    const pairs = [];
+    leftovers.forEach(t => {
+      const amt = Math.abs(Number(t.amount) || 0);
+      const td = dayMs(t.txn_date);
+      if (!isFinite(td) || amt <= 0) return;
+      gifts.forEach((sh, i) => {
+        const dd = Math.abs(dayMs(sh.day) - td) / 86400000;
+        if (dd <= GIFT_DAYS && sh.charge > amt + PENNY) pairs.push({ dd: dd, excess: sh.charge - amt, id: String(t.id), gi: i, sh: sh });
+      });
+    });
+    // Closest in time first, then the smallest gift-card contribution — the least
+    // speculative reading of the pair.
+    pairs.sort((a, b) => (a.dd - b.dd) || (a.excess - b.excess));
+    const usedShip = {}, usedTxn = {}, out = {};
+    pairs.forEach(p => {
+      if (usedShip[p.gi] || usedTxn[p.id]) return;
+      usedShip[p.gi] = 1; usedTxn[p.id] = 1;
+      out[p.id] = p.sh.items.join(' \u00b7 ') + ' \u2014 probably; part-paid by a gift card';
+    });
+    return out;
+  }
+  // A refund is the same money coming back. Where an equal and opposite charge exists earlier
+  // and already has a description, the refund is for that thing.
+  function pairRefunds(leftovers, described) {
+    const out = {};
+    leftovers.forEach(t => {
+      const amt = Number(t.amount) || 0;
+      if (amt >= 0) return;
+      const td = dayMs(t.txn_date);
+      const hits = txns.filter(o => {
+        if (String(o.id) === String(t.id)) return false;
+        const oa = Number(o.amount) || 0;
+        if (Math.abs(oa + amt) >= PENNY) return false;          // equal and opposite
+        const od = dayMs(o.txn_date);
+        return isFinite(od) && od <= td && (td - od) <= 90 * 86400000;
+      });
+      if (hits.length !== 1) return;
+      const src = described[String(hits[0].id)] ||
+                  (hits[0].item_note == null ? '' : String(hits[0].item_note));
+      if (src) out[String(t.id)] = 'Refund: ' + src;
+    });
+    return out;
+  }
+
   function findSuggestions() {
     if (!shipments.length && !instalments.length && !digitals.length) return;
     syncDom();
@@ -896,7 +1014,7 @@
     const pool = shipments.filter(sh => cardLabel(sh.card) === card);
     const targets = txns.filter(t => overwrite || !effNote(t).trim());
     const out = [];
-    const tally = { one: 0, combo: 0, instalment: 0, digital: 0 };
+    const tally = { one: 0, combo: 0, instalment: 0, digital: 0, gift: 0, refund: 0 };
     let none = 0, nearGift = 0, ambiguous = 0, noCandidates = 0;
     targets.forEach(t => {
       const m = matchCharge(pool, t);
@@ -910,14 +1028,32 @@
         else if (m.near.some(sh => sh.gift)) nearGift++;
       }
     });
+    // Second pass over what the first could not resolve. Both are inferences rather than
+    // amounts that tie, so they run only on leftovers and never displace a real match.
+    const resolved = {}; out.forEach(o => { resolved[o.id] = o.note; });
+    const leftovers = targets.filter(t => !resolved[String(t.id)]);
+    const gifted = assignGiftCard(pool, leftovers);
+    Object.keys(gifted).forEach(id => { resolved[id] = gifted[id]; out.push({ id: id, note: gifted[id] }); tally.gift++; });
+    const stillLeft = leftovers.filter(t => !resolved[String(t.id)]);
+    const refunded = pairRefunds(stillLeft, resolved);
+    Object.keys(refunded).forEach(id => { out.push({ id: id, note: refunded[id] }); tally.refund++; });
+    none -= (tally.gift + tally.refund);
+    if (none < 0) none = 0;
+    nearGift -= tally.gift;
+    if (nearGift < 0) nearGift = 0;
+
     suggestions = out;
     const how = [];
     if (tally.one) how.push(tally.one + ' from a single shipment');
     if (tally.combo) how.push(tally.combo + ' from dispatches billed together');
     if (tally.instalment) how.push(tally.instalment + ' from monthly payment plans');
     if (tally.digital) how.push(tally.digital + ' from digital purchases');
+    if (tally.gift) how.push(tally.gift + ' probable, from orders part-paid by a gift card');
+    if (tally.refund) how.push(tally.refund + ' refunds traced to their original charge');
     let html = '<div class="report"><b>' + out.length + '</b> description' + (out.length === 1 ? '' : 's') +
-      ' matched' + (how.length > 1 ? ' \u2014 ' + how.join(', ') : '') + '.';
+      // Always spell out where they came from. Suppressing this when there is only one source
+      // hid exactly the cases that need saying out loud — the inferred ones.
+      ' matched' + (how.length ? ' \u2014 ' + how.join(', ') : '') + '.';
     const probs = [];
     if (none) {
       const bits = [];
@@ -954,6 +1090,8 @@
   function wire() {
     document.getElementById('monthSel').addEventListener('change', redraw);
     document.getElementById('statusSel').addEventListener('change', redraw);
+    document.getElementById('maxAmt').addEventListener('change', redraw);
+    document.getElementById('bulkApplyBtn').addEventListener('click', bulkApply);
     document.getElementById('saveBtn').addEventListener('click', saveChanges);
     document.getElementById('discardBtn').addEventListener('click', discardChanges);
 
