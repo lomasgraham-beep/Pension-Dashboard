@@ -90,7 +90,7 @@
 </head>
 <body>
   <h1>Amazon Transactions</h1>
-  <p class="note">Amazon charges say nothing about what was bought, so they are never categorised automatically &mdash; they wait here until you say what they were. Type straight into the table for a handful, use an Amazon data export to fill the descriptions in for you, or use the clipboard round-trip to clear a backlog in Google Sheets. Nothing is written until you press <strong>Save changes</strong>. <span class="mini">(amazon transactions build: v3)</span></p>
+  <p class="note">Amazon charges say nothing about what was bought, so they are never categorised automatically &mdash; they wait here until you say what they were. Type straight into the table for a handful, use an Amazon data export to fill the descriptions in for you, or use the clipboard round-trip to clear a backlog in Google Sheets. Nothing is written until you press <strong>Save changes</strong>. <span class="mini">(amazon transactions build: v4)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="setupPanel" class="panel" style="display:none;">
@@ -144,12 +144,12 @@
 
     <div class="panel">
       <h2>Fill in descriptions from an Amazon export</h2>
-      <p class="note" style="margin-bottom:12px;">Amazon &rarr; Account &rarr; Data &amp; Privacy &rarr; Request My Data &rarr; Your Orders. Unzip what arrives and pick <code>Retail.OrderHistory.1.csv</code> below. The file is read here in the browser and <strong>nothing from it is stored</strong> &mdash; only the product names it can match to a charge are offered, and only as suggestions you then save.</p>
+      <p class="note" style="margin-bottom:12px;">Amazon &rarr; Account &rarr; Data &amp; Privacy &rarr; Request My Data &rarr; Your Orders. Unzip what arrives and select <strong>all four</strong> of these at once: <code>Retail.OrderHistory</code>, <code>Monthly_Payment_Balance</code>, <code>Monthly_Payment_Plans</code> and <code>Digital_Content_Orders</code>. Physical orders are only part of the story &mdash; instalment plans and Prime, ITVX and film rentals are each in a different file. They are read here in the browser and <strong>nothing from them is stored</strong>.</p>
 
       <div class="row">
         <div style="flex:1 1 260px;">
-          <label for="csvFile">Retail.OrderHistory CSV</label>
-          <input type="file" id="csvFile" accept=".csv,text/csv">
+          <label for="csvFile">Amazon archive CSVs</label>
+          <input type="file" id="csvFile" accept=".csv,text/csv" multiple>
         </div>
       </div>
 
@@ -598,7 +598,14 @@
 
 
   // ---------- Amazon export ----------
-  // Quoted fields matter here: product names are full of commas.
+  // The archive splits one card statement across four files. Physical orders are in
+  // Retail.OrderHistory; instalment debits are in Monthly_Payment_Balance (dates) and
+  // Monthly_Payment_Plans (what was bought); Prime, ITVX and rentals are in
+  // Digital_Content_Orders. A charge can come from any of them.
+  let instalments = [];
+  let digitals = [];
+  let fileNotes = [];
+
   function parseCsv(text) {
     const src = String(text || '').replace(/^\uFEFF/, '');
     const rows = []; let row = [], field = '', q = false;
@@ -619,111 +626,136 @@
     const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, ''));
     return isFinite(n) ? n : 0;
   }
-  function dayOf(v) { return String(v || '').slice(0, 10); }
+  function dayOf(v) {
+    const d = String(v == null ? '' : v).slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : '';
+  }
+  function dayMs(d) { return Date.parse(String(d).slice(0, 10) + 'T00:00:00Z'); }
+  function indexOf(rows) {
+    const head = (rows[0] || []).map(h => String(h || '').replace(/^\uFEFF/, '').trim());
+    const ix = {}; head.forEach((h, i) => { if (!(h in ix)) ix[h] = i; });
+    return ix;
+  }
+  function cell(row, ix, name) { return ix[name] == null ? '' : String(row[ix[name]] == null ? '' : row[ix[name]]); }
   // "MasterCard - 9015" and "Gift Certificate/Card and MasterCard - 9015" are the same card.
   function cardLabel(pay) {
     const m = String(pay || '').match(/(\d{4})\s*$/);
     return m ? m[1] : (String(pay || '').trim() || 'Unknown');
   }
+  // Identify a file by its columns rather than its name, since the archive numbers and
+  // sometimes renames them. Order matters: Retail and Plans both carry Product Name.
+  function sniff(ix) {
+    if ('Payment Method Type' in ix && 'Total Amount' in ix && 'Product Name' in ix) return 'retail';
+    if ('Transaction Type' in ix && 'Execution Date' in ix && 'Transaction Amount' in ix) return 'balance';
+    if ('Payment Amount' in ix && 'Total Payments' in ix && 'Creation Date' in ix) return 'plans';
+    if ('Transaction Amount' in ix && 'Order Date' in ix && 'Product Name' in ix) return 'digital';
+    return null;
+  }
 
   // A card charge is a SHIPMENT, not an order: Amazon bills when things ship, so one order
-  // can produce several debits. Order ID + ship day is therefore the unit.
+  // can produce several debits.
   function buildShipments(rows) {
-    if (!rows.length) throw new Error('That file appears to be empty.');
-    const head = rows[0].map(h => String(h || '').replace(/^\uFEFF/, '').trim());
-    const ix = {}; head.forEach((h, i) => { if (!(h in ix)) ix[h] = i; });
-    const need = ['Order ID', 'Order Date', 'Product Name', 'Total Amount', 'Payment Method Type'];
-    const missing = need.filter(n => !(n in ix));
-    if (missing.length) throw new Error('This does not look like Retail.OrderHistory — missing column(s): ' + missing.join(', '));
-    const map = {};
-    let cancelled = 0;
+    const ix = indexOf(rows);
+    const map = {}; let cancelled = 0;
     for (let i = 1; i < rows.length; i++) {
       const c = rows[i];
       if (!c || c.length < 3) continue;
-      const status = (ix['Order Status'] != null) ? String(c[ix['Order Status']] || '').trim() : '';
-      if (status.toLowerCase() === 'cancelled') { cancelled++; continue; }
-      const oid = String(c[ix['Order ID']] || '').trim();
-      if (!oid) continue;
-      const ship = (ix['Ship Date'] != null) ? dayOf(c[ix['Ship Date']]) : '';
-      const day = /^\d{4}-\d{2}-\d{2}$/.test(ship) ? ship : dayOf(c[ix['Order Date']]);
+      if (cell(c, ix, 'Order Status').trim().toLowerCase() === 'cancelled') { cancelled++; continue; }
+      const oid = cell(c, ix, 'Order ID').trim(); if (!oid) continue;
+      const day = dayOf(cell(c, ix, 'Ship Date')) || dayOf(cell(c, ix, 'Order Date'));
+      if (!day) continue;
       const k = oid + '|' + day;
       if (!map[k]) map[k] = { day: day, charge: 0, card: '', gift: false, items: [] };
       const g = map[k];
       // Total Amount is the line's GROSS and is already net of any discount, so Total
       // Discounts must not be taken off again — doing so undercounts every discounted
       // order. Shipping Charge is apportioned per line, not repeated, so it sums.
-      g.charge += num(c[ix['Total Amount']]);
-      if (ix['Shipping Charge'] != null) g.charge += num(c[ix['Shipping Charge']]);
-      const pay = String(c[ix['Payment Method Type']] || '');
+      g.charge += num(cell(c, ix, 'Total Amount'));
+      g.charge += num(cell(c, ix, 'Shipping Charge'));
+      const pay = cell(c, ix, 'Payment Method Type');
       if (pay && !g.card) g.card = pay;
       if (/gift/i.test(pay)) g.gift = true;
-      const qty = (ix['Original Quantity'] != null) ? num(c[ix['Original Quantity']]) : 1;
-      const nm = String(c[ix['Product Name']] || '').trim();
+      const qty = num(cell(c, ix, 'Original Quantity'));
+      const nm = cell(c, ix, 'Product Name').trim();
       if (nm) g.items.push((qty > 1 ? (qty + '\u00d7 ') : '') + nm);
     }
-    const out = Object.keys(map).map(k => {
-      const g = map[k];
-      g.charge = Math.round(g.charge * 100) / 100;
-      return g;
-    });
+    const out = Object.keys(map).map(k => { const g = map[k]; g.charge = Math.round(g.charge * 100) / 100; return g; });
     out.cancelled = cancelled;
     return out;
   }
-  function buildCardSelect() {
-    const counts = {};
-    shipments.forEach(sh => { const l = cardLabel(sh.card); counts[l] = (counts[l] || 0) + 1; });
-    const labels = Object.keys(counts);
-    // Ranked by how many of THIS ledger's charges each card explains, not by how many
-    // shipments it has. Twenty years of an old card will always out-count the current one.
-    const scored = labels.map(l => ({ l: l, n: scoreCard(l), ships: counts[l] }))
-      .sort((a, b) => (b.n - a.n) || (b.ships - a.ships));
-    const sel = document.getElementById('cardSel');
-    sel.innerHTML = scored.map(x => '<option value="' + escapeHtml(x.l) + '">' + escapeHtml(x.l) +
-      ' \u2014 ' + x.n + ' of ' + txns.length + ' charges match</option>').join('');
-    if (scored.length) sel.value = scored[0].l;
-    document.getElementById('cardPick').style.display = scored.length ? 'block' : 'none';
-    return scored.length;
+
+  function readPlans(rows) {
+    const ix = indexOf(rows), seen = {}, out = [];
+    for (let i = 1; i < rows.length; i++) {
+      const c = rows[i]; if (!c || c.length < 3) continue;
+      const created = dayOf(cell(c, ix, 'Creation Date'));
+      const pay = num(cell(c, ix, 'Payment Amount'));
+      const n = Math.max(1, Math.round(num(cell(c, ix, 'Total Payments'))) || 1);
+      if (!created || !pay) continue;
+      const k = cell(c, ix, 'Order ID').trim() + '|' + created + '|' + pay.toFixed(2);
+      if (seen[k]) continue; seen[k] = 1;                      // the file lists each plan twice
+      out.push({ created: created, pay: Math.round(pay * 100) / 100, n: n, name: cell(c, ix, 'Product Name').trim() });
+    }
+    return out;
   }
-  function onCsvFile(file) {
-    if (!file) return;
-    const done = text => {
-      try {
-        document.getElementById('csvReport').innerHTML = '<div class="report">Reading the file and testing each card\u2026</div>';
-        shipments = buildShipments(parseCsv(text));
-        suggestions = [];
-        document.getElementById('applySuggestBtn').disabled = true;
-        const n = buildCardSelect();
-        document.getElementById('csvReport').innerHTML = '<div class="report"><b>' + shipments.length +
-          '</b> shipment' + (shipments.length === 1 ? '' : 's') + ' read' +
-          (shipments.cancelled ? ', ' + shipments.cancelled + ' cancelled line(s) ignored' : '') +
-          '. The card that explains the most charges is selected \u2014 press <b>Find descriptions</b>.</div>';
-        if (!n) setStatus('No payment methods found in that file.', 's-err');
-      } catch (e) {
-        shipments = [];
-        document.getElementById('cardPick').style.display = 'none';
-        document.getElementById('csvReport').innerHTML =
-          '<div class="report"><span class="bad">' + escapeHtml(e && e.message ? e.message : String(e)) + '</span></div>';
-      }
-    };
-    const fr = new FileReader();
-    fr.onload = () => done(String(fr.result || ''));
-    fr.onerror = () => { document.getElementById('csvReport').innerHTML = '<div class="report"><span class="bad">Could not read that file.</span></div>'; };
-    fr.readAsText(file);
+  // Amazon's instalments land roughly monthly but not on a fixed calendar day — 12 Apr, 12
+  // May, 11 Jun, 11 Jul. Both a calendar-month and a 30-day reading are allowed, purely to
+  // pick which plan a payment belongs to; the DATE of the debit comes from the balance file,
+  // so a loose schedule here cannot produce a wrong match, only a less specific description.
+  function planFits(plan, dayStr) {
+    const t = dayMs(plan.created), td = dayMs(dayStr);
+    if (!isFinite(t) || !isFinite(td)) return -1;
+    const base = new Date(t);
+    for (let k = 0; k < plan.n; k++) {
+      const cal = Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + k, base.getUTCDate());
+      const thirty = t + k * 30 * 86400000;
+      if (Math.abs(cal - td) <= 10 * 86400000 || Math.abs(thirty - td) <= 10 * 86400000) return k + 1;
+    }
+    return -1;
   }
+  function buildInstalments(balRows, plans) {
+    const ix = indexOf(balRows), out = [];
+    for (let i = 1; i < balRows.length; i++) {
+      const c = balRows[i]; if (!c || c.length < 3) continue;
+      if (cell(c, ix, 'Transaction Type').trim().toUpperCase() !== 'CHARGE') continue;
+      const day = dayOf(cell(c, ix, 'Execution Date'));
+      const amt = Math.round(Math.abs(num(cell(c, ix, 'Transaction Amount'))) * 100) / 100;
+      if (!day || !amt) continue;
+      let name = 'Amazon monthly payment';
+      const fits = [];
+      plans.forEach(pl => {
+        if (Math.abs(pl.pay - amt) >= 0.005) return;
+        const k = planFits(pl, day);
+        if (k > 0 && pl.name) fits.push(pl.name + ' (payment ' + k + ' of ' + pl.n + ')');
+      });
+      if (fits.length === 1) name = fits[0];
+      out.push({ day: day, charge: amt, name: name });
+    }
+    return out;
+  }
+  // Digital purchases are written as a net line and a tax line sharing an order, so the
+  // charge is their sum: 2.49 + 0.50 is one £2.99 debit, not two.
+  function buildDigital(rows) {
+    const ix = indexOf(rows), map = {};
+    for (let i = 1; i < rows.length; i++) {
+      const c = rows[i]; if (!c || c.length < 3) continue;
+      const day = dayOf(cell(c, ix, 'Order Date')); if (!day) continue;
+      const k = (cell(c, ix, 'Order ID').trim() || '?') + '|' + day;
+      if (!map[k]) map[k] = { day: day, charge: 0, name: cell(c, ix, 'Product Name').trim() };
+      map[k].charge += num(cell(c, ix, 'Transaction Amount'));
+    }
+    return Object.keys(map).map(k => { const g = map[k]; g.charge = Math.round(g.charge * 100) / 100; return g; })
+      .filter(g => g.charge > 0.005);
+  }
+
   const WINDOW_DAYS = 5;
-  const COMBO_DAYS = 2;          // dispatches billed together land within a day or two
-  const COMBO_MAX = 3;           // beyond three the false-positive risk outweighs the gain
+  const INSTALMENT_DAYS = 3;     // the balance file gives the real debit date, so this is tight
+  const COMBO_DAYS = 2;
+  const COMBO_MAX = 3;
   const PENNY = 0.005;
 
-  function dayMs(d) { return Date.parse(String(d).slice(0, 10) + 'T00:00:00Z'); }
-
-  // Every subset of `pool` of size 2..COMBO_MAX whose charges sum to `amt`. Amazon bills per
-  // dispatch and then puts several dispatches on one debit, so a charge with no single
-  // shipment behind it often has two or three. Returned as a list because the count is the
-  // whole point: more than one way to reach the total means we must not guess.
   function combosFor(pool, amt) {
-    const hits = [];
-    const n = pool.length;
+    const hits = [], n = pool.length;
     if (n < 2) return hits;
     for (let i = 0; i < n; i++) {
       for (let j = i + 1; j < n; j++) {
@@ -740,72 +772,156 @@
     }
     return hits;
   }
-
-  // Resolve one card charge. Single shipment first — a lone exact match is the strongest
-  // evidence available and must never be overridden by a combination that also happens to fit.
+  function within(list, amt, td, days) {
+    return list.filter(x => Math.abs(x.charge - amt) < PENNY && Math.abs(dayMs(x.day) - td) <= days * 86400000);
+  }
+  // Strongest evidence first. A lone exact shipment beats everything; combinations are the
+  // weakest reading and are tried last, so they can never displace a definite answer.
   function matchCharge(pool, txn) {
     const amt = Math.abs(Number(txn.amount) || 0);
     const td = dayMs(txn.txn_date);
     if (!isFinite(td) || !amt) return { kind: 'none', near: [] };
     const near = pool.filter(sh => Math.abs(dayMs(sh.day) - td) <= WINDOW_DAYS * 86400000);
     const exact = near.filter(sh => Math.abs(sh.charge - amt) < PENNY);
-    if (exact.length === 1) return { kind: 'one', ships: [exact[0]], near: near };
+    if (exact.length === 1) return { kind: 'one', items: exact[0].items, near: near };
     if (exact.length > 1) return { kind: 'ambiguous', near: near };
-    // Combinations are drawn from a tighter window: dispatches billed together are close
-    // in time, and a wider net multiplies the ways to reach a total by coincidence.
+
+    const inst = within(instalments, amt, td, INSTALMENT_DAYS);
+    if (inst.length) {
+      const names = {}; inst.forEach(x => { names[x.name] = 1; });
+      const only = Object.keys(names);
+      return { kind: 'instalment', items: [only.length === 1 ? only[0] : 'Amazon monthly payment'], near: near };
+    }
+    const dig = within(digitals, amt, td, WINDOW_DAYS);
+    if (dig.length === 1) return { kind: 'digital', items: [dig[0].name], near: near };
+    if (dig.length > 1) return { kind: 'ambiguous', near: near };
+
     const tight = near.filter(sh => Math.abs(dayMs(sh.day) - td) <= COMBO_DAYS * 86400000);
     const combos = combosFor(tight, amt);
-    if (combos.length === 1) return { kind: 'combo', ships: combos[0], near: near };
+    if (combos.length === 1) {
+      const items = []; combos[0].forEach(sh => sh.items.forEach(it => items.push(it)));
+      return { kind: 'combo', items: items, near: near };
+    }
     if (combos.length > 1) return { kind: 'ambiguous', near: near };
     return { kind: 'none', near: near };
   }
-  function noteFor(ships) {
-    const items = [];
-    ships.forEach(sh => sh.items.forEach(it => items.push(it)));
-    return items.join(' \u00b7 ').slice(0, 300);
-  }
-  // How many of the transactions on this page a given card can actually account for. This is
-  // what the dropdown is labelled with: shipment counts are a poor guide — the busiest card
-  // across twenty years need not be the one this ledger belongs to.
+  const RESOLVED = { one: 1, combo: 1, instalment: 1, digital: 1 };
   function scoreCard(label) {
     const pool = shipments.filter(sh => cardLabel(sh.card) === label);
     let hit = 0;
-    txns.forEach(t => { const m = matchCharge(pool, t); if (m.kind === 'one' || m.kind === 'combo') hit++; });
+    txns.forEach(t => { if (RESOLVED[matchCharge(pool, t).kind]) hit++; });
     return hit;
+  }
+  function buildCardSelect() {
+    const counts = {};
+    shipments.forEach(sh => { const l = cardLabel(sh.card); counts[l] = (counts[l] || 0) + 1; });
+    const labels = Object.keys(counts);
+    if (!labels.length) labels.push('\u2014');
+    // Ranked by how many of THIS ledger's charges each card explains, not by how many
+    // shipments it has. Twenty years of an old card will always out-count the current one.
+    const scored = labels.map(l => ({ l: l, n: scoreCard(l), ships: counts[l] || 0 }))
+      .sort((a, b) => (b.n - a.n) || (b.ships - a.ships));
+    const sel = document.getElementById('cardSel');
+    sel.innerHTML = scored.map(x => '<option value="' + escapeHtml(x.l) + '">' + escapeHtml(x.l) +
+      ' \u2014 ' + x.n + ' of ' + txns.length + ' charges match</option>').join('');
+    if (scored.length) sel.value = scored[0].l;
+    document.getElementById('cardPick').style.display = 'block';
+    return scored.length;
+  }
+
+  function readOne(file) {
+    return new Promise(resolve => {
+      const fr = new FileReader();
+      fr.onload = () => resolve({ name: file.name, text: String(fr.result || '') });
+      fr.onerror = () => resolve({ name: file.name, text: null });
+      fr.readAsText(file);
+    });
+  }
+  async function onCsvFiles(files) {
+    if (!files || !files.length) return;
+    document.getElementById('csvReport').innerHTML = '<div class="report">Reading and testing each card\u2026</div>';
+    shipments = []; instalments = []; digitals = []; fileNotes = []; suggestions = [];
+    document.getElementById('applySuggestBtn').disabled = true;
+    let balRows = null, planRows = null;
+    const unknown = [];
+    for (let i = 0; i < files.length; i++) {
+      const f = await readOne(files[i]);
+      if (f.text == null) { unknown.push(f.name + ' (unreadable)'); continue; }
+      let rows;
+      try { rows = parseCsv(f.text); } catch (e) { unknown.push(f.name); continue; }
+      if (!rows.length) { unknown.push(f.name + ' (empty)'); continue; }
+      const kind = sniff(indexOf(rows));
+      if (kind === 'retail') {
+        shipments = buildShipments(rows);
+        fileNotes.push('<b>' + shipments.length + '</b> shipment' + (shipments.length === 1 ? '' : 's') + ' of physical orders' +
+          (shipments.cancelled ? ' (' + shipments.cancelled + ' cancelled line(s) ignored)' : ''));
+      } else if (kind === 'balance') { balRows = rows; }
+      else if (kind === 'plans') { planRows = rows; }
+      else if (kind === 'digital') {
+        digitals = buildDigital(rows);
+        fileNotes.push('<b>' + digitals.length + '</b> digital purchase' + (digitals.length === 1 ? '' : 's') + ' (Prime, rentals, subscriptions)');
+      } else { unknown.push(f.name); }
+    }
+    if (balRows) {
+      const plans = planRows ? readPlans(planRows) : [];
+      instalments = buildInstalments(balRows, plans);
+      const named = instalments.filter(x => x.name !== 'Amazon monthly payment').length;
+      fileNotes.push('<b>' + instalments.length + '</b> monthly-plan payment' + (instalments.length === 1 ? '' : 's') +
+        (plans.length ? ', ' + named + ' of them named' : ' \u2014 add Monthly_Payment_Plans to see what they were for'));
+    } else if (planRows) {
+      fileNotes.push('Payment plans found, but <b>Monthly_Payment_Balance is missing</b> \u2014 without it the payment dates are unknown');
+    }
+    if (!shipments.length && !instalments.length && !digitals.length) {
+      document.getElementById('cardPick').style.display = 'none';
+      // Keep whatever was learned about the files themselves. A plans-only load produces
+      // nothing matchable but DOES know which file is missing, and that is the useful part.
+      let msg = fileNotes.length ? '<ul><li>' + fileNotes.join('</li><li>') + '</li></ul>' : '';
+      if (unknown.length) msg += '<span class="bad">Not recognised: ' + escapeHtml(unknown.join(', ')) + '.</span> ';
+      msg += '<span class="bad">Nothing to match against yet \u2014 expected Retail.OrderHistory, Monthly_Payment_Balance, Monthly_Payment_Plans or Digital_Content_Orders.</span>';
+      document.getElementById('csvReport').innerHTML = '<div class="report">' + msg + '</div>';
+      return;
+    }
+    buildCardSelect();
+    let html = '<div class="report"><ul><li>' + fileNotes.join('</li><li>') + '</li>';
+    if (unknown.length) html += '<li class="bad">Not recognised: ' + escapeHtml(unknown.join(', ')) + '</li>';
+    html += '</ul>The card explaining the most charges is selected \u2014 press <b>Find descriptions</b>.</div>';
+    document.getElementById('csvReport').innerHTML = html;
   }
 
   function findSuggestions() {
-    if (!shipments.length) return;
+    if (!shipments.length && !instalments.length && !digitals.length) return;
     syncDom();
     const card = document.getElementById('cardSel').value;
     const overwrite = document.getElementById('overwriteNotes').checked;
     const pool = shipments.filter(sh => cardLabel(sh.card) === card);
     const targets = txns.filter(t => overwrite || !effNote(t).trim());
     const out = [];
-    let single = 0, combo = 0, none = 0, nearGift = 0, ambiguous = 0, noCandidates = 0;
+    const tally = { one: 0, combo: 0, instalment: 0, digital: 0 };
+    let none = 0, nearGift = 0, ambiguous = 0, noCandidates = 0;
     targets.forEach(t => {
       const m = matchCharge(pool, t);
-      if (m.kind === 'one' || m.kind === 'combo') {
-        out.push({ id: String(t.id), note: noteFor(m.ships) });
-        if (m.kind === 'combo') combo++; else single++;
-      } else if (m.kind === 'ambiguous') { ambiguous++; }
+      if (RESOLVED[m.kind]) { out.push({ id: String(t.id), note: m.items.join(' \u00b7 ').slice(0, 300) }); tally[m.kind]++; }
+      else if (m.kind === 'ambiguous') ambiguous++;
       else {
         none++;
         if (!m.near.length) noCandidates++;
         // A gift card pays part of an order, but the export records the ORDER total, not the
-        // card's share — so these cannot match on amount and are called out rather than
-        // left looking like a mystery.
+        // card's share — so these cannot match on amount.
         else if (m.near.some(sh => sh.gift)) nearGift++;
       }
     });
     suggestions = out;
+    const how = [];
+    if (tally.one) how.push(tally.one + ' from a single shipment');
+    if (tally.combo) how.push(tally.combo + ' from dispatches billed together');
+    if (tally.instalment) how.push(tally.instalment + ' from monthly payment plans');
+    if (tally.digital) how.push(tally.digital + ' from digital purchases');
     let html = '<div class="report"><b>' + out.length + '</b> description' + (out.length === 1 ? '' : 's') +
-      ' matched on card ' + escapeHtml(card) +
-      (combo ? ' \u2014 ' + single + ' from one shipment, ' + combo + ' from dispatches billed together' : '') + '.';
+      ' matched' + (how.length > 1 ? ' \u2014 ' + how.join(', ') : '') + '.';
     const probs = [];
     if (none) {
       const bits = [];
-      if (noCandidates) bits.push('<b>' + noCandidates + '</b> had nothing in the file within five days \u2014 Prime, Kindle, gift cards and Amazon Fresh are not in Retail.OrderHistory');
+      if (noCandidates) bits.push('<b>' + noCandidates + '</b> had nothing within five days in any of the files loaded');
       if (nearGift) bits.push('<b>' + nearGift + '</b> sit beside a shipment part-paid by a gift card, where the export holds the order total rather than what your card was debited');
       probs.push('<li><b>' + none + '</b> charge(s) matched nothing' + (bits.length ? ': ' + bits.join('; ') : '') + '.</li>');
     }
@@ -854,10 +970,7 @@
     document.getElementById('copyRowsBtn').addEventListener('click', () => { syncDom(); toClipboard(rowsTsv(), 'The rows shown'); });
     document.getElementById('copyHeadBtn').addEventListener('click', () => toClipboard(HEADINGS.join('\t'), 'The headings'));
     document.getElementById('copyCatsBtn').addEventListener('click', () => toClipboard(catsTsv(), 'The category list'));
-    document.getElementById('csvFile').addEventListener('change', e => {
-      const f = e.target.files && e.target.files[0];
-      onCsvFile(f);
-    });
+    document.getElementById('csvFile').addEventListener('change', e => { onCsvFiles(e.target.files); });
     document.getElementById('suggestBtn').addEventListener('click', findSuggestions);
     document.getElementById('applySuggestBtn').addEventListener('click', applySuggestions);
     document.getElementById('checkBtn').addEventListener('click', checkPaste);
