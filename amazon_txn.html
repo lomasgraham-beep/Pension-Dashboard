@@ -52,6 +52,9 @@
   .setup { font-size:14px; color:#475569; }
   .setup ol { padding-left:22px; }
   .setup li { margin:5px 0; }
+  .chk { display:flex; align-items:center; gap:8px; font-weight:normal; font-size:14px; color:#475569; margin:10px 0; }
+  .chk input { width:20px; height:20px; }
+  input[type=file] { font-size:14px; padding:8px 0; max-width:100%; }
   code { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; padding:1px 5px; font-size:13px; }
 
   @media (prefers-color-scheme: dark) {
@@ -80,13 +83,14 @@
     .report .bad { color:#fca5a5 !important; }
     .report .good { color:#6ee7b7 !important; }
     .setup { color:#cbd5e1 !important; }
+    .chk { color:#cbd5e1 !important; }
     code { background:#0f172a !important; border-color:#334155 !important; color:#e2e8f0 !important; }
   }
 </style>
 </head>
 <body>
   <h1>Amazon Transactions</h1>
-  <p class="note">Amazon charges say nothing about what was bought, so they are never categorised automatically &mdash; they wait here until you say what they were. Type straight into the table for a handful, or use the clipboard round-trip below to clear a backlog in Google Sheets. Nothing is written until you press <strong>Save changes</strong>. <span class="mini">(amazon transactions build: v1)</span></p>
+  <p class="note">Amazon charges say nothing about what was bought, so they are never categorised automatically &mdash; they wait here until you say what they were. Type straight into the table for a handful, use an Amazon data export to fill the descriptions in for you, or use the clipboard round-trip to clear a backlog in Google Sheets. Nothing is written until you press <strong>Save changes</strong>. <span class="mini">(amazon transactions build: v2)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="setupPanel" class="panel" style="display:none;">
@@ -136,6 +140,34 @@
         </tr></thead>
         <tbody></tbody>
       </table>
+    </div>
+
+    <div class="panel">
+      <h2>Fill in descriptions from an Amazon export</h2>
+      <p class="note" style="margin-bottom:12px;">Amazon &rarr; Account &rarr; Data &amp; Privacy &rarr; Request My Data &rarr; Your Orders. Unzip what arrives and pick <code>Retail.OrderHistory.1.csv</code> below. The file is read here in the browser and <strong>nothing from it is stored</strong> &mdash; only the product names it can match to a charge are offered, and only as suggestions you then save.</p>
+
+      <div class="row">
+        <div style="flex:1 1 260px;">
+          <label for="csvFile">Retail.OrderHistory CSV</label>
+          <input type="file" id="csvFile" accept=".csv,text/csv">
+        </div>
+      </div>
+
+      <div id="cardPick" style="display:none;">
+        <div class="row">
+          <div>
+            <label for="cardSel">Charged to</label>
+            <select id="cardSel"></select>
+          </div>
+          <button class="btn btn-go" id="suggestBtn" type="button">Find descriptions</button>
+        </div>
+        <label class="chk"><input type="checkbox" id="overwriteNotes"> Replace descriptions I have already written</label>
+      </div>
+
+      <div id="csvReport"></div>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn btn-ghost" id="applySuggestBtn" type="button" disabled>Apply to the table</button>
+      </div>
     </div>
 
     <div class="panel">
@@ -489,6 +521,8 @@
   }
 
   // ---------- clipboard in ----------
+  let shipments = [];             // one entry per Order ID + ship day
+  let suggestions = [];           // {id, note} awaiting Apply
   let stagedPaste = [];
   function parsePaste(raw) {
     const lines = String(raw || '').split(/\r\n|\r|\n/).filter(l => l.trim().length);
@@ -562,6 +596,176 @@
     setStatus(n + ' pasted row(s) applied to the table. Review them, then press Save changes.', 's-ok');
   }
 
+
+  // ---------- Amazon export ----------
+  // Quoted fields matter here: product names are full of commas.
+  function parseCsv(text) {
+    const src = String(text || '').replace(/^\uFEFF/, '');
+    const rows = []; let row = [], field = '', q = false;
+    for (let i = 0; i < src.length; i++) {
+      const c = src[i];
+      if (q) {
+        if (c === '"') { if (src[i + 1] === '"') { field += '"'; i++; } else q = false; }
+        else field += c;
+      } else if (c === '"') { q = true; }
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); field = ''; row = []; }
+      else if (c !== '\r') { field += c; }
+    }
+    if (field.length || row.length) { row.push(field); rows.push(row); }
+    return rows;
+  }
+  function num(v) {
+    const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, ''));
+    return isFinite(n) ? n : 0;
+  }
+  function dayOf(v) { return String(v || '').slice(0, 10); }
+  // "MasterCard - 9015" and "Gift Certificate/Card and MasterCard - 9015" are the same card.
+  function cardLabel(pay) {
+    const m = String(pay || '').match(/(\d{4})\s*$/);
+    return m ? m[1] : (String(pay || '').trim() || 'Unknown');
+  }
+
+  // A card charge is a SHIPMENT, not an order: Amazon bills when things ship, so one order
+  // can produce several debits. Order ID + ship day is therefore the unit.
+  function buildShipments(rows) {
+    if (!rows.length) throw new Error('That file appears to be empty.');
+    const head = rows[0].map(h => String(h || '').replace(/^\uFEFF/, '').trim());
+    const ix = {}; head.forEach((h, i) => { if (!(h in ix)) ix[h] = i; });
+    const need = ['Order ID', 'Order Date', 'Product Name', 'Total Amount', 'Payment Method Type'];
+    const missing = need.filter(n => !(n in ix));
+    if (missing.length) throw new Error('This does not look like Retail.OrderHistory — missing column(s): ' + missing.join(', '));
+    const map = {};
+    let cancelled = 0;
+    for (let i = 1; i < rows.length; i++) {
+      const c = rows[i];
+      if (!c || c.length < 3) continue;
+      const status = (ix['Order Status'] != null) ? String(c[ix['Order Status']] || '').trim() : '';
+      if (status.toLowerCase() === 'cancelled') { cancelled++; continue; }
+      const oid = String(c[ix['Order ID']] || '').trim();
+      if (!oid) continue;
+      const ship = (ix['Ship Date'] != null) ? dayOf(c[ix['Ship Date']]) : '';
+      const day = /^\d{4}-\d{2}-\d{2}$/.test(ship) ? ship : dayOf(c[ix['Order Date']]);
+      const k = oid + '|' + day;
+      if (!map[k]) map[k] = { day: day, charge: 0, card: '', gift: false, items: [] };
+      const g = map[k];
+      // Total Amount is the line's GROSS and is already net of any discount, so Total
+      // Discounts must not be taken off again — doing so undercounts every discounted
+      // order. Shipping Charge is apportioned per line, not repeated, so it sums.
+      g.charge += num(c[ix['Total Amount']]);
+      if (ix['Shipping Charge'] != null) g.charge += num(c[ix['Shipping Charge']]);
+      const pay = String(c[ix['Payment Method Type']] || '');
+      if (pay && !g.card) g.card = pay;
+      if (/gift/i.test(pay)) g.gift = true;
+      const qty = (ix['Original Quantity'] != null) ? num(c[ix['Original Quantity']]) : 1;
+      const nm = String(c[ix['Product Name']] || '').trim();
+      if (nm) g.items.push((qty > 1 ? (qty + '\u00d7 ') : '') + nm);
+    }
+    const out = Object.keys(map).map(k => {
+      const g = map[k];
+      g.charge = Math.round(g.charge * 100) / 100;
+      return g;
+    });
+    out.cancelled = cancelled;
+    return out;
+  }
+  function buildCardSelect() {
+    const counts = {};
+    shipments.forEach(s => { const l = cardLabel(s.card); counts[l] = (counts[l] || 0) + 1; });
+    const labels = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    const sel = document.getElementById('cardSel');
+    sel.innerHTML = labels.map(l => '<option value="' + escapeHtml(l) + '">' + escapeHtml(l) +
+      ' (' + counts[l] + ' shipment' + (counts[l] === 1 ? '' : 's') + ')</option>').join('');
+    if (labels.length) sel.value = labels[0];
+    document.getElementById('cardPick').style.display = labels.length ? 'block' : 'none';
+    return labels.length;
+  }
+  function onCsvFile(file) {
+    if (!file) return;
+    const done = text => {
+      try {
+        shipments = buildShipments(parseCsv(text));
+        suggestions = [];
+        document.getElementById('applySuggestBtn').disabled = true;
+        const n = buildCardSelect();
+        document.getElementById('csvReport').innerHTML = '<div class="report"><b>' + shipments.length +
+          '</b> shipment' + (shipments.length === 1 ? '' : 's') + ' read' +
+          (shipments.cancelled ? ', ' + shipments.cancelled + ' cancelled line(s) ignored' : '') +
+          '. Choose the card and press <b>Find descriptions</b>.</div>';
+        if (!n) setStatus('No payment methods found in that file.', 's-err');
+      } catch (e) {
+        shipments = [];
+        document.getElementById('cardPick').style.display = 'none';
+        document.getElementById('csvReport').innerHTML =
+          '<div class="report"><span class="bad">' + escapeHtml(e && e.message ? e.message : String(e)) + '</span></div>';
+      }
+    };
+    const fr = new FileReader();
+    fr.onload = () => done(String(fr.result || ''));
+    fr.onerror = () => { document.getElementById('csvReport').innerHTML = '<div class="report"><span class="bad">Could not read that file.</span></div>'; };
+    fr.readAsText(file);
+  }
+  const WINDOW_DAYS = 5;
+  function findSuggestions() {
+    if (!shipments.length) return;
+    syncDom();
+    const card = document.getElementById('cardSel').value;
+    const overwrite = document.getElementById('overwriteNotes').checked;
+    const pool = shipments.filter(s => cardLabel(s.card) === card);
+    const targets = txns.filter(t => overwrite || !effNote(t).trim());
+    const out = [];
+    let none = 0, nearGift = 0, ambiguous = 0;
+    targets.forEach(t => {
+      const amt = Math.abs(Number(t.amount) || 0);
+      const td = Date.parse(String(t.txn_date).slice(0, 10) + 'T00:00:00Z');
+      if (!isFinite(td)) return;
+      const near = pool.filter(s => {
+        const sd = Date.parse(s.day + 'T00:00:00Z');
+        return isFinite(sd) && Math.abs(sd - td) <= WINDOW_DAYS * 86400000;
+      });
+      const hits = near.filter(s => Math.abs(s.charge - amt) < 0.005);
+      if (hits.length === 1) out.push({ id: String(t.id), note: hits[0].items.join(' \u00b7 ').slice(0, 300) });
+      else if (hits.length > 1) ambiguous++;
+      else {
+        none++;
+        // A gift card pays part of the order, but the export records the ORDER total, not the
+        // card's share — so these cannot match on amount and are called out rather than
+        // left looking like a mystery.
+        if (near.some(s => s.gift)) nearGift++;
+      }
+    });
+    suggestions = out;
+    const bits = [];
+    bits.push('<b>' + out.length + '</b> description' + (out.length === 1 ? '' : 's') + ' matched a single shipment on card ' + escapeHtml(card) + '.');
+    const probs = [];
+    if (none) {
+      probs.push('<li><b>' + none + '</b> charge(s) matched nothing' +
+        (nearGift ? ', of which <b>' + nearGift + '</b> sit beside a shipment part-paid by a gift card — the export holds the order total, not the amount your card was actually debited' : '') + '.</li>');
+    }
+    if (ambiguous) probs.push('<li class="bad"><b>' + ambiguous + '</b> charge(s) matched more than one shipment and were left alone.</li>');
+    if (!targets.length) probs.push('<li>Every transaction already has a description. Tick the box above to replace them.</li>');
+    let html = '<div class="report">' + bits.join(' ');
+    html += probs.length ? ('<ul>' + probs.join('') + '</ul>') : '<ul><li class="good">Everything matched.</li></ul>';
+    html += '</div>';
+    document.getElementById('csvReport').innerHTML = html;
+    document.getElementById('applySuggestBtn').disabled = !out.length;
+  }
+  // Suggestions stage like every other edit: reviewable in the table, written only on Save.
+  function applySuggestions() {
+    if (!suggestions.length) return;
+    syncDom();
+    let n = 0;
+    suggestions.forEach(sug => {
+      const t = txns.find(x => String(x.id) === sug.id);
+      if (!t) return;
+      const saved = t.item_note == null ? '' : String(t.item_note);
+      if (sug.note !== saved) { pendingNote[sug.id] = sug.note; n++; }
+    });
+    draw();
+    document.getElementById('applySuggestBtn').disabled = true;
+    setStatus(n + ' description(s) applied to the table. Pick categories, then press Save changes.', 's-ok');
+  }
+
   // ---------- wiring ----------
   // Bound once, outside any render, and delegated. Binding inside a render would stack a
   // fresh handler on every redraw and fire the same edit several times over.
@@ -584,6 +788,12 @@
     document.getElementById('copyRowsBtn').addEventListener('click', () => { syncDom(); toClipboard(rowsTsv(), 'The rows shown'); });
     document.getElementById('copyHeadBtn').addEventListener('click', () => toClipboard(HEADINGS.join('\t'), 'The headings'));
     document.getElementById('copyCatsBtn').addEventListener('click', () => toClipboard(catsTsv(), 'The category list'));
+    document.getElementById('csvFile').addEventListener('change', e => {
+      const f = e.target.files && e.target.files[0];
+      onCsvFile(f);
+    });
+    document.getElementById('suggestBtn').addEventListener('click', findSuggestions);
+    document.getElementById('applySuggestBtn').addEventListener('click', applySuggestions);
     document.getElementById('checkBtn').addEventListener('click', checkPaste);
     document.getElementById('applyBtn').addEventListener('click', applyPaste);
     document.getElementById('clearPasteBtn').addEventListener('click', () => {
