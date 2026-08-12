@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amazon Transactions</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js?v=act4"></script>
+<style>
+  body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:960px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
+  h1 { color:#2c3e50; margin-bottom:2px; }
+  .note { color:#64748b; font-size:14px; margin-top:0; margin-bottom:18px; }
+  .mini { color:#94a3b8; font-size:12px; }
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:18px; margin-bottom:18px; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+  h2 { color:#2c3e50; font-size:18px; margin:0 0 12px; }
+  h3 { font-size:15px; color:#475569; margin:18px 0 4px; }
+  .row { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:10px; }
+  label { display:block; font-weight:bold; font-size:13px; color:#475569; margin-bottom:5px; }
+  select { padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:15px; box-sizing:border-box; background:#fff; }
+  .btn { border:none; border-radius:8px; padding:12px 18px; font-size:15px; font-weight:bold; cursor:pointer; min-height:48px; }
+  .btn-save { background:#27ae60; color:#fff; }
+  .btn-go { background:#3498db; color:#fff; }
+  .btn-ghost { background:#fff; color:#3498db; border:1px solid #bfdbfe; }
+  .btn-small { border-radius:8px; padding:9px 14px; font-size:14px; font-weight:bold; cursor:pointer; min-height:42px; background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; }
+  .btn[disabled], .btn-small[disabled] { opacity:0.5; cursor:default; }
+  table { border-collapse:collapse; width:100%; margin-top:6px; }
+  th, td { padding:8px 10px; border-bottom:1px solid #e2e8f0; text-align:right; vertical-align:middle; }
+  th:first-child, td:first-child, th.l, td.l { text-align:left; }
+  th { background:#f8fafc; color:#475569; font-size:13px; }
+  td.desc { max-width:210px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; color:#64748b; }
+  td.empty { text-align:left; color:#94a3b8; font-style:italic; }
+  tr.pedit td.markcell { box-shadow: inset 3px 0 0 #f59e0b; }
+  input.itemnote { width:100%; min-width:150px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:14px; box-sizing:border-box; background:#fff; }
+  input.itemnote:focus { outline:none; border-color:#3498db; box-shadow:0 0 0 3px rgba(52,152,219,0.15); }
+  select.cat { font-size:14px; padding:6px; max-width:170px; }
+  textarea { width:100%; box-sizing:border-box; min-height:120px; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; background:#fff; color:#333; }
+  textarea:focus { outline:none; border-color:#3498db; box-shadow:0 0 0 3px rgba(52,152,219,0.15); }
+  .kpis { display:flex; gap:10px; flex-wrap:wrap; margin:4px 0 12px; }
+  .kpi { flex:1 1 170px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; }
+  .kpi .k { font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.04em; }
+  .kpi .v { font-size:20px; font-weight:bold; color:#2c3e50; margin-top:2px; }
+  .kpi .f { font-size:12px; color:#64748b; margin-top:2px; }
+  #actionBar { display:none; align-items:center; gap:12px; flex-wrap:wrap; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:10px 14px; margin:6px 0 14px; }
+  #actionBar .count { font-weight:bold; color:#92400e; }
+  #status { padding:10px 14px; border-radius:6px; font-weight:bold; margin-bottom:14px; font-size:15px; background:#eff6ff; color:#1e3a8a; }
+  .s-err { background:#fdecea !important; color:#c0392b !important; }
+  .s-ok { background:#d1fae5 !important; color:#065f46 !important; }
+  .report { font-size:14px; margin:10px 0 0; padding:12px 14px; border-radius:8px; background:#f8fafc; border:1px solid #e2e8f0; }
+  .report ul { margin:6px 0 0; padding-left:20px; }
+  .report li { margin:3px 0; }
+  .report .bad { color:#b91c1c; }
+  .report .good { color:#065f46; }
+  .setup { font-size:14px; color:#475569; }
+  .setup ol { padding-left:22px; }
+  .setup li { margin:5px 0; }
+  code { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; padding:1px 5px; font-size:13px; }
+
+  @media (prefers-color-scheme: dark) {
+    html, body { background:#0f172a !important; color:#cbd5e1 !important; }
+    h1, h2, h3, h4 { color:#f1f5f9 !important; }
+    .panel { background:#1e293b !important; border-color:#334155 !important; box-shadow:0 2px 4px rgba(0,0,0,0.4) !important; }
+    .note, .mini { color:#94a3b8 !important; }
+    label { color:#cbd5e1 !important; }
+    select { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    table { color:#cbd5e1 !important; }
+    th { background:#0f172a !important; color:#cbd5e1 !important; border-color:#334155 !important; }
+    td { border-color:#334155 !important; color:#cbd5e1 !important; }
+    td.desc { color:#94a3b8 !important; }
+    td.empty { color:#94a3b8 !important; }
+    input.itemnote { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    textarea { background:#0f172a !important; color:#e2e8f0 !important; border-color:#475569 !important; }
+    .btn-ghost { background:#0f172a !important; color:#93c5fd !important; border-color:#1e3a8a !important; }
+    .btn-small { background:#1e293b !important; color:#93c5fd !important; border-color:#3b5578 !important; }
+    .kpi { background:#0f172a !important; border-color:#334155 !important; }
+    .kpi .k, .kpi .f { color:#94a3b8 !important; }
+    .kpi .v { color:#f1f5f9 !important; }
+    #actionBar { background:#3a2f12 !important; border-color:#a16207 !important; }
+    #actionBar .count { color:#fde68a !important; }
+    #status { background:#1e293b !important; color:#93c5fd !important; }
+    .report { background:#0f172a !important; border-color:#334155 !important; }
+    .report .bad { color:#fca5a5 !important; }
+    .report .good { color:#6ee7b7 !important; }
+    .setup { color:#cbd5e1 !important; }
+    code { background:#0f172a !important; border-color:#334155 !important; color:#e2e8f0 !important; }
+  }
+</style>
+</head>
+<body>
+  <h1>Amazon Transactions</h1>
+  <p class="note">Amazon charges say nothing about what was bought, so they are never categorised automatically &mdash; they wait here until you say what they were. Type straight into the table for a handful, or use the clipboard round-trip below to clear a backlog in Google Sheets. Nothing is written until you press <strong>Save changes</strong>. <span class="mini">(amazon transactions build: v1)</span></p>
+  <div id="status">Loading&hellip;</div>
+
+  <div id="setupPanel" class="panel" style="display:none;">
+    <h2>No merchants are set to manual yet</h2>
+    <div class="setup">
+      <p>This page shows transactions from merchants listed in <code>bd_manual_merchant</code>. That table is empty, so there is nothing to show.</p>
+      <p>Add the Amazon descriptors your statement actually uses &mdash; typically <code>AMAZON</code>, <code>AMZN</code> and <code>AMZNMKTP</code> &mdash; and reload.</p>
+    </div>
+  </div>
+
+  <div id="mainPanel" style="display:none;">
+    <div class="panel">
+      <div class="row" style="justify-content:space-between; align-items:flex-end;">
+        <div>
+          <label for="monthSel">Month</label>
+          <select id="monthSel"></select>
+        </div>
+        <div>
+          <label for="statusSel">Show</label>
+          <select id="statusSel">
+            <option value="uncat">Not yet categorised</option>
+            <option value="cat">Already categorised</option>
+            <option value="all">Everything</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="k">Showing</div><div class="v" id="kShow">&mdash;</div><div class="f" id="kShowFoot">&nbsp;</div></div>
+        <div class="kpi"><div class="k">Still to do</div><div class="v" id="kTodo">&mdash;</div><div class="f" id="kTodoFoot">&nbsp;</div></div>
+        <div class="kpi"><div class="k">Amazon, all time</div><div class="v" id="kAll">&mdash;</div><div class="f" id="kAllFoot">&nbsp;</div></div>
+      </div>
+
+      <div id="actionBar">
+        <span class="count" id="pendCount"></span>
+        <button class="btn btn-save" id="saveBtn" type="button">Save changes</button>
+        <button class="btn btn-ghost" id="discardBtn" type="button">Discard</button>
+      </div>
+
+      <table id="txnTable">
+        <thead><tr>
+          <th class="l">Date</th>
+          <th>Amount</th>
+          <th class="l">Statement text</th>
+          <th class="l">What was it?</th>
+          <th class="l">Category</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Google Sheets round-trip</h2>
+      <p class="note" style="margin-bottom:12px;">Copy the rows above, paste them into your sheet at <strong>A2</strong>, fill in the last two columns, then copy the block back and paste it below. Column order is fixed: Ref, Date, Amount, Statement text, What was it?, Category. <strong>Never change the Ref column</strong> &mdash; it is the only thing tying a row back to its transaction.</p>
+
+      <div class="row">
+        <button class="btn-small" id="copyRowsBtn" type="button">Copy rows shown</button>
+        <button class="btn-small" id="copyHeadBtn" type="button">Copy headings</button>
+        <button class="btn-small" id="copyCatsBtn" type="button">Copy category list</button>
+      </div>
+      <div id="copyOut" style="display:none;">
+        <label for="copyBox">Could not reach the clipboard &mdash; select all of this and copy it by hand</label>
+        <textarea id="copyBox" readonly></textarea>
+      </div>
+
+      <h3>Paste the finished block back</h3>
+      <textarea id="pasteBox" placeholder="Paste the rows copied out of Google Sheets here" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn btn-go" id="checkBtn" type="button">Check pasted rows</button>
+        <button class="btn btn-ghost" id="applyBtn" type="button" disabled>Apply to the table</button>
+        <button class="btn btn-ghost" id="clearPasteBtn" type="button">Clear</button>
+      </div>
+      <div id="pasteReport"></div>
+
+      <h3>Setting the sheet up, once</h3>
+      <div class="setup">
+        <ol>
+          <li>New Google Sheet. Press <strong>Copy headings</strong> here and paste at <code>A1</code>.</li>
+          <li>Add a second tab called <strong>Categories</strong>. Press <strong>Copy category list</strong> and paste it at <code>A1</code> of that tab.</li>
+          <li>On the first tab select <code>F2:F1000</code>, then Data &rarr; Data validation &rarr; Add rule &rarr; <em>Dropdown (from a range)</em> &rarr; <code>Categories!A:A</code>.</li>
+        </ol>
+        <p>That validation belongs to your sheet, so it survives every future paste. Come back each month, paste new rows at <code>A2</code>, and the dropdown is already there.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const fmt = App.fmt;
+
+  // ---------- state ----------
+  let billCats = [];
+  let catDesc = {};               // code -> description
+  let manualKeys = [];            // upper-case match strings from bd_manual_merchant
+  let txns = [];                  // Amazon transactions only
+  let pendingCat = {};            // String(id) -> code or null
+  let pendingNote = {};           // String(id) -> note string or null
+
+  // ---------- helpers ----------
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function setStatus(msg, cls) {
+    const s = document.getElementById('status');
+    s.style.display = 'block'; s.className = cls || ''; s.textContent = msg;
+  }
+  function notifyChanged() {
+    try { if (window.parent && window.parent !== window) window.parent.postMessage('data-saved', '*'); } catch (e) {}
+  }
+  function money(v) { const n = Number(v) || 0; return (n < 0 ? '\u2212£' : '£') + Math.abs(n).toFixed(2); }
+  function normDesc(s) {
+    return String(s || '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  // Same first-token reduction the Card Entry page uses, so "manual" means the same
+  // thing on both pages and a descriptor cannot be manual here but learned there.
+  function merchantKey(s) {
+    let n = normDesc(s);
+    n = n.replace(/^(PAYPAL|SQ|SUMUP|IZ|IZETTLE|ZTL|WWW|TFL|GOOGLE|GOOGL|APL|APPLE PAY)\s+/, '');
+    const toks = n.split(' ').filter(Boolean);
+    if (!toks.length) return n;
+    let key = toks[0];
+    if (key.length <= 3 && toks[1]) key += ' ' + toks[1];
+    return key;
+  }
+  function isManual(desc) {
+    const nd = normDesc(desc);
+    const key = merchantKey(desc);
+    return manualKeys.some(m => key === m || nd.indexOf(m) !== -1);
+  }
+  function monthOf(d) { return String(d || '').slice(0, 7); }
+  function monthLabel(ym) {
+    if (ym === 'ALL') return 'All months';
+    const p = String(ym).split('-'); if (p.length < 2) return ym;
+    const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return names[+p[1] - 1] + ' ' + p[0];
+  }
+  function catOptions(selected) {
+    let html = '<option value="">\u2014</option>';
+    billCats.forEach(c => {
+      const sel = c.code === selected ? ' selected' : '';
+      html += '<option value="' + escapeHtml(c.code) + '"' + sel + ' title="' + escapeHtml(c.description || '') + '">' + escapeHtml(c.code) + '</option>';
+    });
+    return html;
+  }
+  function effCat(t) {
+    const k = String(t.id);
+    return Object.prototype.hasOwnProperty.call(pendingCat, k) ? pendingCat[k] : (t.category_code || null);
+  }
+  function effNote(t) {
+    const k = String(t.id);
+    const v = Object.prototype.hasOwnProperty.call(pendingNote, k) ? pendingNote[k] : t.item_note;
+    return v == null ? '' : String(v);
+  }
+  function pendingTotal() {
+    const ids = {};
+    Object.keys(pendingCat).forEach(k => { ids[k] = 1; });
+    Object.keys(pendingNote).forEach(k => { ids[k] = 1; });
+    return Object.keys(ids).length;
+  }
+  function isEdited(id) {
+    return Object.prototype.hasOwnProperty.call(pendingCat, id) ||
+           Object.prototype.hasOwnProperty.call(pendingNote, id);
+  }
+  function currentMonth() { return document.getElementById('monthSel').value; }
+  function currentStatus() { return document.getElementById('statusSel').value; }
+
+  // ---------- load ----------
+  async function loadAllTxns() {
+    const page = 1000; let off = 0; let out = [];
+    for (;;) {
+      const chunk = await App.rest('bd_card_txn?select=id,txn_date,description,amount,category_code,item_note&order=txn_date.desc&limit=' + page + '&offset=' + off);
+      const got = chunk || [];
+      out = out.concat(got);
+      if (got.length < page) break;
+      off += page;
+      if (off > 50000) break;
+    }
+    return out;
+  }
+  async function load() {
+    try {
+      setStatus('Loading\u2026');
+      const [cats, mm] = await Promise.all([
+        App.rest('bd_bill_category?order=code.asc'),
+        App.rest('bd_manual_merchant')
+      ]);
+      billCats = cats || [];
+      catDesc = {}; billCats.forEach(c => { catDesc[c.code] = c.description || ''; });
+      manualKeys = (mm || []).map(r => normDesc(r.match_text)).filter(Boolean);
+
+      if (!manualKeys.length) {
+        document.getElementById('status').style.display = 'none';
+        document.getElementById('mainPanel').style.display = 'none';
+        document.getElementById('setupPanel').style.display = 'block';
+        return;
+      }
+      const all = await loadAllTxns();
+      txns = all.filter(t => isManual(t.description));
+      pendingCat = {}; pendingNote = {};
+      document.getElementById('status').style.display = 'none';
+      document.getElementById('setupPanel').style.display = 'none';
+      document.getElementById('mainPanel').style.display = 'block';
+      renderMonths();
+    } catch (e) {
+      setStatus('Could not load: ' + (e && e.message ? e.message : e), 's-err');
+    }
+  }
+
+  // ---------- filtering ----------
+  function renderMonths() {
+    const sel = document.getElementById('monthSel');
+    const months = Array.from(new Set(txns.map(t => monthOf(t.txn_date)))).filter(Boolean).sort().reverse();
+    const prev = sel.value;
+    sel.innerHTML = '<option value="ALL">All months</option>' +
+      months.map(m => '<option value="' + m + '">' + monthLabel(m) + '</option>').join('');
+    sel.value = (prev && (prev === 'ALL' || months.indexOf(prev) !== -1)) ? prev : 'ALL';
+    draw();
+  }
+  // The status filter is applied against the SAVED category, not the pending one, so a row
+  // does not vanish from under the cursor the moment it is categorised. It leaves the list
+  // on the next redraw or on save, which is when you expect it to.
+  function rowsShown() {
+    const ym = currentMonth(), st = currentStatus();
+    return txns.filter(t => {
+      if (ym !== 'ALL' && monthOf(t.txn_date) !== ym) return false;
+      const saved = t.category_code || null;
+      if (st === 'uncat' && saved) return false;
+      if (st === 'cat' && !saved) return false;
+      return true;
+    }).sort((a, b) => String(b.txn_date).localeCompare(String(a.txn_date)));
+  }
+
+  // ---------- render ----------
+  function draw() {
+    renderList();
+    renderKpis();
+    renderActionBar();
+  }
+  function renderList() {
+    const list = rowsShown();
+    const body = document.querySelector('#txnTable tbody');
+    if (!list.length) {
+      body.innerHTML = '<tr><td class="empty" colspan="5">Nothing to show for this filter.</td></tr>';
+      return;
+    }
+    body.innerHTML = list.map(t => {
+      const id = String(t.id);
+      const cls = isEdited(id) ? 'pedit' : '';
+      return '<tr data-row="' + escapeHtml(id) + '" class="' + cls + '">' +
+        '<td class="l">' + escapeHtml(t.txn_date) + '</td>' +
+        '<td>' + money(t.amount) + '</td>' +
+        '<td class="l desc" title="' + escapeHtml(t.description) + '">' + escapeHtml(t.description) + '</td>' +
+        '<td class="l markcell"><input type="text" class="itemnote" data-id="' + escapeHtml(id) + '" value="' + escapeHtml(effNote(t)) + '" placeholder="e.g. dog food, printer ink" autocomplete="off" autocapitalize="none" spellcheck="false"></td>' +
+        '<td class="l"><select class="cat" data-id="' + escapeHtml(id) + '">' + catOptions(effCat(t)) + '</select></td>' +
+        '</tr>';
+    }).join('');
+  }
+  function renderKpis() {
+    const shown = rowsShown();
+    const shownTotal = shown.reduce((a, t) => a + (Number(t.amount) || 0), 0);
+    document.getElementById('kShow').textContent = String(shown.length);
+    document.getElementById('kShowFoot').textContent = money(shownTotal) + ' on screen';
+
+    const todo = txns.filter(t => !effCat(t));
+    const todoTotal = todo.reduce((a, t) => a + (Number(t.amount) || 0), 0);
+    document.getElementById('kTodo').textContent = String(todo.length);
+    document.getElementById('kTodoFoot').textContent = money(todoTotal) + ' still unfiled';
+
+    const allTotal = txns.reduce((a, t) => a + (Number(t.amount) || 0), 0);
+    document.getElementById('kAll').textContent = String(txns.length);
+    document.getElementById('kAllFoot').textContent = money(allTotal) + ' across all months';
+  }
+  function renderActionBar() {
+    const bar = document.getElementById('actionBar');
+    const n = pendingTotal();
+    if (!n) { bar.style.display = 'none'; return; }
+    document.getElementById('pendCount').textContent =
+      'Unsaved: ' + n + ' transaction' + (n === 1 ? '' : 's') + ' changed.';
+    bar.style.display = 'flex';
+  }
+  function markRow(id) {
+    const tr = document.querySelector('#txnTable tbody tr[data-row="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]');
+    if (tr) tr.className = isEdited(id) ? 'pedit' : '';
+  }
+
+  // ---------- staged edits ----------
+  // Typing stages straight into pendingNote and never redraws the table. A redraw would
+  // both destroy the caret mid-word and, if it ever ran before staging, silently discard
+  // whatever had been typed. Only the KPI strip and the action bar move.
+  function stageNote(el) {
+    const id = String(el.dataset.id);
+    const t = txns.find(x => String(x.id) === id);
+    if (!t) return;
+    const raw = el.value;
+    const saved = t.item_note == null ? '' : String(t.item_note);
+    if (raw === saved) delete pendingNote[id];
+    else pendingNote[id] = raw;
+    markRow(id);
+  }
+  function stageCat(el) {
+    const id = String(el.dataset.id);
+    const t = txns.find(x => String(x.id) === id);
+    if (!t) return;
+    const code = el.value || null;
+    if (code === (t.category_code || null)) delete pendingCat[id];
+    else pendingCat[id] = code;
+    markRow(id);
+  }
+  // Read every live field back into the pending maps before anything rebuilds the table.
+  // This is the guard against the destructive-redraw defect: a filter change must never be
+  // able to throw away a value that is sitting in the DOM but not yet staged.
+  function syncDom() {
+    document.querySelectorAll('#txnTable tbody input.itemnote').forEach(stageNote);
+    document.querySelectorAll('#txnTable tbody select.cat').forEach(stageCat);
+  }
+  function redraw() { syncDom(); draw(); }
+
+  function discardChanges() {
+    if (!pendingTotal()) return;
+    if (!confirm('Discard all unsaved changes on this page?')) return;
+    pendingCat = {}; pendingNote = {};
+    setStatus('Changes discarded.', 's-ok');
+    draw();
+  }
+
+  async function saveChanges() {
+    syncDom();
+    if (!pendingTotal()) return;
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true; btn.textContent = 'Saving\u2026';
+    const ids = {};
+    Object.keys(pendingCat).forEach(k => { ids[k] = 1; });
+    Object.keys(pendingNote).forEach(k => { ids[k] = 1; });
+    let fails = 0;
+    for (const id of Object.keys(ids)) {
+      const t = txns.find(x => String(x.id) === id);
+      if (!t) { delete pendingCat[id]; delete pendingNote[id]; continue; }
+      const payload = {};
+      if (Object.prototype.hasOwnProperty.call(pendingCat, id)) payload.category_code = pendingCat[id];
+      if (Object.prototype.hasOwnProperty.call(pendingNote, id)) {
+        const n = String(pendingNote[id] || '').trim();
+        payload.item_note = n ? n : null;
+      }
+      try {
+        await App.write('PATCH', 'bd_card_txn?id=eq.' + encodeURIComponent(id), payload);
+        if (Object.prototype.hasOwnProperty.call(payload, 'category_code')) t.category_code = payload.category_code;
+        if (Object.prototype.hasOwnProperty.call(payload, 'item_note')) t.item_note = payload.item_note;
+        delete pendingCat[id]; delete pendingNote[id];
+      } catch (e) { fails++; }
+    }
+    notifyChanged();
+    btn.disabled = false; btn.textContent = 'Save changes';
+    if (fails) {
+      setStatus(fails + ' change(s) could not be saved \u2014 they are still pending.', 's-err');
+      draw();
+    } else {
+      setStatus('All changes saved.', 's-ok');
+      await load();
+    }
+  }
+
+  // ---------- clipboard out ----------
+  const HEADINGS = ['Ref', 'Date', 'Amount', 'Statement text', 'What was it?', 'Category'];
+  // Tabs and newlines are the field and record separators, so anything carrying them would
+  // silently split a row. Strip them on the way out rather than letting the round-trip break.
+  function tsvSafe(s) { return String(s == null ? '' : s).replace(/[\t\r\n]+/g, ' ').trim(); }
+  function rowsTsv() {
+    return rowsShown().map(t => [
+      String(t.id),
+      tsvSafe(t.txn_date),
+      (Number(t.amount) || 0).toFixed(2),
+      tsvSafe(t.description),
+      tsvSafe(effNote(t)),
+      tsvSafe(effCat(t) || '')
+    ].join('\t')).join('\n');
+  }
+  function catsTsv() {
+    return billCats.map(c => tsvSafe(c.code) + '\t' + tsvSafe(c.description)).join('\n');
+  }
+  async function toClipboard(text, what) {
+    const out = document.getElementById('copyOut');
+    const box = document.getElementById('copyBox');
+    if (!text) { setStatus('Nothing to copy \u2014 ' + what + ' is empty.', 's-err'); return; }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        out.style.display = 'none';
+        setStatus(what + ' copied \u2014 paste into your sheet.', 's-ok');
+        return;
+      }
+      throw new Error('no clipboard API');
+    } catch (e) {
+      // Clipboard access can be refused inside a frame or without a trusted gesture.
+      // Falling back to a selectable box means the feature never simply fails.
+      box.value = text;
+      out.style.display = 'block';
+      box.focus(); box.select();
+      setStatus('Clipboard unavailable \u2014 copy the text shown below by hand.', 's-err');
+    }
+  }
+
+  // ---------- clipboard in ----------
+  let stagedPaste = [];
+  function parsePaste(raw) {
+    const lines = String(raw || '').split(/\r\n|\r|\n/).filter(l => l.trim().length);
+    const codeByUpper = {}; billCats.forEach(c => { codeByUpper[String(c.code).toUpperCase()] = c.code; });
+    const byId = {}; txns.forEach(t => { byId[String(t.id)] = t; });
+    const ok = [], badShape = [], badRef = [], badCode = [];
+    lines.forEach((line, i) => {
+      const cells = line.split('\t');
+      if (cells[0] && cells[0].trim().toLowerCase() === 'ref') return;   // pasted heading row
+      if (cells.length < 6) { badShape.push({ n: i + 1, got: cells.length }); return; }
+      const id = cells[0].trim();
+      const t = byId[id];
+      if (!t) { badRef.push({ n: i + 1, ref: id }); return; }
+      const note = cells[4].trim();
+      const rawCode = cells[5].trim();
+      let code = null;
+      if (rawCode) {
+        code = codeByUpper[rawCode.toUpperCase()] || null;
+        if (!code) { badCode.push({ n: i + 1, ref: id, val: rawCode }); return; }
+      }
+      const savedNote = t.item_note == null ? '' : String(t.item_note);
+      const changed = (note !== savedNote) || (code !== (t.category_code || null));
+      ok.push({ id: id, note: note, code: code, changed: changed });
+    });
+    return { ok: ok, badShape: badShape, badRef: badRef, badCode: badCode, lines: lines.length };
+  }
+  function checkPaste() {
+    const raw = document.getElementById('pasteBox').value;
+    const r = parsePaste(raw);
+    stagedPaste = r.ok;
+    const changed = r.ok.filter(x => x.changed).length;
+    const parts = [];
+    parts.push('<b>' + r.lines + '</b> row' + (r.lines === 1 ? '' : 's') + ' read.');
+    parts.push('<span class="good"><b>' + r.ok.length + '</b> matched a transaction, <b>' + changed + '</b> of them changing something.</span>');
+    const problems = [];
+    if (r.badShape.length) {
+      problems.push('<li class="bad"><b>' + r.badShape.length + '</b> row(s) had the wrong number of columns and were skipped &mdash; line(s) ' +
+        r.badShape.map(x => x.n).join(', ') + '. A line break inside a cell will do this.</li>');
+    }
+    if (r.badRef.length) {
+      problems.push('<li class="bad"><b>' + r.badRef.length + '</b> row(s) had a Ref that is not a current Amazon transaction: ' +
+        r.badRef.map(x => escapeHtml(x.ref)).join(', ') + '.</li>');
+    }
+    if (r.badCode.length) {
+      problems.push('<li class="bad"><b>' + r.badCode.length + '</b> row(s) had a category that is not a known code: ' +
+        r.badCode.map(x => escapeHtml(x.val) + ' (ref ' + escapeHtml(x.ref) + ')').join(', ') + '.</li>');
+    }
+    let html = '<div class="report">' + parts.join(' ');
+    if (problems.length) html += '<ul>' + problems.join('') + '</ul>';
+    else html += '<ul><li class="good">No problems found.</li></ul>';
+    html += '</div>';
+    document.getElementById('pasteReport').innerHTML = html;
+    document.getElementById('applyBtn').disabled = !changed;
+  }
+  // Applying only stages the changes into the same pending maps the table uses, so the
+  // pasted block is reviewable in place and still goes through Save changes like anything else.
+  function applyPaste() {
+    if (!stagedPaste.length) return;
+    syncDom();
+    let n = 0;
+    stagedPaste.forEach(x => {
+      const t = txns.find(y => String(y.id) === x.id);
+      if (!t) return;
+      const savedNote = t.item_note == null ? '' : String(t.item_note);
+      if (x.note !== savedNote) pendingNote[x.id] = x.note; else delete pendingNote[x.id];
+      if (x.code !== (t.category_code || null)) pendingCat[x.id] = x.code; else delete pendingCat[x.id];
+      if (x.changed) n++;
+    });
+    draw();
+    document.getElementById('applyBtn').disabled = true;
+    setStatus(n + ' pasted row(s) applied to the table. Review them, then press Save changes.', 's-ok');
+  }
+
+  // ---------- wiring ----------
+  // Bound once, outside any render, and delegated. Binding inside a render would stack a
+  // fresh handler on every redraw and fire the same edit several times over.
+  function wire() {
+    document.getElementById('monthSel').addEventListener('change', redraw);
+    document.getElementById('statusSel').addEventListener('change', redraw);
+    document.getElementById('saveBtn').addEventListener('click', saveChanges);
+    document.getElementById('discardBtn').addEventListener('click', discardChanges);
+
+    const body = document.querySelector('#txnTable tbody');
+    body.addEventListener('input', e => {
+      const el = e.target;
+      if (el && el.classList && el.classList.contains('itemnote')) { stageNote(el); renderKpis(); renderActionBar(); }
+    });
+    body.addEventListener('change', e => {
+      const el = e.target;
+      if (el && el.classList && el.classList.contains('cat')) { stageCat(el); renderKpis(); renderActionBar(); }
+    });
+
+    document.getElementById('copyRowsBtn').addEventListener('click', () => { syncDom(); toClipboard(rowsTsv(), 'The rows shown'); });
+    document.getElementById('copyHeadBtn').addEventListener('click', () => toClipboard(HEADINGS.join('\t'), 'The headings'));
+    document.getElementById('copyCatsBtn').addEventListener('click', () => toClipboard(catsTsv(), 'The category list'));
+    document.getElementById('checkBtn').addEventListener('click', checkPaste);
+    document.getElementById('applyBtn').addEventListener('click', applyPaste);
+    document.getElementById('clearPasteBtn').addEventListener('click', () => {
+      document.getElementById('pasteBox').value = '';
+      document.getElementById('pasteReport').innerHTML = '';
+      document.getElementById('applyBtn').disabled = true;
+      stagedPaste = [];
+    });
+  }
+
+  // Don't let a background refresh wipe out edits in progress.
+  window.addEventListener('message', e => {
+    if (e && e.data === 'refresh-data') {
+      syncDom();
+      if (pendingTotal()) { setStatus('Data changed elsewhere; save or discard your changes here to refresh.', 's-err'); }
+      else load();
+    }
+  });
+
+  if (typeof App === 'undefined' || !App.requireLogin) {
+    document.getElementById('status').textContent = 'Error: common.js did not load (App is undefined).';
+  } else {
+    try { wire(); App.requireLogin(load, { title: 'Amazon Transactions' }); }
+    catch (err) { document.getElementById('status').textContent = 'Error during startup: ' + (err && err.message ? err.message : err); }
+  }
+</script>
+</body>
+</html>
