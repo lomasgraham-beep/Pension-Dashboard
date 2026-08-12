@@ -90,7 +90,7 @@
 </head>
 <body>
   <h1>Amazon Transactions</h1>
-  <p class="note">Amazon charges say nothing about what was bought, so they are never categorised automatically &mdash; they wait here until you say what they were. Type straight into the table for a handful, use an Amazon data export to fill the descriptions in for you, or use the clipboard round-trip to clear a backlog in Google Sheets. Nothing is written until you press <strong>Save changes</strong>. <span class="mini">(amazon transactions build: v2)</span></p>
+  <p class="note">Amazon charges say nothing about what was bought, so they are never categorised automatically &mdash; they wait here until you say what they were. Type straight into the table for a handful, use an Amazon data export to fill the descriptions in for you, or use the clipboard round-trip to clear a backlog in Google Sheets. Nothing is written until you press <strong>Save changes</strong>. <span class="mini">(amazon transactions build: v3)</span></p>
   <div id="status">Loading&hellip;</div>
 
   <div id="setupPanel" class="panel" style="display:none;">
@@ -671,19 +671,24 @@
   }
   function buildCardSelect() {
     const counts = {};
-    shipments.forEach(s => { const l = cardLabel(s.card); counts[l] = (counts[l] || 0) + 1; });
-    const labels = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    shipments.forEach(sh => { const l = cardLabel(sh.card); counts[l] = (counts[l] || 0) + 1; });
+    const labels = Object.keys(counts);
+    // Ranked by how many of THIS ledger's charges each card explains, not by how many
+    // shipments it has. Twenty years of an old card will always out-count the current one.
+    const scored = labels.map(l => ({ l: l, n: scoreCard(l), ships: counts[l] }))
+      .sort((a, b) => (b.n - a.n) || (b.ships - a.ships));
     const sel = document.getElementById('cardSel');
-    sel.innerHTML = labels.map(l => '<option value="' + escapeHtml(l) + '">' + escapeHtml(l) +
-      ' (' + counts[l] + ' shipment' + (counts[l] === 1 ? '' : 's') + ')</option>').join('');
-    if (labels.length) sel.value = labels[0];
-    document.getElementById('cardPick').style.display = labels.length ? 'block' : 'none';
-    return labels.length;
+    sel.innerHTML = scored.map(x => '<option value="' + escapeHtml(x.l) + '">' + escapeHtml(x.l) +
+      ' \u2014 ' + x.n + ' of ' + txns.length + ' charges match</option>').join('');
+    if (scored.length) sel.value = scored[0].l;
+    document.getElementById('cardPick').style.display = scored.length ? 'block' : 'none';
+    return scored.length;
   }
   function onCsvFile(file) {
     if (!file) return;
     const done = text => {
       try {
+        document.getElementById('csvReport').innerHTML = '<div class="report">Reading the file and testing each card\u2026</div>';
         shipments = buildShipments(parseCsv(text));
         suggestions = [];
         document.getElementById('applySuggestBtn').disabled = true;
@@ -691,7 +696,7 @@
         document.getElementById('csvReport').innerHTML = '<div class="report"><b>' + shipments.length +
           '</b> shipment' + (shipments.length === 1 ? '' : 's') + ' read' +
           (shipments.cancelled ? ', ' + shipments.cancelled + ' cancelled line(s) ignored' : '') +
-          '. Choose the card and press <b>Find descriptions</b>.</div>';
+          '. The card that explains the most charges is selected \u2014 press <b>Find descriptions</b>.</div>';
         if (!n) setStatus('No payment methods found in that file.', 's-err');
       } catch (e) {
         shipments = [];
@@ -706,45 +711,106 @@
     fr.readAsText(file);
   }
   const WINDOW_DAYS = 5;
+  const COMBO_DAYS = 2;          // dispatches billed together land within a day or two
+  const COMBO_MAX = 3;           // beyond three the false-positive risk outweighs the gain
+  const PENNY = 0.005;
+
+  function dayMs(d) { return Date.parse(String(d).slice(0, 10) + 'T00:00:00Z'); }
+
+  // Every subset of `pool` of size 2..COMBO_MAX whose charges sum to `amt`. Amazon bills per
+  // dispatch and then puts several dispatches on one debit, so a charge with no single
+  // shipment behind it often has two or three. Returned as a list because the count is the
+  // whole point: more than one way to reach the total means we must not guess.
+  function combosFor(pool, amt) {
+    const hits = [];
+    const n = pool.length;
+    if (n < 2) return hits;
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const two = pool[i].charge + pool[j].charge;
+        if (Math.abs(two - amt) < PENNY) { hits.push([pool[i], pool[j]]); if (hits.length > 1) return hits; continue; }
+        if (COMBO_MAX < 3 || two - amt > PENNY) continue;
+        for (let k = j + 1; k < n; k++) {
+          if (Math.abs(two + pool[k].charge - amt) < PENNY) {
+            hits.push([pool[i], pool[j], pool[k]]);
+            if (hits.length > 1) return hits;
+          }
+        }
+      }
+    }
+    return hits;
+  }
+
+  // Resolve one card charge. Single shipment first — a lone exact match is the strongest
+  // evidence available and must never be overridden by a combination that also happens to fit.
+  function matchCharge(pool, txn) {
+    const amt = Math.abs(Number(txn.amount) || 0);
+    const td = dayMs(txn.txn_date);
+    if (!isFinite(td) || !amt) return { kind: 'none', near: [] };
+    const near = pool.filter(sh => Math.abs(dayMs(sh.day) - td) <= WINDOW_DAYS * 86400000);
+    const exact = near.filter(sh => Math.abs(sh.charge - amt) < PENNY);
+    if (exact.length === 1) return { kind: 'one', ships: [exact[0]], near: near };
+    if (exact.length > 1) return { kind: 'ambiguous', near: near };
+    // Combinations are drawn from a tighter window: dispatches billed together are close
+    // in time, and a wider net multiplies the ways to reach a total by coincidence.
+    const tight = near.filter(sh => Math.abs(dayMs(sh.day) - td) <= COMBO_DAYS * 86400000);
+    const combos = combosFor(tight, amt);
+    if (combos.length === 1) return { kind: 'combo', ships: combos[0], near: near };
+    if (combos.length > 1) return { kind: 'ambiguous', near: near };
+    return { kind: 'none', near: near };
+  }
+  function noteFor(ships) {
+    const items = [];
+    ships.forEach(sh => sh.items.forEach(it => items.push(it)));
+    return items.join(' \u00b7 ').slice(0, 300);
+  }
+  // How many of the transactions on this page a given card can actually account for. This is
+  // what the dropdown is labelled with: shipment counts are a poor guide — the busiest card
+  // across twenty years need not be the one this ledger belongs to.
+  function scoreCard(label) {
+    const pool = shipments.filter(sh => cardLabel(sh.card) === label);
+    let hit = 0;
+    txns.forEach(t => { const m = matchCharge(pool, t); if (m.kind === 'one' || m.kind === 'combo') hit++; });
+    return hit;
+  }
+
   function findSuggestions() {
     if (!shipments.length) return;
     syncDom();
     const card = document.getElementById('cardSel').value;
     const overwrite = document.getElementById('overwriteNotes').checked;
-    const pool = shipments.filter(s => cardLabel(s.card) === card);
+    const pool = shipments.filter(sh => cardLabel(sh.card) === card);
     const targets = txns.filter(t => overwrite || !effNote(t).trim());
     const out = [];
-    let none = 0, nearGift = 0, ambiguous = 0;
+    let single = 0, combo = 0, none = 0, nearGift = 0, ambiguous = 0, noCandidates = 0;
     targets.forEach(t => {
-      const amt = Math.abs(Number(t.amount) || 0);
-      const td = Date.parse(String(t.txn_date).slice(0, 10) + 'T00:00:00Z');
-      if (!isFinite(td)) return;
-      const near = pool.filter(s => {
-        const sd = Date.parse(s.day + 'T00:00:00Z');
-        return isFinite(sd) && Math.abs(sd - td) <= WINDOW_DAYS * 86400000;
-      });
-      const hits = near.filter(s => Math.abs(s.charge - amt) < 0.005);
-      if (hits.length === 1) out.push({ id: String(t.id), note: hits[0].items.join(' \u00b7 ').slice(0, 300) });
-      else if (hits.length > 1) ambiguous++;
+      const m = matchCharge(pool, t);
+      if (m.kind === 'one' || m.kind === 'combo') {
+        out.push({ id: String(t.id), note: noteFor(m.ships) });
+        if (m.kind === 'combo') combo++; else single++;
+      } else if (m.kind === 'ambiguous') { ambiguous++; }
       else {
         none++;
-        // A gift card pays part of the order, but the export records the ORDER total, not the
+        if (!m.near.length) noCandidates++;
+        // A gift card pays part of an order, but the export records the ORDER total, not the
         // card's share — so these cannot match on amount and are called out rather than
         // left looking like a mystery.
-        if (near.some(s => s.gift)) nearGift++;
+        else if (m.near.some(sh => sh.gift)) nearGift++;
       }
     });
     suggestions = out;
-    const bits = [];
-    bits.push('<b>' + out.length + '</b> description' + (out.length === 1 ? '' : 's') + ' matched a single shipment on card ' + escapeHtml(card) + '.');
+    let html = '<div class="report"><b>' + out.length + '</b> description' + (out.length === 1 ? '' : 's') +
+      ' matched on card ' + escapeHtml(card) +
+      (combo ? ' \u2014 ' + single + ' from one shipment, ' + combo + ' from dispatches billed together' : '') + '.';
     const probs = [];
     if (none) {
-      probs.push('<li><b>' + none + '</b> charge(s) matched nothing' +
-        (nearGift ? ', of which <b>' + nearGift + '</b> sit beside a shipment part-paid by a gift card — the export holds the order total, not the amount your card was actually debited' : '') + '.</li>');
+      const bits = [];
+      if (noCandidates) bits.push('<b>' + noCandidates + '</b> had nothing in the file within five days \u2014 Prime, Kindle, gift cards and Amazon Fresh are not in Retail.OrderHistory');
+      if (nearGift) bits.push('<b>' + nearGift + '</b> sit beside a shipment part-paid by a gift card, where the export holds the order total rather than what your card was debited');
+      probs.push('<li><b>' + none + '</b> charge(s) matched nothing' + (bits.length ? ': ' + bits.join('; ') : '') + '.</li>');
     }
-    if (ambiguous) probs.push('<li class="bad"><b>' + ambiguous + '</b> charge(s) matched more than one shipment and were left alone.</li>');
+    if (ambiguous) probs.push('<li class="bad"><b>' + ambiguous + '</b> charge(s) could be explained more than one way and were left alone \u2014 a wrong description is worse than a blank one.</li>');
     if (!targets.length) probs.push('<li>Every transaction already has a description. Tick the box above to replace them.</li>');
-    let html = '<div class="report">' + bits.join(' ');
     html += probs.length ? ('<ul>' + probs.join('') + '</ul>') : '<ul><li class="good">Everything matched.</li></ul>';
     html += '</div>';
     document.getElementById('csvReport').innerHTML = html;
