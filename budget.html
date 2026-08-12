@@ -132,8 +132,8 @@
     <span id="refreshNote" class="refresh-note" role="status" aria-live="polite"></span>
   </div>
   <div id="pageInfo" class="info-panel" hidden>
-    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. The working-days chip at the top of each person&rsquo;s card is read-only and follows the schedule in Basic Data against the month you&rsquo;re viewing &mdash; so a 3-day week starting in September shows 5-day in August and 3-day from September, and salary and pension contributions switch with it. Figures are shown in the money of the year you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr), stepping once each January rather than creeping every month, so amounts hold steady across a year. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel, Julie Hair &amp; Nails and Dogs spend, which is deducted in the Cash Summary. Hair &amp; Nails follows the same <b>Plan / Actual</b> basis as dining, holidays and fuel (set on the Weekly Plan page): on <em>Actual</em> it uses your real card spend on the <b>JULIE</b> category over the last 12 months, divided by 12, and the row is marked <em>actual</em>. If that category doesn&rsquo;t exist or can&rsquo;t be read it quietly falls back to the planned bill row. Xmas and Birthdays are not on the card here &mdash; they are saved monthly into a savings account (age-tapered gift values, inflated 0.5%/yr, managed on the Gift Savings page) and appear as a <em>Gift savings</em> set-aside against that account&rsquo;s paying account, smoothing the December peak. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from, and the <b>Loans</b> card lists what is still owed on each &mdash; the balance outstanding at the start of the viewed month and how many payments remain, counting that month. Settled loans drop off the card.</p>
-    <span class="info-build">Budget build: v51</span>
+    <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. The working-days chip at the top of each person&rsquo;s card is read-only and follows the schedule in Basic Data against the month you&rsquo;re viewing &mdash; so a 3-day week starting in September shows 5-day in August and 3-day from September, and salary and pension contributions switch with it. Figures are shown in the money of the year you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr), stepping once each January rather than creeping every month, so amounts hold steady across a year. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box shows the Groceries, Fuel, Julie Hair &amp; Nails and Dogs spend, which is deducted in the Cash Summary. The <b>Cash Summary</b> now spells the calculation out in the order it happens &mdash; each person&rsquo;s income and the household total, then each person&rsquo;s bills, the bills total, pensions and the card, the total out, and what is left. Hair &amp; Nails follows the same <b>Plan / Actual</b> basis as dining, holidays and fuel (set on the Weekly Plan page): on <em>Actual</em> it uses your real card spend on the <b>JULIE</b> category over the last 12 months, divided by 12, and the row is marked <em>actual</em>. If that category doesn&rsquo;t exist or can&rsquo;t be read it quietly falls back to the planned bill row. Xmas and Birthdays are not on the card here &mdash; they are saved monthly into a savings account (age-tapered gift values, inflated 0.5%/yr, managed on the Gift Savings page) and appear as a <em>Gift savings</em> set-aside against that account&rsquo;s paying account, smoothing the December peak. Insurances are listed in the third column. Loans show as a line in the account they&rsquo;re paid from, and the <b>Loans</b> card lists what is still owed on each &mdash; the balance outstanding at the start of the viewed month and how many payments remain, counting that month. Settled loans drop off the card.</p>
+    <span class="info-build">Budget build: v52</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -445,11 +445,13 @@
     const meta = buildAccountMeta(d);
     const shown = {};   // bill row index -> true, so we can detect leftovers
 
-    const avails = {}, avgAvails = {}, incomeLedger = [];
+    const avails = {}, avgAvails = {}, incomeLedger = [], people = [];
     const blocks = d.names.map(name => {
       const r = personBlock(name, d, meta, shown);
       avails[name] = r.avail; avgAvails[name] = r.availAvg;
       incomeLedger.push(r.income);
+      people.push({ name: name, income: (r.income && r.income.total) || 0, bills: r.bills || 0,
+                    billsAvg: r.billsAvg || 0, avail: r.avail || 0, availAvg: r.availAvg || 0 });
       return r.html;
     });
 
@@ -474,7 +476,7 @@
 
     const pens = pensionBlock(d);
     const ccParts = creditCardParts(d);
-    const cash = cashSummary(avails, avgAvails, pens.total, ccParts);
+    const cash = cashSummary(people, pens.total, ccParts);
     const cc = creditCardBox(d);
 
     // Three columns: Graham | Julie + Cash Summary | Insurances + Credit Card + Pensions + Loans.
@@ -619,7 +621,10 @@
           '<tr class="total"><td>Total bills' + billsAvgNote + '</td><td class="amt">' + fmt(totalBills) + '</td></tr>' +
         '</tbody></table>' +
       '</div>';
-    return { html: html, avail: avail, availAvg: availAvg,
+    // v46: bills are returned as well as the net figure. The Cash Summary used to start from
+    // "available" (income minus bills, already netted off), which meant the household bill
+    // total appeared nowhere on screen and the arithmetic could not be followed.
+    return { html: html, avail: avail, availAvg: availAvg, bills: totalBills, billsAvg: totalBillsAvg,
              income: { name: name, days: days, lines: incLines, total: totalIn } };
   }
 
@@ -833,28 +838,59 @@
     '</div>';
   }
 
-  function cashSummary(avails, avgAvails, pensTotal, card) {
-    const names = Object.keys(avails);
-    const sumAvail = names.reduce((s, n) => s + (avails[n] || 0), 0);
-    const sumAvgAvail = names.reduce((s, n) => s + (avgAvails[n] || 0), 0);
+  // v46: the whole calculation is on screen, in the order it happens — income in, bills out,
+  // then the two deductions taken once for the household. Every figure between total income
+  // and cash in hand is now visible, rather than each person's bills being netted off before
+  // the summary starts.
+  function cashSummary(people, pensTotal, card) {
+    const list = (people || []).filter(Boolean);
+    const money = k => list.reduce((s, p) => s + (Number(p[k]) || 0), 0);
+    const totalIncome = money('income');
+    const totalBills = money('bills');
+    const totalBillsAvg = money('billsAvg');
     const pens = Number(pensTotal) || 0;
     const cardT = (card && Number(card.total)) || 0;
     const cardA = (card && Number(card.avg)) || 0;
-    const totalCash = sumAvail - pens - cardT;
-    const totalCashAvg = sumAvgAvail - pens - cardA;
-    let availRows = names.map(n => '<tr><td>' + esc(n) + ' available</td><td class="amt">' + fmt(avails[n] || 0) + '</td></tr>').join('');
+    const outgo = totalBills + pens + cardT;
+    const outgoAvg = totalBillsAvg + pens + cardA;
+    const totalCash = totalIncome - outgo;
+    const totalCashAvg = totalIncome - outgoAvg;
+    const neg = v => '<td class="amt neg">\u2212' + fmt(v) + '</td>';
+
+    // Only worth naming people individually when there is more than one of them.
+    const many = list.length > 1;
+    const incRows = many
+      ? list.map(p => '<tr><td>' + esc(p.name) + '</td><td class="amt">' + fmt(p.income) + '</td></tr>').join('')
+      : '';
+    const billRows = many
+      ? list.map(p => '<tr><td>' + esc(p.name) + '\u2019s bills</td>' + neg(p.bills) + '</tr>').join('')
+      : '';
+    const cardNames = (card && card.lines && card.lines.length)
+      ? ' <span class="muted2">' + card.lines.map(l => esc(l.label)).join(', ') + '</span>' : '';
     const avgRow = (!isAnnual() && Math.abs(totalCash - totalCashAvg) > 0.5)
       ? '<tr><td class="muted2">Average month (reference)</td><td class="amt muted2">' + fmt(totalCashAvg) + '</td></tr>' : '';
+    // Kept as a footnote: whose account the slack actually sits in, before the household
+    // deductions come off. Useful, but not part of the chain above.
+    const byPerson = many
+      ? '<tr><td colspan="2" class="muted2" style="padding-top:10px;">Before pensions and card, available by person: ' +
+        list.map(p => esc(p.name) + ' ' + fmt(p.avail)).join(' \u00b7 ') + '</td></tr>' : '';
+
     return '<div class="panelcard">' +
       '<div class="blocktitle">Cash Summary</div>' +
+      '<div class="subtitle">How it adds up \u2014 ' + (isAnnual() ? 'whole year' : monthLabelShort()) + '</div>' +
       '<table><tbody>' +
-        availRows +
-        '<tr class="total"><td>Sum of available</td><td class="amt">' + fmt(sumAvail) + '</td></tr>' +
-        (Math.round(pens * 100) === 0 ? '' :
-          '<tr class="total"><td>Less pensions</td><td class="amt neg">\u2212' + fmt(pens) + '</td></tr>') +
-        '<tr class="total"><td>Less credit card' + ((card && card.lines && card.lines.length) ? ' (' + card.lines.map(l => esc(l.label)).join(', ') + ')' : '') + '</td><td class="amt neg">\u2212' + fmt(cardT) + '</td></tr>' +
-        '<tr class="avail"><td>Total cash available ' + (isAnnual() ? '(annual)' : 'in ' + monthLabelShort()) + '</td><td class="amt">' + fmt(totalCash) + '</td></tr>' +
+        (many ? '<tr><td colspan="2" class="subtitle">Money in</td></tr>' : '') +
+        incRows +
+        '<tr class="total"><td>Total income</td><td class="amt">' + fmt(totalIncome) + '</td></tr>' +
+        '<tr><td colspan="2" class="subtitle" style="padding-top:8px;">Money out</td></tr>' +
+        billRows +
+        '<tr class="total"><td>Total bills</td>' + neg(totalBills) + '</tr>' +
+        (Math.round(pens * 100) === 0 ? '' : '<tr><td>Pensions</td>' + neg(pens) + '</tr>') +
+        '<tr><td>Credit card' + cardNames + '</td>' + neg(cardT) + '</tr>' +
+        '<tr class="total"><td>Total out</td>' + neg(outgo) + '</tr>' +
+        '<tr class="avail"><td>Cash available ' + (isAnnual() ? '(annual)' : 'in ' + monthLabelShort()) + '</td><td class="amt">' + fmt(totalCash) + '</td></tr>' +
         avgRow +
+        byPerson +
       '</tbody></table>' +
     '</div>';
   }
