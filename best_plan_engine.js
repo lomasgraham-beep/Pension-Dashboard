@@ -1,6 +1,6 @@
 /* ============================================================
    best_plan_engine.js — Intelligent Modelling sandbox controller
-   build: bpe1 / target app build LC-326
+   build: bpe7 / target app build LC-521
 
    Uses the existing PensionEngine as the single source of pension maths.
    It never mutates the main Modelling page state and never writes to Supabase.
@@ -8,7 +8,7 @@
 (function (global) {
   'use strict';
 
-  const BUILD = 'bpe1';
+  const BUILD = 'bpe7';
   const ANN_NAME = 'Best Plan Finder Annuity';
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -47,7 +47,13 @@
     if (!global.App || !App.rest) throw new Error('App helpers are not loaded.');
     if (!global.PensionEngine) throw new Error('PensionEngine is not loaded.');
     const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases, crashes, savingsAccounts, contributionExceptions, workingTiers, incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings] = await Promise.all([
-      App.rest('bd_members'), App.rest('bd_household_bills'), App.rest('bd_dining_habits'),
+      // bpe7: bills MUST go through applyActualCosts, exactly as app.html and every other engine
+      // caller does. Without it this page ran a hybrid cost base — planned bills for every ordinary
+      // category, but ACTUAL dining / holidays / fuel (those arrive via resolveDiscretionary below,
+      // which was already wired). Any category ticked on the Actual Costs page was silently ignored
+      // here and only here, so Best Plan, MSS and Earliest Retirement Age were answered against a
+      // household cost the main dashboard never shows.
+      App.rest('bd_members'), App.rest('bd_household_bills').then(App.applyActualCosts), App.rest('bd_dining_habits'),
       App.rest('bd_guaranteed_incomes'), App.rest('bd_pensions'),
       App.rest('bd_pension_contributions'), App.rest('op_pension_logs?order=log_date.desc'),
       App.rest('bd_purchases?order=purchase_date.asc'),
