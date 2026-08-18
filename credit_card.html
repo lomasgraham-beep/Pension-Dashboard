@@ -94,7 +94,11 @@
     // Label by CODE, matching the card pages.
     (billCats || []).forEach(c => { catLabel[c.code] = c.code; });
 
-    const mine = (bills || []).filter(b => b.paid_by === 'Credit card');
+    // Xmas and Birthdays are not card bills: they come from bd_gift_savings and are saved monthly
+    // into a savings account. Five other surfaces and the engine already drop any bill row still
+    // carrying those codes; this page did not, so legacy gift rows showed here as card spending.
+    const IS_GIFT = c => /^(xmas|christmas|birthdays?)$/i.test(String(c || '').trim());
+    const mine = (bills || []).filter(b => b.paid_by === 'Credit card' && !IS_GIFT(b.category_code));
     const byCat = {};
     let total = 0;
     mine.forEach(b => {

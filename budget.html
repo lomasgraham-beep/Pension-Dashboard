@@ -391,7 +391,13 @@
       // helper rewrites the matching bill rows to a smoothed monthly actual, so Budget needs no
       // per-category code at all: the account boxes, the Credit Card box and the bills total all
       // read the rewritten rows through the normal billView path. The v49 Julie special case is gone.
-      const billsEff = await App.applyActualCosts(bills || []);
+      // Xmas and Birthdays come from bd_gift_savings (Gift Savings page) and are drawn below as a
+      // monthly set-aside against the savings account. Any bill row still carrying one of those
+      // codes is a legacy leftover from before that page existed: bills.html, bills_summary.html,
+      // house_overview.html, save_forecast.html and engine.js all drop them, this page did not, and
+      // the whole gift budget was landing in the Credit Card box on top of the set-aside.
+      const IS_GIFT = c => /^(xmas|christmas|birthdays?)$/i.test(String(c || '').trim());
+      const billsEff = (await App.applyActualCosts(bills || [])).filter(b => !IS_GIFT(b.category_code));
       let holidayFundingAcct = null;
       const potId = holSettings.savings_account ? String(holSettings.savings_account).trim() : '';
       if (potId) {
