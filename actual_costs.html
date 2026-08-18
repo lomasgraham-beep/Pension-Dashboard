@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Actual Costs</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=act4"></script>
+<script src="common.js?v=act5"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:1500px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin-bottom:2px; }
@@ -84,6 +84,7 @@
 
 <script>
   let rows = [], cats = [], planner = {}, members = [], accounts = [], deleted = [], endMonth = null;
+  let billHint = {};   // category_code -> the settings its bill rows carry, shown as a hint only
 
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const escA = s => esc(s).replace(/"/g, '&quot;');
@@ -129,9 +130,15 @@
       const monthly = Math.round(net / 12 * 100) / 100;
       // Evidence first: a category with no transactions behind it must not look like a real figure.
       let spend;
+      const mc = Number(r.months_covered) || 0;
       if (!r.txn_count) spend = '<span class="warn">no card spend</span>';
       else spend = '<span class="big">' + fmt(r.annual) + '</span> <span class="muted">\u00b7 ' + r.txn_count
-                 + (r.txn_count === 1 ? ' txn' : ' txns') + '</span>';
+                 + (r.txn_count === 1 ? ' txn' : ' txns') + ' in ' + mc + ' of 12 months</span>';
+      // A transaction count alone hides thin coverage: thirty charges inside one month look
+      // healthy and divide by twelve into a twelfth of the real annual cost. Under six months of
+      // spread the figure is not an annual total, so the row says so before it is trusted.
+      if (r.txn_count && mc < 6) spend += '<div class="warn">only ' + mc +
+        ' of 12 months have spend \u2014 this is unlikely to be a full year</div>';
       // Show the arithmetic when an adjust is set, so the figure the model uses is never a number
       // that appears from nowhere next to a card total it doesn't match.
       if (adj) spend += '<div class="net">' + (adj > 0 ? '+' : '\u2212') + fmt(Math.abs(adj))
@@ -142,9 +149,24 @@
       if (r.active && net <= 0) spend += '<div class="warn">'
         + (r.is_planner ? 'actual would show \u00a30 \u2014 the planner figure is not used while this is ticked'
                         : 'override would show \u00a30') + '</div>';
+      // What the category's bill rows say, when it differs from what this row is set to. Not
+      // applied, just stated — the two can legitimately disagree, and the disagreement is the
+      // thing worth seeing.
+      let hint = '';
+      const bh = r.is_planner ? null : billHint[r.category_code];
+      if (bh && bh.n) {
+        const cur = { red: !!r.spend_reduction,
+                      t70: r.taper_at_70 != null ? Number(r.taper_at_70) : 1,
+                      t80: r.taper_at_80 != null ? Number(r.taper_at_80) : 1,
+                      t90: r.taper_at_90 != null ? Number(r.taper_at_90) : 1 };
+        if (bh.red !== cur.red || bh.t70 !== cur.t70 || bh.t80 !== cur.t80 || bh.t90 !== cur.t90) {
+          hint = '<div class="muted" style="margin-top:4px;">Its ' + bh.n + (bh.n === 1 ? ' bill says' : ' bills say') +
+                 ' reduce ' + (bh.red ? 'yes' : 'no') + ', taper ' + bh.t70 + ' / ' + bh.t80 + ' / ' + bh.t90 + '</div>';
+        }
+      }
       return '<tr data-i="' + i + '">' +
         '<td><strong>' + esc(r.category_code) + '</strong>' + (r.is_planner ? '<span class="plab">planner</span>' : '') +
-          '<div class="muted">' + esc(r.description) + '</div></td>' +
+          '<div class="muted">' + esc(r.description) + '</div>' + hint + '</td>' +
         // A planner-backed domain is not a bill: it never lands in an account box or the Credit
         // Card box as a bill row, so a payer here would be a control that does nothing.
         '<td>' + (r.is_planner ? '<span class="dash">\u2014</span>'
@@ -263,6 +285,18 @@
 
   async function saveAll() {
     harvest();
+    // A ticked row with nothing behind it does not leave the category at its planned figure — it
+    // REPLACES those bills with zero, right through the budget and the retirement projection, and
+    // says nothing. The screen has warned about it since v4 but nothing stopped it being saved.
+    // An adjust alone is a legitimate basis for a row, so the test is the net, not the count.
+    const empty = rows.filter(r => r.active && Math.max(0, (Number(r.annual) || 0) + (Number(r.adjust) || 0)) <= 0);
+    if (empty.length) {
+      setStatus('Cannot save: ' + empty.map(r => r.category_code).join(', ') +
+        (empty.length === 1 ? ' is ticked' : ' are ticked') +
+        ' with no card spend and no adjust, which would model ' +
+        (empty.length === 1 ? 'it' : 'them') + ' as \u00a30. Untick, or set an adjust.', 'err');
+      return;
+    }
     try {
       setStatus('Saving\u2026');
       for (const id of deleted) await App.deleteActualCost(id);
@@ -282,10 +316,25 @@
       cats = data.cats || [];
       planner = data.planner || {};
       endMonth = data.endMonth;
-      const [mem, acc] = await Promise.all([
+      const [mem, acc, blls] = await Promise.all([
         App.rest('bd_members?order=name.asc'),
-        App.rest('bd_bank_account?order=account_id.asc')
+        App.rest('bd_bank_account?order=account_id.asc'),
+        // Ticking a category swaps its bill rows for one synthetic row carrying THIS row's slider
+        // and taper settings, so whatever the bills said stops applying the moment it goes active.
+        // Read back deliberately as a hint rather than prefilled: a hand-keyed taper here is often
+        // the better judgement, and silently overwriting it would be worse than saying nothing.
+        App.rest('bd_household_bills?select=category_code,spend_reduction,taper_at_70,taper_at_80,taper_at_90')
       ]);
+      billHint = {};
+      (blls || []).forEach(function (b) {
+        const c = b.category_code; if (!c) return;
+        const h = billHint[c] || (billHint[c] = { red: false, t70: 1, t80: 1, t90: 1, n: 0 });
+        h.n += 1;
+        if (b.spend_reduction) h.red = true;
+        h.t70 = Math.min(h.t70, b.taper_at_70 != null ? Number(b.taper_at_70) : 1);
+        h.t80 = Math.min(h.t80, b.taper_at_80 != null ? Number(b.taper_at_80) : 1);
+        h.t90 = Math.min(h.t90, b.taper_at_90 != null ? Number(b.taper_at_90) : 1);
+      });
       members = (mem || []).map(m => m.name).filter(Boolean);
       accounts = (acc || []).map(a => a.account_id).filter(Boolean);
       const w = document.getElementById('winNote');

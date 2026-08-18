@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fuel Costs</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=act4"></script>
+<script src="common.js?v=act5"></script>
 <style>
   body { font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; margin:0 auto; max-width:720px; padding:20px; background:#f4f7f6; color:#333; font-size:16px; }
   h1 { color:#2c3e50; margin-bottom:2px; }
@@ -74,6 +74,7 @@
       <input type="date" id="workEnds">
     </div>
     <p class="fuel-note">Leave blank if commuting never stops in the model. <span id="workEg"></span></p>
+    <p class="fuel-note" id="shareEg"></p>
   </div>
 
   <div class="panel" id="taperPanel" style="display:none;">
@@ -108,6 +109,9 @@
   const PHASE = 'retired';
   let settings = null;     // bd_fuel_settings single row
   let standing = [];       // bd_fuel_line rows with week_no IS NULL
+  let weekLines = [];      // act5: retired rows keyed to a single week, read-only here, used
+                           // only so the work share reflects the whole plan and not just the
+                           // standing lines this page edits
   let deleted = [];        // ids to remove on save
   let ctx = null;
 
@@ -120,12 +124,16 @@
   async function load() {
     const status = document.getElementById('status');
     try {
-      const [sRows, lRows] = await Promise.all([
+      const [sRows, lRows, aRows] = await Promise.all([
         App.rest('bd_fuel_settings?id=eq.1'),
-        App.rest('bd_fuel_line?week_no=is.null&order=sort_order.asc')
+        App.rest('bd_fuel_line?week_no=is.null&order=sort_order.asc'),
+        // act5: every retired line, standing AND week-specific, so the work share shown below is
+        // the real one the engine uses rather than the standing-only slice this page manages.
+        App.rest('bd_fuel_line?phase=eq.retired&order=sort_order.asc')
       ]);
       settings = (sRows && sRows[0]) || { id: 1, price_per_litre: 1.63, mpg_normal: 40, mpg_towing: 27, taper_at_70: 1, taper_at_80: 1, taper_at_90: 1, work_ends_on: null };
       standing = (lRows || []).filter(l => (l.phase || 'retired') === PHASE);
+      weekLines = (aRows || []).filter(l => l.week_no != null);
       deleted = [];
       ['ratePanel', 'workPanel', 'taperPanel', 'standingPanel', 'savePanel'].forEach(id => document.getElementById(id).style.display = 'block');
       status.style.display = 'none';
@@ -156,8 +164,13 @@
     });
   }
 
+  // act5: display labels only. The value written to bd_fuel_line.purpose is unchanged, so no
+  // migration is needed and App.FUEL_WORK still matches. 'Work' is spelled out because its
+  // consequence — the only purpose that stops at a date — was not obvious from the word alone.
+  const PURPOSE_LABEL = { 'Work': 'Work \u2014 stops at retirement' };
   function purposeOptions(sel) {
-    return App.FUEL_PURPOSES.map(p => '<option value="' + p + '"' + (sel === p ? ' selected' : '') + '>' + p + '</option>').join('');
+    return App.FUEL_PURPOSES.map(p => '<option value="' + p + '"' + (sel === p ? ' selected' : '') + '>' +
+      (PURPOSE_LABEL[p] || p) + '</option>').join('');
   }
 
   function render() {
@@ -180,6 +193,23 @@
     }
     updateRateEg();
     updateWorkEg();
+    updateShareEg();
+  }
+
+  // act5: the work share was invisible and it decides a great deal. When Fuel is on the actual
+  // basis the engine takes ONE number off the card and has no way of knowing which part of it was
+  // commuting, so it copies the proportions out of this plan. A stray Work line here therefore
+  // deletes real money from the retirement projection, silently. Now it says so.
+  function updateShareEg() {
+    const el = document.getElementById('shareEg');
+    if (!el) return;
+    const all = weekLines.concat(standing);
+    const a = App.fuelAnnual(all, ctx);
+    if (!a.total) { el.textContent = 'No driving planned yet, so none of your fuel is treated as commuting.'; return; }
+    const pct = Math.round((a.workAnnual / a.total) * 1000) / 10;
+    el.textContent = 'This plan is ' + pct + '% commuting (' + fmt(a.workAnnual) + ' of ' + fmt(a.total) +
+      ' a year). When Fuel is set to actual costs, that same ' + pct + '% of your real card spend is the part that stops; the other ' +
+      (Math.round((100 - pct) * 10) / 10) + '% runs for life.';
   }
 
   function updateRateEg() {
@@ -208,7 +238,11 @@
   }
 
   function addLine() {
-    standing.push({ id: null, phase: PHASE, week_no: null, purpose: 'Work', miles: 0, towing: false, sort_order: standing.length, _dirty: true });
+    // act5: new lines default to 'Out and about', NOT 'Work'. The old default silently created
+    // commuting in a RETIREMENT plan, and because the work share is what decides how much of
+    // your real fuel spend stops at retirement, one unedited line could halve the fuel the
+    // model carries forward. Work is now something you choose deliberately.
+    standing.push({ id: null, phase: PHASE, week_no: null, purpose: 'Out and about', miles: 0, towing: false, sort_order: standing.length, _dirty: true });
     render();
   }
 

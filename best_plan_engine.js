@@ -1,6 +1,6 @@
 /* ============================================================
    best_plan_engine.js — Intelligent Modelling sandbox controller
-   build: bpe7 / target app build LC-521
+   build: bpe8 / target app build LC-522
 
    Uses the existing PensionEngine as the single source of pension maths.
    It never mutates the main Modelling page state and never writes to Supabase.
@@ -8,7 +8,7 @@
 (function (global) {
   'use strict';
 
-  const BUILD = 'bpe7';
+  const BUILD = 'bpe8';
   const ANN_NAME = 'Best Plan Finder Annuity';
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -43,10 +43,31 @@
     return out;
   }
 
+  // bpe8: identical in behaviour to the copy in app.html. A schedule row dated in the future is
+  // turned into a contribution override starting on that date; current and past rows are ignored
+  // because the live contribution mirror already carries them.
+  function expandFutureSteps(schedule) {
+    const now = new Date();
+    const nowIdx = now.getFullYear() * 12 + now.getMonth();
+    const out = [];
+    (schedule || []).forEach(e => {
+      const d = new Date(e.effective_from); if (isNaN(d)) return;
+      const idx = d.getFullYear() * 12 + d.getMonth();
+      if (idx <= nowIdx) return;
+      out.push({
+        member_name: e.member_name, pension_name: e.pension_name,
+        start_date: e.effective_from, end_date: null,
+        contribution_value: Number(e.monthly_value) || 0, one_off: false
+      });
+    });
+    out.sort((a, b) => String(a.start_date).localeCompare(String(b.start_date)));
+    return out;
+  }
+
   async function loadState() {
     if (!global.App || !App.rest) throw new Error('App helpers are not loaded.');
     if (!global.PensionEngine) throw new Error('PensionEngine is not loaded.');
-    const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases, crashes, savingsAccounts, contributionExceptions, workingTiers, incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings] = await Promise.all([
+    const [members, bills, dining, guaranteed, pensions, contributions, logs, purchases, crashes, savingsAccounts, contributionExceptions, workingTiers, incomeSources, incomeAmounts, diningRota, mealCost, annuities, holidayPlan, holidayCost, holidaySettings, diningSettings, contributionSchedule] = await Promise.all([
       // bpe7: bills MUST go through applyActualCosts, exactly as app.html and every other engine
       // caller does. Without it this page ran a hybrid cost base — planned bills for every ordinary
       // category, but ACTUAL dining / holidays / fuel (those arrive via resolveDiscretionary below,
@@ -68,7 +89,15 @@
       App.rest('bd_annuities?order=purchase_date.asc'),
       App.rest('bd_holiday_plan?phase=eq.retired&order=week_no.asc'),
       App.rest('bd_holiday_cost'),
-      App.rest('bd_holiday_settings?id=eq.1')
+      App.rest('bd_holiday_settings?id=eq.1'),
+      // bpe8: two more things app.html sends the engine and this page did not.
+      // bd_dining_settings carries the dining age taper; without it the engine defaults to 1.0 and
+      // dining never reduces with age here, so late-life costs ran high and Earliest Retirement Age
+      // ran late. bd_contribution_schedule holds future-dated contribution changes, which app.html
+      // expands into engine overrides — unexpanded, any contribution change dated ahead simply
+      // never happened in this page's world.
+      App.rest('bd_dining_settings?id=eq.1'),
+      App.rest('bd_contribution_schedule?order=effective_from.asc')
     ]);
     const mealCostMap = {};
     (mealCost || []).forEach(c => { mealCostMap[c.meal_type + '|' + c.level] = Number(c.cost) || 0; });
@@ -83,7 +112,11 @@
     const diningAnnual = _eff.diningAnnual, holidayAnnual = _eff.holidayAnnual;
     const fuelDiscAnnual = _eff.fuelAnnual, fuelWorkAnnual = _eff.fuelWorkAnnual;
     let giftRows = []; try { giftRows = await App.rest('bd_gift_savings?order=gift_type.asc,sort_order.asc,id.asc') || []; } catch (e) { giftRows = []; }
-    const data = { members, bills, gifts: giftRows, dining, diningAnnual, holidayAnnual, fuelAnnual: fuelDiscAnnual, fuelWorkAnnual: fuelWorkAnnual, fuelTaper: _fuel.taper, fuelWorkEndDate: _fuel.workEndsOn, guaranteed, pensions, contributions, logs, purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: contributionExceptions || [], workingTiers: workingTiers || [], incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
+    const _hs = (holidaySettings && holidaySettings[0]) || {};
+    const _ds = (diningSettings && diningSettings[0]) || {};
+    const holidayTaper = { taper_at_70: _hs.taper_at_70, taper_at_80: _hs.taper_at_80, taper_at_90: _hs.taper_at_90 };
+    const diningTaper = { taper_at_70: _ds.taper_at_70, taper_at_80: _ds.taper_at_80, taper_at_90: _ds.taper_at_90 };
+    const data = { members, bills, gifts: giftRows, dining, diningAnnual, holidayAnnual, holidayTaper: holidayTaper, diningTaper: diningTaper, fuelAnnual: fuelDiscAnnual, fuelWorkAnnual: fuelWorkAnnual, fuelTaper: _fuel.taper, fuelWorkEndDate: _fuel.workEndsOn, guaranteed, pensions, contributions, logs, purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: expandFutureSteps(contributionSchedule).concat(contributionExceptions || []), contributionRateHistory: contributionSchedule || [], workingTiers: workingTiers || [], incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
     const sortedM = (members || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const p1Name = sortedM[0] ? sortedM[0].name : 'Graham';
     const p2Name = sortedM[1] ? sortedM[1].name : null;

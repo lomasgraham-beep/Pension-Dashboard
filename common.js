@@ -324,7 +324,24 @@
     (txns || []).forEach(function (t) { const ym = String(t.txn_date || '').slice(0, 7); if (ym) present[ym] = true; });
     const keys = Object.keys(present).sort();
     if (!keys.length) return { byCode: {}, endMonth: null, months: 12 };
-    const end = keys[keys.length - 1];
+    // act5: the window ends at the last FULLY ELAPSED month, never at a part-finished one.
+    //
+    // It used to end at the month of the newest transaction. That month is normally the current
+    // one and normally only a few days old, so eleven complete months plus a handful of days were
+    // being presented as a full year — every actual category ran light, by up to 8%. Worse, the
+    // size of the shortfall depended on how recently the statements were imported, so the same
+    // database gave a different household cost on the 3rd than on the 28th and the projection was
+    // not reproducible month to month.
+    //
+    // Taking the LOWER of (newest transaction month, previous calendar month) fixes both without
+    // losing the behaviour that already tested sound: stop importing for a few months and the
+    // window still slides backwards with the data rather than filling up with empty months.
+    const now = new Date();
+    let cy = now.getFullYear(), cm = now.getMonth();       // getMonth() is 0-based, so this IS last month
+    if (cm === 0) { cm = 12; cy -= 1; }
+    const lastComplete = cy + '-' + ('0' + cm).slice(-2);
+    const newest = keys[keys.length - 1];
+    const end = newest < lastComplete ? newest : lastComplete;
     const ey = Number(end.slice(0, 4)), em = Number(end.slice(5, 7));
     const wanted = {};
     for (let i = 11; i >= 0; i--) { let mm = em - i, yy = ey; while (mm <= 0) { mm += 12; yy -= 1; } wanted[yy + '-' + ('0' + mm).slice(-2)] = true; }
@@ -334,10 +351,17 @@
       if (!wanted[ym]) return;
       const code = t.category_code;
       if (!code || sets.reimburse[code]) return;
-      const e = byCode[code] || (byCode[code] = { total: 0, count: 0 });
-      e.total += Number(t.amount) || 0; e.count += 1;
+      const e = byCode[code] || (byCode[code] = { total: 0, count: 0, _m: {} });
+      e.total += Number(t.amount) || 0; e.count += 1; e._m[ym] = true;
     });
-    Object.keys(byCode).forEach(function (k) { byCode[k].total = Math.round(byCode[k].total * 100) / 100; });
+    // act5: how many of the twelve months a code actually appears in. A transaction count alone
+    // cannot tell a full year of shopping from thirty charges in one week, and dividing the latter
+    // by twelve states a twelfth of the truth as an annual cost.
+    Object.keys(byCode).forEach(function (k) {
+      byCode[k].total = Math.round(byCode[k].total * 100) / 100;
+      byCode[k].months = Object.keys(byCode[k]._m).length;
+      delete byCode[k]._m;
+    });
     return { byCode: byCode, endMonth: end, months: 12 };
   }
   // sum the 12-month actual across every code in a set (dining / holiday / fuel are each one code
@@ -491,6 +515,7 @@
           net_annual: Math.round(net * 100) / 100,
           monthly: Math.round(net / 12 * 100) / 100,
           txn_count: e ? e.count : 0,
+          months_covered: e ? (e.months || 0) : 0,
           is_planner: !!a.planner[r.category_code]
         });
       })
