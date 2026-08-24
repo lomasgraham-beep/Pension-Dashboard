@@ -136,7 +136,7 @@
   </div>
   <div id="pageInfo" class="info-panel" hidden>
     <p>Per-person budget for the period you're viewing: net income in, the bills that leave each account, and what's left. Use the <b>Monthly / Annual</b> toggle to switch between the viewed month and the whole-year total; in monthly view, step to next month or jump ahead, and the muted <em>avg</em> figure is the smoothed 12-month monthly cost. PayPal shows as one line in the account it draws from; pensions are gathered into their own block and taken off once at the end. The working-days chip at the top of each person&rsquo;s card is read-only and follows the schedule in Basic Data against the month you&rsquo;re viewing &mdash; so a 3-day week starting in September shows 5-day in August and 3-day from September, and salary and pension contributions switch with it. Figures are shown in the money of the year you're viewing: bills, income, insurances and savings set-asides grow with inflation (2.5%/yr), stepping once each January rather than creeping every month, so amounts hold steady across a year. Pension contributions and loan payments follow their own dated schedules and are not inflated on top. The Credit Card box is <b>category-driven</b>: every bill paid by Credit card, grouped by its category &mdash; Groceries, Dogs, Julie&rsquo;s Hair &amp; Nails, and anything else you put on the card &mdash; plus Fuel. The whole of it is deducted in the Cash Summary, so nothing on the card can be shown here and quietly left out of the total. The <b>Cash Summary</b> spells the calculation out in the order it happens &mdash; each person&rsquo;s income and the household total, then each person&rsquo;s bills, the bills total, pensions and the card, the total out, and what is left. Any category can be switched from its planned bill rows to <b>real card spend</b> on the <b>Actual Costs</b> page: its rows are replaced by a smoothed 12-month actual and the line is marked <em>actual</em>. Dining, Holidays and Fuel live on that page too, tagged <em>planner</em>, and each is independent &mdash; Dining can run on actuals while Holidays stays on plan. Fuel keeps its work / other split, apportioned by the plan&rsquo;s own ratio, because card spend cannot tell commuting from leisure. The old single Plan / Actual switch on the Weekly Plan page no longer exists. Xmas and Birthdays are not on the card here &mdash; they are saved monthly into a savings account (age-tapered gift values, inflated 0.5%/yr, managed on the Gift Savings page) and appear as a <em>Gift savings</em> set-aside against that account&rsquo;s paying account, smoothing the December peak. Insurances are listed in the fourth column. Loans show as a line in the account they&rsquo;re paid from, and the <b>Loans</b> card lists what is still owed on each &mdash; the balance outstanding at the start of the viewed month and how many payments remain, counting that month. Settled loans drop off the card.</p>
-    <span class="info-build">Budget build: v53</span>
+    <span class="info-build">Budget build: v54</span>
   </div>
   <div id="status">Loading&hellip;</div>
   <div id="nav" class="navbar" style="display:none;">
@@ -474,11 +474,14 @@
     const leftovers = (d.bills || []).filter((b, i) =>
       !shown[i] && b.paid_by !== 'Credit card' && !meta.isPot[(b.paid_account || '').trim()]);
     if (leftovers.length) {
-      let rows = '', tot = 0;
+      const lines = [];   // v54: sorted by value like every other card in column four
+      let tot = 0;
       leftovers.forEach(b => {
         const m = billView(b); if (m <= 0) return; tot += m;
-        rows += '<tr><td>' + esc(b.bill_name || '\u2014') + ' <span class="muted">(' + esc(b.paid_account || 'no account') + ')</span></td><td class="amt">' + fmt(m) + '</td></tr>';
+        lines.push({ amt: m, html: '<tr><td>' + esc(b.bill_name || '\u2014') + ' <span class="muted">(' + esc(b.paid_account || 'no account') + ')</span></td><td class="amt">' + fmt(m) + '</td></tr>' });
       });
+      lines.sort((x, y) => y.amt - x.amt);
+      const rows = lines.map(l => l.html).join('');
       if (rows) leftoverHtml =
         '<div class="panelcard">' +
           '<div class="blocktitle">Unassigned bills</div>' +
@@ -548,7 +551,12 @@
     const giftMap = giftFundingMap(d);   // paying account -> smoothed monthly gift set-aside (pre period/inflation)
     held.forEach(a => {
       const acctId = a.account_id;
-      let rows = '', boxTotal = 0, boxAvg = 0, paypalSum = 0, paypalAvg = 0;
+      // v54: every line in the box is collected as { amt, html } and sorted by value on the way
+      // out, largest first. It used to be a string built in whatever order the code happened to
+      // add things — bills alphabetically (the fetch is ordered bill_name.asc), then PayPal, then
+      // the savings set-asides, then loans — so a £4 subscription could sit above a £400 mortgage.
+      const lines = [];
+      let boxTotal = 0, boxAvg = 0, paypalSum = 0, paypalAvg = 0;
       // bills paid from this account (any payer except Credit card)
       (d.bills || []).forEach((b, i) => {
         if ((b.paid_account || '').trim() !== acctId) return;
@@ -558,11 +566,11 @@
         const av = billViewAvg(b);                          // smoothed average for the current view
         if (b.paid_by === 'PayPal') { paypalSum += m; paypalAvg += av; return; }   // collapse PayPal into one line
         boxAvg += av;
-        if (m > 0) { boxTotal += m; rows += '<tr><td>' + esc(b.bill_name || '\u2014') + '</td><td class="amt">' + fmt(m) + '</td></tr>'; }
+        if (m > 0) { boxTotal += m; lines.push({ amt: m, html: '<tr><td>' + esc(b.bill_name || '\u2014') + '</td><td class="amt">' + fmt(m) + '</td></tr>' }); }
       });
       // PayPal drawn from this account, shown as one connected line (counts in the total)
       if (paypalSum > 0) {
-        rows += '<tr class="pot-line"><td>PayPal</td><td class="amt">' + fmt(paypalSum) + '</td></tr>';
+        lines.push({ amt: paypalSum, html: '<tr class="pot-line"><td>PayPal</td><td class="amt">' + fmt(paypalSum) + '</td></tr>' });
         boxTotal += paypalSum;
       }
       boxAvg += paypalAvg;
@@ -570,7 +578,7 @@
       const pots = meta.fundingToPots[acctId] || [];
       const potSum = pots.reduce((s, pid) => s + (meta.potMonthly[pid] || 0), 0) * periodScale() * inflFactor();
       if (potSum > 0) {
-        rows += '<tr class="pot-line"><td>Insurance/car savings</td><td class="amt">' + fmt(potSum) + '</td></tr>';
+        lines.push({ amt: potSum, html: '<tr class="pot-line"><td>Insurance/car savings</td><td class="amt">' + fmt(potSum) + '</td></tr>' });
         boxTotal += potSum; boxAvg += potSum;
       }
       // savings set-asides against this pot's funding account.
@@ -579,15 +587,15 @@
       const sharePot = d.holidayPotId && d.diningPotId && d.holidayPotId === d.diningPotId;
       if (sharePot && acctId === d.holidayFundingAcct && (holV + dinV) > 0) {
         const combined = holV + dinV;
-        rows += '<tr class="pot-line"><td>Dining and Holidays savings</td><td class="amt">' + fmt(combined) + '</td></tr>';
+        lines.push({ amt: combined, html: '<tr class="pot-line"><td>Dining and Holidays savings</td><td class="amt">' + fmt(combined) + '</td></tr>' });
         boxTotal += combined; boxAvg += combined;
       } else {
         if (d.holidayFundingAcct && acctId === d.holidayFundingAcct && holV > 0) {
-          rows += '<tr class="pot-line"><td>Holiday savings</td><td class="amt">' + fmt(holV) + '</td></tr>';
+          lines.push({ amt: holV, html: '<tr class="pot-line"><td>Holiday savings</td><td class="amt">' + fmt(holV) + '</td></tr>' });
           boxTotal += holV; boxAvg += holV;
         }
         if (d.diningFundingAcct && acctId === d.diningFundingAcct && dinV > 0) {
-          rows += '<tr class="pot-line"><td>Dining savings</td><td class="amt">' + fmt(dinV) + '</td></tr>';
+          lines.push({ amt: dinV, html: '<tr class="pot-line"><td>Dining savings</td><td class="amt">' + fmt(dinV) + '</td></tr>' });
           boxTotal += dinV; boxAvg += dinV;
         }
       }
@@ -596,7 +604,7 @@
       // (not the card) carries the cost and flattens the December peak.
       const giftV = (giftMap[acctId] || 0) * periodScale() * giftFactor(viewY);
       if (giftV > 0) {
-        rows += '<tr class="pot-line"><td>Gift savings (Xmas &amp; birthdays)</td><td class="amt">' + fmt(giftV) + '</td></tr>';
+        lines.push({ amt: giftV, html: '<tr class="pot-line"><td>Gift savings (Xmas &amp; birthdays)</td><td class="amt">' + fmt(giftV) + '</td></tr>' });
         boxTotal += giftV; boxAvg += giftV;
       }
       // loans paid from this account — a line per loan, shown while active in the viewed period
@@ -604,10 +612,12 @@
         if (l.account !== acctId) return;
         const m = loanView(l), av = loanViewAvg(l);
         boxAvg += av;
-        if (m > 0) { rows += '<tr class="pot-line"><td>Loan \u00b7 ' + esc(l.name) + '</td><td class="amt">' + fmt(m) + '</td></tr>'; boxTotal += m; }
+        if (m > 0) { lines.push({ amt: m, html: '<tr class="pot-line"><td>Loan \u00b7 ' + esc(l.name) + '</td><td class="amt">' + fmt(m) + '</td></tr>' }); boxTotal += m; }
       });
       totalBillsAvg += boxAvg;     // count the average even if nothing is charged this particular month
-      if (!rows) return;           // nothing actually leaves this account this month → no box
+      if (!lines.length) return;   // nothing actually leaves this account this month → no box
+      lines.sort((x, y) => y.amt - x.amt);
+      const rows = lines.map(l => l.html).join('');
       totalBills += boxTotal;
       const title = esc(a.bank_name ? (a.bank_name + ' \u00b7 ' + acctId) : acctId);
       boxesHtml +=
@@ -666,7 +676,10 @@
   function pensionBlock(d) {
     const heldIds = {};
     (d.bankAccts || []).forEach(a => { if (a.account_id) heldIds[a.account_id] = a.account_holder || ''; });
-    let rows = '', total = 0;
+    // v54: rows are collected and sorted by cost, largest first. The fetch is member_name.asc,
+    // so before this the order was alphabetical by whose pension it was.
+    const lines = [];
+    let total = 0;
     (d.pensContribs || []).forEach(p => {
       const acct = (p.paid_account || '').trim();
       if (!acct || !(acct in heldIds)) return;   // only pensions paid from a known account
@@ -681,8 +694,10 @@
       if (Math.round(costV * 100) === 0) return;
       total += costV;
       const whose = owner ? owner + ' ' : '';
-      rows += '<tr><td>' + esc(whose + (p.pension_name || 'Pension')) + ' <span class="muted">(' + esc(acct) + ')</span></td><td class="amt">' + fmt(costV) + '</td></tr>';
+      lines.push({ amt: costV, html: '<tr><td>' + esc(whose + (p.pension_name || 'Pension')) + ' <span class="muted">(' + esc(acct) + ')</span></td><td class="amt">' + fmt(costV) + '</td></tr>' });
     });
+    lines.sort((x, y) => y.amt - x.amt);
+    const rows = lines.map(l => l.html).join('');
     // Nothing due this period → no panel at all. An empty Pensions card reading £0.00 is a
     // reference to a commitment that isn't there, and the Cash Summary drops its deduction to
     // match, so the two never disagree about whether pensions exist this month.
@@ -704,7 +719,10 @@
   // have not started yet show their full principal and full term.
   function loansBlock(loans) {
     const idx = isAnnual() ? (CUR_Y * 12 + (CUR_M - 1)) : (viewY * 12 + (viewM - 1));
-    let rows = '', totBal = 0, any = false;
+    // v54: ordered by balance outstanding, largest first. The fetch is start_date.asc, so the
+    // order used to be whichever loan was taken out first.
+    const lines = [];
+    let totBal = 0, any = false;
     (loans || []).forEach(l => {
       if (l.firstIdx == null || idx > l.payoffIdx) return;          // settled before this month
       const started = idx >= l.firstIdx;
@@ -713,12 +731,14 @@
       for (let mi = Math.max(idx, l.firstIdx); mi <= l.payoffIdx; mi++) if (l.payByIdx[mi] > 0) left++;
       if (bal <= 0 && left === 0) return;
       any = true; totBal += bal;
-      rows += '<tr><td>' + esc(l.name) +
+      lines.push({ amt: bal, html: '<tr><td>' + esc(l.name) +
                 (started ? '' : ' <span class="muted">(not started)</span>') +
                 '<span class="muted"> \u00b7 ' + left + (left === 1 ? ' payment left' : ' payments left') + '</span></td>' +
-              '<td class="amt">' + fmt(bal) + '</td></tr>';
+              '<td class="amt">' + fmt(bal) + '</td></tr>' });
     });
     if (!any) return '';                                            // no card at all when nothing is owed
+    lines.sort((x, y) => y.amt - x.amt);
+    const rows = lines.map(l => l.html).join('');
     return '<div class="panelcard">' +
       '<div class="blocktitle">Loans</div>' +
       '<div class="subtitle">Outstanding at ' + (isAnnual() ? MABBR[CUR_M - 1] + ' ' + CUR_Y : monthLabelShort()) + '</div>' +
@@ -793,8 +813,10 @@
     const lines = Object.keys(groups).map(code => ({
       label: label[code] || code, amt: groups[code].view, actual: groups[code].actual
     })).filter(l => Math.abs(l.amt) > 0.005);
-    lines.sort((x, y) => y.amt - x.amt);
+    // v54: Fuel is added BEFORE the sort. It used to be pushed after it, which pinned Fuel to the
+    // bottom of the card whatever it cost — the one line in the box not ordered by value.
     if (Math.abs(fuel) > 0.005) lines.push({ label: 'Fuel', amt: fuel, actual: d.fuelIsActual === true });
+    lines.sort((x, y) => y.amt - x.amt);
 
     const billTotal = Object.keys(groups).reduce((t, c) => t + groups[c].view, 0);
     const billAvg = Object.keys(groups).reduce((t, c) => t + groups[c].avg, 0);
