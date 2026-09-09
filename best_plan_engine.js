@@ -1,6 +1,6 @@
 /* ============================================================
    best_plan_engine.js — Intelligent Modelling sandbox controller
-   build: bpe8 / target app build LC-522
+   build: bpe9 / target app build LC-525
 
    Uses the existing PensionEngine as the single source of pension maths.
    It never mutates the main Modelling page state and never writes to Supabase.
@@ -8,7 +8,7 @@
 (function (global) {
   'use strict';
 
-  const BUILD = 'bpe8';
+  const BUILD = 'bpe9';
   const ANN_NAME = 'Best Plan Finder Annuity';
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -43,17 +43,74 @@
     return out;
   }
 
-  // bpe8: identical in behaviour to the copy in app.html. A schedule row dated in the future is
-  // turned into a contribution override starting on that date; current and past rows are ignored
-  // because the live contribution mirror already carries them.
-  function expandFutureSteps(schedule) {
+  // Month index (year*12 + 0-based month) read from the digits of a YYYY-MM-DD string rather than
+  // via new Date(). A bare date string parses as UTC midnight while the engine's month cursor is
+  // LOCAL midnight, so under BST a date on the 1st compares as belonging to the previous month.
+  function schedMonthIdx(s) {
+    const m = /^(\d{4})-(\d{2})/.exec(String(s || ''));
+    return m ? (Number(m[1]) * 12 + Number(m[2]) - 1) : null;
+  }
+  // Working-days tier in force for a member at a month index (latest from_date on or before it).
+  function tierDaysAt(tiers, member, idx) {
+    let best = null, bestIdx = -Infinity;
+    (tiers || []).forEach(t => {
+      if (t.member_name !== member) return;
+      const i = schedMonthIdx(t.from_date);
+      if (i == null || i > idx || i <= bestIdx) return;
+      bestIdx = i; best = Number(t.days);
+    });
+    return best;
+  }
+  // bpe9: bd_pension_contributions is only a MIRROR of the schedule value in force today, written
+  // solely by contributions.html when a schedule row is saved — nothing refreshes it as time passes.
+  // A step therefore goes live on its effective date while the mirror keeps the previous figure, and
+  // expandFutureSteps deliberately skips current/past steps on the assumption the mirror is current.
+  // Re-resolve the mirror in memory so that assumption actually holds. Matches contributions.html's
+  // inForceEntry(): latest step on or before this month whose tier tag is "All" (null) or equal to
+  // the row's own working_days. Returns a NEW array; nothing is written back to Supabase.
+  function resolveContribMirror(contributions, schedule) {
+    const rows = contributions || [];
+    if (!schedule || !schedule.length) return rows.slice();
+    const now = new Date();
+    const nowIdx = now.getFullYear() * 12 + now.getMonth();
+    return rows.map(r => {
+      let best = null, bestIdx = -Infinity;
+      schedule.forEach(e => {
+        if (e.member_name !== r.member_name || e.pension_name !== r.pension_name) return;
+        const wd = e.working_days;
+        if (!(wd == null || wd === '' || (r.working_days != null && Number(wd) === Number(r.working_days)))) return;
+        const i = schedMonthIdx(e.effective_from);
+        if (i == null || i > nowIdx || i <= bestIdx) return;
+        bestIdx = i; best = e;
+      });
+      if (!best) return r;
+      const out = Object.assign({}, r, { monthly_contribution: Number(best.monthly_value) || 0 });
+      if (best.increase_pct != null && best.increase_pct !== '') out.august_increase_pct = Number(best.increase_pct);
+      if (best.increase_month != null) out.increase_month = Number(best.increase_month);
+      if (best.paid_account != null && best.paid_account !== '') out.paid_account = best.paid_account;
+      return out;
+    });
+  }
+
+  // bpe9: identical in behaviour to the copy in app.html. A schedule row dated in the future is
+  // turned into a contribution override starting on that date; current and past rows are supplied
+  // by resolveContribMirror above.
+  // A step tagged for a specific working pattern is only injected when that pattern is the tier
+  // actually in force on its effective date. Without that test a 5-day-tagged (or "All") step would
+  // override a 3-day contribution, because the engine's exceptionFor() matches on member + pension
+  // alone and knows nothing about working_days.
+  function expandFutureSteps(schedule, tiers) {
     const now = new Date();
     const nowIdx = now.getFullYear() * 12 + now.getMonth();
     const out = [];
     (schedule || []).forEach(e => {
-      const d = new Date(e.effective_from); if (isNaN(d)) return;
-      const idx = d.getFullYear() * 12 + d.getMonth();
-      if (idx <= nowIdx) return;
+      const idx = schedMonthIdx(e.effective_from);
+      if (idx == null || idx <= nowIdx) return;
+      const wd = e.working_days;
+      if (!(wd == null || wd === '')) {
+        const days = tierDaysAt(tiers, e.member_name, idx);
+        if (days == null || Number(wd) !== Number(days)) return;
+      }
       out.push({
         member_name: e.member_name, pension_name: e.pension_name,
         start_date: e.effective_from, end_date: null,
@@ -116,7 +173,10 @@
     const _ds = (diningSettings && diningSettings[0]) || {};
     const holidayTaper = { taper_at_70: _hs.taper_at_70, taper_at_80: _hs.taper_at_80, taper_at_90: _hs.taper_at_90 };
     const diningTaper = { taper_at_70: _ds.taper_at_70, taper_at_80: _ds.taper_at_80, taper_at_90: _ds.taper_at_90 };
-    const data = { members, bills, gifts: giftRows, dining, diningAnnual, holidayAnnual, holidayTaper: holidayTaper, diningTaper: diningTaper, fuelAnnual: fuelDiscAnnual, fuelWorkAnnual: fuelWorkAnnual, fuelTaper: _fuel.taper, fuelWorkEndDate: _fuel.workEndsOn, guaranteed, pensions, contributions, logs, purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: expandFutureSteps(contributionSchedule).concat(contributionExceptions || []), contributionRateHistory: contributionSchedule || [], workingTiers: workingTiers || [], incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
+    const _tiers = workingTiers || [];
+    const _sched = contributionSchedule || [];
+    const _liveContribs = resolveContribMirror(contributions || [], _sched);
+    const data = { members, bills, gifts: giftRows, dining, diningAnnual, holidayAnnual, holidayTaper: holidayTaper, diningTaper: diningTaper, fuelAnnual: fuelDiscAnnual, fuelWorkAnnual: fuelWorkAnnual, fuelTaper: _fuel.taper, fuelWorkEndDate: _fuel.workEndsOn, guaranteed, pensions, contributions: _liveContribs, logs, purchases: purchases || [], crashes: crashes || [], savingsAccounts: savingsAccounts || [], contributionExceptions: expandFutureSteps(_sched, _tiers).concat(contributionExceptions || []), contributionRateHistory: _sched, workingTiers: _tiers, incomeSources: incomeSources || [], incomeAmounts: incomeAmounts || [], annuities: annuities || [] };
     const sortedM = (members || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const p1Name = sortedM[0] ? sortedM[0].name : 'Graham';
     const p2Name = sortedM[1] ? sortedM[1].name : null;
