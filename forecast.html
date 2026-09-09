@@ -85,7 +85,8 @@
 <body>
   <div id="status" class="s-load">Loading…</div>
   <h2>Pre-Retirement Monthly Forecast</h2>
-  <p class="note">Projected pot growth to each person's retirement date, computed in your browser from your tiers and contributions. <span style="color:#94a3b8;">(forecast build: sched2)</span></p>
+  <p class="note">Projected pot growth to each person's retirement date, computed in your browser from your tiers and contributions. <span style="color:#94a3b8;">(forecast build: sched3)</span></p>
+  <div id="staleNote" style="display:none; background:#fffbeb; border:1px solid #f59e0b; color:#92400e; padding:10px 12px; border-radius:6px; font-size:13px; margin-bottom:12px;"></div>
   <label style="display:inline-flex; align-items:center; gap:10px; font-size:15px; margin-bottom:12px; cursor:pointer;">
     <input type="checkbox" id="detailToggle" class="toggle-switch" onchange="toggleDetail()"> <span>Show contributions &amp; growth per pot</span>
   </label>
@@ -123,9 +124,25 @@
         p2Name ? App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p2Name) + '&order=updated_at.desc&limit=1') : Promise.resolve([])
       ]);
 
-      const data = { members, pensions, contributions, logs,
-                     contributionExceptions: expandFutureSteps(contribSchedule || []).concat(contributionExceptions || []),
-                     workingTiers: workingTiers || [], crashes: [], savingsAccounts: [] };
+      // bd_pension_contributions is only a MIRROR of the schedule value in force today, and it is
+      // written solely by contributions.html when a schedule row is saved. Nothing refreshes it as
+      // time passes, so a step goes live on its effective date while the mirror keeps the previous
+      // figure. Re-resolve it here, in memory, so the model always reads what is actually in force.
+      const tiers = workingTiers || [];
+      const sched = contribSchedule || [];
+      const rawContribs = contributions || [];
+      const liveContribs = resolveContribMirror(rawContribs, sched, tiers);
+      const stale = [];
+      liveContribs.forEach((r, i) => {
+        const was = Number(rawContribs[i] && rawContribs[i].monthly_contribution) || 0;
+        const now = Number(r.monthly_contribution) || 0;
+        if (was !== now) stale.push({ member: r.member_name, pension: r.pension_name, days: r.working_days, was: was, now: now });
+      });
+      showStaleNote(stale);
+
+      const data = { members, pensions, contributions: liveContribs, logs,
+                     contributionExceptions: expandFutureSteps(sched, tiers).concat(contributionExceptions || []),
+                     workingTiers: tiers, crashes: [], savingsAccounts: [] };
 
       const p = (p1ParamsArr && p1ParamsArr.length) ? p1ParamsArr[0] : {};
       const p2 = (p2ParamsArr && p2ParamsArr.length) ? p2ParamsArr[0] : null;
@@ -150,22 +167,90 @@
     } catch (e) { status.className = 's-err'; status.textContent = 'Could not load: ' + e.message; }
   }
 
+  // Month index (year*12 + 0-based month) from a YYYY-MM-DD string, read from the text rather than
+  // via new Date(). A bare date string parses as UTC midnight while the engine's month cursor is
+  // LOCAL midnight, so under BST a date on the 1st compares as belonging to the previous month.
+  // Reading the digits sidesteps that entirely.
+  function schedMonthIdx(s) {
+    const m = /^(\d{4})-(\d{2})/.exec(String(s || ''));
+    return m ? (Number(m[1]) * 12 + Number(m[2]) - 1) : null;
+  }
+  // Working-days tier in force for a member at a given month index (latest from_date on or before
+  // it), or null when no tier has started yet.
+  function tierDaysAt(tiers, member, idx) {
+    let best = null, bestIdx = -Infinity;
+    (tiers || []).forEach(t => {
+      if (t.member_name !== member) return;
+      const i = schedMonthIdx(t.from_date);
+      if (i == null || i > idx || i <= bestIdx) return;
+      bestIdx = i; best = Number(t.days);
+    });
+    return best;
+  }
+  // bd_pension_contributions is a mirror of the schedule value in force TODAY, refreshed only when
+  // contributions.html saves a schedule row — never by the passage of time. Re-resolve it here so a
+  // step that has already gone live is picked up even if the stored table has not caught up.
+  // Matches contributions.html's inForceEntry(): latest step on or before this month whose tier tag
+  // is either "All" (null) or equal to the row's own working_days. Returns a NEW array.
+  function resolveContribMirror(contributions, schedule, tiers) {
+    const rows = contributions || [];
+    if (!schedule || !schedule.length) return rows.slice();
+    const now = new Date();
+    const nowIdx = now.getFullYear() * 12 + now.getMonth();
+    return rows.map(r => {
+      let best = null, bestIdx = -Infinity;
+      schedule.forEach(e => {
+        if (e.member_name !== r.member_name || e.pension_name !== r.pension_name) return;
+        const wd = e.working_days;
+        if (!(wd == null || wd === '' || (r.working_days != null && Number(wd) === Number(r.working_days)))) return;
+        const i = schedMonthIdx(e.effective_from);
+        if (i == null || i > nowIdx || i <= bestIdx) return;
+        bestIdx = i; best = e;
+      });
+      if (!best) return r;
+      const out = Object.assign({}, r, { monthly_contribution: Number(best.monthly_value) || 0 });
+      if (best.increase_pct != null && best.increase_pct !== '') out.august_increase_pct = Number(best.increase_pct);
+      if (best.increase_month != null) out.increase_month = Number(best.increase_month);
+      if (best.paid_account != null && best.paid_account !== '') out.paid_account = best.paid_account;
+      return out;
+    });
+  }
   // Expand the dated contribution schedule into open-ended engine overrides for steps that begin
-  // AFTER the current month (current/past values already live in bd_pension_contributions). Each
-  // future step becomes a flat override from its date; the engine applies them per month with
+  // AFTER the current month (current and past values are supplied by resolveContribMirror above).
+  // Each future step becomes a flat override from its date; the engine applies them per month with
   // last-start-wins — accurate future-dated changes with no engine change.
-  function expandFutureSteps(schedule) {
+  // A step tagged for a specific working pattern is only injected when that pattern is the tier
+  // actually in force on its effective date; otherwise a 5-day-tagged step would override a 3-day
+  // contribution, because the engine's exceptionFor() matches on member + pension alone.
+  function expandFutureSteps(schedule, tiers) {
     const now = new Date();
     const nowIdx = now.getFullYear() * 12 + now.getMonth();
     const out = [];
     (schedule || []).forEach(e => {
-      const d = new Date(e.effective_from); if (isNaN(d)) return;
-      const idx = d.getFullYear() * 12 + d.getMonth();
-      if (idx <= nowIdx) return;
+      const idx = schedMonthIdx(e.effective_from);
+      if (idx == null || idx <= nowIdx) return;
+      const wd = e.working_days;
+      if (!(wd == null || wd === '')) {
+        const days = tierDaysAt(tiers, e.member_name, idx);
+        if (days == null || Number(wd) !== Number(days)) return;
+      }
       out.push({ member_name: e.member_name, pension_name: e.pension_name, start_date: e.effective_from, end_date: null, contribution_value: Number(e.monthly_value) || 0, one_off: false });
     });
     out.sort((a, b) => String(a.start_date).localeCompare(String(b.start_date)));
     return out;
+  }
+
+  // Tell the user when the stored mirror disagreed with the schedule. The page has already
+  // corrected itself in memory; the stored table still needs a re-sync on the Contributions page,
+  // because pages that do not read the schedule (Budget, Cash, KPIs, Save Forecast) still trust it.
+  function showStaleNote(stale) {
+    const el = document.getElementById('staleNote');
+    if (!el) return;
+    if (!stale || !stale.length) { el.style.display = 'none'; return; }
+    const lines = stale.map(s => `${s.member} · ${s.pension}${s.days != null ? ' (' + s.days + '-day)' : ''}: stored ${fmt(s.was)} → schedule says ${fmt(s.now)}`).join('<br>');
+    el.innerHTML = `<strong>Contribution figures were out of date.</strong> This page has used the schedule instead, so the forecast below is correct.<br><br>${lines}<br><br>`
+                 + `Open <strong>Contributions</strong> and press <strong>Re-sync all</strong> to correct the stored table — other pages still read it.`;
+    el.style.display = '';
   }
 
   const MONTHS_FULL = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
