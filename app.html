@@ -1611,7 +1611,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-527</span>
+      <span class="build-stamp">LC-528</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -4933,7 +4933,48 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     document.addEventListener('input', function (e) { const t = e.target; if (t && t.type === 'range' && t.closest && t.closest('.params')) paintSlider(t); });
     document.addEventListener('DOMContentLoaded', function () { paintRailSliders(); setTimeout(paintRailSliders, 1500); });
 
-    function onParam() { applyDynamicMaxes(); syncLabels(); document.getElementById('m_floors').classList.toggle('show', document.getElementById('m_dynamic').checked); recomputeAll(); paintRailSliders(); }
+    // LC-528 — keep the control you are touching visually still across a redraw.
+    //
+    // The Modelling and Retirement pages put the charts above and the control rail below
+    // (LC-417). Recomputing changes the height of things ABOVE the rail: the custom chart
+    // legend can rewrap, the Market Crashes / Cash Savings / Annuity chart tabs and their
+    // headings show and hide as the scenario changes, and an open "Explain this scenario"
+    // panel rewrites its text. Chrome and Firefox absorb that with native scroll anchoring.
+    // Safari does not implement it at all, so on iPad, iPhone and Mac the page slides under
+    // your finger and the rail walks off the bottom of the screen mid-drag.
+    //
+    // Fix: measure the anchor element's position on screen before the redraw and again
+    // after, then scroll by the difference. Net effect is that the slider stays exactly
+    // where it was and only the content above it moves. Reads are after a forced layout
+    // (getBoundingClientRect), and every render in the chain is synchronous, so one
+    // measurement either side is enough.
+    function withScrollAnchor(anchorEl, fn) {
+      const el = (anchorEl && anchorEl.getBoundingClientRect && document.body.contains(anchorEl))
+        ? anchorEl : null;
+      const before = el ? el.getBoundingClientRect().top : null;
+      try { fn(); } finally {
+        if (el && before != null && document.body.contains(el)) {
+          const delta = el.getBoundingClientRect().top - before;
+          // sub-pixel drift isn't worth a scroll; anything real gets corrected
+          if (Math.abs(delta) > 0.5) window.scrollBy(0, delta);
+        }
+      }
+    }
+
+    function onParam() {
+      // The control that fired is the thing to hold still, but Safari does not focus a
+      // <button> on click, so activeElement is often <body> after a nudge or a segmented
+      // day button. Fall back to the rail card itself: everything that resizes sits above
+      // it, so pinning its top pins every control inside it.
+      const rail = document.getElementById('modelRail');
+      const act = document.activeElement;
+      const anchor = (act && act.closest && act.closest('.params')) ? act : rail;
+      withScrollAnchor(anchor, function () {
+        applyDynamicMaxes(); syncLabels();
+        document.getElementById('m_floors').classList.toggle('show', document.getElementById('m_dynamic').checked);
+        recomputeAll(); paintRailSliders();
+      });
+    }
 
     // wire the segmented day buttons (delegated)
     document.querySelectorAll('.seg').forEach(seg => {
@@ -5453,7 +5494,10 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // The floor box changes only this search — no need to redraw the whole dashboard.
-    function onCFloor() { syncLabels(); ejSchedule(false); }
+    function onCFloor() {
+      const el = document.getElementById('m_cfloor');
+      withScrollAnchor(el, function () { syncLabels(); ejSchedule(false); });
+    }
 
     // ---- Read-only: earliest retirement age (objective 4) ----
     // Holds the current spend/growth/ratio settings, bisects the retirement DATE.
@@ -6773,7 +6817,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-527';
+    if (stamp) stamp.textContent = 'LC-528';
   }
 
   function buildSubnav() {
