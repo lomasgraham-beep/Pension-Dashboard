@@ -1611,7 +1611,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-525</span>
+      <span class="build-stamp">LC-526</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1656,6 +1656,10 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       <div class="ov-head">
         <div class="ttl"><span class="bar4"></span> Current position</div>
         <div class="ov-stamp" id="ovStamp"></div>
+        <!-- LC-526: earliest joint retirement at 100% spend against the combined DC floor.
+             Computed once in the modelling script and parked here as text, so the hero and
+             the framed Overview tile read one source of truth rather than recomputing. -->
+        <span id="ovEarliestJoint" style="display:none;">&mdash;</span><span id="ovEarliestJointSub" style="display:none;"></span>
       </div>
 
       <div class="ov-strip" id="ovStrip" style="display:none;">
@@ -1951,6 +1955,11 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         <div class="ctrl" id="ctrl_retire"><label>Fully retire <span id="m_retire_v" class="sv">—</span></label><input type="range" id="m_retire" min="0" max="120" step="1" value="60" oninput="onParam()"></div>
         <div id="tierSliders" style="display:contents;"></div>
         <div class="ctrl" id="ctrlRatio"><label><span class="nm-p1">Graham</span> drawdown ratio <span id="m_ratio_v" class="sv">50%</span></label><input type="range" id="m_ratio" min="0" max="100" step="1" value="50" oninput="onParam()"></div>
+        <div class="ctrl" id="ctrlCFloor"><label>Combined DC floor <span id="m_cfloor_v" class="sv">&pound;100,000</span>
+            <button type="button" class="info-btn" onclick="toggleInfo(event,'info_cfloor')" aria-label="About the combined DC floor">i</button></label>
+          <input type="number" id="m_cfloor" min="0" step="5000" value="100000" onchange="onCFloor()" style="width:100%; padding:6px 8px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--ink); font-size:13px;">
+          <div class="info-text" id="info_cfloor">The least the <strong>combined</strong> DC pot is allowed to be worth at <em>any</em> month between retiring and end of life &mdash; the bottom of the U, wherever it falls. Feeds the <strong>Earliest both retire</strong> tile on the Overview: that tile searches for the first retirement date whose low point still clears this figure, with spending held at 100%. Saved with your plan.</div>
+          <div class="hint" id="m_cfloor_out">Earliest both retire: &mdash;</div></div>
         </div>
         <div class="rail-col">
         <div class="ctrl phone-hide"><label>Pension growth <span id="m_growth_v" class="sv">5.0%</span>
@@ -4710,8 +4719,17 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         spRate: parseFloat(document.getElementById('m_sprate').value) / 100,
         spDelay: parseInt(document.getElementById('m_spdelay').value) || 0,
         tierDateOverrides: readTierOverrides(),
-        privContrib: readPrivContrib()
+        privContrib: readPrivContrib(),
+        combinedFloor: readCombinedFloor()
       };
+    }
+    // LC-526: the combined DC floor used by the earliest-joint-retirement search.
+    // Blank, negative or non-numeric all fall back to the £100k default rather than 0,
+    // because a 0 floor silently turns the search into "any date that avoids a shortfall".
+    function readCombinedFloor() {
+      const el = document.getElementById('m_cfloor');
+      const v = el ? parseFloat(String(el.value).replace(/[^0-9.\-]/g, '')) : NaN;
+      return (isFinite(v) && v >= 0) ? v : 100000;
     }
     function applyControls(plan) {
       document.getElementById('m_retire').value = dateToIdx(plan.retirementDate);
@@ -4729,6 +4747,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       document.getElementById('m_ratio').value = Math.round(plan.gRatio * 100);
       document.getElementById('m_gfloor').value = Math.round((plan.gFloorPct != null ? plan.gFloorPct : 0.25) * 100);
       document.getElementById('m_jfloor').value = Math.round((plan.jFloorPct != null ? plan.jFloorPct : 0.20) * 100);
+      const cf = document.getElementById('m_cfloor');
+      if (cf) cf.value = (plan.combinedFloor != null ? plan.combinedFloor : 100000);
       // State Pension Risk sliders are what-if only — always reset to baseline (2.5% uprating, 0 delay)
       document.getElementById('m_sprate').value = 2.5;
       document.getElementById('m_spdelay').value = 0;
@@ -4743,6 +4763,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       document.getElementById('m_ratio_v').textContent = document.getElementById('m_ratio').value + '%';
       document.getElementById('m_gfloor_v').textContent = document.getElementById('m_gfloor').value + '%';
       document.getElementById('m_jfloor_v').textContent = document.getElementById('m_jfloor').value + '%';
+      const cfv = document.getElementById('m_cfloor_v');
+      if (cfv) cfv.textContent = '\u00a3' + Math.round(readCombinedFloor()).toLocaleString('en-GB');
       document.getElementById('m_sprate_v').textContent = parseFloat(document.getElementById('m_sprate').value).toFixed(1) + '%';
       const dly = parseInt(document.getElementById('m_spdelay').value) || 0;
       document.getElementById('m_spdelay_v').textContent = dly + (dly === 1 ? ' yr' : ' yrs');
@@ -4919,6 +4941,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         crystallisation_date_graham: c.crystallisationDateGraham || null,
         crystallisation_date_julie: c.crystallisationDateJulie || null,
         ufpls_divert_tf: c.ufplsDivertTf,
+        combined_dc_floor: c.combinedFloor,
         updated_at: new Date().toISOString()
       };
       msg.style.color = '#1e3a8a'; msg.textContent = 'Saving…';
@@ -5194,6 +5217,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       renderOverview();
       renderRetirementTable();
       if (chartsReady) drawCharts();
+      ejSchedule(false);   // LC-526: debounced, and a no-op unless an input that moves it changed
     }
 
     // Keep the earliest-retirement nest-egg slider's ceiling tied to the pot you'd
@@ -5264,6 +5288,153 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       const clampNote = (applied < target) ? ' (slider maximum \u2014 true figure is higher)' : '';
       out.innerHTML += '<div style="margin-top:6px; font-size:12px; color:#475569;">Spending slider set to ' + applied + '%' + clampNote + ' \u2014 the charts now show this scenario (what-if, not saved).</div>';
     }
+
+    // ================================================================================
+    // LC-526 — Earliest joint retirement at 100% spend, combined DC floor
+    // --------------------------------------------------------------------------------
+    // Feeds the "Earliest both retire" tile on the framed Overview. Answers one question:
+    // what is the first month BOTH of you can stop work, with spending held at 100%, such
+    // that the COMBINED DC pot never dips below the floor at any point from that month to
+    // the end of the projection?
+    //
+    // Why this does not call PensionOptimiser.earliestRetirement: that function's floor
+    // test (evaluateEarliest) measures ONE member's pot — g_closing or j_closing, chosen
+    // by opts.who. There is no combined mode, and adding one would be an optimiser.js
+    // change needing sign-off plus an inertness proof. The bisection below is the same
+    // shape, run against r.combinedClosing instead, and touches neither engine nor
+    // optimiser.
+    //
+    // Monotonicity (why bisection is valid) is unchanged from the optimiser's reasoning:
+    // retiring later means a larger pot at retirement, fewer drawing years before state
+    // pension, and a shorter bridge — so the low point only ever rises with the date.
+    //
+    // Everything else (growth, ratio, withdrawal method, dynamic floors, tier overrides,
+    // crashes) comes from the live rail, so the tile tracks the sliders. Only spendRed is
+    // pinned, to 1.0, and retireByMember is cleared so both members share the searched date.
+    let _ejTimer = null, _ejKey = null, _ejRunning = false;
+
+    // Inputs that change the ANSWER. Deliberately excludes the retirement date (that is
+    // what we are solving for) and the spend slider (pinned at 100%), so dragging either
+    // never triggers a re-run.
+    function ejInputKey(plan) {
+      return JSON.stringify([
+        plan.growthRate, plan.gRatio, plan.dynamic, plan.gFloorPct, plan.jFloorPct,
+        plan.savingsFundBills, plan.ufplsDivertTf, plan.retired,
+        plan.withdrawalMethodGraham, plan.withdrawalMethodJulie,
+        plan.crystallisationDateGraham, plan.crystallisationDateJulie,
+        plan.spRate, plan.spDelay, plan.tierDateOverrides, plan.privContrib,
+        plan.combinedFloor
+      ]);
+    }
+
+    // One candidate date: rebuild the cfg exactly as recomputeAll does, run the real
+    // drawdown, and walk the MONTHLY rows from the retirement month onward.
+    function ejTestDate(basePlan, retireDate, floor) {
+      const plan = Object.assign({}, basePlan, {
+        retirementDate: retireDate,
+        retireByMember: null,    // null => engine uses the shared cfg.retirementDate for both
+        spendRed: 1.0            // the "100% spend" part of the question
+      });
+      const cfg = buildDrawdownCfg(plan);
+      const rows = PensionEngine.drawdown(data, cfg) || {};
+      const monthly = rows.monthly || [];
+      const retIdx = retireDate.getFullYear() * 12 + retireDate.getMonth();
+      let minV = null, minIdx = null, anyShortfall = false;
+      for (let i = 0; i < monthly.length; i++) {
+        const r = monthly[i];
+        const idx = r.year * 12 + r.month;
+        if (idx < retIdx) continue;                 // pre-retirement months are not the test
+        if (r.shortfall) anyShortfall = true;
+        const v = Number(r.combinedClosing) || 0;
+        if (minV === null || v < minV) { minV = v; minIdx = idx; }
+      }
+      const floorOK = (minV === null) || (minV >= floor - 1e-6);
+      return { pass: !anyShortfall && floorOK, minV: minV, minIdx: minIdx, anyShortfall: anyShortfall };
+    }
+
+    function ejWrite(value, sub) {
+      const v = document.getElementById('ovEarliestJoint');
+      const s = document.getElementById('ovEarliestJointSub');
+      if (v) v.textContent = value;
+      if (s) s.textContent = sub || '';
+      const rail = document.getElementById('m_cfloor_out');
+      if (rail) rail.textContent = 'Earliest both retire: ' + value + (sub ? ' \u2014 ' + sub : '');
+    }
+
+    // Full search. ~10 drawdown runs (two probes plus a bisection over ~120 months),
+    // which is why this only ever runs debounced off ejSchedule, never inline.
+    function ejCompute() {
+      if (_ejRunning) return;
+      const sld = document.getElementById('m_retire');
+      if (!sld || !window.PensionEngine || !data || !data.members) return;
+      const basePlan = readControls();
+      if (basePlan.retired) { ejWrite('\u2014', 'already retired'); return; }
+
+      const floor = basePlan.combinedFloor;
+      const loIdx = parseInt(sld.min, 10) || 0;
+      const hiIdx = parseInt(sld.max, 10) || 120;
+      if (hiIdx < loIdx) { ejWrite('\u2014', ''); return; }
+
+      const gbpShort = n => {
+        if (n == null) return '\u2014';
+        return (n >= 1000) ? '\u00a3' + Math.round(n / 1000).toLocaleString('en-GB') + 'k'
+                           : '\u00a3' + Math.round(n).toLocaleString('en-GB');
+      };
+      const floorTxt = gbpShort(floor) + ' floor';
+
+      _ejRunning = true;
+      try {
+        const at = idx => ejTestDate(basePlan, idxToDate(idx), floor);
+
+        // Retiring as late as the slider allows is the easiest case. If that fails,
+        // nothing inside the range works.
+        const hiRes = at(hiIdx);
+        if (!hiRes.pass) {
+          ejWrite('Not in range', hiRes.anyShortfall
+            ? 'shortfall even at ' + monthLabel(idxToDate(hiIdx))
+            : 'low ' + gbpShort(hiRes.minV) + ' vs ' + floorTxt);
+          return;
+        }
+
+        let answer = hiIdx, atRangeFloor = false;
+        const loRes = at(loIdx);
+        if (loRes.pass) { answer = loIdx; atRangeFloor = true; }
+        else {
+          let lo = loIdx, hi = hiIdx;            // lo fails, hi passes
+          while (hi - lo > 1) {
+            const mid = Math.floor((lo + hi) / 2);
+            if (at(mid).pass) hi = mid; else lo = mid;
+          }
+          answer = hi;
+        }
+
+        const res = atRangeFloor ? loRes : at(answer);
+        const yr = (res.minIdx != null) ? Math.floor(res.minIdx / 12) : null;
+        let sub = floorTxt + ' \u00b7 low ' + gbpShort(res.minV) + (yr ? ' ' + yr : '');
+        if (atRangeFloor) sub = 'at or before this \u00b7 ' + floorTxt;
+        ejWrite(monthLabel(idxToDate(answer)), sub);
+      } catch (e) {
+        ejWrite('\u2014', 'could not compute');
+      } finally {
+        _ejRunning = false;
+      }
+    }
+
+    // Debounced trigger. Skips entirely when nothing that moves the answer has changed,
+    // so dragging the retirement or spend sliders costs nothing.
+    function ejSchedule(force) {
+      if (!data || !data.members) return;
+      let key;
+      try { key = ejInputKey(readControls()); } catch (e) { return; }
+      if (!force && key === _ejKey) return;
+      _ejKey = key;
+      ejWrite('\u2026', 'recalculating');
+      clearTimeout(_ejTimer);
+      _ejTimer = setTimeout(ejCompute, 600);
+    }
+
+    // The floor box changes only this search — no need to redraw the whole dashboard.
+    function onCFloor() { syncLabels(); ejSchedule(false); }
 
     // ---- Read-only: earliest retirement age (objective 4) ----
     // Holds the current spend/growth/ratio settings, bisects the retirement DATE.
@@ -5352,7 +5523,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front191';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front192';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { HouseOverview:'house_overview.html', Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', ActualCosts:'actual_costs.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', AmazonTxn:'amazon_txn.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', FuelCosts:'fuel_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Contracts:'contracts.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -6054,7 +6225,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
           crystallisationDateGraham: p.crystallisation_date_graham || null,
           crystallisationDateJulie: p.crystallisation_date_julie || null,
           ufplsDivertTf: !!p.ufpls_divert_tf,
-          retired: p.retired_mode != null ? !!p.retired_mode : false
+          retired: p.retired_mode != null ? !!p.retired_mode : false,
+          combinedFloor: p.combined_dc_floor != null ? Number(p.combined_dc_floor) : 100000
         };
 
         // The browser engine is the single source of truth — no server RPC, no calibration.
@@ -6124,7 +6296,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         withdrawal_method_julie: c.withdrawalMethodJulie,
         crystallisation_date_graham: c.crystallisationDateGraham || null,
         crystallisation_date_julie: c.crystallisationDateJulie || null,
-        ufpls_divert_tf: c.ufplsDivertTf
+        ufpls_divert_tf: c.ufplsDivertTf,
+        combined_dc_floor: c.combinedFloor
       };
     }
 
@@ -6581,7 +6754,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-525';
+    if (stamp) stamp.textContent = 'LC-526';
   }
 
   function buildSubnav() {
@@ -6832,7 +7005,10 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       { label:'Target funded',               value:t('mprFundedMount'),    sub:'' },
       { label:'Retirement date',             value:t('mprRetirementDate'), sub:'' },
       { label:'Time remaining',              value:t('ovCountNum'),        sub:t('ovCountSub') },
-      { label:'Minimum projected pot',       value:t('mprMinimumPot'),     sub:t('mprMinimumYear') }
+      { label:'Minimum projected pot',       value:t('mprMinimumPot'),     sub:t('mprMinimumYear') },
+      // LC-526: read straight off the modelling script's own node — there is no mpr* mirror
+      // for this one, the same way 'Time remaining' reads ovCountNum directly.
+      { label:'Earliest joint retirement',   value:t('ovEarliestJoint'),   sub:t('ovEarliestJointSub') }
     ].filter(m => m.value && m.value !== '\u2014' && m.value !== '-');
     if (!metrics.length) return;
     try { frame.contentWindow.postMessage({ type:'mpr-metrics', metrics:metrics }, '*'); } catch (e) {}
@@ -6864,6 +7040,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     [
       'ovVerdictWord', 'ovVerdictRet', 'ovVerdictLow',
       'ovSurviveNum', 'ovSurviveSub', 'ovRealTerms', 'ovStamp',
+      'ovEarliestJoint', 'ovEarliestJointSub',
       'ovCombined', 'ovDeltaCombined', 'ovDeltaGraham', 'ovDeltaJulie',
       'ovSparkCombined', 'ovSparkGraham', 'ovSparkJulie',
       'ovVerdictTl', 'ovTrajHost'
