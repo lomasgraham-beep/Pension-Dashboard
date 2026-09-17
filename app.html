@@ -1611,7 +1611,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-526</span>
+      <span class="build-stamp">LC-527</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -3001,6 +3001,15 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         if (joint) return chartRound(gN + jN);
         return chartRound(currentView === p1Name ? gN : jN);
       }
+      // LC-527: what the DC pot actually paid out that year — the third line on the pot
+      // chart's right axis, closing the gap between the spend line and the net guaranteed
+      // income line. Joint uses r.drawdown, which the engine accumulates as g_draw + j_draw,
+      // so it is the household total and never one person's share. Single views take that
+      // person's own draw via vrow, matching how spend and income are split above.
+      function drawForRow(r) {
+        if (joint) return chartRound(r.drawdown || 0);
+        return chartRound(vrow(r).draw || 0);
+      }
 
       // ---------- POT CHART (stacked columns) ----------
       const dPots = new google.visualization.DataTable();
@@ -3013,16 +3022,18 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         dPots.addColumn('number', p2Name + ' taxable');  dPots.addColumn('number', p1Name + ' taxable');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
         dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Pension income (net)');
+        dPots.addColumn('number','Drawdown');
         yrRows.forEach(r => dPots.addRow([String(r.year), dAnn(r.year), dAnnT(r.year),
           chartRound(r.j_taxFree), chartRound(r.g_taxFree), chartRound(r.j_taxable), chartRound(r.g_taxable),
-          evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]));
+          evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r), drawForRow(r)]));
         potColors = ['#f472b6','#38bdf8','#c026d3','#2563eb']; // Julie tax-free (pink), Graham tax-free (sky), Julie taxable (fuchsia), Graham taxable (royal)
         potTitle = 'Combined Pots';
       } else {
         dPots.addColumn('number','Tax-Free Pot'); dPots.addColumn('number','Taxable Pot');
         dPots.addColumn({type:'string', role:'annotation'}); dPots.addColumn({type:'string', role:'annotationText'});
         dPots.addColumn('number','Annual spend'); dPots.addColumn('number','Pension income (net)');
-        yrRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), dAnn(r.year), dAnnT(r.year), chartRound(v.tf), chartRound(v.tx), evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r)]); });
+        dPots.addColumn('number','Drawdown');
+        yrRows.forEach(r => { const v = vrow(r); dPots.addRow([String(r.year), dAnn(r.year), dAnnT(r.year), chartRound(v.tf), chartRound(v.tx), evDot(r.year), evText(r.year), spendForRow(r), fixedIncomeForRow(r), drawForRow(r)]); });
         potColors = ['#10b981','#f59e0b'];   // tax-free emerald, taxable amber
         potTitle = currentView + ' Pots';
       }
@@ -3118,9 +3129,10 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       // annual-spend / pension-income line axis (pot chart, right side)
       let spendMax = 0;
       drawdownRows.forEach(r => {
-        const s = spendForRow(r), fi = fixedIncomeForRow(r);
+        const s = spendForRow(r), fi = fixedIncomeForRow(r), dw = drawForRow(r);
         if (s > spendMax) spendMax = s;
         if (fi > spendMax) spendMax = fi;
+        if (dw > spendMax) spendMax = dw;   // LC-527: the drawdown line shares this axis
       });
       spendMax = Math.ceil((spendMax * 1.1) / 1000) * 1000 || 1000;
 
@@ -3148,16 +3160,21 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       const potVAxis = { minValue: 0, viewWindow: { min: 0, max: potMax }, ticks: shortTicks(potMax, phone ? 5 : 6), textStyle: axisText, gridlines: { color: gridCol }, baselineColor: gridCol };
       const incTicks = shortTicks(incMax, phone ? 5 : 6);
 
+      // Series indices count NUMBER columns only (annotation-role columns don't take one).
+      // Joint: j_tf 0, g_tf 1, j_tx 2, g_tx 3, spend 4, income 5, drawdown 6.
+      // Single: tf 0, tx 1, spend 2, income 3, drawdown 4.
       const potSpendIdx = joint ? 4 : 2;
       const potFixedIdx = joint ? 5 : 3;
+      const potDrawIdx  = joint ? 6 : 4;
       const potSeries = {};
       potSeries[potSpendIdx] = { type: 'line', targetAxisIndex: 1, color: inkCol, lineWidth: 3, pointSize: 4 };
       potSeries[potFixedIdx] = { type: 'line', targetAxisIndex: 1, color: '#14b8a6', lineWidth: 3, pointSize: 4, lineDashStyle: [6, 4] };
+      potSeries[potDrawIdx]  = { type: 'line', targetAxisIndex: 1, color: '#dc2626', lineWidth: 3, pointSize: 4 };
       // event ● markers ride the top bar series — keep those red; domain markers (Retire/Low) go neutral below
       potSeries[potBarCount - 1] = Object.assign(potSeries[potBarCount - 1] || {}, { annotations: { textStyle: { fontSize: 13, color: '#c0392b', bold: true }, stem: { color: '#c0392b' } } });
       const spendVAxis = phone
         ? { viewWindow: { min: 0, max: spendMax }, ticks: shortTicks(spendMax), textStyle: axisText, gridlines: { count: 0 } }
-        : { title: 'Spend & pension income (£)', viewWindow: { min: 0, max: spendMax }, ticks: shortTicks(spendMax, 6), textStyle: axisText, gridlines: { count: 0 } };
+        : { title: 'Spend, pension income & drawdown (£)', viewWindow: { min: 0, max: spendMax }, ticks: shortTicks(spendMax, 6), textStyle: axisText, gridlines: { count: 0 } };
 
       new google.visualization.ComboChart(document.getElementById('potChart')).draw(dPots, {
         title: '', seriesType: 'bars', isStacked: true, series: potSeries,
@@ -3175,13 +3192,15 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
             { label: p2Name + ' taxable',  color: potColors[2], type: 'bar' },
             { label: p1Name + ' taxable',  color: potColors[3], type: 'bar' },
             { label: 'Annual spend',       color: inkCol,       type: 'line' },
-            { label: 'Pension income (net)', color: '#14b8a6',  type: 'line' }
+            { label: 'Pension income (net)', color: '#14b8a6',  type: 'line' },
+            { label: 'Drawdown',           color: '#dc2626',    type: 'line' }
           ]
         : [
             { label: 'Tax-Free Pot',       color: potColors[0], type: 'bar' },
             { label: 'Taxable Pot',        color: potColors[1], type: 'bar' },
             { label: 'Annual spend',       color: inkCol,       type: 'line' },
-            { label: 'Pension income (net)', color: '#14b8a6',  type: 'line' }
+            { label: 'Pension income (net)', color: '#14b8a6',  type: 'line' },
+            { label: 'Drawdown',           color: '#dc2626',    type: 'line' }
           ];
       renderCustomLegend(document.getElementById('potChart').closest('.chart-wrap'), potLegendEntries);
 
@@ -6754,7 +6773,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-526';
+    if (stamp) stamp.textContent = 'LC-527';
   }
 
   function buildSubnav() {
