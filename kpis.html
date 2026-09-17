@@ -10,9 +10,11 @@
   body { font-family:'Segoe UI',Tahoma,sans-serif; margin:0; padding:10px 12px 12px; background:#e9eef3; color:#1e293b; }
   h2 { color:#2c3e50; margin:0 0 8px; font-size:19px; }
   .note { color:#64748b; font-size:13px; margin-top:-4px; }
-  /* cumgr17: plan figures are slim tiles, not full cards — one label, one number.
-     Fixed column count so the row never re-flows as values change width. */
-  .kpi-tiles { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:8px; margin:0 0 9px; }
+  /* cumgr18: plan figures are slim tiles, not full cards — one label, one number.
+     Fixed column count so the row never re-flows as values change width.
+     Eight tiles on a 4-wide grid = two even rows; the earliest-retirement tile is
+     placed fourth so it sits top-right. */
+  .kpi-tiles { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:0 0 9px; }
   .kpi-tile { min-width:0; background:#fff; border:1px solid #cbd5e1; border-radius:9px; padding:9px 11px; }
   .kpi-tile .tl { font-size:11px; color:#64748b; letter-spacing:.03em; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .kpi-tile .tv { margin-top:3px; font-size:21px; font-weight:800; letter-spacing:-.02em; color:#0f172a; line-height:1.05;
@@ -20,7 +22,6 @@
   .kpi-tile .tv.good { color:#16a34a; }
   .kpi-tile .tv.bad { color:#c0392b; }
   .kpi-tile .ts { margin-top:2px; font-size:10.5px; color:#94a3b8; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  @media (max-width:1100px) { .kpi-tiles { grid-template-columns:repeat(4,minmax(0,1fr)); } }
   @media (max-width:640px)  { .kpi-tiles { grid-template-columns:repeat(2,minmax(0,1fr)); } }
   .card { background:#fff; border:1px solid #cbd5e1; border-radius:10px; padding:16px; text-align:center; box-shadow:0 1px 3px rgba(15,23,42,0.08),0 4px 12px rgba(15,23,42,0.06); }
   .card.hl { background:#e8f1ff; border-color:#93c5fd; }
@@ -155,7 +156,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading…</div>
-  <h2 style="display:none;">Overview <span style="font-size:11px; font-weight:600; color:#94a3b8; letter-spacing:0;">cumgr17</span></h2>
+  <h2 style="display:none;">Overview <span style="font-size:11px; font-weight:600; color:#94a3b8; letter-spacing:0;">cumgr18</span></h2>
   <div id="kpiTiles" class="kpi-tiles"></div>
   <div id="kpiCardHost"><div class="kpi-empty">Crunching…</div></div>
   <div class="filter-bar">
@@ -383,13 +384,20 @@
       if (allLogs.length) renderKPIs();
     }
   });
-  // cumgr17: seven tiles on one row. Two come from the logs on this page, five are pushed
-  // in by the shell. Green marks growth and plan-positive figures; plain ink for the neutral
-  // facts (pot totals, dates) so the colour still means something.
-  const TILE_ORDER = ['Projected pot at retirement', 'Target funded', 'Retirement date',
+  // cumgr18: eight tiles on a 4-wide grid (two rows). Two come from the logs on this page,
+  // six are pushed in by the shell. Green marks growth and plan-positive figures; plain ink
+  // for the neutral facts (pot totals, dates) so the colour still means something.
+  // TILE_ORDER is the full running order including the two local tiles, so the shell
+  // metrics can be interleaved rather than only appended — 'Earliest joint retirement'
+  // sits fourth, which is the top-right slot on the 4-wide grid.
+  const LOCAL_GROWTH = '__localGrowth', LOCAL_POT = '__localPot';
+  const TILE_ORDER = [LOCAL_GROWTH, LOCAL_POT,
+                      'Projected pot at retirement', 'Earliest joint retirement',
+                      'Target funded', 'Retirement date',
                       'Time remaining', 'Minimum projected pot'];
   const TILE_LABEL = {
     'Projected pot at retirement': 'Pot at retirement',
+    'Earliest joint retirement': 'Earliest both retire',
     'Target funded': 'Target funded',
     'Retirement date': 'Retirement date',
     'Time remaining': 'Time remaining',
@@ -406,11 +414,15 @@
       '<div class="tv' + (tone ? ' ' + tone : '') + '">' + esc(value) + '</div>' +
       '<div class="ts">' + (sub ? esc(sub) : '&nbsp;') + '</div></div>';
 
-    let html = tile('Expected growth / mo', fmtDiff(expected), '', expected >= 0 ? 'good' : 'bad');
-    html += tile('Current pot', fmt(currentTotal), '', '');
     const by = {};
     planMetrics.forEach(m => { by[m.label] = m; });
+    let html = '';
     TILE_ORDER.forEach(key => {
+      if (key === LOCAL_GROWTH) {
+        html += tile('Expected growth / mo', fmtDiff(expected), '', expected >= 0 ? 'good' : 'bad');
+        return;
+      }
+      if (key === LOCAL_POT) { html += tile('Current pot', fmt(currentTotal), '', ''); return; }
       const m = by[key];
       if (!m) return;
       html += tile(TILE_LABEL[key] || key, m.value, m.sub, TILE_GOOD[key] ? 'good' : '');
