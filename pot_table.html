@@ -5,7 +5,7 @@
 <title>Pot at Retirement</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=act5"></script>
-<script src="engine.js?v=ann10"></script>
+<script src="engine.js?v=ann11"></script>
 <style>
   :root {
     --accent:#1d3a63; --safe:#10b981; --risk:#ef4444;
@@ -78,7 +78,7 @@
 </head>
 <body>
   <div class="head">
-    <div class="h-title">Pot at Retirement <span class="build">(build: pt8)</span></div>
+    <div class="h-title">Pot at Retirement <span class="build">(build: pt9)</span></div>
     <div class="h-sub" id="hsub">Pot value for each possible retirement month, from this month onwards. <b>Safe spend %</b> is the most you could spend at that date and still have both pots last (capped by the spend lock). <b>Lowest pot</b> is the lowest the combined pot falls to during drawdown at that spend, and the year it happens (red if it empties).</div>
     <div class="ctlrow">
       <span class="ctl-label">Offset months</span>
@@ -404,7 +404,7 @@
    copy or an engine.js that was not deployed first. In-flow (not fixed) so it is visible in
    both scrolling and overflow:hidden flex layouts inside the Safari iframe. */
 (function () {
-  var WANT = 'ann11', TAG = 'pot table pt8';
+  var WANT = 'ann11', TAG = 'pot table pt9';
   function go() {
     var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
     if (got !== WANT) {

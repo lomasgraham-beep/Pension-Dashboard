@@ -5,7 +5,7 @@
 <title>Sensitivity</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js?v=act5"></script>
-<script src="engine.js?v=ann10"></script>
+<script src="engine.js?v=ann11"></script>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 <style>
   :root { --accent:#1d3a63; --aqua:#0f766e; --up:#10b981; --down:#ef4444; --ink:#2c3e50; --sub:#64748b;
@@ -33,7 +33,7 @@
 </style>
 </head>
 <body>
-  <h2>Sensitivity <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(sensitivity build: sens3)</span></h2>
+  <h2>Sensitivity <span style="font-size:11px;font-weight:normal;color:#94a3b8;">(sensitivity build: sens4)</span></h2>
   <p class="note">Your saved plan is re-run with one assumption nudged at a time, so you can see which dial actually
   moves the outcome. Bars show the change in the <b>combined pot at end of life</b> against your saved plan; the
   table adds the lowest-point ("trough") pot and the year the money would run out, if ever. Growth nudges apply to
@@ -284,7 +284,7 @@
 <script>
 /* LC-383: engine build self-check + deploy stamp. */
 (function () {
-  var WANT = 'ann11', TAG = 'sensitivity sens3';
+  var WANT = 'ann11', TAG = 'sensitivity sens4';
   function go() {
     var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
     if (got !== WANT) {
