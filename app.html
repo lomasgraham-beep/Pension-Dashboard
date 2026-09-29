@@ -7,7 +7,7 @@
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="common.js?v=act5"></script>
-  <script src="engine.js?v=ann11"></script>
+  <script src="engine.js?v=ann12"></script>
   <script src="optimiser.js?v=era02"></script>
   <style>
     :root {
@@ -1609,7 +1609,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-534</span>
+      <span class="build-stamp">LC-535</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1834,6 +1834,9 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         <div class="ctrl" id="ctrl_retire"><label>Fully retire <span id="m_retire_v" class="sv">—</span></label><input type="range" id="m_retire" min="0" max="120" step="1" value="60" oninput="onParam()"></div>
         <div id="tierSliders" style="display:contents;"></div>
         <div class="ctrl" id="ctrlRatio"><label><span class="nm-p1">Graham</span> drawdown ratio <span id="m_ratio_v" class="sv">50%</span></label><input type="range" id="m_ratio" min="0" max="100" step="1" value="50" oninput="onParam()"></div>
+        <div class="ctrl" id="ctrlPool">
+          <label class="switch"><input type="checkbox" id="m_pool" onchange="onParam()"><span class="track"></span><span class="switch-text">Pool surplus income</span></label>
+          <div class="hint">LC-535: once you have both retired, if one person's income after tax is more than their share of the bills, the spare pays towards the other's share <em>before</em> anything is drawn from the other's pot. Only what is left over goes to surplus savings. Saved with the plan.</div></div>
         <div class="ctrl" id="ctrlCFloor"><label>Combined DC floor <span id="m_cfloor_v" class="sv">&pound;100,000</span>
             <button type="button" class="info-btn" onclick="toggleInfo(event,'info_cfloor')" aria-label="About the combined DC floor">i</button></label>
           <input type="number" id="m_cfloor" min="0" step="5000" value="100000" onchange="onCFloor()" style="width:100%; padding:6px 8px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--ink); font-size:13px;">
@@ -2542,12 +2545,17 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       if (loan > 0.5) costLines += `<div class="ss-line"><span>Loan payment</span><b>${ssMoney(loan)}</b></div>`;
       if (purch > 0.5) costLines += `<div class="ss-line"><span>Purchase</span><b>${ssMoney(purch)}</b></div>`;
       costLines += `<div class="ss-line ss-total"><span>Total costs (their share)</span><b>${ssMoney(costTotal)}</b></div>`;
+      const poolIn = (who === 'g') ? (r.g_poolIn || 0) : (r.j_poolIn || 0);     // LC-535
+      const poolOut = (who === 'g') ? (r.g_poolOut || 0) : (r.j_poolOut || 0);
+      const otherNm = (who === 'g') ? (p2Name || 'partner') : (p1Name || 'partner');
+      if (poolIn > 0.5) costLines += `<div class="ss-line ss-sub"><span>&hellip;of which paid by ${otherNm}'s spare income</span><b>${ssMoney(poolIn)}</b></div>`;
       if (savedPlan.savingsFundBills && savToBills > 0.5) costLines += `<div class="ss-line ss-sub"><span>&hellip;of which met from savings</span><b>${ssMoney(savToBills)}</b></div>`;
 
       const surplusThis = (who === 'g') ? (r.g_surplusThis || 0) : (r.j_surplusThis || 0);
       let taxNet = `<div class="ss-line"><span>Gross income</span><b>${ssMoney(gross)}</b></div>`
         + `<div class="ss-line ss-tax"><span>Tax</span><b>&minus;${ssMoney(tax)}</b></div>`
         + `<div class="ss-line ss-total ss-net"><span>Net income</span><b>${ssMoney(net)}</b></div>`;
+      if (poolOut > 0.5) taxNet += `<div class="ss-line ss-sub"><span>Paid towards ${otherNm}'s share</span><b>${ssMoney(poolOut)}</b></div>`;   // LC-535
       if (surplusThis > 0.5) taxNet += `<div class="ss-line ss-sub"><span>Transferred to surplus savings</span><b>${ssMoney(surplusThis)}</b></div>`;
 
       return `<div class="ss-person"><h4>${name}</h4>`
@@ -4606,6 +4614,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         crystallisationDateJulie: wmjSel === 'tffirst' ? App.toInputDate(memberRetireDate('j'))
           : wmjSel === 'faddate' ? (document.getElementById('m_crystdate_j').value || null) : null,
         ufplsDivertTf: document.getElementById('m_divert_tf').checked,
+        poolSurplus: !!(document.getElementById('m_pool') && document.getElementById('m_pool').checked),   // LC-535
         retired: savedPlan ? !!savedPlan.retired : false,
         gFloorPct: (parseFloat(document.getElementById('m_gfloor').value) || 0) / 100,
         jFloorPct: (parseFloat(document.getElementById('m_jfloor').value) || 0) / 100,
@@ -4636,6 +4645,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       const wmjSel = document.getElementById('m_wm_j');
       if (wmjSel) wmjSel.value = deriveWmMode(plan.withdrawalMethodJulie, plan.crystallisationDateJulie, 'j');
       document.getElementById('m_divert_tf').checked = !!plan.ufplsDivertTf;
+      if (document.getElementById('m_pool')) document.getElementById('m_pool').checked = !!plan.poolSurplus;   // LC-535
       syncWmControls();
       document.getElementById('m_growth').value = (plan.growthRate * 100).toFixed(2);
       document.getElementById('m_spend').value = Math.round(plan.spendRed * 100);
@@ -4900,6 +4910,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         crystallisation_date_graham: c.crystallisationDateGraham || null,
         crystallisation_date_julie: c.crystallisationDateJulie || null,
         ufpls_divert_tf: c.ufplsDivertTf,
+        pool_surplus: !!c.poolSurplus,   // LC-535
         combined_dc_floor: c.combinedFloor,
         updated_at: new Date().toISOString()
       };
@@ -4996,6 +5007,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
           julie: plan.crystallisationDateJulie ? App.parseLocalDate(plan.crystallisationDateJulie) : null
         },
         ufplsDivertTf: plan.ufplsDivertTf,
+        poolSurplus: !!plan.poolSurplus,   // LC-535 (engine ann12)
         growthRate: plan.growthRate,   // LC-383 (engine ann7): growth slider now applies through drawdown too
         spCut: (plan.spCutFrom && plan.spCutPct > 0) ? { fromYear: plan.spCutFrom, pct: Math.min(1, plan.spCutPct) } : null,   // LC-532
         sp: sp
@@ -5013,7 +5025,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       if (!savedPlan) return false;
       const numKeys = ['growthRate', 'spendRed', 'gRatio'];
       for (const k of numKeys) { if (typeof savedPlan[k] === 'number' && Math.abs((plan[k] || 0) - savedPlan[k]) > 1e-9) return true; }
-      const boolKeys = ['dynamic', 'savingsFundBills', 'ufplsDivertTf'];
+      const boolKeys = ['dynamic', 'savingsFundBills', 'ufplsDivertTf', 'poolSurplus'];
       for (const k of boolKeys) { if (typeof savedPlan[k] === 'boolean' && !!plan[k] !== !!savedPlan[k]) return true; }
       const strKeys = ['withdrawalMethodGraham', 'withdrawalMethodJulie', 'crystallisationDateGraham', 'crystallisationDateJulie'];
       for (const k of strKeys) { if (savedPlan[k] !== undefined && (plan[k] || null) !== (savedPlan[k] || null)) return true; }
@@ -5052,6 +5064,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       if (plan.ufplsDivertTf && (wmgSel === 'ufpls' || wmjSel === 'ufpls')) {
         s2 += ' The 25% tax-free element of each UFPLS draw is diverted to surplus savings rather than covering bills.';
       }
+      if (plan.poolSurplus && p2Name) s2 += ' <strong>Surplus income is pooled</strong>: once you have both retired, either person\'s spare income after tax pays towards the other\'s share before any drawdown.';   // LC-535
       parts.push('<p>' + s2 + '</p>');
 
       // How bills are met
@@ -5318,7 +5331,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     function ejInputKey(plan) {
       return JSON.stringify([
         plan.growthRate, plan.gRatio, plan.dynamic, plan.gFloorPct, plan.jFloorPct,
-        plan.savingsFundBills, plan.ufplsDivertTf, plan.retired,
+        plan.savingsFundBills, plan.ufplsDivertTf, plan.retired, !!plan.poolSurplus,
         plan.withdrawalMethodGraham, plan.withdrawalMethodJulie,
         plan.crystallisationDateGraham, plan.crystallisationDateJulie,
         plan.spRate, plan.spDelay, plan.tierDateOverrides, plan.privContrib,
@@ -5525,7 +5538,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front194';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front195';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { HouseOverview:'house_overview.html', Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', ActualCosts:'actual_costs.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', AmazonTxn:'amazon_txn.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', FuelCosts:'fuel_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Contracts:'contracts.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -6197,6 +6210,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
           crystallisationDateGraham: p.crystallisation_date_graham || null,
           crystallisationDateJulie: p.crystallisation_date_julie || null,
           ufplsDivertTf: !!p.ufpls_divert_tf,
+          poolSurplus: !!p.pool_surplus,   // LC-535
           retired: p.retired_mode != null ? !!p.retired_mode : false,
           combinedFloor: p.combined_dc_floor != null ? Number(p.combined_dc_floor) : 100000
         };
@@ -6269,6 +6283,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         crystallisation_date_graham: c.crystallisationDateGraham || null,
         crystallisation_date_julie: c.crystallisationDateJulie || null,
         ufpls_divert_tf: c.ufplsDivertTf,
+        pool_surplus: !!c.poolSurplus,   // LC-535
         combined_dc_floor: c.combinedFloor
       };
     }
@@ -6606,7 +6621,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
 <script>
 /* LC-383: engine build self-check + deploy stamp. */
 (function () {
-  var WANT = 'ann11';
+  var WANT = 'ann12';
   var TAG = 'app ' + (((document.querySelector('.build-stamp') || {}).textContent) || 'LC-?');   // read the real LC stamp — never drifts
   function go() {
     var got = (window.PensionEngine && window.PensionEngine.BUILD) || 'pre-ann7 (no BUILD export)';
@@ -6729,7 +6744,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-534';
+    if (stamp) stamp.textContent = 'LC-535';
   }
 
   function buildSubnav() {
