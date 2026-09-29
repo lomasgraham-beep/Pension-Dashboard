@@ -1611,7 +1611,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-530</span>
+      <span class="build-stamp">LC-531</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -4986,6 +4986,24 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
 
     function resetPlan() { if (savedPlan) { applyControls(savedPlan); document.getElementById('m_msg').textContent = ''; recomputeAll(); } }
 
+    // LC-531: the Modelling slider is ONE joint retirement date. Every save of the plan copies it
+    // onto the partner's row too, so op_modelling_parameters never holds two different dates by
+    // accident (the Forecast page and the on-load slider both read the per-member rows). Pension
+    // Defaults can still set different dates deliberately; the next plan save re-joins them.
+    async function syncPartnerRetirement(dateStr) {
+      if (!p2Name) return;
+      const rows = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p2Name));
+      if (!rows || !rows.length) return;   // no partner row: loaders already fall back to p1's date
+      await App.write('PATCH', 'op_modelling_parameters?member_name=eq.' + encodeURIComponent(p2Name),
+        { retirement_date: dateStr || null, updated_at: new Date().toISOString() });
+    }
+    function jointRetireByMember(d) {
+      const m = {};
+      if (p1Name && d) m[p1Name] = d;
+      if (p2Name && d) m[p2Name] = d;
+      return m;
+    }
+
     async function savePlan() {
       const msg = document.getElementById('m_msg');
       const c = readControls();
@@ -5009,7 +5027,9 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         const existing = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name));
         if (existing.length) await App.write('PATCH', 'op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name), payload);
         else await App.write('POST', 'op_modelling_parameters', payload);
+        await syncPartnerRetirement(payload.retirement_date);            // LC-531
         savedPlan = c;
+        savedPlan.retireByMember = jointRetireByMember(c.retirementDate); // LC-531
         // tell already-loaded framed pages (e.g. Cash & Purchases) to re-pull the saved plan,
         // so the savings-fund-bills switch is reflected without a browser refresh.
         document.querySelectorAll('iframe.app-frame').forEach(f => {
@@ -6371,7 +6391,9 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       const existing = await App.rest('op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name));
       if (existing && existing.length) await App.write('PATCH', 'op_modelling_parameters?member_name=eq.' + encodeURIComponent(p1Name), payload);
       else await App.write('POST', 'op_modelling_parameters', payload);
+      await syncPartnerRetirement(payload.retirement_date);            // LC-531
       savedPlan = c;
+      savedPlan.retireByMember = jointRetireByMember(c.retirementDate); // LC-531
     }
 
     // gather everything a model captures (no DB writes): rail + the four collection tables
@@ -6590,6 +6612,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         if (pl.modelling) {
           if (pl.modelling.p1) await patchModellingRow(p1Name, pl.modelling.p1);
           if (p2Name && pl.modelling.p2) await patchModellingRow(p2Name, pl.modelling.p2);
+          if (pl.modelling.p1) await syncPartnerRetirement(pl.modelling.p1.retirement_date);   // LC-531
         }
         for (const t of MODEL_COLLECTIONS) {
           await App.write('DELETE', t.base + '?id=not.is.null', undefined);
@@ -6817,7 +6840,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-530';
+    if (stamp) stamp.textContent = 'LC-531';
   }
 
   function buildSubnav() {
