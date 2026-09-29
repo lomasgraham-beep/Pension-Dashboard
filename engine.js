@@ -1,5 +1,16 @@
 /* ============================================================
    engine.js  —  Pension modelling engine (pure JavaScript)
+   build tag: ann12 (additive: POOLED SURPLUS INCOME, behind cfg.poolSurplus — default off.
+                     Once BOTH members are retired, each month compares each person's NET fixed
+                     income (state + DB + annuity, taxed exactly as fundPerson taxes it) with their
+                     ratio share of the household cost. If one has spare and the other has a gap,
+                     the spare pays towards the gap BEFORE any drawdown: the targets are simply
+                     moved (giver's target up, receiver's down, by min(spare, gap)). The giver's
+                     raised target is still fully covered by their fixed income, so they never draw
+                     for it; only spare left after both shares are met reaches surplus savings.
+                     Rows gain g_poolIn / g_poolOut / j_poolIn / j_poolOut (display only).
+                     Inertness: with cfg.poolSurplus falsy nothing moves, every figure identical
+                     to ann11. Staggered gap months (one still working) are never pooled.)
    build tag: ann11 (additive: fuel costing split out of the holiday figure, behind FUEL_COSTS.
                      Takes TWO fields, because fuel is two different animals:
                        data.fuelAnnual     — discretionary driving (Holiday / Caravan / Out and
@@ -754,6 +765,13 @@
     // `potFloor`: minimum total pot value (Dynamic mode only; 0 = no floor).
     // `crystallised`: true once FAD crystallisation has occurred (tfPot will be 0).
     // `dvTf`: divert the 25% tax-free element of UFPLS draws to surplus savings.
+    // ann12: net of a month's fixed (guaranteed) income — the identical expression fundPerson uses
+    // for dbNet, so pooling moves exactly the money fundPerson will later count as spare.
+    function netOfFixed(dbGross) {
+      if (dbGross > MPA + MBR) return MPA + MBR * 0.80 + (dbGross - MPA - MBR) * 0.60;
+      if (dbGross > MPA) return MPA + (dbGross - MPA) * 0.80;
+      return dbGross;
+    }
     function fundPerson(target, inc, tfPot, txPot, potFloor, crystallised, dvTf) {
       const dbGross = inc.total;
       // ann7 flag 2: dbNet consumes the PA, then the basic-rate band (20%), then 40% above.
@@ -881,7 +899,8 @@
           combinedClosing: 0, g_closing: 0, j_closing: 0, shortfall: false,
           cashBalance: 0, cashFinance: 0, cashDeposit: 0, cashShortfall: 0, cashCapDraw: 0,
           surplusBalance: 0, g_surplusBalance: 0, j_surplusBalance: 0,
-          surplusThis: 0, g_surplusThis: 0, j_surplusThis: 0
+          surplusThis: 0, g_surplusThis: 0, j_surplusThis: 0,
+          g_poolIn: 0, j_poolIn: 0, g_poolOut: 0, j_poolOut: 0
         };
       }
 
@@ -1119,6 +1138,16 @@
       const gInc = grossMonth(p1Name, idx, elapsed);
       const jInc = p2Name ? grossMonth(p2Name, idx, elapsed) : { stateGross: 0, otherGross: 0, total: 0, sources: [] };
 
+      // ann12: pooled surplus income (see header). Only when both are retired.
+      let gPoolIn = 0, jPoolIn = 0;
+      if (cfg.poolSurplus && p2Name && p1Retired && p2Retired) {
+        const gFix = netOfFixed(gInc.total), jFix = netOfFixed(jInc.total);
+        const toG = Math.min(Math.max(0, jFix - jTargetM), Math.max(0, gTargetM - gFix));   // Julie's spare -> Graham's gap
+        const toJ = Math.min(Math.max(0, gFix - gTargetM), Math.max(0, jTargetM - jFix));   // Graham's spare -> Julie's gap
+        if (toG > 0) { gTargetM -= toG; jTargetM += toG; gPoolIn = toG; }
+        if (toJ > 0) { jTargetM -= toJ; gTargetM += toJ; jPoolIn = toJ; }
+      }
+
       let gRes, jRes, monthShort;
       if (cfg.dynamic) {
         let a = allocate(gTargetM, jTargetM, gInc, jInc, gTf, gTx, jTf, jTx, gFloor, jFloor, gCrystallised, jCrystallised, divertTf);
@@ -1184,11 +1213,13 @@
         cashBalance: cashBal, cashFinance: financeThisMonth, cashDeposit: depositThisMonth, cashShortfall: depositShortfall, cashCapDraw: capDrawFromSavings,
         surplusBalance: gSurplusBal + jSurplusBal, g_surplusBalance: gSurplusBal, j_surplusBalance: jSurplusBal,
         surplusThis: gSurplusThis + jSurplusThis, g_surplusThis: gSurplusThis, j_surplusThis: jSurplusThis,
+        g_poolIn: gPoolIn, j_poolIn: jPoolIn, g_poolOut: jPoolIn, j_poolOut: gPoolIn,
         acctBalances: savingsAccts.map(a => ({ name: a.name, member: a.member, bal: a.bal }))
       });
 
       acc.outgoings += outM; acc.billsTotal += billsM; acc.diningTotal += diningM; acc.holidayTotal += holidayM; acc.fuelTotal += fuelM;
       acc.gTarget += gTargetM; acc.jTarget += jTargetM;
+      acc.g_poolIn += gPoolIn; acc.j_poolIn += jPoolIn; acc.g_poolOut += jPoolIn; acc.j_poolOut += gPoolIn;   // ann12
       acc.stateGross += gRes.inc.stateGross + jRes.inc.stateGross;
       acc.g_other += gRes.inc.total; acc.j_other += jRes.inc.total;
       acc.g_annuityIncome += gRes.inc.annuityGross; acc.j_annuityIncome += jRes.inc.annuityGross;
@@ -1238,7 +1269,7 @@
   }
 
   global.PensionEngine = {
-    BUILD: 'ann11',  // LC-383: exported so framed pages can self-check the loaded engine build
+    BUILD: 'ann12',  // LC-383: exported so framed pages can self-check the loaded engine build
     INFL: INFL, GROWTH: GROWTH, PA: PA,
     latestPots: latestPots,
     forecast: forecast,
