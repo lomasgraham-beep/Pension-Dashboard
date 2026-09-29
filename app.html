@@ -1611,7 +1611,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-531</span>
+      <span class="build-stamp">LC-532</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -2002,6 +2002,10 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
           <div class="hint">Annual rise on the State Pension. Default 2.5%; the triple lock has averaged nearer 4%, so drag up to model it holding, or down for it weakened, capped, or frozen (0%). <span style="color:var(--ink-soft);">What-if only, never saved.</span></div></div>
         <div class="ctrl"><label>Delay state pension <span id="m_spdelay_v" class="sv">0 yrs</span></label><input type="range" id="m_spdelay" min="0" max="10" step="1" value="0" oninput="onParam()">
           <div class="hint">Years the State Pension age rises, delaying both of you equally.</div></div>
+        <div class="ctrl"><label>Cut state pension from <span id="m_spcut_from_v" class="sv">Off</span></label><select id="m_spcut_from" onchange="onParam()"><option value="">Off</option><option value="2027">2027</option><option value="2028">2028</option><option value="2029">2029</option><option value="2030">2030</option><option value="2031">2031</option><option value="2032">2032</option><option value="2033">2033</option><option value="2034">2034</option><option value="2035">2035</option><option value="2036">2036</option><option value="2037">2037</option><option value="2038">2038</option><option value="2039">2039</option><option value="2040">2040</option><option value="2041">2041</option><option value="2042">2042</option><option value="2043">2043</option><option value="2044">2044</option><option value="2045">2045</option><option value="2046">2046</option><option value="2047">2047</option><option value="2048">2048</option><option value="2049">2049</option><option value="2050">2050</option></select>
+          <div class="hint">LC-532: a means-test or policy what-if. From April of this year both State Pensions are reduced by the percentage below (they keep rising with the growth setting). <span style="color:var(--ink-soft);">What-if only, never saved.</span></div></div>
+        <div class="ctrl"><label>State pension cut by <span id="m_spcut_v" class="sv">0%</span></label><input type="range" id="m_spcut" min="0" max="100" step="5" value="0" oninput="onParam()">
+          <div class="hint">0% = no change &middot; 100% = no State Pension at all from the year above.</div></div>
         <div class="ctrl ctrl-wide">
           <label class="switch"><input type="checkbox" id="m_divert_tf" onchange="onParam()"><span class="track"></span><span class="switch-text">Divert tax-free to surplus savings</span>
             <button type="button" class="info-btn" onclick="toggleInfo(event,'info_divert')" aria-label="About divert tax-free">i</button></label>
@@ -4075,7 +4079,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     function ovVerdictSurvives(spendRed) {
       if (!lastDrawdownCfg) return true;
       const cfg = Object.assign({}, lastDrawdownCfg, { spendRed: spendRed });
-      const rows = PensionEngine.drawdown(data, cfg) || [];
+      const rows = PensionEngine.drawdown(engineData(cfg), cfg) || [];
       if (!rows.length) return true;
       const last = rows[rows.length - 1];
       return ((last.g_taxFree || 0) + (last.g_taxable || 0) + (last.j_taxFree || 0) + (last.j_taxable || 0)) >= 1000;
@@ -4737,6 +4741,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         jFloorPct: (parseFloat(document.getElementById('m_jfloor').value) || 0) / 100,
         spRate: parseFloat(document.getElementById('m_sprate').value) / 100,
         spDelay: parseInt(document.getElementById('m_spdelay').value) || 0,
+        spCutFrom: parseInt(document.getElementById('m_spcut_from').value, 10) || null,   // LC-532
+        spCutPct: (parseFloat(document.getElementById('m_spcut').value) || 0) / 100,        // LC-532
         tierDateOverrides: readTierOverrides(),
         privContrib: readPrivContrib(),
         combinedFloor: readCombinedFloor()
@@ -4771,6 +4777,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       // State Pension Risk sliders are what-if only — always reset to baseline (2.5% uprating, 0 delay)
       document.getElementById('m_sprate').value = 2.5;
       document.getElementById('m_spdelay').value = 0;
+      document.getElementById('m_spcut_from').value = '';   // LC-532: cut is what-if only
+      document.getElementById('m_spcut').value = 0;
       resetTierSliders();
       resetPrivContribSliders();
       syncLabels();
@@ -4787,6 +4795,9 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       document.getElementById('m_sprate_v').textContent = parseFloat(document.getElementById('m_sprate').value).toFixed(1) + '%';
       const dly = parseInt(document.getElementById('m_spdelay').value) || 0;
       document.getElementById('m_spdelay_v').textContent = dly + (dly === 1 ? ' yr' : ' yrs');
+      const cutFrom = document.getElementById('m_spcut_from').value;   // LC-532
+      document.getElementById('m_spcut_from_v').textContent = cutFrom ? ('Apr ' + cutFrom) : 'Off';
+      document.getElementById('m_spcut_v').textContent = document.getElementById('m_spcut').value + '%';
       syncTierLabels();
       syncPrivContribLabels();
       refreshRecentGrowthBtn();
@@ -5043,6 +5054,39 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     // Build a drawdown cfg from a plan, applying calibration and SP baseline exactly
     // as the dashboard does. Shared by recomputeAll and the earliest-retirement
     // optimiser so the two can never drift apart.
+    // LC-532: State Pension cut what-if, applied WITHOUT an engine change. Each State Pension row
+    // is split in two before the engine sees it: the full pension up to the end of March of the cut
+    // year, then a copy reduced by the cut % from April (dropped entirely at 100%). The engine grows
+    // State Pension from TODAY'S value regardless of a row's start date, so the reduced copy rises
+    // exactly as the original would have. The State Pension age delay shifts a row's START by whole
+    // years but not its END, so the reduced copy starts `delay` years before April of the cut year —
+    // after the engine adds the delay back it lands on the cut month itself.
+    function engineData(cfg) {
+      const cut = cfg && cfg.spCut;
+      if (!cut || !(cut.pct > 0) || !cut.fromYear) return data;
+      const stateNamesX = new Set((data.guaranteed || []).map(x => x.income_name).filter(n => n && n.toLowerCase().indexOf('state') >= 0));
+      const pad = n => ('0' + n).slice(-2);
+      const ymd = (y, m, d) => y + '-' + pad(m) + '-' + pad(d);
+      const cutIdx = cut.fromYear * 12 + 3;                       // April of the cut year (0-based month 3)
+      const out = [];
+      (data.guaranteed || []).forEach(g => {
+        if (!stateNamesX.has(g.income_name) || !g.start_date) { out.push(g); return; }
+        const delay = (cfg.sp && cfg.sp.spDelay && cfg.sp.spDelay[g.member_name]) || 0;
+        const sd = new Date(g.start_date);
+        const startIdx = (sd.getFullYear() + delay) * 12 + sd.getMonth();   // first paid month, as the engine sees it
+        const endIdx = g.end_date ? (new Date(g.end_date).getFullYear() * 12 + new Date(g.end_date).getMonth()) : Infinity;
+        if (startIdx < cutIdx) out.push(Object.assign({}, g, { end_date: ymd(cut.fromYear, 3, 31) }));   // full, to end of March
+        if (cut.pct < 1 && endIdx >= cutIdx) {
+          const reducedStartYear = Math.max(sd.getFullYear() * 12 + sd.getMonth(), (cut.fromYear - delay) * 12 + 3);
+          out.push(Object.assign({}, g, {
+            start_date: ymd(Math.floor(reducedStartYear / 12), (reducedStartYear % 12) + 1, 1),
+            initial_annual_value: (Number(g.initial_annual_value) || 0) * (1 - cut.pct)
+          }));
+        }
+      });
+      return Object.assign({}, data, { guaranteed: out });
+    }
+
     function buildDrawdownCfg(plan) {
       const stateNames = new Set((data.guaranteed || []).map(x => x.income_name).filter(n => n && n.toLowerCase().indexOf('state') >= 0));
       const js = PensionEngine.forecast(data, plan, 1);
@@ -5083,6 +5127,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         },
         ufplsDivertTf: plan.ufplsDivertTf,
         growthRate: plan.growthRate,   // LC-383 (engine ann7): growth slider now applies through drawdown too
+        spCut: (plan.spCutFrom && plan.spCutPct > 0) ? { fromYear: plan.spCutFrom, pct: Math.min(1, plan.spCutPct) } : null,   // LC-532
         sp: sp
       };
     }
@@ -5152,8 +5197,12 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       // State pension + dynamic floors
       let s4 = 'The State Pension is assumed to rise <strong>' + (plan.spRate * 100).toFixed(1) + '%</strong> a year';
       if (plan.spDelay && plan.spDelay > 0) s4 += ', with State Pension age pushed back <strong>' + plan.spDelay + ' year' + (plan.spDelay === 1 ? '' : 's') + '</strong> for both';
+      const spCutOn = plan.spCutFrom && plan.spCutPct > 0;   // LC-532
+      if (spCutOn) s4 += (plan.spCutPct >= 1)
+        ? ', and <strong>stopped altogether from April ' + plan.spCutFrom + '</strong> for both'
+        : ', and <strong>cut by ' + Math.round(plan.spCutPct * 100) + '% from April ' + plan.spCutFrom + '</strong> for both';
       s4 += '.';
-      if (Math.abs((plan.spRate || 0) - 0.025) > 1e-9 || (plan.spDelay || 0) > 0) s4 += ' (State Pension risk settings are what-if only and never saved.)';
+      if (Math.abs((plan.spRate || 0) - 0.025) > 1e-9 || (plan.spDelay || 0) > 0 || spCutOn) s4 += ' (State Pension risk settings are what-if only and never saved.)';
       if (plan.dynamic) {
         s4 += ' Dynamic mode is on: each pot is protected down to a floor (' + p1 + ' ' + Math.round((plan.gFloorPct || 0) * 100) + '%' + (both ? ', ' + p2 + ' ' + Math.round((plan.jFloorPct || 0) * 100) + '%' : '') + ' of its value at retirement), redirecting any shortfall to the other pot.';
       } else {
@@ -5289,7 +5338,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       const plan = readControls();
       lastDrawdownCfg = buildDrawdownCfg(plan);
       livePots = lastDrawdownCfg.pots;
-      drawdownRows = PensionEngine.drawdown(data, lastDrawdownCfg);
+      drawdownRows = PensionEngine.drawdown(engineData(lastDrawdownCfg), lastDrawdownCfg);
       updateEraFloorMax();
       updateSavbIndicator();
       renderScenarioSummary(plan);
@@ -5416,7 +5465,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         spendRed: 1.0            // the "100% spend" part of the question
       });
       const cfg = buildDrawdownCfg(plan);
-      const rows = PensionEngine.drawdown(data, cfg) || {};
+      const rows = PensionEngine.drawdown(engineData(cfg), cfg) || {};
       const monthly = rows.monthly || [];
       const retIdx = retireDate.getFullYear() * 12 + retireDate.getMonth();
       let minV = null, minIdx = null, anyShortfall = false;
@@ -5585,7 +5634,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       if (lab) lab.textContent = monthLabel(idxToDate(applied));
       lastDrawdownCfg = rebuildForDate(res.earliestDate);
       livePots = lastDrawdownCfg.pots;
-      drawdownRows = PensionEngine.drawdown(data, lastDrawdownCfg);
+      drawdownRows = PensionEngine.drawdown(engineData(lastDrawdownCfg), lastDrawdownCfg);
       updateEraFloorMax();
       renderOverview();
       renderRetirementTable();
@@ -6840,7 +6889,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-531';
+    if (stamp) stamp.textContent = 'LC-532';
   }
 
   function buildSubnav() {
