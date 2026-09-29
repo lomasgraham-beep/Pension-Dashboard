@@ -1609,7 +1609,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-533</span>
+      <span class="build-stamp">LC-534</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1623,7 +1623,9 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <option value="LogEntry">Log Entry</option>
     <option value="Forecast">Forecast</option>
     <option value="LivingCosts">Household</option>
-    <option value="Modelling">Modelling</option>
+    <option value="Modelling">Retirement Model</option>
+    <option value="Retirement">Retirement Table View</option>
+    <option value="Cash">Other Pages</option>
     <option value="BasicData">Setup</option>
   </select>
   <div class="tab-buttons" id="navBar" style="display:none;"><!-- LC-465: rendered by renderNav() --></div>
@@ -1770,7 +1772,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
   <div id="Cash" class="tabcontent">
     <div class="subtab-buttons">
       <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
-      <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
+      <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement Table View</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
@@ -1780,7 +1782,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
   <div id="Crashes" class="tabcontent">
     <div class="subtab-buttons">
       <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
-      <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
+      <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement Table View</button>
       <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
@@ -1791,7 +1793,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
   <div id="Annuities" class="tabcontent">
     <div class="subtab-buttons">
       <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
-      <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
+      <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement Table View</button>
       <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link active-sub" onclick="showTab(event,'Annuities')">Annuities</button>
@@ -1806,7 +1808,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
   <div id="Modelling" class="tabcontent">
     <div class="subtab-buttons">
       <button class="subtab-link active-sub" onclick="showTab(event,'Modelling')">Retirement Model</button>
-      <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement</button>
+      <button class="subtab-link" onclick="showTab(event,'Retirement')">Retirement Table View</button>
       <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
@@ -1977,7 +1979,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
   <div id="Retirement" class="tabcontent">
     <div class="subtab-buttons">
       <button class="subtab-link" onclick="showTab(event,'Modelling')">Retirement Model</button>
-      <button class="subtab-link active-sub" onclick="showTab(event,'Retirement')">Retirement</button>
+      <button class="subtab-link active-sub" onclick="showTab(event,'Retirement')">Retirement Table View</button>
       <button class="subtab-link" onclick="showTab(event,'Cash')">Cash &amp; Purchases</button>
       <button class="subtab-link" onclick="showTab(event,'Crashes')">Market Crashes</button>
       <button class="subtab-link" onclick="showTab(event,'Annuities')">Annuities</button>
@@ -5627,7 +5629,9 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         document.querySelectorAll('.tab-link').forEach(b => { const oc = b.getAttribute('onclick') || ''; if (oc.indexOf("'Modelling'") >= 0) b.classList.add('active-btn'); });
       }
       // keep the phone dropdown in sync
-      const sel = document.getElementById('tabSelect'); const selVal = (MODEL_IDS.indexOf(id) >= 0) ? 'Modelling' : id; if (sel && sel.value !== selVal) sel.value = selVal;
+      const sel = document.getElementById('tabSelect');
+      const selVal = (sel && Array.prototype.some.call(sel.options, o => o.value === id)) ? id   // LC-534
+        : (['Crashes', 'Annuities'].indexOf(id) >= 0 ? 'Cash' : (MODEL_IDS.indexOf(id) >= 0 ? 'Modelling' : id)); if (sel && sel.value !== selVal) sel.value = selVal;
       // the main title shows only on Overview, freeing space elsewhere
       const title = document.getElementById('appTitle'); if (title) title.style.display = '';
       if (id === 'Modelling') setTimeout(drawCharts, 40);
@@ -5666,10 +5670,14 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       RetOverview: { label: 'Overview', kind: 'page', top: 'Overview', sub: 'PerfKPIs' },
       LogEntry:    { label: 'Log Entry', kind: 'leaf', top: 'LogEntry' },
       Forecast:    { label: 'Forecast', kind: 'leaf', top: 'Forecast' },
+      // LC-534: the two retirement views are buttons on the row in their own right; the
+      // dropdown (key kept as 'Modelling' so NAV_MODEL_TABS still derives from it) now holds
+      // only the supporting pages, under the name Other Pages.
+      RetModel: { label: 'Retirement Model', kind: 'leaf', top: 'Modelling' },
+      RetTable: { label: 'Retirement Table View', kind: 'leaf', top: 'Retirement' },
       Modelling: {
-        label: 'Modelling', top: 'Modelling', kind: 'tabs',
+        label: 'Other Pages', top: 'Cash', kind: 'tabs',
         items: [
-          { l: 'Retirement Model', t: 'Modelling' }, { l: 'Retirement', t: 'Retirement' },
           { l: 'Cash & Purchases', t: 'Cash' }, { l: 'Market Crashes', t: 'Crashes' },
           { l: 'Annuities', t: 'Annuities' }
         ]
@@ -5752,8 +5760,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       Retirement: {
         label: 'Retirement planning',
         blurb: 'Track the pots, log their values, and model what retirement looks like from here.',
-        holds: 'Overview · Log Entry · Forecast · Modelling',
-        order: ['RetOverview', 'LogEntry', 'Forecast', 'Modelling'],
+        holds: 'Overview · Log Entry · Forecast · Retirement Model · Retirement Table View · Other Pages',
+        order: ['RetOverview', 'LogEntry', 'Forecast', 'RetModel', 'RetTable', 'Modelling'],
         landing: ['Overview', 'PerfKPIs'],
         icon: 'M3 20h18M6 20V10m5 10V4m5 16v-7m5 7V8'
       },
@@ -6721,7 +6729,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-533';
+    if (stamp) stamp.textContent = 'LC-534';
   }
 
   function buildSubnav() {
