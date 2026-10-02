@@ -1609,7 +1609,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-535</span>
+      <span class="build-stamp">LC-536</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -5704,6 +5704,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       // NAV_OWNER build below makes the promoted entry win, so the row lights Budget
       // rather than Money when it is open.
       Budget:      { label: 'Budget', kind: 'page', top: 'LivingCosts', sub: 'Budget' },
+      // LC-536: Bills moved out of Commitments onto the row beside Budget.
+      Bills:       { label: 'Bills', kind: 'page', top: 'LivingCosts', sub: 'Bills' },
       Money: {
         label: 'Money', top: 'LivingCosts', kind: 'sub',
         items: [
@@ -5715,7 +5717,6 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       Commitments: {
         label: 'Commitments', top: 'LivingCosts', kind: 'sub',
         items: [
-          { l: 'Bills', s: 'Bills', d: 'Every recurring bill and how it is paid' },
           { l: 'Contracts', s: 'Contracts', d: 'Renewal dates, suppliers and expiry reminders' },
           { l: 'Loans', s: 'Loans', d: 'Balances outstanding and payments remaining' },
           { l: 'Insurance Savings', s: 'InsSavings', d: 'Set-asides for policies funded from savings' },
@@ -5781,8 +5782,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       Household: {
         label: 'Household',
         blurb: 'The money coming in and going out: budget, bills, contracts, cards and the plans behind them.',
-        holds: 'Overview · Budget · Money · Commitments · Spending · Plans · Reference',
-        order: ['HhOverview', 'Budget', 'Money', 'Commitments', 'Spending', 'Plans', 'Reference'],
+        holds: 'Overview · Budget · Bills · Money · Commitments · Spending · Plans · Reference',
+        order: ['HhOverview', 'Budget', 'Bills', 'Money', 'Commitments', 'Spending', 'Plans', 'Reference'],
         landing: ['LivingCosts', 'HouseOverview'],
         icon: 'M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3l9-8z'
       },
@@ -6744,7 +6745,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-535';
+    if (stamp) stamp.textContent = 'LC-536';
   }
 
   function buildSubnav() {
