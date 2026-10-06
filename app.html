@@ -1609,7 +1609,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-536</span>
+      <span class="build-stamp">LC-537</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -5698,18 +5698,14 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
 
       // ---- Household ----
       HhOverview:  { label: 'Overview', kind: 'page', top: 'LivingCosts', sub: 'HouseOverview' },
-      // Budget is the page reached most often, so it sits on the row in its own right
-      // rather than behind the Money dropdown. It stays listed under Money as well —
-      // a dropdown that quietly omitted the most-used page would look broken — and the
-      // NAV_OWNER build below makes the promoted entry win, so the row lights Budget
-      // rather than Money when it is open.
+      // Budget is the page reached most often, so it sits on the row in its own right.
+      // LC-537: no longer duplicated in the Money dropdown.
       Budget:      { label: 'Budget', kind: 'page', top: 'LivingCosts', sub: 'Budget' },
       // LC-536: Bills moved out of Commitments onto the row beside Budget.
       Bills:       { label: 'Bills', kind: 'page', top: 'LivingCosts', sub: 'Bills' },
       Money: {
         label: 'Money', top: 'LivingCosts', kind: 'sub',
         items: [
-          { l: 'Budget', s: 'Budget', d: 'Income in, bills out, what is left each month' },
           { l: 'What I Could Save', s: 'SaveForecast', d: 'Month-by-month surplus for the years ahead' },
           { l: 'Bills Summary', s: 'BillsSummary', d: 'The whole bill book totalled and grouped' }
         ]
@@ -6745,7 +6741,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-536';
+    if (stamp) stamp.textContent = 'LC-537';
   }
 
   function buildSubnav() {
