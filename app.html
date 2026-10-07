@@ -387,7 +387,7 @@
     .model-layout > .rail-slot, .model-layout > .rail-strip, .model-layout > .params { order:2; }
     .model-layout > .rail-slot:empty { display:none; }
     .model-layout .model-main h2 { margin-top:0; }
-    @media (min-width: 1300px) {
+    @media (min-width: 1100px) {
       .rail-collapse { width:100%; margin-bottom:10px; padding:8px; border:1px solid var(--line); border-radius:999px; background:var(--surface-2); color:var(--ink-soft); font-weight:bold; font-size:13px; cursor:pointer; }
       .rail-strip { display:none; width:100%; border:1px solid var(--line); border-radius:999px; background:var(--surface-2); cursor:pointer; }
       .rail-strip span { display:block; text-align:center; padding:10px 0; color:var(--ink-soft); font-weight:bold; font-size:13px; }
@@ -396,7 +396,25 @@
       .model-layout.collapsed .rail-strip { display:block; }
     }
     /* below the rail breakpoint, the collapse controls are irrelevant */
-    @media (max-width: 1299px) { .rail-collapse, .rail-strip { display:none !important; } }
+    @media (max-width: 1099px) { .rail-collapse, .rail-strip { display:none !important; } }
+    /* LC-543: from 1100px the controls go back to a slim LEFT column with the charts/table on
+       the right. The rail is one control per row, sticky under the nav and scrolls on its own,
+       so the chart stays in view while you change things. Narrower screens keep the LC-417
+       stacked layout (content first, controls below). */
+    @media (min-width: 1100px) {
+      .model-layout { display:grid; grid-template-columns:290px minmax(0,1fr); gap:18px; align-items:start; }
+      .model-layout > .rail-slot { order:0; grid-column:1; grid-row:1; position:sticky; top:72px; max-height:calc(100vh - 84px); overflow-y:auto; overscroll-behavior:contain; }
+      .model-layout > .rail-strip { order:0; grid-column:1; grid-row:1; }
+      .model-layout > .model-main { order:0; grid-column:2; grid-row:1; }
+      .model-layout .params { padding:16px 14px; margin:0; }
+      .model-layout .rail-cols { grid-template-columns:1fr; gap:18px; }
+      .model-layout .params .ctrl-wide { grid-column:auto; }
+      /* collapsed: slim vertical tab on the left, content takes the rest */
+      .model-layout.collapsed { grid-template-columns:38px minmax(0,1fr); }
+      .model-layout.collapsed > .rail-slot { display:none; }
+      .model-layout.collapsed .rail-strip { width:38px; border-radius:10px; position:sticky; top:72px; }
+      .model-layout.collapsed .rail-strip span { writing-mode:vertical-rl; padding:14px 0; margin:0 auto; }
+    }
     .params .ctrl-wide { grid-column: span 2; }
     .params label { display:block; font-weight:bold; font-size:14px; color:var(--ink); margin-bottom:5px; }
     .params .ctrl { display:flex; flex-direction:column; }
@@ -1609,7 +1627,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-542</span>
+      <span class="build-stamp">LC-543</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -5597,7 +5615,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front200';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front201';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', ActualCosts:'actual_costs.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', AmazonTxn:'amazon_txn.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', FuelCosts:'fuel_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Contracts:'contracts.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -5685,8 +5703,11 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       document.querySelectorAll('.model-layout').forEach(l => l.classList.remove('collapsed'));
       if (layout && railCollapsed[railTab]) layout.classList.add('collapsed');
     }
-    function collapseRail() { railCollapsed[railTab] = true; applyRailCollapse(); persistRailCollapsed(); }
-    function expandRail() { railCollapsed[railTab] = false; applyRailCollapse(); persistRailCollapsed(); }
+    // LC-543: the side rail changes the chart width without a window resize, so nudge the
+    // existing resize handlers to redraw the charts at their new width.
+    function railReflow() { setTimeout(() => window.dispatchEvent(new Event('resize')), 50); }
+    function collapseRail() { railCollapsed[railTab] = true; applyRailCollapse(); persistRailCollapsed(); railReflow(); }
+    function expandRail() { railCollapsed[railTab] = false; applyRailCollapse(); persistRailCollapsed(); railReflow(); }
 
     function showTab(evt, id) {
       if (!id || !document.getElementById(id)) id = 'Modelling';   // LC-533: removed tabs fall back
@@ -6799,7 +6820,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-542';
+    if (stamp) stamp.textContent = 'LC-543';
   }
 
   function buildSubnav() {
