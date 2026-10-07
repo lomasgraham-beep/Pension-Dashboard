@@ -156,7 +156,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading…</div>
-  <h2 style="display:none;">Overview <span style="font-size:11px; font-weight:600; color:#94a3b8; letter-spacing:0;">cumgr18</span></h2>
+  <h2 style="display:none;">Overview <span style="font-size:11px; font-weight:600; color:#94a3b8; letter-spacing:0;">cumgr19</span></h2>
   <div id="kpiTiles" class="kpi-tiles"></div>
   <div id="kpiCardHost"><div class="kpi-empty">Crunching…</div></div>
   <div class="filter-bar">
@@ -393,11 +393,13 @@
   const LOCAL_GROWTH = '__localGrowth', LOCAL_POT = '__localPot';
   const TILE_ORDER = [LOCAL_GROWTH, LOCAL_POT,
                       'Projected pot at retirement', 'Earliest joint retirement',
+                      'Affordable if retiring next month',   // cumgr19 (LC-538)
                       'Target funded', 'Retirement date',
                       'Time remaining', 'Minimum projected pot'];
   const TILE_LABEL = {
     'Projected pot at retirement': 'Pot at retirement',
     'Earliest joint retirement': 'Earliest both retire',
+    'Affordable if retiring next month': 'Retire next month, afford',
     'Target funded': 'Target funded',
     'Retirement date': 'Retirement date',
     'Time remaining': 'Time remaining',
