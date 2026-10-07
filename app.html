@@ -1609,7 +1609,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-537</span>
+      <span class="build-stamp">LC-538</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -1659,6 +1659,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
              Computed once in the modelling script and parked here as text, so the hero and
              the framed Overview tile read one source of truth rather than recomputing. -->
         <span id="ovEarliestJoint" style="display:none;">&mdash;</span><span id="ovEarliestJointSub" style="display:none;"></span>
+        <!-- LC-538: affordable monthly spend if both retire next month, same combined DC floor. -->
+        <span id="ovAffordNext" style="display:none;">&mdash;</span><span id="ovAffordNextSub" style="display:none;"></span>
       </div>
 
       <div class="ov-strip" id="ovStrip" style="display:none;">
@@ -1841,7 +1843,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
             <button type="button" class="info-btn" onclick="toggleInfo(event,'info_cfloor')" aria-label="About the combined DC floor">i</button></label>
           <input type="number" id="m_cfloor" min="0" step="5000" value="100000" onchange="onCFloor()" style="width:100%; padding:6px 8px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--ink); font-size:13px;">
           <div class="info-text" id="info_cfloor">The least the <strong>combined</strong> DC pot is allowed to be worth at <em>any</em> month between retiring and end of life &mdash; the bottom of the U, wherever it falls. Feeds the <strong>Earliest both retire</strong> tile on the Overview: that tile searches for the first retirement date whose low point still clears this figure, with spending held at 100%. Saved with your plan.</div>
-          <div class="hint" id="m_cfloor_out">Earliest both retire: &mdash;</div></div>
+          <div class="hint" id="m_cfloor_out">Earliest both retire: &mdash;</div>
+          <div class="hint" id="m_afford_out">Retire next month: &mdash;</div></div>
         </div>
         <div class="rail-col">
         <div class="ctrl phone-hide"><label>Pension growth <span id="m_growth_v" class="sv">5.0%</span>
@@ -5341,11 +5344,11 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
 
     // One candidate date: rebuild the cfg exactly as recomputeAll does, run the real
     // drawdown, and walk the MONTHLY rows from the retirement month onward.
-    function ejTestDate(basePlan, retireDate, floor) {
+    function ejTestDate(basePlan, retireDate, floor, spendRed) {
       const plan = Object.assign({}, basePlan, {
         retirementDate: retireDate,
         retireByMember: null,    // null => engine uses the shared cfg.retirementDate for both
-        spendRed: 1.0            // the "100% spend" part of the question
+        spendRed: (spendRed != null) ? spendRed : 1.0   // 100% for the earliest-date search; LC-538 varies it
       });
       const cfg = buildDrawdownCfg(plan);
       const rows = PensionEngine.drawdown(engineData(cfg), cfg) || {};
@@ -5361,7 +5364,13 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
         if (minV === null || v < minV) { minV = v; minIdx = idx; }
       }
       const floorOK = (minV === null) || (minV >= floor - 1e-6);
-      return { pass: !anyShortfall && floorOK, minV: minV, minIdx: minIdx, anyShortfall: anyShortfall };
+      // LC-538: total outgoings in the retirement month itself — the "per month" figure.
+      let retOut = null;
+      for (let i = 0; i < monthly.length; i++) {
+        const r = monthly[i];
+        if (r.year * 12 + r.month === retIdx) { retOut = Number(r.outgoings) || 0; break; }
+      }
+      return { pass: !anyShortfall && floorOK, minV: minV, minIdx: minIdx, anyShortfall: anyShortfall, retOut: retOut };
     }
 
     function ejWrite(value, sub) {
@@ -5442,7 +5451,61 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       _ejKey = key;
       ejWrite('\u2026', 'recalculating');
       clearTimeout(_ejTimer);
-      _ejTimer = setTimeout(ejCompute, 600);
+      afWrite('\u2026', 'recalculating');
+      _ejTimer = setTimeout(function () {
+        ejCompute();
+        setTimeout(afCompute, 0);   // LC-538: second search, yielded so the first tile paints first
+      }, 600);
+    }
+
+    // ================================================================================
+    // LC-538 — "If you both retire next month, you can afford £X a month"
+    // --------------------------------------------------------------------------------
+    // Same test as the earliest-date search (ejTestDate: no shortfall, combined DC pot never
+    // below the floor from retirement to the end), but the date is pinned to next month and
+    // the Spending in retirement factor is what gets bisected. More spend can only lower the
+    // low point, so bisection is valid. Range is the slider's own, 25%-200%. The answer is the
+    // engine's total outgoings in the retirement month at the highest passing factor.
+    // Shares ejSchedule's input key and timer, so it re-runs on exactly the same changes.
+    function afWrite(value, sub) {
+      const v = document.getElementById('ovAffordNext');
+      const s = document.getElementById('ovAffordNextSub');
+      if (v) v.textContent = value;
+      if (s) s.textContent = sub || '';
+      const rail = document.getElementById('m_afford_out');
+      if (rail) rail.textContent = 'Retire next month: ' + value + (sub ? ' \u2014 ' + sub : '');
+    }
+
+    function afCompute() {
+      if (!window.PensionEngine || !data || !data.members) return;
+      let basePlan;
+      try { basePlan = readControls(); } catch (e) { return; }
+      if (basePlan.retired) { afWrite('\u2014', 'already retired'); return; }
+      const floor = basePlan.combinedFloor;
+      const retD = idxToDate(0);            // first of next month
+      const gbp = n => '\u00a3' + Math.round(n).toLocaleString('en-GB');
+      const floorTxt = (floor >= 1000 ? '\u00a3' + Math.round(floor / 1000).toLocaleString('en-GB') + 'k' : gbp(floor)) + ' floor';
+      const LO = 0.25, HI = 2.0, STEP = 0.005;
+      try {
+        const at = f => ejTestDate(basePlan, retD, floor, f);
+        const loRes = at(LO);
+        if (!loRes.pass) { afWrite('Not affordable', 'fails even at 25% spend \u00b7 ' + floorTxt); return; }
+        const hiRes = at(HI);
+        if (hiRes.pass) {
+          afWrite(gbp(hiRes.retOut || 0) + '+/mo', 'slider maximum (200%) \u00b7 ' + floorTxt);
+          return;
+        }
+        let lo = LO, hi = HI, best = loRes;   // lo passes, hi fails
+        while (hi - lo > STEP) {
+          const mid = (lo + hi) / 2;
+          const r = at(mid);
+          if (r.pass) { lo = mid; best = r; } else hi = mid;
+        }
+        afWrite(gbp(best.retOut || 0) + '/mo',
+          Math.floor(lo * 100) + '% spend \u00b7 ' + monthLabel(retD) + ' \u00b7 ' + floorTxt);
+      } catch (e) {
+        afWrite('\u2014', 'could not compute');
+      }
     }
 
     // The floor box changes only this search — no need to redraw the whole dashboard.
@@ -5538,7 +5601,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front195';   // frame-file cache-buster: bump when any framed page changes
+    const FV = '?v=front196';   // frame-file cache-buster: bump when any framed page changes
     const SUB_SRC = { HouseOverview:'house_overview.html', Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', ActualCosts:'actual_costs.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', AmazonTxn:'amazon_txn.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', FuelCosts:'fuel_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Contracts:'contracts.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
@@ -6741,7 +6804,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-537';
+    if (stamp) stamp.textContent = 'LC-538';
   }
 
   function buildSubnav() {
@@ -6995,7 +7058,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       { label:'Minimum projected pot',       value:t('mprMinimumPot'),     sub:t('mprMinimumYear') },
       // LC-526: read straight off the modelling script's own node — there is no mpr* mirror
       // for this one, the same way 'Time remaining' reads ovCountNum directly.
-      { label:'Earliest joint retirement',   value:t('ovEarliestJoint'),   sub:t('ovEarliestJointSub') }
+      { label:'Earliest joint retirement',   value:t('ovEarliestJoint'),   sub:t('ovEarliestJointSub') },
+      { label:'Affordable if retiring next month', value:t('ovAffordNext'), sub:t('ovAffordNextSub') }   // LC-538
     ].filter(m => m.value && m.value !== '\u2014' && m.value !== '-');
     if (!metrics.length) return;
     try { frame.contentWindow.postMessage({ type:'mpr-metrics', metrics:metrics }, '*'); } catch (e) {}
@@ -7027,7 +7091,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     [
       'ovVerdictWord', 'ovVerdictRet', 'ovVerdictLow',
       'ovSurviveNum', 'ovSurviveSub', 'ovRealTerms', 'ovStamp',
-      'ovEarliestJoint', 'ovEarliestJointSub',
+      'ovEarliestJoint', 'ovEarliestJointSub', 'ovAffordNext', 'ovAffordNextSub',
       'ovCombined', 'ovDeltaCombined', 'ovDeltaGraham', 'ovDeltaJulie',
       'ovSparkCombined', 'ovSparkGraham', 'ovSparkJulie',
       'ovVerdictTl', 'ovTrajHost'
