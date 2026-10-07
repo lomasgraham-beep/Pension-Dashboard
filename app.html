@@ -1609,7 +1609,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="right">
       <span id="modelBadge" class="model-badge" style="display:none;"></span>
       <span id="retiredBadge" class="retired-badge" style="display:none;">RETIRED MODE</span>
-      <span class="build-stamp">LC-540</span>
+      <span class="build-stamp">LC-541</span>
       <a class="logout-link" onclick="App.doLogout()">Log out</a>
     </div>
   </div>
@@ -2057,8 +2057,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     <div class="subtab-buttons lc-nav">
       <span class="subtab-group-label">Planned costs</span>
       <div class="subtab-row">
-      <button id="subbtn-HouseOverview" class="subtab-link active-sub" onclick="showSub(event,'HouseOverview')">Overview</button>
-      <button id="subbtn-Budget" class="subtab-link" onclick="showSub(event,'Budget')">Budget</button>
+      <button id="subbtn-Budget" class="subtab-link active-sub" onclick="showSub(event,'Budget')">Budget</button>
       <button id="subbtn-Bills" class="subtab-link" onclick="showSub(event,'Bills')">Bills</button>
       <button id="subbtn-Contracts" class="subtab-link" onclick="showSub(event,'Contracts')">Contracts</button>
       <button id="subbtn-WeeklyPlan" class="subtab-link" onclick="showSub(event,'WeeklyPlan')">Weekly Plan</button>
@@ -2085,10 +2084,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       <button id="subbtn-PayPal" class="subtab-link" onclick="showSub(event,'PayPal')">PayPal</button>
       </div>
     </div>
-    <!-- LC-518: Household landing is now a framed page (house_overview.html). It was an
-         in-shell renderIndex() placeholder in LC-508..LC-510; it now carries the real
-         dashboard, so it needs its own file and its own cache-buster. -->
-    <div id="sub-HouseOverview" class="subtabcontent"><iframe id="frame-HouseOverview" class="app-frame" title="Household Overview"></iframe></div>
+    <!-- LC-541: Household Overview (house_overview.html) removed; Household lands on Budget. -->
     <div id="sub-Budget" class="subtabcontent"><iframe id="frame-Budget" class="app-frame" title="Monthly Budget"></iframe></div>
     <div id="sub-Bills" class="subtabcontent"><iframe id="frame-Bills" class="app-frame" title="Household Bills"></iframe></div>
     <div id="sub-Contracts" class="subtabcontent"><iframe id="frame-Contracts" class="app-frame" title="Contracts"></iframe></div>
@@ -5601,8 +5597,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     // ---------- embedded frames ----------
-    const FV = '?v=front198';   // frame-file cache-buster: bump when any framed page changes
-    const SUB_SRC = { HouseOverview:'house_overview.html', Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', ActualCosts:'actual_costs.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', AmazonTxn:'amazon_txn.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', FuelCosts:'fuel_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Contracts:'contracts.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', Backup:'backup.html' };
+    const FV = '?v=front199';   // frame-file cache-buster: bump when any framed page changes
+    const SUB_SRC = { Members:'members.html', Pensions:'pensions.html', Contributions:'contributions.html', Income:'workplace_income.html', Guaranteed:'guaranteed.html', Defaults:'pension_defaults.html', BankAccts:'bank_accounts.html', BillCats:'bills_categories.html', ActualCosts:'actual_costs.html', Budget:'budget.html', CreditCard:'credit_card.html', CardEntry:'card_entry.html', CardStatements:'card_statements.html', AmazonTxn:'amazon_txn.html', CardCats:'card_categories.html', CostAnalysis:'cost_analysis.html', PayPal:'paypal.html', MealCosts:'meal_costs.html', WeeklyPlan:'weekly_plan.html', HolidayCosts:'holiday_costs.html', FuelCosts:'fuel_costs.html', HolidaySummary:'holidays_summary.html', Bills:'bills.html', Contracts:'contracts.html', Loans:'loans.html', BillsSummary:'bills_summary.html', SaveForecast:'save_forecast.html', InsSavings:'insurance_savings.html', GiftSavings:'gift_savings.html', PerfKPIs:'kpis.html', Backup:'backup.html' };
     function sizeFrame(f) {
       if (f.__fsLock) return;   // a chart inside is full-screen; leave the frame at full-viewport size
       try { const doc = f.contentWindow.document; const h = Math.max(doc.body ? doc.body.scrollHeight : 0, 600); f.style.height = h + 'px'; }
@@ -5717,7 +5713,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       if (id === 'LogEntry') { ensureFrame('frame-LogEntry', 'logs.html' + FV); pingFrame('frame-LogEntry'); }
       if (id === 'Crashes') ensureFrame('frame-Crashes', 'crashes.html' + FV);
       if (id === 'Annuities') ensureFrame('frame-Annuities', 'annuities.html' + FV);
-      if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'HouseOverview'); }
+      if (id === 'LivingCosts' && !window.__lc) { window.__lc = true; showSub(null, 'Budget'); }   // LC-541: Budget is the Household landing
       if (id === 'BasicData' && !window.__bd) { window.__bd = true; showSub(null, 'SetupIndex'); }
       if (id === 'Overview' && !window.__ov) { window.__ov = true; showSub(null, 'PerfKPIs'); }
       if (typeof navSyncTab === 'function') navSyncTab(id);   // LC-465: refresh contextual row
@@ -5760,7 +5756,6 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       },
 
       // ---- Household ----
-      HhOverview:  { label: 'Overview', kind: 'page', top: 'LivingCosts', sub: 'HouseOverview' },
       // Budget is the page reached most often, so it sits on the row in its own right.
       // LC-537: no longer duplicated in the Money dropdown.
       Budget:      { label: 'Budget', kind: 'page', top: 'LivingCosts', sub: 'Budget' },
@@ -5841,9 +5836,9 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       Household: {
         label: 'Household',
         blurb: 'The money coming in and going out: budget, bills, contracts, cards and the plans behind them.',
-        holds: 'Overview · Budget · Bills · Money · Commitments · Spending · Plans · Reference',
-        order: ['HhOverview', 'Budget', 'Bills', 'Money', 'Commitments', 'Spending', 'Plans', 'Reference'],
-        landing: ['LivingCosts', 'HouseOverview'],
+        holds: 'Budget · Bills · Money · Commitments · Spending · Plans · Reference',
+        order: ['Budget', 'Bills', 'Money', 'Commitments', 'Spending', 'Plans', 'Reference'],
+        landing: ['LivingCosts', 'Budget'],
         icon: 'M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3l9-8z'
       },
       Setup: {
@@ -6149,8 +6144,8 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
       host.appendChild(wrap);
     }
     function renderLandings() {
-      // LC-518: Household no longer has an in-shell index — its landing is house_overview.html,
-      // reached through SUB_SRC like any other framed page. Setup keeps its NAV-built index.
+      // LC-518: Household no longer has an in-shell index — its landing is the Budget page
+      // (LC-541; was house_overview.html), reached through SUB_SRC like any other framed page. Setup keeps its NAV-built index.
       renderIndex('sub-SetupIndex', 'Setup', 'Setup',
         'Reference data both streams are built on. Changes here feed the budget and the model alike.');
     }
@@ -6804,7 +6799,7 @@ body.mpr-dashboard .mpr-chart-panel .mpr-section-head h2 { color:#112d4e; }
     }
 
     const stamp = document.querySelector('.build-stamp');
-    if (stamp) stamp.textContent = 'LC-540';
+    if (stamp) stamp.textContent = 'LC-541';
   }
 
   function buildSubnav() {
