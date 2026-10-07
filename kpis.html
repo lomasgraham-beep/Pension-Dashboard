@@ -156,7 +156,7 @@
 </head>
 <body>
   <div id="status" class="s-load">Loading…</div>
-  <h2 style="display:none;">Overview <span style="font-size:11px; font-weight:600; color:#94a3b8; letter-spacing:0;">cumgr20</span></h2>
+  <h2 style="display:none;">Overview <span style="font-size:11px; font-weight:600; color:#94a3b8; letter-spacing:0;">cumgr21</span></h2>
   <div id="kpiTiles" class="kpi-tiles"></div>
   <div id="kpiCardHost"><div class="kpi-empty">Crunching…</div></div>
   <div class="filter-bar">
@@ -166,25 +166,25 @@
   <div class="chart-card">
     <div class="chart-head">
       <div class="chart-tabs">
-        <button type="button" class="chart-tab on" data-chart="value" onclick="showKpiChart('value')">Total Value</button>
+        <button type="button" class="chart-tab" data-chart="value" onclick="showKpiChart('value')">Total Value</button>
         <button type="button" class="chart-tab" data-chart="growth" onclick="showKpiChart('growth')">Monthly Growth</button>
-        <button type="button" class="chart-tab" data-chart="cum" onclick="showKpiChart('cum')">Accumulated Growth</button>
+        <button type="button" class="chart-tab on" data-chart="cum" onclick="showKpiChart('cum')">Accumulated Growth</button>
       </div>
       <div class="chart-tools">
-        <span id="cumToggleWrap" style="display:none; align-items:center; gap:8px;">
+        <span id="cumToggleWrap" style="display:inline-flex; align-items:center; gap:8px;">
           <span class="cum-lbl">Unit</span>
           <span id="cumToggle" style="display:inline-flex; border:1px solid #cbd5e1; border-radius:6px; overflow:hidden;">
-            <button type="button" id="cumGbpBtn" onclick="setCumMode('gbp')" style="border:none; border-right:1px solid #cbd5e1; padding:6px 16px; font-size:14px; cursor:pointer; background:#2c3e50; color:#fff;">£</button>
-            <button type="button" id="cumPctBtn" onclick="setCumMode('pct')" style="border:none; padding:6px 16px; font-size:14px; cursor:pointer; background:transparent; color:#64748b;">%</button>
+            <button type="button" id="cumGbpBtn" onclick="setCumMode('gbp')" style="border:none; border-right:1px solid #cbd5e1; padding:6px 16px; font-size:14px; cursor:pointer; background:transparent; color:#64748b;">£</button>
+            <button type="button" id="cumPctBtn" onclick="setCumMode('pct')" style="border:none; padding:6px 16px; font-size:14px; cursor:pointer; background:#2c3e50; color:#fff;">%</button>
           </span>
         </span>
       </div>
     </div>
     <div class="chart-wrap">
       <button type="button" class="chart-fs-btn" onclick="toggleChartFs(this)" title="Full screen" aria-label="Full screen"></button>
-      <div id="chartValue" class="chart-box"></div>
+      <div id="chartValue" class="chart-box" style="display:none;"></div>
       <div id="chartGrowth" class="chart-box" style="display:none;"></div>
-      <div id="chartCumGrowth" class="chart-box" style="display:none;"></div>
+      <div id="chartCumGrowth" class="chart-box"></div>
     </div>
   </div>
 <script>
@@ -211,12 +211,12 @@
   }
   let p1Name = 'Graham', p2Name = null;
   let chartsReady = false;
-  let cumMode = 'gbp';   // accumulated-growth chart unit: 'gbp' (£) or 'pct' (% of starting value)
+  let cumMode = 'pct';     // accumulated-growth chart unit: 'gbp' (£) or 'pct' (% of starting value)
   // Shared chart styling for stronger contrast (darker labels/titles, firmer gridlines).
   const CH_AXIS = { color:'#334155', fontSize:12 };
   const CH_TITLE = { color:'#0f172a', fontSize:15, bold:true };
   const CH_GRID = '#cbd5e1', CH_BASE = '#94a3b8';
-  let activeChart = 'value';   // which single chart is shown: 'value' | 'growth' | 'cum'
+  let activeChart = 'cum';   // cumgr21: Accumulated Growth (%) is the default view   // which single chart is shown: 'value' | 'growth' | 'cum'
   google.charts.load('current', { packages:['corechart'] });
   google.charts.setOnLoadCallback(() => { chartsReady = true; initChartFsButtons(); if (allLogs.length) drawCharts(); });
 
